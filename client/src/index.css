@@ -1,0 +1,129 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #241d14;
+  background: #fffcf5;
+}
+
+table input[type="number"] {
+  font-family: inherit;
+}
+
+::selection {
+  background: #ffd400;
+  color: #14110d;
+}
+
+/* Shared form controls (see client/src/components/ui.tsx) - every text
+   field, date field, select, and button in the app renders through these
+   classes so alignment, spacing, borders, and focus states match everywhere
+   instead of each page inlining its own one-off styles. */
+.ae-input,
+.ae-select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 7px 10px;
+  border: 1px solid #e7dfc9;
+  border-radius: 6px;
+  background: #fff;
+  color: #241d14;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease;
+}
+.ae-input:focus,
+.ae-select:focus {
+  outline: none;
+  border-color: #c99a2e;
+  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.18);
+}
+.ae-input:disabled,
+.ae-select:disabled {
+  background: #f3efe4;
+  color: #8a8272;
+  cursor: not-allowed;
+}
+/* Tighter padding variant for dense data-grid cells (Section 3.1) - keeps
+   the same border/focus treatment without inflating row height. */
+.ae-input-cell {
+  padding: 3px 6px;
+}
+
+.ae-btn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    filter 120ms ease,
+    opacity 120ms ease;
+}
+.ae-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.ae-btn:active:not(:disabled) {
+  filter: brightness(0.94);
+}
+.ae-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ae-btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.ae-btn-primary {
+  background: #c1272d;
+  border-color: #c1272d;
+  color: #f1e9d0;
+}
+.ae-btn-secondary {
+  background: transparent;
+  border-color: #8b6a1e;
+  color: #241d14;
+}
+.ae-btn-ghost {
+  background: transparent;
+  border-color: #8b6a1e;
+  color: #c99a2e;
+}
+.ae-btn-danger {
+  background: transparent;
+  border-color: #c1272d;
+  color: #c1272d;
+}
+
+@media print {
+  /* Printing should output the data sheet itself, not a snapshot of the app
+     chrome - hides the sidebar nav and any page's own toolbar (date pickers,
+     Generate/Print buttons) that opts in via this class. */
+  .no-print {
+    display: none !important;
+  }
+
+  body,
+  main {
+    background: #fff !important;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+}

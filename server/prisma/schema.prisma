@@ -1,0 +1,177 @@
+// Ala Eh Food Products - Online & Offline Stocks Monitoring System
+// Prisma schema - mirrors Section 5 (Database Design) of the documentation plan.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ONLINE_ENCODER
+  OFFLINE_ENCODER
+  SUPERVISOR_ADMIN
+}
+
+enum StockLocation {
+  ONLINE
+  OFFLINE
+  TOTAL
+}
+
+enum ChangeAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+/// 5.9 users - login and role assignment
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  username     String   @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  onlineEntries    DailyOnlineStock[]  @relation("OnlineEncodedBy")
+  offlineEntries   DailyOfflineStock[] @relation("OfflineEncodedBy")
+  manualCounts     ManualCount[]       @relation("CountedBy")
+  receiptsCreated  Receipt[]           @relation("ReceiptCreatedBy")
+  receiptsAsSales  Receipt[]           @relation("ReceiptSalesRep")
+  changeLogEntries ChangeLog[]         @relation("ChangedBy")
+
+  @@map("users")
+}
+
+/// 5.1 products - master product list shared by every table in the system
+model Product {
+  id        Int      @id @default(autoincrement())
+  name      String
+  category  String
+  unit      String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  onlineStocks  DailyOnlineStock[]
+  offlineStocks DailyOfflineStock[]
+  manualCounts  ManualCount[]
+  receiptItems  ReceiptItem[]
+
+  @@map("products")
+}
+
+/// 5.2 daily_online_stock - one row per product, per date (Online Monitoring table)
+model DailyOnlineStock {
+  id                Int      @id @default(autoincrement())
+  productId         Int
+  product           Product  @relation(fields: [productId], references: [id])
+  entryDate         DateTime @db.Date
+  openingStock      Decimal  @default(0) @db.Decimal(14, 2)
+  stockInOffToOl    Decimal  @default(0) @db.Decimal(14, 2)
+  stockOutOlToOff   Decimal  @default(0) @db.Decimal(14, 2)
+  onlineStock       Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
+  productionIn      Decimal  @default(0) @db.Decimal(14, 2)
+  fulfillmentOut    Decimal  @default(0) @db.Decimal(14, 2) // can be auto-posted from receipts
+  rts               Decimal  @default(0) @db.Decimal(14, 2)
+  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next day's opening
+  encodedById       Int?
+  encodedBy         User?    @relation("OnlineEncodedBy", fields: [encodedById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([productId, entryDate])
+  @@map("daily_online_stock")
+}
+
+/// 5.3 daily_offline_stock - one row per product, per date (Offline Monitoring table)
+model DailyOfflineStock {
+  id                Int      @id @default(autoincrement())
+  productId         Int
+  product           Product  @relation(fields: [productId], references: [id])
+  entryDate         DateTime @db.Date
+  openingStock      Decimal  @default(0) @db.Decimal(14, 2)
+  stockInOlToOff    Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockOutOlToOff
+  stockOutOffToOl   Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockInOffToOl
+  offlineStock      Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
+  productionIn      Decimal  @default(0) @db.Decimal(14, 2)
+  deliveryOut       Decimal  @default(0) @db.Decimal(14, 2)
+  backloads         Decimal  @default(0) @db.Decimal(14, 2)
+  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next day's opening
+  encodedById       Int?
+  encodedBy         User?    @relation("OfflineEncodedBy", fields: [encodedById], references: [id])
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([productId, entryDate])
+  @@map("daily_offline_stock")
+}
+
+/// 5.4 manual_counts - physical count capture; variance is always derived
+model ManualCount {
+  id                   Int           @id @default(autoincrement())
+  productId            Int
+  product              Product       @relation(fields: [productId], references: [id])
+  entryDate            DateTime      @db.Date
+  location             StockLocation
+  systemRemainingStock Decimal       @db.Decimal(14, 2)
+  manualCount          Decimal       @db.Decimal(14, 2)
+  variance             Decimal       @db.Decimal(14, 2) // calc: system - manual
+  countedById          Int?
+  countedBy            User?         @relation("CountedBy", fields: [countedById], references: [id])
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@unique([productId, entryDate, location])
+  @@map("manual_counts")
+}
+
+/// 5.6 receipts - header record for one sales order
+model Receipt {
+  id          Int      @id @default(autoincrement())
+  orderDate   DateTime @db.Date
+  customer    String
+  location    String
+  salesRepId  Int?
+  salesRep    User?    @relation("ReceiptSalesRep", fields: [salesRepId], references: [id])
+  createdById Int?
+  createdBy   User?    @relation("ReceiptCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+
+  items ReceiptItem[]
+
+  @@map("receipts")
+}
+
+/// 5.7 receipt_items - one row per product ordered on a receipt
+model ReceiptItem {
+  id        Int     @id @default(autoincrement())
+  receiptId Int
+  receipt   Receipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Decimal @db.Decimal(14, 2)
+
+  @@map("receipt_items")
+}
+
+/// 5.8 change_log - change history for accountability and variance tracing
+model ChangeLog {
+  id          Int          @id @default(autoincrement())
+  tableName   String
+  recordId    Int
+  action      ChangeAction
+  changedById Int?
+  changedBy   User?        @relation("ChangedBy", fields: [changedById], references: [id])
+  changedAt   DateTime     @default(now())
+  oldValue    Json?
+  newValue    Json?
+
+  @@map("change_log")
+}
