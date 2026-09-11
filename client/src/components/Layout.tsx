@@ -11,6 +11,7 @@ const links = [
   { to: "/receipts", label: "Receipts", roles: ["ONLINE_ENCODER", "SUPERVISOR_ADMIN"] },
   { to: "/variance-report", label: "Variance Report", roles: ["SUPERVISOR_ADMIN"] },
   { to: "/daily-report", label: "Daily Report", roles: ["SUPERVISOR_ADMIN"] },
+  { to: "/change-log", label: "Change Log", roles: ["SUPERVISOR_ADMIN"] },
   { to: "/products", label: "Products", roles: ["SUPERVISOR_ADMIN"] },
 ];
 
@@ -26,7 +27,7 @@ export function Layout() {
     // down to that same height, dragging the logout block far below the
     // fold. Each pane now scrolls on its own, so the sidebar is always
     // exactly one screen tall regardless of how long the active page is.
-    <div style={{ fontFamily: fonts.body, height: "100vh", display: "flex", overflow: "hidden" }}>
+    <div className="app-shell" style={{ fontFamily: fonts.body, height: "100vh", display: "flex", overflow: "hidden" }}>
       <nav
         className="no-print"
         style={{

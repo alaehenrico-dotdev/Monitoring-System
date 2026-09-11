@@ -1,9 +1,9 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Receipt } from "../types";
 import { colors, fonts } from "../theme";
 import { LogoMark } from "./LogoMark";
 
-const CARD_WIDTH = 300;
+export const RECEIPT_CARD_WIDTH = 300;
 const TOOTH = 18; // px per zigzag segment along the bottom edge
 const DEPTH = 11; // px the zigzag dips down
 
@@ -22,14 +22,18 @@ function zigzagBottomClipPath(width: number, tooth: number, depth: number): stri
   return `polygon(${points.join(", ")})`;
 }
 
-export function ReceiptCard({ receipt }: { receipt: Receipt }) {
-  const totalItems = receipt.items.reduce((sum, it) => sum + Number(it.quantity), 0);
-
+/**
+ * The shared "paper" shell - background, border, torn zigzag edge, and the
+ * centered logo header - factored out so the read-only output card and the
+ * editable entry form (ReceiptsPage) render as the exact same physical
+ * receipt, one with static text, one with inputs in place of the values.
+ */
+export function ReceiptPaper({ children, testId }: { children: ReactNode; testId?: string }) {
   return (
     <div
-      data-testid="receipt-card"
+      data-testid={testId}
       style={{
-        width: CARD_WIDTH,
+        width: RECEIPT_CARD_WIDTH,
         background: "#FFFFFF",
         fontFamily: "'Courier New', Courier, monospace",
         color: colors.ink,
@@ -38,7 +42,7 @@ export function ReceiptCard({ receipt }: { receipt: Receipt }) {
         // close in tone - a shadow alone washes out against warm paper tones.
         border: `1.5px solid ${colors.goldDark}`,
         boxShadow: "0 8px 18px rgba(20,17,13,0.22)",
-        clipPath: zigzagBottomClipPath(CARD_WIDTH, TOOTH, DEPTH),
+        clipPath: zigzagBottomClipPath(RECEIPT_CARD_WIDTH, TOOTH, DEPTH),
         padding: "20px 22px",
         paddingBottom: DEPTH + 16,
       }}
@@ -50,21 +54,37 @@ export function ReceiptCard({ receipt }: { receipt: Receipt }) {
         </div>
         <div style={{ fontSize: 10, letterSpacing: 2, color: colors.subtleInk }}>SALES RECEIPT</div>
       </div>
+      {children}
+    </div>
+  );
+}
 
+/// Read-only rendering of a saved (or live-preview) receipt. `isPreview`
+/// softens a couple of lines that don't make sense before the receipt has
+/// actually been saved (no receipt number yet, no "logged by" audit trail).
+export function ReceiptCard({ receipt, isPreview }: { receipt: Receipt; isPreview?: boolean }) {
+  const totalItems = receipt.items.reduce((sum, it) => sum + Number(it.quantity), 0);
+
+  return (
+    <ReceiptPaper testId="receipt-card">
       <Divider />
-      <Row label="Receipt #" value={`#${String(receipt.id).padStart(6, "0")}`} />
+      <Row label="Receipt #" value={isPreview ? "(unsaved)" : `#${String(receipt.id).padStart(6, "0")}`} />
       <Row label="Date" value={receipt.orderDate.slice(0, 10)} />
-      <Row label="Customer" value={receipt.customer} />
-      <Row label="Location" value={receipt.location} />
+      <Row label="Customer" value={receipt.customer || "—"} />
+      <Row label="Location" value={receipt.location || "—"} />
       <Row label="Sales Rep" value={receipt.salesRep?.name ?? "—"} />
       <Divider />
 
-      {receipt.items.map((it) => (
-        <div key={it.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginBottom: 3 }}>
-          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.product.name}</span>
-          <span style={{ flexShrink: 0 }}>x{Number(it.quantity)}</span>
-        </div>
-      ))}
+      {receipt.items.length === 0 ? (
+        <div style={{ fontSize: 12, color: colors.subtleInk, textAlign: "center", padding: "6px 0" }}>No items yet</div>
+      ) : (
+        receipt.items.map((it) => (
+          <div key={it.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginBottom: 3 }}>
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.product.name}</span>
+            <span style={{ flexShrink: 0 }}>x{Number(it.quantity)}</span>
+          </div>
+        ))
+      )}
 
       <Divider />
       <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 13 }}>
@@ -74,14 +94,20 @@ export function ReceiptCard({ receipt }: { receipt: Receipt }) {
       <Divider dashed />
 
       <div style={{ textAlign: "center", fontSize: 10.5, color: colors.subtleInk, marginTop: 8 }}>
-        <div>Logged by {receipt.createdBy?.name ?? "system"}</div>
-        <div style={{ marginTop: 6, fontWeight: 700, letterSpacing: 1.5, color: colors.ink }}>* * * THANK YOU! * * *</div>
+        {isPreview ? (
+          <div style={{ fontWeight: 700, letterSpacing: 1, color: colors.warningText }}>PREVIEW - NOT YET SAVED</div>
+        ) : (
+          <>
+            <div>Logged by {receipt.createdBy?.name ?? "system"}</div>
+            <div style={{ marginTop: 6, fontWeight: 700, letterSpacing: 1.5, color: colors.ink }}>* * * THANK YOU! * * *</div>
+          </>
+        )}
       </div>
-    </div>
+    </ReceiptPaper>
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+export function Row({ label, value }: { label: string; value: string }) {
   const style: CSSProperties = {
     fontWeight: 600,
     textAlign: "right",
@@ -98,6 +124,6 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Divider({ dashed }: { dashed?: boolean }) {
+export function Divider({ dashed }: { dashed?: boolean }) {
   return <div style={{ borderTop: `1px ${dashed ? "dashed" : "dotted"} ${colors.goldDark}`, margin: "8px 0" }} />;
 }

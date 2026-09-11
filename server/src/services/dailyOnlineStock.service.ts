@@ -111,6 +111,19 @@ async function mirrorTransferToOffline(
   userId?: number
 ) {
   const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate);
+
+  // saveOnlineEntry calls this mirror unconditionally after every save, even
+  // when only an unrelated field (e.g. Fulfillment Out) changed and the
+  // transfer figures are exactly what the offline side already has. Without
+  // this guard that's a no-op write plus a change-log entry with nothing to
+  // show for it, on every single Online save.
+  if (existing && toNum(existing.stockInOlToOff) === mirrored.stockInOlToOff && toNum(existing.stockOutOffToOl) === mirrored.stockOutOffToOl) {
+    return;
+  }
+  if (!existing && mirrored.stockInOlToOff === 0 && mirrored.stockOutOffToOl === 0) {
+    return; // nothing has actually transferred yet - don't create a blank row just to mirror zeros
+  }
+
   const openingStock = existing ? toNum(existing.openingStock) : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate);
 
   const merged = {

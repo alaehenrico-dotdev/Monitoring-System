@@ -11,6 +11,7 @@ import { ReceiptsPage } from "./pages/ReceiptsPage";
 import { VarianceReportPage } from "./pages/VarianceReportPage";
 import { DailyReportPage } from "./pages/DailyReportPage";
 import { ProductsAdminPage } from "./pages/ProductsAdminPage";
+import { ChangeLogPage } from "./pages/ChangeLogPage";
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
             <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
               <Route path="/variance-report" element={<VarianceReportPage />} />
               <Route path="/daily-report" element={<DailyReportPage />} />
+              <Route path="/change-log" element={<ChangeLogPage />} />
               <Route path="/products" element={<ProductsAdminPage />} />
             </Route>
           </Route>

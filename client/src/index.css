@@ -101,6 +101,100 @@ table input[type="number"] {
   color: #c1272d;
 }
 
+/* Toolbar - the card strip holding a page's date/location fields and its
+   action controls (CSV export/import, zoom). Gives the controls a defined
+   home instead of floating loose against the page background. */
+.ae-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  background: #fff;
+  border: 1px solid #e7dfc9;
+  border-radius: 10px;
+}
+.ae-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.ae-toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 26px;
+  background: #e7dfc9;
+}
+
+/* Segmented control group - the "one cohesive pill" pattern used by zoom
+   controls (Figma, Google Docs) and grouped toolbar actions everywhere else:
+   a single bordered, rounded container with borderless segments inside,
+   separated by hairlines, each segment showing state on hover/press rather
+   than carrying its own permanent border. */
+.ae-segment-group {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  border: 1px solid #e7dfc9;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.ae-segment-divider {
+  width: 1px;
+  background: #e7dfc9;
+}
+.ae-segment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: #241d14;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0 12px;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ae-segment-btn:hover:not(:disabled) {
+  background: #f3ecd8;
+}
+.ae-segment-btn:active:not(:disabled) {
+  background: #e7dfc9;
+}
+.ae-segment-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ae-segment-btn-icon {
+  width: 32px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.ae-segment-select {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #241d14;
+  text-align: center;
+  text-align-last: center;
+  padding: 0 8px;
+  cursor: pointer;
+  min-width: 68px;
+}
+.ae-segment-select:focus {
+  outline: none;
+  background: #f3ecd8;
+}
+
 @media print {
   /* Printing should output the data sheet itself, not a snapshot of the app
      chrome - hides the sidebar nav and any page's own toolbar (date pickers,
@@ -114,9 +208,42 @@ table input[type="number"] {
     background: #fff !important;
   }
 
+  /* The app shell (Layout.tsx) is pinned to exactly one viewport's height
+     with overflow:hidden, on purpose, so the sidebar and the content pane
+     scroll independently on screen (see the comment in Layout.tsx). At print
+     time that fixed height silently clips everything past the first screen's
+     worth of content - overriding main's own overflow wasn't enough, since
+     its *parent* was still the one enforcing the 100vh/hidden box. Print
+     needs the whole document to flow naturally so the browser can paginate
+     across as many physical pages as the content needs. */
+  .app-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
   main {
+    height: auto !important;
     padding: 0 !important;
     overflow: visible !important;
+  }
+
+  /* The grid tables' own horizontal-scroll wrapper (StockGrid,
+     TotalStocksTable, Manual Count) has no meaning on a printed page - lift
+     the constraint so the full table prints instead of being clipped to
+     whatever fit the screen's scrollable viewport. */
+  .table-scroll {
+    overflow: visible !important;
+  }
+
+  /* Single-receipt print (see ReceiptsPage.tsx + #print-portal in
+     index.html): while body carries this class, hide the whole app and show
+     only the one ReceiptCard rendered into the portal. */
+  body.printing-single-receipt #root {
+    display: none !important;
+  }
+  body.printing-single-receipt .print-portal {
+    display: block !important;
   }
 
   table {
@@ -126,4 +253,10 @@ table input[type="number"] {
   tr {
     page-break-inside: avoid;
   }
+}
+
+/* Hidden on screen at all times - only ever shown (see @media print above)
+   while body.printing-single-receipt is set. */
+.print-portal {
+  display: none;
 }

@@ -103,6 +103,18 @@ async function mirrorTransferToOnline(
   userId?: number
 ) {
   const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate);
+
+  // Same guard as the reverse direction in dailyOnlineStock.service.ts -
+  // saveOfflineEntry mirrors unconditionally after every save, so without
+  // this check an edit to e.g. Delivery (Out) alone would still rewrite and
+  // re-log the online row even though nothing about the transfer changed.
+  if (existing && toNum(existing.stockInOffToOl) === mirrored.stockInOffToOl && toNum(existing.stockOutOlToOff) === mirrored.stockOutOlToOff) {
+    return;
+  }
+  if (!existing && mirrored.stockInOffToOl === 0 && mirrored.stockOutOlToOff === 0) {
+    return; // nothing has actually transferred yet - don't create a blank row just to mirror zeros
+  }
+
   const openingStock = existing ? toNum(existing.openingStock) : await dailyOnlineStockRepository.getOpeningStock(productId, entryDate);
 
   const merged = {

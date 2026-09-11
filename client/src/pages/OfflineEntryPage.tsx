@@ -2,19 +2,15 @@ import { useEffect, useState } from "react";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOfflineGrid, saveOfflineEntry } from "../api/offlineStock";
 import { useAuth } from "../context/AuthContext";
-import { Field, TextInput } from "../components/ui";
+import { TextInput } from "../components/ui";
+import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
+import { CsvTools } from "../components/CsvTools";
+import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
+import { SearchInput } from "../components/SearchInput";
+import { offlineStockColumns as columns } from "../config/stockColumns";
+import { matchesSearch } from "../utils/search";
+import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
-
-const columns = [
-  { key: "openingStock", label: "Stocks (Opening)", editable: false },
-  { key: "stockInOlToOff", label: "Stocks In (Ol→Off)", editable: true },
-  { key: "stockOutOffToOl", label: "Stocks Out (Off→Ol)", editable: true },
-  { key: "offlineStock", label: "Offline Stocks", editable: false },
-  { key: "productionIn", label: "Production (In)", editable: true },
-  { key: "deliveryOut", label: "Delivery (Out)", editable: true },
-  { key: "backloads", label: "Backloads", editable: true },
-  { key: "remainingStock", label: "Remaining Stocks", editable: false },
-];
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -25,7 +21,14 @@ export function OfflineEntryPage() {
   const [date, setDate] = useState(today());
   const [rows, setRows] = useState<GridRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [zoom, setZoom] = useZoom("offline-entry");
+  const [query, setQuery] = useState("");
   const canEdit = user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
+
+  // Search only affects what's displayed - CsvTools keeps working off the
+  // full, unfiltered `rows` so import-matching and export still cover every
+  // product regardless of the current search text.
+  const visibleRows = rows?.filter((r) => matchesSearch([r.product.name, r.product.category], query));
 
   useEffect(() => {
     setRows(null);
@@ -36,29 +39,60 @@ export function OfflineEntryPage() {
 
   // One round trip per edit instead of two - the save endpoint already
   // returns the recalculated row.
+  function mergeEntry(productId: number, saved: unknown) {
+    setRows((prev) =>
+      prev?.map((r) => (r.product.id === productId ? { ...r, entry: saved as unknown as typeof r.entry, isSaved: true } : r)) ?? prev
+    );
+  }
+
   async function handleCommit(productId: number, key: string, value: number) {
     setError(null);
     try {
       const saved = await saveOfflineEntry(productId, date, { [key]: value });
-      setRows((prev) =>
-        prev?.map((r) => (r.product.id === productId ? { ...r, entry: saved as unknown as typeof r.entry, isSaved: true } : r)) ?? prev
-      );
+      mergeEntry(productId, saved);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Save failed");
     }
   }
 
+  // CSV import applies every editable column present in the file for one
+  // product/date in a single request, then merges the result exactly like a
+  // manual cell edit would (Section 3.1 - bulk correction via a spreadsheet
+  // file instead of retyping cell by cell).
+  async function handleImportRow(productId: number, values: Record<string, number>) {
+    const saved = await saveOfflineEntry(productId, date, values);
+    mergeEntry(productId, saved);
+  }
+
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Daily Offline Stock Monitoring</h2>
+      <h2 style={{ margin: "0 0 6px" }}>Daily Offline Stock Monitoring - {formatDateDisplay(date)}</h2>
       <p style={{ fontSize: 13, color: colors.subtleInk }}>
         Stocks In/Out transfers here mirror automatically onto the Online table (Section 4.3).
       </p>
-      <Field label="Date" style={{ marginBottom: 16, maxWidth: 180 }}>
-        <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ width: "100%" }} />
-      </Field>
+      <Toolbar className="no-print">
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search product or category…" />
+        </div>
+        <ToolbarControls>
+          {rows && (
+            <>
+              <CsvTools filenamePrefix="offline-stock" date={date} rows={rows} columns={columns} onImportRow={handleImportRow} canImport={canEdit} />
+              <ToolbarDivider />
+            </>
+          )}
+          <ZoomControl zoom={zoom} onChange={setZoom} />
+        </ToolbarControls>
+      </Toolbar>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
-      {!rows ? <p>Loading…</p> : <StockGrid rows={rows} columns={columns} onCommit={handleCommit} readOnly={!canEdit} />}
+      {!rows ? (
+        <p>Loading…</p>
+      ) : (
+        <div style={zoomStyle(zoom)}>
+          <StockGrid rows={visibleRows ?? []} columns={columns} onCommit={handleCommit} readOnly={!canEdit} />
+        </div>
+      )}
       {!canEdit && <p style={{ fontSize: 12, color: colors.subtleInk, marginTop: 8 }}>Read-only: your role can view but not edit Offline entries.</p>}
     </div>
   );

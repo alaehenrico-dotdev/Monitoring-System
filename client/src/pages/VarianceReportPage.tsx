@@ -78,7 +78,7 @@ export function VarianceReportPage() {
                 <tr key={r.id}>
                   <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{r.entryDate.slice(0, 10)}</td>
                   <td style={tdStyle}>{r.location}</td>
-                  <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{r.product.category}</td>
+                  <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "nowrap" }}>{r.product.category}</td>
                   <td style={nameCellStyle}>{r.product.name}</td>
                   <td style={tdStyle}>{r.systemRemainingStock}</td>
                   <td style={tdStyle}>{r.manualCount}</td>
@@ -94,6 +94,6 @@ export function VarianceReportPage() {
   );
 }
 
-const thStyle: CSSProperties = { textAlign: "right", padding: "5px 6px", borderBottom: `2px solid ${colors.black}`, background: colors.border, whiteSpace: "nowrap" };
+const thStyle: CSSProperties = { textAlign: "left", padding: "5px 6px", borderBottom: `2px solid ${colors.black}`, background: colors.border, whiteSpace: "nowrap" };
 const tdStyle: CSSProperties = { textAlign: "right", padding: "3px 6px", borderBottom: `1px solid ${colors.border}` };
 const nameCellStyle: CSSProperties = { ...tdStyle, textAlign: "left", whiteSpace: "nowrap" };

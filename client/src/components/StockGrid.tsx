@@ -86,7 +86,7 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
   const allProductIds = rows.map((r) => r.product.id);
 
   return (
-    <div style={{ overflowX: "auto" }}>
+    <div style={{ overflowX: "auto" }} className="table-scroll">
       <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 720 }}>
         <thead>
           <tr>
@@ -162,7 +162,7 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
 }
 
 const thStyle: CSSProperties = {
-  textAlign: "right",
+  textAlign: "left",
   padding: "5px 6px",
   borderBottom: `2px solid ${colors.black}`,
   whiteSpace: "nowrap",
