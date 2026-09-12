@@ -43,6 +43,16 @@ export function SearchIcon() {
   );
 }
 
+/// Points down - used on the floating "sidebar is fully tucked away" badge
+/// (Layout.tsx) to indicate clicking it brings the sidebar back.
+export function ChevronDownIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2.5 4.5 6 8l3.5-3.5" />
+    </svg>
+  );
+}
+
 export function PrinterIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

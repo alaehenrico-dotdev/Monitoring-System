@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
 import { createReceipt, listReceipts } from "../api/receipts";
 import { listProducts } from "../api/products";
 import type { Product, Receipt } from "../types";
@@ -11,10 +10,18 @@ import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { matchesSearch } from "../utils/search";
-import { PrinterIcon } from "../components/icons";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function formatDayHeading(day: string): string {
+  return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 interface LineItem {
@@ -38,7 +45,6 @@ export function ReceiptsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [zoom, setZoom] = useZoom("receipts");
   const [query, setQuery] = useState("");
-  const [printTarget, setPrintTarget] = useState<Receipt | null>(null);
 
   const [orderDate, setOrderDate] = useState(today());
   const [customer, setCustomer] = useState("");
@@ -50,27 +56,6 @@ export function ReceiptsPage() {
     listReceipts().then(setReceipts);
     listProducts().then(setProducts);
   }, []);
-
-  // Print/Save as PDF for exactly one receipt: render it into #print-portal
-  // (see index.html), flip a body class that the print CSS uses to hide
-  // everything else, then invoke the browser's print dialog - "Save as PDF"
-  // there produces a real PDF of just that receipt. `afterprint` fires
-  // whether the user actually printed or cancelled, so cleanup runs either
-  // way.
-  useEffect(() => {
-    if (!printTarget) return;
-    document.body.classList.add("printing-single-receipt");
-    const timer = setTimeout(() => window.print(), 50);
-    function cleanup() {
-      document.body.classList.remove("printing-single-receipt");
-      setPrintTarget(null);
-    }
-    window.addEventListener("afterprint", cleanup, { once: true });
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("afterprint", cleanup);
-    };
-  }, [printTarget]);
 
   function updateItem(index: number, patch: Partial<LineItem>) {
     setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
@@ -142,6 +127,19 @@ export function ReceiptsPage() {
   const visibleReceipts = receipts?.filter((r) =>
     matchesSearch([r.customer, r.location, ...r.items.map((it) => it.product.name)], query)
   );
+
+  // Group receipts by order date (newest day first) so "Recent Receipts"
+  // reads as a day-by-day log instead of one long flat list.
+  const receiptsByDay = useMemo(() => {
+    const groups = new Map<string, Receipt[]>();
+    for (const r of visibleReceipts ?? []) {
+      const day = r.orderDate.slice(0, 10);
+      const bucket = groups.get(day);
+      if (bucket) bucket.push(r);
+      else groups.set(day, [r]);
+    }
+    return Array.from(groups.entries()).sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0));
+  }, [visibleReceipts]);
 
   return (
     <div>
@@ -245,7 +243,7 @@ export function ReceiptsPage() {
           </ReceiptPaper>
         </form>
 
-        <PrintableReceipt receipt={previewReceipt} isPreview onPrint={() => setPrintTarget(previewReceipt)} />
+        <ReceiptCard receipt={previewReceipt} isPreview />
       </div>
 
       <h3 style={{ marginBottom: 12 }}>Recent Receipts</h3>
@@ -254,29 +252,19 @@ export function ReceiptsPage() {
       ) : visibleReceipts?.length === 0 ? (
         <p style={{ color: colors.subtleInk }}>{receipts.length === 0 ? "No receipts logged yet." : "No receipts match your search."}</p>
       ) : (
-        <div style={{ ...zoomStyle(zoom), display: "flex", flexWrap: "wrap", gap: 28 }}>
-          {visibleReceipts?.map((r) => (
-            <PrintableReceipt key={r.id} receipt={r} onPrint={() => setPrintTarget(r)} />
+        <div style={zoomStyle(zoom)}>
+          {receiptsByDay.map(([day, dayReceipts]) => (
+            <div key={day} style={{ marginBottom: 24 }}>
+              <h4 style={dayHeadingStyle}>{formatDayHeading(day)}</h4>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 28 }}>
+                {dayReceipts.map((r) => (
+                  <ReceiptCard key={r.id} receipt={r} />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
-
-      {printTarget &&
-        createPortal(<ReceiptCard receipt={printTarget} isPreview={printTarget.id === 0} />, document.getElementById("print-portal")!)}
-    </div>
-  );
-}
-
-/// A ReceiptCard with a small "Print / Save as PDF" button overlaid in the
-/// corner - kept outside ReceiptCard itself so the plain card rendered into
-/// the print portal never includes page-level button chrome.
-function PrintableReceipt({ receipt, isPreview, onPrint }: { receipt: Receipt; isPreview?: boolean; onPrint: () => void }) {
-  return (
-    <div style={{ position: "relative" }}>
-      <button type="button" onClick={onPrint} title="Print / Save as PDF" aria-label="Print receipt" style={printButtonStyle}>
-        <PrinterIcon />
-      </button>
-      <ReceiptCard receipt={receipt} isPreview={isPreview} />
     </div>
   );
 }
@@ -298,22 +286,12 @@ const receiptInputStyle: CSSProperties = {
   padding: "3px 6px",
 };
 
-const printButtonStyle: CSSProperties = {
-  position: "absolute",
-  top: -10,
-  right: -10,
-  width: 30,
-  height: 30,
-  borderRadius: "50%",
-  border: `1px solid ${colors.goldDark}`,
-  background: colors.paper,
-  color: colors.ink,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  boxShadow: "0 2px 6px rgba(20,17,13,0.18)",
-  zIndex: 1,
+const dayHeadingStyle: CSSProperties = {
+  margin: "0 0 10px",
+  paddingBottom: 6,
+  borderBottom: `1px solid ${colors.goldDark}`,
+  fontSize: 13,
+  color: colors.subtleInk,
 };
 
 const removeButtonStyle: CSSProperties = {

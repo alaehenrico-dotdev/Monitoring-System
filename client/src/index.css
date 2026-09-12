@@ -18,6 +18,215 @@ table input[type="number"] {
   color: #14110d;
 }
 
+/* Sidebar rail (see Layout.tsx). At rest this reserves a fixed 76px in the
+   flex layout - not a remembered expanded/collapsed choice, just the
+   permanent default. `overflow: visible` is what lets .sidebar-inner (below)
+   pop out wider than these 76px on hover without .sidebar-rail itself
+   growing - so main never reflows for a temporary peek. */
+.sidebar-rail {
+  position: relative;
+  overflow: visible;
+  flex-shrink: 0;
+  height: 100%;
+  width: 76px;
+  transition: width 240ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* The one state that *does* change layout width - the whole rail tucked
+   away (logo clicked), so main can actually reclaim the space. */
+.sidebar-rail--hidden {
+  width: 0;
+}
+
+/* Always absolutely positioned (not just on hover) so animating its width
+   never has to cross a static<->absolute switch mid-transition. Sized to
+   match .sidebar-rail at rest; :hover/:focus-within below pop it out to
+   232px as a floating overlay elevated above main. */
+.sidebar-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 76px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #1d1812;
+  color: #f1e9d0;
+  padding: 20px 10px;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+  box-shadow: none;
+  transition:
+    width 220ms cubic-bezier(0.4, 0, 0.2, 1),
+    padding 220ms ease,
+    box-shadow 200ms ease,
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+.sidebar-rail:hover .sidebar-inner,
+.sidebar-rail:focus-within .sidebar-inner {
+  width: 232px;
+  padding: 20px 14px;
+  z-index: 40;
+  box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+}
+/* Tucked away: fade + a slight upward drift, echoing "minimizes up to the
+   logo" rather than just popping out of existence. `visibility: hidden`
+   (not just opacity/pointer-events) so the links inside stop being
+   Tab-reachable too - otherwise a keyboard user could still focus one,
+   which would satisfy :focus-within above and pop the (invisible) rail
+   back open. */
+.sidebar-rail--hidden .sidebar-inner {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+
+.sidebar-logo-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  margin-bottom: 20px;
+  cursor: pointer;
+  transition: gap 200ms ease, justify-content 200ms ease;
+}
+.sidebar-rail:hover .sidebar-logo-row,
+.sidebar-rail:focus-within .sidebar-logo-row {
+  justify-content: flex-start;
+  gap: 10px;
+}
+.sidebar-logo-text {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  max-width: 0;
+  transition: opacity 160ms ease, max-width 220ms ease;
+}
+.sidebar-rail:hover .sidebar-logo-text,
+.sidebar-rail:focus-within .sidebar-logo-text {
+  opacity: 1;
+  max-width: 150px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 4px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: background 120ms ease, padding 200ms ease, justify-content 200ms ease;
+}
+.sidebar-rail:hover .sidebar-link,
+.sidebar-rail:focus-within .sidebar-link {
+  justify-content: flex-start;
+  padding: 8px 10px;
+}
+/* Two copies of each link's text - a real abbreviation (not a truncation of
+   the full label), so the rail shows "ON" for Online Entry rather than a
+   clipped "Onl…". CSS swaps which one is visible instead of React deciding
+   what to render, so the hover/focus expand is a pure :hover/:focus-within
+   rule - no JS state, no re-render on every mouse move, and keyboard-Tab
+   focus gets the same expansion for free via :focus-within. */
+.sidebar-link-full {
+  display: none;
+}
+.sidebar-link-abbr {
+  display: inline;
+}
+.sidebar-rail:hover .sidebar-link-full,
+.sidebar-rail:focus-within .sidebar-link-full {
+  display: inline;
+}
+.sidebar-rail:hover .sidebar-link-abbr,
+.sidebar-rail:focus-within .sidebar-link-abbr {
+  display: none;
+}
+
+.sidebar-user-block {
+  font-size: 12px;
+  color: #f1e9d0;
+  opacity: 0.85;
+  padding: 12px 8px 4px;
+  transition: padding 220ms ease;
+}
+.sidebar-rail:hover .sidebar-user-block,
+.sidebar-rail:focus-within .sidebar-user-block {
+  padding: 12px 24px 4px;
+}
+.sidebar-user-text {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  max-height: 0;
+  transition: opacity 160ms ease, max-height 220ms ease;
+}
+.sidebar-rail:hover .sidebar-user-text,
+.sidebar-rail:focus-within .sidebar-user-text {
+  opacity: 1;
+  max-height: 40px;
+}
+.sidebar-logout-btn {
+  width: 100%;
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+  color: #c99a2e;
+  border: 1px solid #8b6a1e;
+  border-radius: 5px;
+  padding: 4px 0;
+  transition: padding 200ms ease;
+}
+.sidebar-rail:hover .sidebar-logout-btn,
+.sidebar-rail:focus-within .sidebar-logout-btn {
+  width: auto;
+  padding: 4px 10px;
+}
+
+/* Rendered inside <main>, before the page's own content (Layout.tsx), only
+   while the rail is fully hidden - a genuine CSS float nested in the
+   page's own normal flow (not position:fixed, not a disconnected floating
+   badge), so it behaves exactly like an image floated left of a paragraph:
+   the page's own h2/p naturally wrap beside it ("logo | h2 / p"), while
+   .ae-toolbar and .table-scroll (both `clear: left` below) always resume
+   the full width afterward regardless of how tall a given page's own
+   header happens to be - no per-page height-matching needed. Same 40px
+   size as the real sidebar logo, so as .sidebar-rail's own logo fades out
+   while its width collapses, this one fades in at essentially the same
+   spot, reading as one logo staying put while everything else tucks away
+   around it - not a second, different-looking floating control. */
+.ghost-logo {
+  float: left;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0 14px 10px 0;
+  cursor: pointer;
+  color: #8b6a1e;
+  animation: ghost-logo-in 220ms ease 140ms both;
+}
+.ghost-logo:hover {
+  filter: brightness(1.15);
+}
+@keyframes ghost-logo-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Shared form controls (see client/src/components/ui.tsx) - every text
    field, date field, select, and button in the app renders through these
    classes so alignment, spacing, borders, and focus states match everywhere
@@ -103,18 +312,24 @@ table input[type="number"] {
 
 /* Toolbar - the card strip holding a page's date/location fields and its
    action controls (CSV export/import, zoom). Gives the controls a defined
-   home instead of floating loose against the page background. */
+   home instead of floating loose against the page background. `clear: left`
+   is a no-op in every normal page load - it only matters while the sidebar
+   is fully hidden (see .ghost-logo above), guaranteeing the toolbar always
+   starts below that floated logo and spans the full width, regardless of
+   how tall the page's own h2/p happened to render. */
 .ae-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 16px;
-  padding: 8px 12px;
+  gap: 14px;
+  padding: 6px 10px;
   margin-bottom: 16px;
   background: #fff;
-  border: 1px solid #e7dfc9;
-  border-radius: 10px;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(20, 17, 13, 0.06);
+  position: relative;
+  clear: left;
 }
 .ae-toolbar-controls {
   display: flex;
@@ -126,7 +341,94 @@ table input[type="number"] {
   width: 1px;
   align-self: stretch;
   min-height: 26px;
-  background: #e7dfc9;
+  background: rgba(36, 29, 20, 0.1);
+}
+
+/* Toolbar-scoped chrome: buttons, inputs, and segment groups nested inside
+   .ae-toolbar drop their hairline borders in favor of a light fill, shrink
+   their padding a touch, and round up further - closer to the flat,
+   pill-shaped controls in the Google Sheets toolbar. Scoped to .ae-toolbar
+   so the same components used elsewhere (forms, tables) keep their bordered
+   look. */
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 12px;
+  background: #e8f0fe;
+}
+.ae-toolbar .ae-input:focus,
+.ae-toolbar .ae-select:focus {
+  box-shadow: 0 0 0 2px rgba(201, 154, 46, 0.35);
+  background: #fff;
+}
+.ae-toolbar .ae-input:disabled,
+.ae-toolbar .ae-select:disabled {
+  background: #f3efe4;
+}
+.ae-toolbar .ae-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.ae-toolbar .ae-btn-sm {
+  padding: 4px 9px;
+}
+.ae-toolbar .ae-btn-secondary {
+  background: #e8f0fe;
+}
+.ae-toolbar .ae-btn-ghost {
+  background: #e8f0fe;
+}
+.ae-toolbar .ae-btn-danger {
+  background: #fbe9ea;
+}
+.ae-toolbar .ae-segment-group {
+  border: none;
+  border-radius: 999px;
+  background: #e8f0fe;
+}
+.ae-toolbar .ae-segment-divider {
+  background: rgba(26, 115, 232, 0.16);
+}
+.ae-toolbar .ae-segment-btn {
+  padding: 0 10px;
+}
+.ae-toolbar .ae-segment-btn:hover:not(:disabled) {
+  background: rgba(26, 115, 232, 0.1);
+}
+.ae-toolbar .ae-segment-btn:active:not(:disabled) {
+  background: rgba(26, 115, 232, 0.18);
+}
+.ae-toolbar .ae-segment-select:focus {
+  background: rgba(26, 115, 232, 0.1);
+}
+
+/* .ae-toolbar--compact is applied by Toolbar.tsx, not a width breakpoint -
+   it measures the toolbar's actual one-line natural width (via a hidden,
+   always-full clone) against how much room is really available (which
+   shrinks whenever the sidebar is expanded rather than collapsed, see
+   Layout.tsx) and only adds this class when the full-label layout would
+   genuinely not fit. So labels never disappear "just in case" at some
+   guessed pixel width - only once there's literally not enough space for
+   them. Segment buttons drop their text label (kept for screen readers via
+   the button's own title/aria-label) and fall back to icon-only, gaps
+   tighten, and the search box narrows, so the toolbar keeps to one line
+   instead of wrapping. */
+.ae-toolbar--compact {
+  gap: 8px;
+}
+.ae-toolbar--compact .ae-toolbar-controls {
+  gap: 8px;
+}
+.ae-toolbar--compact .ae-segment-label {
+  display: none;
+}
+.ae-toolbar--compact .ae-segment-btn {
+  padding: 0 8px;
+}
+.ae-toolbar--compact input[type="search"] {
+  width: 120px !important;
 }
 
 /* Segmented control group - the "one cohesive pill" pattern used by zoom
@@ -195,6 +497,43 @@ table input[type="number"] {
   background: #f3ecd8;
 }
 
+/* Main content pane (see Layout.tsx) - padding lives here rather than
+   inline so it can shrink at narrower widths instead of eating a fixed
+   24px on every side of a phone/tablet viewport. */
+.ae-main {
+  padding: 24px;
+}
+
+@media (max-width: 900px) {
+  .ae-main {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 520px) {
+  .ae-main {
+    padding: 12px;
+  }
+  .ae-toolbar {
+    padding: 6px 8px;
+    gap: 10px;
+  }
+}
+
+/* Grid/table wrapper (StockGrid, TotalStocksTable, Manual Count, Change
+   Log) - `clear: left` is a no-op normally, only mattering while the
+   sidebar is fully hidden (see .ghost-logo above), so the grid always
+   spans the full width there too, not just the toolbar above it. */
+.table-scroll {
+  clear: left;
+}
+/* A couple of simpler admin pages (Variance Report, Products) render a
+   bare <table> with no .table-scroll wrapper at all - this catches those
+   too, same reasoning. */
+main table {
+  clear: left;
+}
+
 @media print {
   /* Printing should output the data sheet itself, not a snapshot of the app
      chrome - hides the sidebar nav and any page's own toolbar (date pickers,
@@ -236,16 +575,6 @@ table input[type="number"] {
     overflow: visible !important;
   }
 
-  /* Single-receipt print (see ReceiptsPage.tsx + #print-portal in
-     index.html): while body carries this class, hide the whole app and show
-     only the one ReceiptCard rendered into the portal. */
-  body.printing-single-receipt #root {
-    display: none !important;
-  }
-  body.printing-single-receipt .print-portal {
-    display: block !important;
-  }
-
   table {
     page-break-inside: auto;
   }
@@ -253,10 +582,4 @@ table input[type="number"] {
   tr {
     page-break-inside: avoid;
   }
-}
-
-/* Hidden on screen at all times - only ever shown (see @media print above)
-   while body.printing-single-receipt is set. */
-.print-portal {
-  display: none;
 }

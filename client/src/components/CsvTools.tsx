@@ -113,9 +113,9 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <div className="ae-segment-group" aria-label="Export/Import" title="Export/Import">
-        <button type="button" className="ae-segment-btn" onClick={handleExport}>
+        <button type="button" className="ae-segment-btn" onClick={handleExport} title="Export">
           <UploadIcon />
-          Export
+          <span className="ae-segment-label">Export</span>
         </button>
         <div className="ae-segment-divider" />
         <button
@@ -125,14 +125,20 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
           title="Export as PDF (choose 'Save as PDF' in the print dialog)"
         >
           <PrinterIcon />
-          PDF
+          <span className="ae-segment-label">PDF</span>
         </button>
         {canImport && (
           <>
             <div className="ae-segment-divider" />
-            <button type="button" className="ae-segment-btn" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+            <button
+              type="button"
+              className="ae-segment-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={busy}
+              title={busy ? "Importing…" : "Import"}
+            >
               <DownloadIcon />
-              {busy ? "Importing…" : "Import"}
+              <span className="ae-segment-label">{busy ? "Importing…" : "Import"}</span>
             </button>
             <input
               ref={fileInputRef}

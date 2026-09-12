@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { listChangeLog } from "../api/changeLog";
 import type { ChangeLogEntry } from "../types";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
@@ -49,6 +49,20 @@ export function ChangeLogPage() {
     matchesSearch([TABLE_LABELS[e.tableName] ?? e.tableName, e.action, e.changedBy?.name, e.changedBy?.username, e.recordId], query)
   );
 
+  // Group entries by the local calendar day they were changed on, preserving
+  // the API's newest-first ordering within and across days, so the log reads
+  // as a day-by-day timeline instead of one long flat table.
+  const groupedByDay = useMemo(() => {
+    const groups = new Map<string, ChangeLogEntry[]>();
+    for (const entry of filtered ?? []) {
+      const day = dayKey(entry.changedAt);
+      const bucket = groups.get(day);
+      if (bucket) bucket.push(entry);
+      else groups.set(day, [entry]);
+    }
+    return Array.from(groups.entries());
+  }, [filtered]);
+
   return (
     <div>
       <h2 style={{ margin: "0 0 6px" }}>Change Log</h2>
@@ -87,8 +101,17 @@ export function ChangeLogPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered?.map((entry) => (
-                <ChangeLogRow key={entry.id} entry={entry} expanded={expanded === entry.id} onToggle={() => setExpanded((cur) => (cur === entry.id ? null : entry.id))} />
+              {groupedByDay.map(([day, dayEntries]) => (
+                <Fragment key={day}>
+                  <tr>
+                    <td colSpan={6} style={dayHeadingStyle}>
+                      {formatDayHeading(day)}
+                    </td>
+                  </tr>
+                  {dayEntries.map((entry) => (
+                    <ChangeLogRow key={entry.id} entry={entry} expanded={expanded === entry.id} onToggle={() => setExpanded((cur) => (cur === entry.id ? null : entry.id))} />
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -166,6 +189,33 @@ function diffFields(oldValue: unknown, newValue: unknown): { key: string; before
   }
   return diffs;
 }
+
+/// Local calendar-day key (not UTC) so an entry groups under the day it
+/// actually shows in the "When" column, which also renders in local time.
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function formatDayHeading(day: string): string {
+  const [year, month, date] = day.split("-").map(Number);
+  return new Date(year, month - 1, date).toLocaleDateString(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+const dayHeadingStyle: CSSProperties = {
+  textAlign: "left",
+  padding: "10px 6px 5px",
+  fontSize: 13,
+  fontWeight: 700,
+  color: colors.subtleInk,
+  borderBottom: `1px solid ${colors.border}`,
+  background: "#faf7ee",
+};
 
 const thStyle: CSSProperties = {
   textAlign: "left",

@@ -184,7 +184,7 @@ const categoryRowStyle: CSSProperties = {
   fontWeight: 700,
   padding: "6px 8px",
   background: colors.black,
-  color: colors.gold,
+  color: colors.yellow,
   borderLeft: `4px solid ${colors.red}`,
 };
 const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: "#F3ECD8" };

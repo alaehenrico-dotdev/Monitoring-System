@@ -24,7 +24,7 @@ export function SearchInput({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="Search"
-        style={{ paddingLeft: 28, width: 180 }}
+        style={{ paddingLeft: 28, width: 280 }}
       />
     </div>
   );
