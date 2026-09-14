@@ -34,9 +34,13 @@ async function noop() {}
 export function DailyReportPage() {
   const [date, setDate] = useState(today());
   const [report, setReport] = useState<DailyReport | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   function load() {
-    getDailyReport(date).then(setReport);
+    setError(null);
+    getDailyReport(date)
+      .then(setReport)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to build report"));
   }
 
   function handleExport() {
@@ -71,6 +75,8 @@ export function DailyReportPage() {
           )}
         </div>
       </Toolbar>
+
+      {error && <p style={{ color: colors.danger }}>{error}</p>}
 
       {report && (
         <div>

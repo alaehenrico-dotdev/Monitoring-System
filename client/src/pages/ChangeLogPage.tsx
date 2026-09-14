@@ -65,8 +65,8 @@ export function ChangeLogPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 6px" }}>Change Log</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, marginBottom: 16 }}>
+      <h2 style={{ margin: "0 0 3px" }}>Change Log</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, marginBottom: 8 }}>
         Every create/update/delete across the app, attributed and timestamped - click a row to see exactly what changed.
       </p>
 
@@ -89,14 +89,12 @@ export function ChangeLogPage() {
       ) : filtered && filtered.length === 0 ? (
         <p style={{ color: colors.subtleInk }}>No matching entries.</p>
       ) : (
-        <div style={{ overflowX: "auto" }} className="table-scroll">
-          <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 720 }}>
+        <div className="ae-table-scroll table-scroll">
+          <table className="ae-table" style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 {["When", "Table", "Record", "Action", "Changed By", ""].map((h) => (
-                  <th key={h} style={thStyle}>
-                    {h}
-                  </th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -127,12 +125,12 @@ function ChangeLogRow({ entry, expanded, onToggle }: { entry: ChangeLogEntry; ex
   return (
     <>
       <tr style={{ cursor: "pointer" }} onClick={onToggle}>
-        <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{new Date(entry.changedAt).toLocaleString()}</td>
-        <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "nowrap" }}>{TABLE_LABELS[entry.tableName] ?? entry.tableName}</td>
-        <td style={tdStyle}>#{entry.recordId}</td>
-        <td style={{ ...tdStyle, textAlign: "left", fontWeight: 700, color: ACTION_COLOR[entry.action] }}>{entry.action}</td>
-        <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "nowrap" }}>{entry.changedBy?.name ?? "system"}</td>
-        <td style={{ ...tdStyle, color: colors.subtleInk }}>{expanded ? "▲" : "▼"}</td>
+        <td style={{ whiteSpace: "nowrap" }}>{new Date(entry.changedAt).toLocaleString()}</td>
+        <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>{TABLE_LABELS[entry.tableName] ?? entry.tableName}</td>
+        <td>#{entry.recordId}</td>
+        <td style={{ textAlign: "left", fontWeight: 700, color: ACTION_COLOR[entry.action] }}>{entry.action}</td>
+        <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>{entry.changedBy?.name ?? "system"}</td>
+        <td style={{ color: colors.subtleInk }}>{expanded ? "▲" : "▼"}</td>
       </tr>
       {expanded && (
         <tr>
@@ -142,11 +140,11 @@ function ChangeLogRow({ entry, expanded, onToggle }: { entry: ChangeLogEntry; ex
                 {entry.action === "CREATE" ? "New record - no prior value to compare." : "No field-level differences recorded."}
               </span>
             ) : (
-              <table style={{ borderCollapse: "collapse", fontSize: 12.5 }}>
+              <table className="ae-table" style={{ fontSize: 12.5 }}>
                 <thead>
                   <tr>
                     {["Field", "Before", "After"].map((h) => (
-                      <th key={h} style={{ ...thStyle, padding: "3px 10px" }}>
+                      <th key={h} style={{ padding: "3px 10px" }}>
                         {h}
                       </th>
                     ))}
@@ -155,9 +153,9 @@ function ChangeLogRow({ entry, expanded, onToggle }: { entry: ChangeLogEntry; ex
                 <tbody>
                   {diffs.map((d) => (
                     <tr key={d.key}>
-                      <td style={{ ...tdStyle, textAlign: "left", padding: "3px 10px" }}>{d.key}</td>
-                      <td style={{ ...tdStyle, padding: "3px 10px" }}>{d.before}</td>
-                      <td style={{ ...tdStyle, padding: "3px 10px", fontWeight: 600 }}>{d.after}</td>
+                      <td style={{ textAlign: "left", padding: "3px 10px" }}>{d.key}</td>
+                      <td style={{ padding: "3px 10px" }}>{d.before}</td>
+                      <td style={{ padding: "3px 10px", fontWeight: 600 }}>{d.after}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -216,12 +214,3 @@ const dayHeadingStyle: CSSProperties = {
   borderBottom: `1px solid ${colors.border}`,
   background: "#faf7ee",
 };
-
-const thStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "5px 6px",
-  borderBottom: `2px solid ${colors.black}`,
-  background: colors.border,
-  whiteSpace: "nowrap",
-};
-const tdStyle: CSSProperties = { textAlign: "right", padding: "5px 6px", borderBottom: `1px solid ${colors.border}` };

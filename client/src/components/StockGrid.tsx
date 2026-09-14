@@ -14,6 +14,17 @@ export interface GridColumn {
   label: string;
   editable?: boolean;
   /** Read-only calculated columns are shown but locked, like a spreadsheet formula cell (Section 3.1). */
+  /** Alternate header spellings recognized on CSV import - see CsvTools.tsx; unused by the grid itself. */
+  aliases?: string[];
+  /**
+   * Recognized on CSV import even though the live grid keeps this cell
+   * locked (editable: false) - Opening Stock is normally auto-carried
+   * forward from the prior day's Remaining Stock (Section 4.6), which is
+   * exactly right day-to-day but leaves every product's very first date at
+   * 0 with nothing to carry from. Importing a file gives that first date a
+   * real starting balance instead. Unused by the grid itself.
+   */
+  importable?: boolean;
 }
 
 interface StockGridProps {
@@ -86,15 +97,13 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
   const allProductIds = rows.map((r) => r.product.id);
 
   return (
-    <div style={{ overflowX: "auto" }} className="table-scroll">
-      <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 720 }}>
+    <div className="ae-table-scroll table-scroll">
+      <table className="ae-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
-            <th style={thStyle}>Product</th>
+            <th>Product</th>
             {columns.map((c) => (
-              <th key={c.key} style={thStyle}>
-                {c.label}
-              </th>
+              <th key={c.key}>{c.label}</th>
             ))}
           </tr>
         </thead>
@@ -115,13 +124,13 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
                     const displayValue = drafts[draftKey] ?? (raw === null || raw === undefined ? "" : String(raw));
                     if (!col.editable || readOnly) {
                       return (
-                        <td key={col.key} style={{ ...tdStyle, ...(col.editable ? {} : lockedStyle) }}>
+                        <td key={col.key} style={col.editable ? undefined : lockedStyle}>
                           {raw === null || raw === undefined ? "—" : Number(raw).toLocaleString()}
                         </td>
                       );
                     }
                     return (
-                      <td key={col.key} style={tdStyle}>
+                      <td key={col.key}>
                         <input
                           className="ae-input ae-input-cell"
                           data-cell={draftKey}
@@ -138,21 +147,17 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
                 </tr>
               ))}
               <tr key={`${category}-subtotal`} style={subtotalRowStyle}>
-                <td style={tdStyle}>Subtotal - {category}</td>
+                <td>Subtotal - {category}</td>
                 {columns.map((col) => (
-                  <td key={col.key} style={tdStyle}>
-                    {groupRows.reduce((sum, r) => sum + toNum(r.entry[col.key]), 0).toLocaleString()}
-                  </td>
+                  <td key={col.key}>{groupRows.reduce((sum, r) => sum + toNum(r.entry[col.key]), 0).toLocaleString()}</td>
                 ))}
               </tr>
             </Fragment>
           ))}
           <tr style={grandTotalRowStyle}>
-            <td style={tdStyle}>GRAND TOTAL</td>
+            <td>GRAND TOTAL</td>
             {columns.map((col) => (
-              <td key={col.key} style={tdStyle}>
-                {rows.reduce((sum, r) => sum + toNum(r.entry[col.key]), 0).toLocaleString()}
-              </td>
+              <td key={col.key}>{rows.reduce((sum, r) => sum + toNum(r.entry[col.key]), 0).toLocaleString()}</td>
             ))}
           </tr>
         </tbody>
@@ -161,20 +166,11 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
   );
 }
 
-const thStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "5px 6px",
-  borderBottom: `2px solid ${colors.black}`,
-  whiteSpace: "nowrap",
-  background: colors.border,
-  position: "sticky",
-  top: 0,
-};
-const tdStyle: CSSProperties = { textAlign: "right", padding: "3px 6px", borderBottom: `1px solid ${colors.border}` };
 // Product names never wrap - a long name (e.g. "Distilled Cane Vinegar
 // White") just widens this one column instead of breaking to a second line
-// and inflating every row's height.
-const nameCellStyle: CSSProperties = { ...tdStyle, textAlign: "left", whiteSpace: "nowrap" };
+// and inflating every row's height. Border/padding/alignment defaults
+// otherwise come from the shared .ae-table CSS (index.css).
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };
 const lockedStyle: CSSProperties = { background: "#faf7ee", color: colors.subtleInk };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.

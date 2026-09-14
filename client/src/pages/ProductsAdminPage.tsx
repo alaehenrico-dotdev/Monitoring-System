@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { createProduct, deactivateProduct, listProducts } from "../api/products";
 import type { Product } from "../types";
 import { Button, Field, TextInput } from "../components/ui";
@@ -14,7 +14,9 @@ export function ProductsAdminPage() {
   const [error, setError] = useState<string | null>(null);
 
   function reload() {
-    listProducts().then(setProducts);
+    listProducts()
+      .then(setProducts)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load products"));
   }
 
   useEffect(reload, []);
@@ -64,35 +66,32 @@ export function ProductsAdminPage() {
       {!products ? (
         <p>Loading…</p>
       ) : (
-        <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 560 }}>
-          <thead>
-            <tr>
-              {["Category", "Product", "Unit", ""].map((h) => (
-                <th key={h} style={thStyle}>
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id}>
-                <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{p.category}</td>
-                <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{p.name}</td>
-                <td style={tdStyle}>{p.unit}</td>
-                <td style={tdStyle}>
-                  <Button variant="danger" size="sm" onClick={() => handleDeactivate(p.id)}>
-                    Deactivate
-                  </Button>
-                </td>
+        <div className="ae-table-scroll table-scroll">
+          <table className="ae-table ae-table--left" style={{ minWidth: 560 }}>
+            <thead>
+              <tr>
+                {["Category", "Product", "Unit", ""].map((h) => (
+                  <th key={h}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td style={{ whiteSpace: "nowrap" }}>{p.category}</td>
+                  <td style={{ whiteSpace: "nowrap" }}>{p.name}</td>
+                  <td>{p.unit}</td>
+                  <td>
+                    <Button variant="danger" size="sm" onClick={() => handleDeactivate(p.id)}>
+                      Deactivate
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
 }
-
-const thStyle: CSSProperties = { textAlign: "left", padding: "5px 6px", borderBottom: `2px solid ${colors.black}`, background: colors.border };
-const tdStyle: CSSProperties = { textAlign: "left", padding: "3px 6px", borderBottom: `1px solid ${colors.border}` };

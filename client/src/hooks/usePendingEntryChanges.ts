@@ -1,0 +1,107 @@
+import { useMemo, useState } from "react";
+import type { GridRow } from "../components/StockGrid";
+
+/// productId -> { columnKey -> staged value }
+export type PendingByProduct = Record<number, Record<string, number>>;
+
+/**
+ * Section 3.1 - "Save" / "Preview" on the Online/Offline Entry grids: a cell
+ * edit used to hit the save endpoint the instant you tabbed/clicked away,
+ * with no way to review a batch of changes before they went live. This holds
+ * edits locally (keyed by product) until the page's own Save button flushes
+ * them, and gives Preview something concrete (old value -> new value, per
+ * field) to show first.
+ *
+ * Deliberately shallow: it doesn't know about the save endpoint, mirroring
+ * to the other table, or the calculated columns (Online/Offline/Remaining
+ * Stock) - those still only update once a change is actually saved, exactly
+ * like a CSV import already behaves. Recomputing them locally would mean
+ * duplicating the server's own stock-math formulas just for an in-progress
+ * preview.
+ */
+export function usePendingEntryChanges(rows: GridRow[] | null) {
+  const [pending, setPending] = useState<PendingByProduct>({});
+
+  // What the grid should actually render - the last-saved rows with any
+  // staged-but-not-yet-saved edits overlaid on top, so typing a value shows
+  // up immediately without a round trip.
+  const displayRows = useMemo(() => {
+    if (!rows || Object.keys(pending).length === 0) return rows;
+    return rows.map((r) => {
+      const changes = pending[r.product.id];
+      return changes ? { ...r, entry: { ...r.entry, ...changes }, isSaved: false } : r;
+    });
+  }, [rows, pending]);
+
+  /// Stages one cell's edit. Editing a cell back to its last-saved value
+  /// removes it from the pending set entirely, rather than leaving a
+  /// no-op change sitting in Preview/Save.
+  function stage(productId: number, key: string, value: number, savedValue: number) {
+    setPending((prev) => {
+      const productPending = { ...(prev[productId] ?? {}) };
+      if (value === savedValue) delete productPending[key];
+      else productPending[key] = value;
+
+      const next = { ...prev };
+      if (Object.keys(productPending).length === 0) delete next[productId];
+      else next[productId] = productPending;
+      return next;
+    });
+  }
+
+  /// Drops one product's pending changes once they've been saved (or the
+  /// user discards them) - not the whole set, so a partial-failure Save
+  /// (some products saved, some didn't) can clear just the successful ones.
+  function clear(productId: number) {
+    setPending((prev) => {
+      if (!(productId in prev)) return prev;
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
+  }
+
+  function clearAll() {
+    setPending({});
+  }
+
+  return { pending, displayRows, stage, clear, clearAll, pendingCount: Object.keys(pending).length };
+}
+
+export interface PendingChangeDetail {
+  productId: number;
+  name: string;
+  category: string;
+  label: string;
+  oldValue: number;
+  newValue: number;
+}
+
+/// Expands the raw pending map into display-ready rows for the Preview
+/// modal - product name/category and the column's human label, resolved
+/// against the last-saved rows (not the pending-overlaid displayRows above,
+/// which would show the new value as its own "old" value).
+export function describePendingChanges(
+  rows: GridRow[] | null,
+  pending: PendingByProduct,
+  columns: { key: string; label: string }[],
+): PendingChangeDetail[] {
+  if (!rows) return [];
+  const details: PendingChangeDetail[] = [];
+  for (const [productIdStr, changes] of Object.entries(pending)) {
+    const productId = Number(productIdStr);
+    const row = rows.find((r) => r.product.id === productId);
+    if (!row) continue;
+    for (const [key, newValue] of Object.entries(changes)) {
+      details.push({
+        productId,
+        name: row.product.name,
+        category: row.product.category,
+        label: columns.find((c) => c.key === key)?.label ?? key,
+        oldValue: Number(row.entry[key] ?? 0),
+        newValue,
+      });
+    }
+  }
+  return details;
+}

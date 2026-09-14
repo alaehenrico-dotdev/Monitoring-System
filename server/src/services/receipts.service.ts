@@ -15,7 +15,8 @@ export interface CreateReceiptInput {
   orderDate: Date;
   customer: string;
   location: string;
-  salesRepId?: number;
+  /// Free text - not necessarily a system user (Section 4.7).
+  salesRepName?: string;
   items: ReceiptItemInput[];
   postToFulfillment?: boolean;
 }
@@ -34,7 +35,7 @@ export async function createReceipt(input: CreateReceiptInput, createdById?: num
     orderDate: input.orderDate,
     customer: input.customer,
     location: input.location,
-    salesRepId: input.salesRepId,
+    salesRepName: input.salesRepName,
     createdById,
     items: input.items,
   });

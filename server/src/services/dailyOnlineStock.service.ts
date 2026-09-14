@@ -13,6 +13,11 @@ export interface OnlineEntryInput {
   productionIn?: number;
   fulfillmentOut?: number;
   rts?: number;
+  /// Not part of the normal encoder-facing edit (Section 4.6 auto-carries
+  /// this forward from the prior day's Remaining Stock instead) - only
+  /// meant for a CSV import seeding a real starting balance on a product's
+  /// very first date, where there's nothing to carry forward from yet.
+  openingStock?: number;
 }
 
 /// Section 4.6 - auto carry-forward (delegated to the repository, which owns
@@ -21,7 +26,7 @@ export function computeOpeningStock(productId: number, entryDate: Date): Promise
   return dailyOnlineStockRepository.getOpeningStock(productId, entryDate);
 }
 
-function calculate(opening: number, input: Required<OnlineEntryInput>) {
+function calculate(opening: number, input: Required<Omit<OnlineEntryInput, "openingStock">>) {
   const onlineStock = calculateOnlineStock(opening, input.stockInOffToOl, input.stockOutOlToOff);
   const remainingStock = calculateOnlineRemaining(onlineStock, input.productionIn, input.fulfillmentOut, input.rts);
   return { onlineStock, remainingStock };
@@ -48,7 +53,7 @@ export async function getOnlineGrid(entryDate: Date) {
     if (existing) return { product, entry: existing, isSaved: true };
 
     const openingStock = openingStockByProduct.get(product.id) ?? 0;
-    const zero: Required<OnlineEntryInput> = {
+    const zero: Required<Omit<OnlineEntryInput, "openingStock">> = {
       stockInOffToOl: 0,
       stockOutOlToOff: 0,
       productionIn: 0,
@@ -68,8 +73,9 @@ export async function getOnlineGrid(entryDate: Date) {
 export async function saveOnlineEntry(productId: number, entryDate: Date, input: OnlineEntryInput, userId?: number) {
   const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate);
 
-  const openingStock = existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate);
-  const merged: Required<OnlineEntryInput> = {
+  const openingStock =
+    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate));
+  const merged: Required<Omit<OnlineEntryInput, "openingStock">> = {
     stockInOffToOl: input.stockInOffToOl ?? toNum(existing?.stockInOffToOl),
     stockOutOlToOff: input.stockOutOlToOff ?? toNum(existing?.stockOutOlToOff),
     productionIn: input.productionIn ?? toNum(existing?.productionIn),

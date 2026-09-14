@@ -5,7 +5,8 @@ export interface CreateReceiptInput {
   orderDate: string;
   customer: string;
   location: string;
-  salesRepId?: number;
+  /// Free text - not necessarily a system user (Section 4.7).
+  salesRepName?: string;
   postToFulfillment?: boolean;
   items: { productId: number; quantity: number }[];
 }

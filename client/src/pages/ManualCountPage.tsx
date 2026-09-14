@@ -82,7 +82,7 @@ export function ManualCountPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 6px" }}>Manual Counting &amp; Variance - {formatDateDisplay(date)}</h2>
+      <h2 style={{ margin: "0 0 3px" }}>Manual Counting &amp; Variance - {formatDateDisplay(date)}</h2>
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -121,29 +121,24 @@ export function ManualCountPage() {
       {!rows ? (
         <p>Loading…</p>
       ) : (
-        <div style={zoomStyle(zoom)}>
+        <div className="ae-grid-fill" style={zoomStyle(zoom)}>
           {/* Same containment as StockGrid: the scrollbar belongs to this
               inner wrapper, not the page - at high zoom the table scrolls
               sideways in place instead of pushing the whole page (heading,
               date/location fields) off to the right. */}
-          <div style={{ overflowX: "auto" }} className="table-scroll">
-            <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 640 }}>
+          <div className="ae-table-scroll table-scroll">
+            <table className="ae-table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
                   {["Category", "Product", "System Remaining", "Manual Count", "Variance"].map((h) => (
-                    <th
-                      key={h}
-                      style={{ textAlign: "left", padding: "5px 6px", borderBottom: `2px solid ${colors.black}`, background: colors.border, whiteSpace: "nowrap" }}
-                    >
-                      {h}
-                    </th>
+                    <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {(visibleRows ?? []).map((r) => (
                   <tr key={r.product.id} style={r.isFlagged ? { background: colors.warningBg } : undefined}>
-                    <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "nowrap" }}>{r.product.category}</td>
+                    <td style={nameCellStyle}>{r.product.category}</td>
                     <td style={nameCellStyle}>{r.product.name}</td>
                     {/* Prisma Decimal fields serialize as JSON strings once a row is
                         persisted (unlike the plain-number preview shown before a
@@ -151,8 +146,8 @@ export function ManualCountPage() {
                         relying on .toLocaleString() alone - a bare string's
                         .toLocaleString() is a silent no-op, not a crash, but it
                         would drop thousands-separator formatting on saved rows. */}
-                    <td style={tdStyle}>{Number(r.entry.systemRemainingStock).toLocaleString()}</td>
-                    <td style={tdStyle}>
+                    <td>{Number(r.entry.systemRemainingStock).toLocaleString()}</td>
+                    <td>
                       <input
                         className="ae-input ae-input-cell"
                         type="number"
@@ -163,7 +158,7 @@ export function ManualCountPage() {
                         style={{ width: 64, textAlign: "right" }}
                       />
                     </td>
-                    <td style={{ ...tdStyle, fontWeight: r.isFlagged ? 700 : 400 }}>{r.entry.variance ?? "—"}</td>
+                    <td style={{ fontWeight: r.isFlagged ? 700 : 400 }}>{r.entry.variance ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -175,5 +170,4 @@ export function ManualCountPage() {
   );
 }
 
-const tdStyle: CSSProperties = { textAlign: "right", padding: "3px 6px", borderBottom: `1px solid ${colors.border}` };
-const nameCellStyle: CSSProperties = { ...tdStyle, textAlign: "left", whiteSpace: "nowrap" };
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };

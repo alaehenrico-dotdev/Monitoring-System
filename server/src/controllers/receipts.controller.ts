@@ -8,7 +8,7 @@ const createSchema = z.object({
   orderDate: z.string(),
   customer: z.string().min(1),
   location: z.string().min(1),
-  salesRepId: z.number().optional(),
+  salesRepName: z.string().optional(),
   postToFulfillment: z.boolean().optional(),
   items: z
     .array(z.object({ productId: z.number(), quantity: z.number().positive() }))

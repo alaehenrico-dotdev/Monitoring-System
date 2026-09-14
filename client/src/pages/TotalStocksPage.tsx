@@ -9,6 +9,7 @@ import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar"
 import { SearchInput } from "../components/SearchInput";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { colors } from "../theme";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -28,12 +29,16 @@ const csvColumns = [
 export function TotalStocksPage() {
   const [date, setDate] = useState(today());
   const [rows, setRows] = useState<TotalStockRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("total-stocks");
   const [query, setQuery] = useState("");
 
   useEffect(() => {
     setRows(null);
-    getTotalStocks(date).then(setRows);
+    setError(null);
+    getTotalStocks(date)
+      .then(setRows)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load total stocks"));
   }, [date]);
 
   // CsvTools expects {product, entry} rows; nulls become "" (not 0) so an
@@ -55,7 +60,7 @@ export function TotalStocksPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 6px" }}>Total Stocks (Online + Offline) - {formatDateDisplay(date)}</h2>
+      <h2 style={{ margin: "0 0 3px" }}>Total Stocks (Online + Offline) - {formatDateDisplay(date)}</h2>
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
@@ -71,10 +76,11 @@ export function TotalStocksPage() {
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
       </Toolbar>
+      {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
         <p>Loading…</p>
       ) : (
-        <div style={zoomStyle(zoom)}>
+        <div className="ae-grid-fill" style={zoomStyle(zoom)}>
           <TotalStocksTable rows={visibleRows ?? []} />
         </div>
       )}

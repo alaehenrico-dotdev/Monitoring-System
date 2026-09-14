@@ -13,6 +13,9 @@ export interface OfflineEntryInput {
   productionIn?: number;
   deliveryOut?: number;
   backloads?: number;
+  /// See OnlineEntryInput's own doc comment (dailyOnlineStock.service.ts) -
+  /// same reasoning, same CSV-import-only exception to auto-carry-forward.
+  openingStock?: number;
 }
 
 /// Section 4.6 - same carry-forward principle as the Online table.
@@ -20,7 +23,7 @@ export function computeOpeningStock(productId: number, entryDate: Date): Promise
   return dailyOfflineStockRepository.getOpeningStock(productId, entryDate);
 }
 
-function calculate(opening: number, input: Required<OfflineEntryInput>) {
+function calculate(opening: number, input: Required<Omit<OfflineEntryInput, "openingStock">>) {
   const offlineStock = calculateOfflineStock(opening, input.stockInOlToOff, input.stockOutOffToOl);
   const remainingStock = calculateOfflineRemaining(offlineStock, input.productionIn, input.deliveryOut, input.backloads);
   return { offlineStock, remainingStock };
@@ -41,7 +44,7 @@ export async function getOfflineGrid(entryDate: Date) {
     if (existing) return { product, entry: existing, isSaved: true };
 
     const openingStock = openingStockByProduct.get(product.id) ?? 0;
-    const zero: Required<OfflineEntryInput> = {
+    const zero: Required<Omit<OfflineEntryInput, "openingStock">> = {
       stockInOlToOff: 0,
       stockOutOffToOl: 0,
       productionIn: 0,
@@ -61,8 +64,9 @@ export async function getOfflineGrid(entryDate: Date) {
 export async function saveOfflineEntry(productId: number, entryDate: Date, input: OfflineEntryInput, userId?: number) {
   const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate);
 
-  const openingStock = existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate);
-  const merged: Required<OfflineEntryInput> = {
+  const openingStock =
+    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate));
+  const merged: Required<Omit<OfflineEntryInput, "openingStock">> = {
     stockInOlToOff: input.stockInOlToOff ?? toNum(existing?.stockInOlToOff),
     stockOutOffToOl: input.stockOutOffToOl ?? toNum(existing?.stockOutOffToOl),
     productionIn: input.productionIn ?? toNum(existing?.productionIn),

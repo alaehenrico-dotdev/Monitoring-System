@@ -9,19 +9,12 @@ import { useAuth } from "../context/AuthContext";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
+import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
+import { formatDateDisplay } from "../utils/dateFormat";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-function formatDayHeading(day: string): string {
-  return new Date(`${day}T00:00:00`).toLocaleDateString(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
 }
 
 interface LineItem {
@@ -45,16 +38,30 @@ export function ReceiptsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [zoom, setZoom] = useZoom("receipts");
   const [query, setQuery] = useState("");
+  const [selectedReceipt, setSelectedReceipt] = useState<Receipt | null>(null);
 
   const [orderDate, setOrderDate] = useState(today());
   const [customer, setCustomer] = useState("");
   const [location, setLocation] = useState("");
+  const [salesRepName, setSalesRepName] = useState("");
   const [postToFulfillment, setPostToFulfillment] = useState(true);
   const [items, setItems] = useState<LineItem[]>([{ productId: 0, quantity: "" }]);
 
   useEffect(() => {
-    listReceipts().then(setReceipts);
-    listProducts().then(setProducts);
+    // Every fetch here needs its own .catch - without one, a failed request
+    // (an expired session, a network blip) left `receipts` stuck at `null`
+    // forever with nothing telling the user why: the "Recent Receipts"
+    // table below just silently stays on "Loading…" instead of showing an
+    // error or falling back to an empty list.
+    listReceipts()
+      .then(setReceipts)
+      .catch((e) => {
+        setError(e instanceof Error ? e.message : "Failed to load receipts");
+        setReceipts([]);
+      });
+    listProducts()
+      .then(setProducts)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load products"));
   }, []);
 
   function updateItem(index: number, patch: Partial<LineItem>) {
@@ -83,6 +90,7 @@ export function ReceiptsPage() {
         orderDate,
         customer,
         location,
+        salesRepName: salesRepName.trim() || undefined,
         postToFulfillment,
         items: validItems.map((it) => ({ productId: it.productId, quantity: Number(it.quantity) })),
       });
@@ -92,12 +100,25 @@ export function ReceiptsPage() {
       setReceipts((prev) => [saved, ...(prev ?? [])]);
       setCustomer("");
       setLocation("");
+      setSalesRepName("");
       setItems([{ productId: 0, quantity: "" }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save receipt");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Prints just the receipt preview dialog, not the page it was opened from
+  // - see the `body.ae-printing-receipt` rules in index.css and Modal's own
+  // doc comment for how the dialog stays on the page while everything else
+  // is hidden. `window.print()` blocks until the print dialog is dismissed
+  // in every browser this app targets, so it's safe to remove the class
+  // immediately after rather than needing an `afterprint` listener.
+  function handlePrintReceipt() {
+    document.body.classList.add("ae-printing-receipt");
+    window.print();
+    document.body.classList.remove("ae-printing-receipt");
   }
 
   // Mirrors the draft form state into the exact shape ReceiptCard expects,
@@ -116,40 +137,31 @@ export function ReceiptsPage() {
       orderDate,
       customer,
       location,
+      salesRepName: salesRepName.trim() || null,
       salesRepId: null,
       salesRep: null,
       createdBy: user ? { id: user.id, username: user.username, name: user.name, role: user.role } : null,
       createdAt: new Date().toISOString(),
       items: previewItems,
     };
-  }, [orderDate, customer, location, items, products, user]);
+  }, [orderDate, customer, location, items, products, user, salesRepName]);
 
-  const visibleReceipts = receipts?.filter((r) =>
-    matchesSearch([r.customer, r.location, ...r.items.map((it) => it.product.name)], query)
-  );
-
-  // Group receipts by order date (newest day first) so "Recent Receipts"
-  // reads as a day-by-day log instead of one long flat list.
-  const receiptsByDay = useMemo(() => {
-    const groups = new Map<string, Receipt[]>();
-    for (const r of visibleReceipts ?? []) {
-      const day = r.orderDate.slice(0, 10);
-      const bucket = groups.get(day);
-      if (bucket) bucket.push(r);
-      else groups.set(day, [r]);
-    }
-    return Array.from(groups.entries()).sort(([a], [b]) => (a < b ? 1 : a > b ? -1 : 0));
-  }, [visibleReceipts]);
+  // Newest first - matches the order the create endpoint's response gets
+  // prepended in, so a freshly-saved receipt appears at the top without a
+  // re-sort.
+  const visibleReceipts = receipts
+    ?.filter((r) => matchesSearch([r.customer, r.location, r.salesRepName, ...r.items.map((it) => it.product.name)], query))
+    .sort((a, b) => (a.orderDate < b.orderDate ? 1 : a.orderDate > b.orderDate ? -1 : b.id - a.id));
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 6px" }}>Receipts / Sales Orders</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, marginBottom: 16 }}>
+      <h2 style={{ margin: "0 0 3px" }}>Receipts / Sales Orders</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, marginBottom: 8 }}>
         Fill in the receipt on the left - the card on the right always shows exactly what will be saved.
       </p>
 
       <Toolbar>
-        <SearchInput value={query} onChange={setQuery} placeholder="Search customer, location, or product…" />
+        <SearchInput value={query} onChange={setQuery} placeholder="Search customer, location, sales rep, or product…" />
         <ToolbarControls>
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
@@ -186,10 +198,15 @@ export function ReceiptsPage() {
                 placeholder="Delivery address"
               />
             </FormRow>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 2 }}>
-              <span style={{ color: colors.subtleInk }}>Sales Rep</span>
-              <span style={{ color: colors.subtleInk }}>—</span>
-            </div>
+            <FormRow label="Sales Rep">
+              <input
+                className="ae-input"
+                style={receiptInputStyle}
+                value={salesRepName}
+                onChange={(e) => setSalesRepName(e.target.value)}
+                placeholder="Name"
+              />
+            </FormRow>
             <Divider />
 
             {items.map((item, i) => (
@@ -252,18 +269,62 @@ export function ReceiptsPage() {
       ) : visibleReceipts?.length === 0 ? (
         <p style={{ color: colors.subtleInk }}>{receipts.length === 0 ? "No receipts logged yet." : "No receipts match your search."}</p>
       ) : (
-        <div style={zoomStyle(zoom)}>
-          {receiptsByDay.map(([day, dayReceipts]) => (
-            <div key={day} style={{ marginBottom: 24 }}>
-              <h4 style={dayHeadingStyle}>{formatDayHeading(day)}</h4>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 28 }}>
-                {dayReceipts.map((r) => (
-                  <ReceiptCard key={r.id} receipt={r} />
-                ))}
-              </div>
-            </div>
-          ))}
+        /* Not .ae-table-scroll here on purpose - its flex:1/min-height:0 is
+           meant for a page where the table is the only thing below the
+           toolbar (StockGrid pages), stretching to fill whatever's left of
+           main's height. On this page the table sits under a good chunk of
+           entry-form content that isn't flex-sized, so that fill behavior
+           squeezed the wrapper down to a sliver - and since overflow-x:auto
+           forces overflow-y to compute as auto too (not visible), the
+           squeezed box quietly became its own tiny scroll container: every
+           row was still in the DOM, just invisible without scrolling a box
+           that didn't look scrollable. Plain overflow-x + the same
+           border/radius, natural (shrink-to-fit) height - the page itself
+           already scrolls via .ae-main. `table-scroll` (unprefixed) is kept -
+           it's only the print-safety class (index.css lifts its `overflow`
+           for printing), unrelated to the flex-fill class. */
+        <div className="table-scroll" style={{ ...zoomStyle(zoom), overflowX: "auto", border: "1px solid #e7dfc9", borderRadius: 10 }}>
+          <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th>Receipt #</th>
+                <th>Date</th>
+                <th>Customer</th>
+                <th>Location</th>
+                <th>Sales Rep</th>
+                <th style={{ textAlign: "right" }}>Items</th>
+                <th style={{ textAlign: "right" }}>Total Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visibleReceipts?.map((r) => (
+                <tr key={r.id} onClick={() => setSelectedReceipt(r)} style={{ cursor: "pointer" }} title="Click to preview and print">
+                  <td>#{String(r.id).padStart(6, "0")}</td>
+                  <td>{formatDateDisplay(r.orderDate.slice(0, 10))}</td>
+                  <td>{r.customer || "—"}</td>
+                  <td>{r.location || "—"}</td>
+                  <td>{r.salesRepName || "—"}</td>
+                  <td style={{ textAlign: "right" }}>{r.items.length}</td>
+                  <td style={{ textAlign: "right" }}>{r.items.reduce((sum, it) => sum + Number(it.quantity), 0)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+      )}
+
+      {selectedReceipt && (
+        <Modal title={`Receipt #${String(selectedReceipt.id).padStart(6, "0")}`} onClose={() => setSelectedReceipt(null)} width={340}>
+          <ReceiptCard receipt={selectedReceipt} />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }} className="no-print">
+            <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedReceipt(null)}>
+              Close
+            </Button>
+            <Button type="button" size="sm" onClick={handlePrintReceipt}>
+              Print
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );
@@ -284,14 +345,6 @@ const receiptInputStyle: CSSProperties = {
   fontSize: 12,
   textAlign: "right",
   padding: "3px 6px",
-};
-
-const dayHeadingStyle: CSSProperties = {
-  margin: "0 0 10px",
-  paddingBottom: 6,
-  borderBottom: `1px solid ${colors.goldDark}`,
-  fontSize: 13,
-  color: colors.subtleInk,
 };
 
 const removeButtonStyle: CSSProperties = {

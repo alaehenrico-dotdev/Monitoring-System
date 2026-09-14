@@ -10,6 +10,11 @@ const entrySchema = z.object({
   productionIn: z.number().min(0).optional(),
   fulfillmentOut: z.number().min(0).optional(),
   rts: z.number().min(0).optional(),
+  // Not user-editable in the live grid (auto-carried forward, Section 4.6)
+  // but settable via CSV import (see CsvTools.tsx) to seed a real starting
+  // balance on a file's first date - no .min(0), a negative opening stock
+  // is a real thing a business's own external sheet can already show.
+  openingStock: z.number().optional(),
 });
 
 export async function getOnlineStockGrid(req: Request, res: Response) {

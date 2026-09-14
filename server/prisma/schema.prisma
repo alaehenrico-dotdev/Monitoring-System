@@ -138,6 +138,10 @@ model Receipt {
   orderDate   DateTime @db.Date
   customer    String
   location    String
+  // Free text - the sales rep on an order isn't necessarily a system user
+  // with a login (kept salesRepId/salesRep below only for whatever old
+  // receipts already have one set; new receipts always go through this).
+  salesRepName String?
   salesRepId  Int?
   salesRep    User?    @relation("ReceiptSalesRep", fields: [salesRepId], references: [id])
   createdById Int?

@@ -63,37 +63,35 @@ export function VarianceReportPage() {
       {rows && (
         <>
           <p style={{ fontSize: 13, color: colors.subtleInk }}>{rows.length} flagged variance(s) found.</p>
-          <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 640 }}>
-            <thead>
-              <tr>
-                {["Date", "Location", "Category", "Product", "System", "Manual Count", "Variance", "Counted By"].map((h) => (
-                  <th key={h} style={thStyle}>
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ ...tdStyle, whiteSpace: "nowrap" }}>{r.entryDate.slice(0, 10)}</td>
-                  <td style={tdStyle}>{r.location}</td>
-                  <td style={{ ...tdStyle, textAlign: "left", whiteSpace: "nowrap" }}>{r.product.category}</td>
-                  <td style={nameCellStyle}>{r.product.name}</td>
-                  <td style={tdStyle}>{r.systemRemainingStock}</td>
-                  <td style={tdStyle}>{r.manualCount}</td>
-                  <td style={{ ...tdStyle, fontWeight: 700, color: Number(r.variance) < 0 ? colors.danger : colors.warningText }}>{r.variance}</td>
-                  <td style={tdStyle}>{r.countedBy?.name ?? "—"}</td>
+          <div className="ae-table-scroll table-scroll">
+            <table className="ae-table" style={{ minWidth: 640 }}>
+              <thead>
+                <tr>
+                  {["Date", "Location", "Category", "Product", "System", "Manual Count", "Variance", "Counted By"].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td style={{ whiteSpace: "nowrap" }}>{r.entryDate.slice(0, 10)}</td>
+                    <td>{r.location}</td>
+                    <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>{r.product.category}</td>
+                    <td style={nameCellStyle}>{r.product.name}</td>
+                    <td>{r.systemRemainingStock}</td>
+                    <td>{r.manualCount}</td>
+                    <td style={{ fontWeight: 700, color: Number(r.variance) < 0 ? colors.danger : colors.warningText }}>{r.variance}</td>
+                    <td>{r.countedBy?.name ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
     </div>
   );
 }
 
-const thStyle: CSSProperties = { textAlign: "left", padding: "5px 6px", borderBottom: `2px solid ${colors.black}`, background: colors.border, whiteSpace: "nowrap" };
-const tdStyle: CSSProperties = { textAlign: "right", padding: "3px 6px", borderBottom: `1px solid ${colors.border}` };
-const nameCellStyle: CSSProperties = { ...tdStyle, textAlign: "left", whiteSpace: "nowrap" };
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };

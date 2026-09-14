@@ -20,14 +20,12 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
   const grandTotal = rows.reduce((sum, r) => sum + r.totalRemainingStock, 0);
 
   return (
-    <div style={{ overflowX: "auto" }} className="table-scroll">
-      <table style={{ borderCollapse: "collapse", fontSize: 13, minWidth: 640 }}>
+    <div className="ae-table-scroll table-scroll">
+      <table className="ae-table" style={{ minWidth: 640 }}>
         <thead>
           <tr>
             {["Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"].map((h) => (
-              <th key={h} style={thStyle}>
-                {h}
-              </th>
+              <th key={h}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -42,28 +40,28 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
               {groupRows.map((r) => (
                 <tr key={r.product.id} style={r.totalVariance ? { background: colors.warningBg } : undefined}>
                   <td style={nameCellStyle}>{r.product.name}</td>
-                  <td style={tdStyle}>{r.onlineRemainingStock.toLocaleString()}</td>
-                  <td style={tdStyle}>{r.offlineRemainingStock.toLocaleString()}</td>
-                  <td style={{ ...tdStyle, fontWeight: 600 }}>{r.totalRemainingStock.toLocaleString()}</td>
-                  <td style={tdStyle}>{r.totalManualCount ?? "—"}</td>
-                  <td style={tdStyle}>{r.totalVariance ?? "—"}</td>
+                  <td>{r.onlineRemainingStock.toLocaleString()}</td>
+                  <td>{r.offlineRemainingStock.toLocaleString()}</td>
+                  <td style={{ fontWeight: 600 }}>{r.totalRemainingStock.toLocaleString()}</td>
+                  <td>{r.totalManualCount ?? "—"}</td>
+                  <td>{r.totalVariance ?? "—"}</td>
                 </tr>
               ))}
               <tr style={subtotalRowStyle}>
                 <td style={nameCellStyle}>Subtotal - {category}</td>
-                <td style={tdStyle}>{groupRows.reduce((s, r) => s + r.onlineRemainingStock, 0).toLocaleString()}</td>
-                <td style={tdStyle}>{groupRows.reduce((s, r) => s + r.offlineRemainingStock, 0).toLocaleString()}</td>
-                <td style={tdStyle}>{groupRows.reduce((s, r) => s + r.totalRemainingStock, 0).toLocaleString()}</td>
-                <td style={tdStyle} colSpan={2} />
+                <td>{groupRows.reduce((s, r) => s + r.onlineRemainingStock, 0).toLocaleString()}</td>
+                <td>{groupRows.reduce((s, r) => s + r.offlineRemainingStock, 0).toLocaleString()}</td>
+                <td>{groupRows.reduce((s, r) => s + r.totalRemainingStock, 0).toLocaleString()}</td>
+                <td colSpan={2} />
               </tr>
             </Fragment>
           ))}
           <tr style={grandTotalRowStyle}>
             <td style={nameCellStyle}>GRAND TOTAL</td>
-            <td style={tdStyle}>{rows.reduce((s, r) => s + r.onlineRemainingStock, 0).toLocaleString()}</td>
-            <td style={tdStyle}>{rows.reduce((s, r) => s + r.offlineRemainingStock, 0).toLocaleString()}</td>
-            <td style={tdStyle}>{grandTotal.toLocaleString()}</td>
-            <td style={tdStyle} colSpan={2} />
+            <td>{rows.reduce((s, r) => s + r.onlineRemainingStock, 0).toLocaleString()}</td>
+            <td>{rows.reduce((s, r) => s + r.offlineRemainingStock, 0).toLocaleString()}</td>
+            <td>{grandTotal.toLocaleString()}</td>
+            <td colSpan={2} />
           </tr>
         </tbody>
       </table>
@@ -71,15 +69,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
   );
 }
 
-const thStyle: CSSProperties = {
-  textAlign: "left",
-  padding: "5px 6px",
-  borderBottom: `2px solid ${colors.black}`,
-  background: colors.border,
-  whiteSpace: "nowrap",
-};
-const tdStyle: CSSProperties = { textAlign: "right", padding: "3px 6px", borderBottom: `1px solid ${colors.border}` };
-const nameCellStyle: CSSProperties = { ...tdStyle, textAlign: "left", whiteSpace: "nowrap" };
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };
 const categoryRowStyle: CSSProperties = {
   textAlign: "left",
   fontWeight: 700,

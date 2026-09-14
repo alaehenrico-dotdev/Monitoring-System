@@ -10,6 +10,8 @@ const entrySchema = z.object({
   productionIn: z.number().min(0).optional(),
   deliveryOut: z.number().min(0).optional(),
   backloads: z.number().min(0).optional(),
+  // See dailyOnlineStock.controller.ts's entrySchema - same reasoning.
+  openingStock: z.number().optional(),
 });
 
 export async function getOfflineStockGrid(req: Request, res: Response) {

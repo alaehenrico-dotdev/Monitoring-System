@@ -92,6 +92,8 @@ export interface Receipt {
   orderDate: string;
   customer: string;
   location: string;
+  /// Free text (Section 4.7) - not necessarily a system user.
+  salesRepName: string | null;
   salesRepId: number | null;
   salesRep: AuthUser | null;
   createdBy: AuthUser | null;

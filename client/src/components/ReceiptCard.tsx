@@ -72,7 +72,7 @@ export function ReceiptCard({ receipt, isPreview }: { receipt: Receipt; isPrevie
       <Row label="Date" value={receipt.orderDate.slice(0, 10)} />
       <Row label="Customer" value={receipt.customer || "—"} />
       <Row label="Location" value={receipt.location || "—"} />
-      <Row label="Sales Rep" value={receipt.salesRep?.name ?? "—"} />
+      <Row label="Sales Rep" value={receipt.salesRepName || "—"} />
       <Divider />
 
       {receipt.items.length === 0 ? (

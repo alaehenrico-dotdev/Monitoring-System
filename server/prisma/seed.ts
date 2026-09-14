@@ -3,9 +3,18 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
-// Section 4.1 - Product and Category Master List (example products from the
-// documentation plan). Admins can add/rename/deactivate/re-categorize products
-// from the app afterwards - this seed just gets the sheet's starting shape in.
+// Section 4.1 - Product and Category Master List, taken directly from the
+// business's actual monthly Online/Offline Stocks Monitoring reports
+// (Section 8.1, e.g. "Online Monitoring - Sept 10, 2026 online/offline"),
+// not the earlier placeholder guess - every name/category/order here
+// matches what's on those sheets exactly, so the CSV re-import (see
+// CsvTools.tsx) has real products to match against instead of a
+// documentation-plan approximation. Two things on the source sheets were
+// reconciled rather than copied literally: "TAKOYAKI SAUCE LITER" is listed
+// twice in a row in the online report (a duplicate line, not a second
+// product), and "Cassava" appears only in the online report's New Products
+// section, not the offline one - kept once here since it's still one
+// product shared by both grids, just with no offline activity that month.
 const PRODUCT_CATEGORIES: { category: string; unit: string; products: string[] }[] = [
   {
     category: "Premium (350ML)",
@@ -32,7 +41,7 @@ const PRODUCT_CATEGORIES: { category: string; unit: string; products: string[] }
       "Fish Sauce A",
       "Cane Vinegar White A",
       "Oyster Sauce A",
-      "Dark A",
+      "Oyster Sauce Dark A",
       "Toyo Mansi",
       "Catsup A",
       "Catsup for Burger",
@@ -54,6 +63,10 @@ const PRODUCT_CATEGORIES: { category: string; unit: string; products: string[] }
     ],
   },
   {
+    // The sheet itself is inconsistent here - every other item in this
+    // category is suffixed "A" but this one isn't ("Cane Vinegar Red", not
+    // "Cane Vinegar Red A") - kept exactly as the sheet has it rather than
+    // "fixing" what might be a real, separate product line.
     category: "Class A (Gallon)",
     unit: "Gallon",
     products: [
@@ -63,9 +76,9 @@ const PRODUCT_CATEGORIES: { category: string; unit: string; products: string[] }
       "Dark Soysauce A",
       "Fish Sauce A",
       "Cane Vinegar White A",
-      "Cane Vinegar Red A",
+      "Cane Vinegar Red",
       "Oyster Sauce A",
-      "Dark A",
+      "Oyster Sauce Dark A",
       "Toyo Mansi",
       "Catsup A",
       "Catsup for Burger",
@@ -83,19 +96,16 @@ const PRODUCT_CATEGORIES: { category: string; unit: string; products: string[] }
     category: "New Products",
     unit: "Mixed (L / gal / kg)",
     products: [
-      "Liquid Seasoning 200ML",
-      "Liquid Seasoning 600ML",
+      "Palm Oil Liter",
+      "Palm Oil Gallon",
       "Sukang Maligalig 750ML",
-      "Takoyaki Sauce (Liter)",
-      "Takoyaki Sauce (Gallon)",
+      "Takoyaki Sauce Liter",
       "Cassava",
       "Retail Salt",
       "Sack of Salt",
       "Chili Powder 1kg",
       "Black Pepper 1kg",
       "Onion Powder 1kg",
-      "Palm Oil (Liter)",
-      "Palm Oil (Gallon)",
     ],
   },
   {
