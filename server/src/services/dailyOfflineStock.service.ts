@@ -2,6 +2,7 @@ import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRe
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
+import { HttpError } from "../utils/HttpError";
 import { calculateOfflineRemaining, calculateOfflineStock, calculateOnlineRemaining, calculateOnlineStock, toNum } from "../utils/stockMath";
 
 const TABLE = "daily_offline_stock";
@@ -62,6 +63,8 @@ export async function getOfflineGrid(entryDate: Date) {
 
 /// Encoder-facing upsert for one product/date cell row (Section 4.3).
 export async function saveOfflineEntry(productId: number, entryDate: Date, input: OfflineEntryInput, userId?: number) {
+  const product = await productRepository.findActiveById(productId);
+  if (!product) throw HttpError.notFound("Active product not found");
   const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate);
 
   const openingStock =

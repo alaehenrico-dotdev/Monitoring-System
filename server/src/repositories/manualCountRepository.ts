@@ -31,9 +31,10 @@ export const manualCountRepository = {
     return prisma.manualCount.findMany({ where: { entryDate, location } });
   },
 
-  /// Used by the Total Stocks view (Section 4.5) to sum Online + Offline manual counts.
+  /// Used by the Total Stocks view (Section 4.5). A saved TOTAL count is the
+  /// authoritative combined count; ONLINE/OFFLINE counts remain the fallback.
   findForTotals(entryDate: Date) {
-    return prisma.manualCount.findMany({ where: { entryDate, location: { in: ["ONLINE", "OFFLINE"] } } });
+    return prisma.manualCount.findMany({ where: { entryDate, location: { in: ["ONLINE", "OFFLINE", "TOTAL"] } } });
   },
 
   upsert(id: number | undefined, data: ManualCountData) {

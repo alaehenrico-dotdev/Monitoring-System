@@ -98,9 +98,13 @@ table input[type="number"] {
 .ae-table-scroll {
   overflow-x: auto;
   border: 1px solid #e7dfc9;
-  border-radius: 10px;
+  border-radius: 0;
   flex: 1;
   min-height: 0;
+  margin: 0 -24px -24px;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
 }
 
 /* Shared form controls (see client/src/components/ui.tsx) - every text
@@ -113,7 +117,7 @@ table input[type="number"] {
   font-size: 13px;
   padding: 7px 10px;
   border: 1px solid #e7dfc9;
-  border-radius: 8px;
+  border-radius: 999px;
   background: #fff;
   color: #241d14;
   transition:
@@ -183,10 +187,10 @@ table input[type="number"] {
 .ae-btn {
   font-family: inherit;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1.2;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 999px;
   cursor: pointer;
   border: 1px solid transparent;
   transition:
@@ -237,8 +241,8 @@ table input[type="number"] {
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 14px;
-  padding: 5px 10px;
-  margin-bottom: 10px;
+  padding: 5px 6px;
+  margin: 0 -20px 10px;
   background: #fff;
   border-radius: 999px;
   box-shadow: 0 1px 3px rgba(20, 17, 13, 0.06);
@@ -268,57 +272,81 @@ table input[type="number"] {
   border: none;
   border-radius: 999px;
   padding: 6px 12px;
+  font-weight: 700;
   /* background-color, not the `background` shorthand - a shorthand also
      resets background-image to none, which would silently strip
      .ae-select's own chevron image (below) whenever a select is used
      inside a toolbar. */
-  background-color: #e8f0fe;
+  background-color: #ffd400;
+  color: #14110d;
 }
 .ae-toolbar .ae-input:focus,
 .ae-toolbar .ae-select:focus {
   box-shadow: 0 0 0 2px rgba(201, 154, 46, 0.35);
-  background-color: #fff;
+  background-color: #ffd400;
+  color: #14110d;
 }
 .ae-toolbar .ae-input:disabled,
 .ae-toolbar .ae-select:disabled {
-  background-color: #f3efe4;
+  background-color: #e4b94d;
+  color: #14110d;
 }
 .ae-toolbar .ae-btn {
   border: none;
   border-radius: 999px;
   padding: 6px 14px;
+  background: #ffd400;
+  color: #14110d;
+  font-weight: 700;
 }
 .ae-toolbar .ae-btn-sm {
   padding: 4px 9px;
 }
+.ae-toolbar .ae-toolbar-save {
+  height: 32px;
+  min-width: 72px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
 .ae-toolbar .ae-btn-secondary {
-  background: #e8f0fe;
+  background: #ffd400;
 }
 .ae-toolbar .ae-btn-ghost {
-  background: #e8f0fe;
+  background: #ffd400;
 }
 .ae-toolbar .ae-btn-danger {
-  background: #fbe9ea;
+  background: #ffd400;
+  color: #14110d;
 }
 .ae-toolbar .ae-segment-group {
   border: none;
   border-radius: 999px;
-  background: #e8f0fe;
+  background: #ffd400;
 }
 .ae-toolbar .ae-segment-divider {
-  background: rgba(26, 115, 232, 0.16);
+  background: #c99a2e;
 }
 .ae-toolbar .ae-segment-btn {
   padding: 0 10px;
+  color: #14110d;
+  font-weight: 700;
 }
 .ae-toolbar .ae-segment-btn:hover:not(:disabled) {
-  background: rgba(26, 115, 232, 0.1);
+  background: #e4b94d;
 }
 .ae-toolbar .ae-segment-btn:active:not(:disabled) {
-  background: rgba(26, 115, 232, 0.18);
+  background: #c99a2e;
 }
 .ae-toolbar .ae-segment-select:focus {
-  background: rgba(26, 115, 232, 0.1);
+  background: #e4b94d;
+  color: #14110d;
+}
+.ae-toolbar .ae-segment-select {
+  color: #14110d;
+  font-weight: 700;
 }
 
 /* .ae-toolbar--compact is applied by Toolbar.tsx, not a width breakpoint -
@@ -346,6 +374,26 @@ table input[type="number"] {
 }
 .ae-toolbar--compact input[type="search"] {
   width: 120px !important;
+}
+
+/* Entry toolbars contain the largest action cluster. Keep their outer row
+   stable while the sidebar changes width; compact mode handles the controls
+   themselves instead of allowing a one-frame wrap/bounce. */
+.ae-toolbar-entry {
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+.ae-toolbar-entry .ae-toolbar-controls {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.ae-sidebar-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ae-sidebar-nav::-webkit-scrollbar {
+  display: none;
 }
 
 /* Segmented control group - the "one cohesive pill" pattern used by zoom
@@ -421,6 +469,7 @@ table input[type="number"] {
    can be told to fill the rest of main's height below - see `.ae-main > div`
    and `.ae-grid-fill` just below. */
 .ae-main {
+  min-width: 0;
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -431,10 +480,20 @@ table input[type="number"] {
    instead of the browser's ~1em UA default). Pages that set their own full
    margin inline still take precedence, per the normal cascade. */
 .ae-main h2 {
-  margin: 0 0 3px;
+  margin: -8px 0 0;
 }
 .ae-main p {
   margin: 0 0 8px;
+}
+/* The toolbar extends beyond main's padding, so the page title and intro
+   line follow its left edge when the sidebar is in its normal rail state. */
+.ae-main > div > h2:first-child,
+.ae-main > div > h2:first-child + p {
+  position: relative;
+  left: -12px;
+}
+.ae-main > div > h2:first-child {
+  margin-top: -16px !important;
 }
 /* Every page renders exactly one root element - stretch it to fill
    whatever height main actually has, and make it a flex column in turn,
@@ -479,18 +538,54 @@ body.ae-sidebar-collapsed-icon .ae-main {
 }
 body.ae-sidebar-collapsed-icon .ae-main h2:first-child,
 body.ae-sidebar-collapsed-icon .ae-main h2:first-child + p {
+  left: 0;
   padding-left: 48px;
+}
+body.ae-sidebar-collapsed-icon .ae-main h2:first-child {
+  margin-top: -8px !important;
+}
+/* Pages without an intro paragraph put the toolbar immediately after the
+   title. Keep a small gap in the floating-logo state so the logo has clear
+   space beside the toolbar instead of overlapping its top edge. */
+body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
+  margin-top: 20px;
 }
 
 @media (max-width: 900px) {
   .ae-main {
     padding: 16px;
   }
+  .ae-toolbar {
+    margin-left: -16px;
+    margin-right: -16px;
+  }
+  .ae-main > div > h2:first-child,
+  .ae-main > div > h2:first-child + p {
+    left: -8px;
+  }
+  .ae-table-scroll {
+    margin: 0 -16px -16px;
+  }
 }
 
 @media (max-width: 520px) {
   .ae-main {
     padding: 12px;
+  }
+  .ae-toolbar {
+    margin-left: -12px;
+    margin-right: -12px;
+  }
+  .ae-main > div > h2:first-child,
+  .ae-main > div > h2:first-child + p {
+    left: -6px;
+  }
+  .ae-main > div > h2:first-child,
+  .ae-main > div > h2:first-child + p {
+    left: -12px;
+  }
+  .ae-table-scroll {
+    margin: 0 -12px -12px;
   }
   .ae-toolbar {
     padding: 6px 8px;

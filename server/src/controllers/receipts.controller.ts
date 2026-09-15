@@ -11,7 +11,7 @@ const createSchema = z.object({
   salesRepName: z.string().optional(),
   postToFulfillment: z.boolean().optional(),
   items: z
-    .array(z.object({ productId: z.number(), quantity: z.number().positive() }))
+    .array(z.object({ productId: z.number().int().positive(), quantity: z.number().finite().positive() }))
     .min(1),
 });
 

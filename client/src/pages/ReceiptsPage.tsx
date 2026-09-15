@@ -12,6 +12,7 @@ import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { PrinterIcon } from "../components/icons";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -155,8 +156,8 @@ export function ReceiptsPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 3px" }}>Receipts / Sales Orders</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, marginBottom: 8 }}>
+      <h2 style={{ margin: "-8px 0 0px" }}>Receipts / Sales Orders</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
         Fill in the receipt on the left - the card on the right always shows exactly what will be saved.
       </p>
 
@@ -167,8 +168,8 @@ export function ReceiptsPage() {
         </ToolbarControls>
       </Toolbar>
 
-      <div style={{ ...zoomStyle(zoom), display: "flex", gap: 28, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 36 }}>
-        <form onSubmit={handleSubmit}>
+      <div style={{ ...zoomStyle(zoom), display: "flex", gap: 28, flex: 1, minHeight: 0, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 0 }}>
+        <form onSubmit={handleSubmit} style={{ marginTop: 34 }}>
           <ReceiptPaper>
             <Divider />
             <FormRow label="Date">
@@ -260,58 +261,47 @@ export function ReceiptsPage() {
           </ReceiptPaper>
         </form>
 
-        <ReceiptCard receipt={previewReceipt} isPreview />
-      </div>
-
-      <h3 style={{ marginBottom: 12 }}>Recent Receipts</h3>
-      {!receipts ? (
-        <p>Loading…</p>
-      ) : visibleReceipts?.length === 0 ? (
-        <p style={{ color: colors.subtleInk }}>{receipts.length === 0 ? "No receipts logged yet." : "No receipts match your search."}</p>
-      ) : (
-        /* Not .ae-table-scroll here on purpose - its flex:1/min-height:0 is
-           meant for a page where the table is the only thing below the
-           toolbar (StockGrid pages), stretching to fill whatever's left of
-           main's height. On this page the table sits under a good chunk of
-           entry-form content that isn't flex-sized, so that fill behavior
-           squeezed the wrapper down to a sliver - and since overflow-x:auto
-           forces overflow-y to compute as auto too (not visible), the
-           squeezed box quietly became its own tiny scroll container: every
-           row was still in the DOM, just invisible without scrolling a box
-           that didn't look scrollable. Plain overflow-x + the same
-           border/radius, natural (shrink-to-fit) height - the page itself
-           already scrolls via .ae-main. `table-scroll` (unprefixed) is kept -
-           it's only the print-safety class (index.css lifts its `overflow`
-           for printing), unrelated to the flex-fill class. */
-        <div className="table-scroll" style={{ ...zoomStyle(zoom), overflowX: "auto", border: "1px solid #e7dfc9", borderRadius: 10 }}>
-          <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
-            <thead>
-              <tr>
-                <th>Receipt #</th>
-                <th>Date</th>
-                <th>Customer</th>
-                <th>Location</th>
-                <th>Sales Rep</th>
-                <th style={{ textAlign: "right" }}>Items</th>
-                <th style={{ textAlign: "right" }}>Total Qty</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleReceipts?.map((r) => (
-                <tr key={r.id} onClick={() => setSelectedReceipt(r)} style={{ cursor: "pointer" }} title="Click to preview and print">
-                  <td>#{String(r.id).padStart(6, "0")}</td>
-                  <td>{formatDateDisplay(r.orderDate.slice(0, 10))}</td>
-                  <td>{r.customer || "—"}</td>
-                  <td>{r.location || "—"}</td>
-                  <td>{r.salesRepName || "—"}</td>
-                  <td style={{ textAlign: "right" }}>{r.items.length}</td>
-                  <td style={{ textAlign: "right" }}>{r.items.reduce((sum, it) => sum + Number(it.quantity), 0)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={{ marginTop: 34 }}>
+          <ReceiptCard receipt={previewReceipt} isPreview />
         </div>
-      )}
+        <div style={{ display: "flex", flexDirection: "column", flex: "1 1 420px", minWidth: 320, minHeight: 0 }}>
+          <h3 style={{ margin: "0 0 12px" }}>Recent Receipts</h3>
+          {!receipts ? (
+            <p>Loading…</p>
+          ) : visibleReceipts?.length === 0 ? (
+            <p style={{ color: colors.subtleInk }}>{receipts.length === 0 ? "No receipts logged yet." : "No receipts match your search."}</p>
+          ) : (
+            <div className="table-scroll" style={{ ...zoomStyle(zoom), flex: 1, minHeight: 0, overflow: "auto", border: "1px solid #e7dfc9", borderRadius: 10 }}>
+              <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
+                <thead>
+                  <tr>
+                    <th>Receipt #</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Location</th>
+                    <th>Sales Rep</th>
+                    <th style={{ textAlign: "right" }}>Items</th>
+                    <th style={{ textAlign: "right" }}>Total Qty</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleReceipts?.map((r) => (
+                    <tr key={r.id} onClick={() => setSelectedReceipt(r)} style={{ cursor: "pointer" }} title="Click to preview and print">
+                      <td>#{String(r.id).padStart(6, "0")}</td>
+                      <td>{formatDateDisplay(r.orderDate.slice(0, 10))}</td>
+                      <td>{r.customer || "—"}</td>
+                      <td>{r.location || "—"}</td>
+                      <td>{r.salesRepName || "—"}</td>
+                      <td style={{ textAlign: "right" }}>{r.items.length}</td>
+                      <td style={{ textAlign: "right" }}>{r.items.reduce((sum, it) => sum + Number(it.quantity), 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
 
       {selectedReceipt && (
         <Modal title={`Receipt #${String(selectedReceipt.id).padStart(6, "0")}`} onClose={() => setSelectedReceipt(null)} width={340}>
@@ -320,8 +310,8 @@ export function ReceiptsPage() {
             <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedReceipt(null)}>
               Close
             </Button>
-            <Button type="button" size="sm" onClick={handlePrintReceipt}>
-              Print
+            <Button type="button" size="sm" onClick={handlePrintReceipt} title="Print or save as PDF">
+              <PrinterIcon /> PDF
             </Button>
           </div>
         </Modal>

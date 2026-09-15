@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { Button, TextInput } from "../components/ui";
 import { StockGrid, type GridRow } from "../components/StockGrid";
@@ -8,6 +8,9 @@ import { onlineStockColumns, offlineStockColumns } from "../config/stockColumns"
 import { toCsv, downloadCsv } from "../utils/csv";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
+import { Link, useSearchParams } from "react-router-dom";
+import { recordReportHistory } from "../utils/reportHistory";
+import { PrinterIcon } from "../components/icons";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -32,14 +35,34 @@ async function noop() {}
  * category grouping/subtotals and proper number formatting for free.
  */
 export function DailyReportPage() {
-  const [date, setDate] = useState(today());
+  const [searchParams] = useSearchParams();
+  const [date, setDate] = useState(searchParams.get("date") ?? today());
   const [report, setReport] = useState<DailyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const printAfterLoad = useRef(searchParams.get("history") === "1");
+
+  useEffect(() => {
+    if (searchParams.get("history") === "1") load();
+    // History links intentionally generate the selected report once on open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!report || !printAfterLoad.current) return;
+    printAfterLoad.current = false;
+    const frame = requestAnimationFrame(() => window.print());
+    return () => cancelAnimationFrame(frame);
+  }, [report]);
 
   function load() {
     setError(null);
     getDailyReport(date)
-      .then(setReport)
+      .then((nextReport) => {
+        setReport(nextReport);
+        if (searchParams.get("history") !== "1") {
+          recordReportHistory({ type: "Daily Report", scope: nextReport.date, route: `/daily-report?history=1&date=${nextReport.date}` });
+        }
+      })
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to build report"));
   }
 
@@ -68,11 +91,14 @@ export function DailyReportPage() {
               <Button variant="secondary" onClick={handleExport}>
                 Export CSV
               </Button>
-              <Button variant="secondary" onClick={() => window.print()}>
-                Print
+              <Button variant="secondary" onClick={() => window.print()} title="Print or save as PDF">
+                <PrinterIcon /> PDF
               </Button>
             </>
           )}
+          <Link to="/daily-report-history" className="ae-btn ae-btn-secondary ae-btn-sm" style={{ textDecoration: "none" }}>
+            Daily History
+          </Link>
         </div>
       </Toolbar>
 

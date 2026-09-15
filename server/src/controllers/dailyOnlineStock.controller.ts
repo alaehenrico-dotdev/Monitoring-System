@@ -24,6 +24,7 @@ export async function getOnlineStockGrid(req: Request, res: Response) {
 
 export async function putOnlineStockEntry(req: Request, res: Response) {
   const productId = Number(req.params.productId);
+  if (!Number.isSafeInteger(productId) || productId <= 0) throw HttpError.badRequest("Invalid product id");
   const entryDate = parseDateOnly(req.query.date ?? req.body?.date);
   const parsed = entrySchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid online stock entry", parsed.error.flatten());

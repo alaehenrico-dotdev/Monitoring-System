@@ -12,6 +12,9 @@ import { VarianceReportPage } from "./pages/VarianceReportPage";
 import { DailyReportPage } from "./pages/DailyReportPage";
 import { ProductsAdminPage } from "./pages/ProductsAdminPage";
 import { ChangeLogPage } from "./pages/ChangeLogPage";
+import { DashboardPage } from "./pages/DashboardPage";
+import { DailyReportHistoryPage } from "./pages/DailyReportHistoryPage";
+import { VarianceReportHistoryPage } from "./pages/VarianceReportHistoryPage";
 
 export default function App() {
   return (
@@ -29,6 +32,9 @@ export default function App() {
             <Route path="/receipts" element={<ReceiptsPage />} />
 
             <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
+              <Route path="/daily-report-history" element={<DailyReportHistoryPage />} />
+              <Route path="/variance-report-history" element={<VarianceReportHistoryPage />} />
               <Route path="/variance-report" element={<VarianceReportPage />} />
               <Route path="/daily-report" element={<DailyReportPage />} />
               <Route path="/change-log" element={<ChangeLogPage />} />

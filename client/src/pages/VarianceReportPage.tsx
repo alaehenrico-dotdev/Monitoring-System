@@ -1,7 +1,10 @@
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { getVarianceReport } from "../api/manualCounts";
 import { Button, Field, TextInput } from "../components/ui";
 import { colors } from "../theme";
+import { Link, useSearchParams } from "react-router-dom";
+import { recordReportHistory } from "../utils/reportHistory";
+import { PrinterIcon } from "../components/icons";
 
 interface VarianceRow {
   id: number;
@@ -24,11 +27,26 @@ function daysAgo(n: number): string {
 /// product/category/location, to spot recurring problem SKUs (Section 4.4
 /// calls out Toyo Mansi and Oyster Sauce A as historically the largest).
 export function VarianceReportPage() {
-  const [startDate, setStartDate] = useState(daysAgo(30));
-  const [endDate, setEndDate] = useState(daysAgo(0));
-  const [category, setCategory] = useState("");
+  const [searchParams] = useSearchParams();
+  const [startDate, setStartDate] = useState(searchParams.get("startDate") ?? daysAgo(30));
+  const [endDate, setEndDate] = useState(searchParams.get("endDate") ?? daysAgo(0));
+  const [category, setCategory] = useState(searchParams.get("category") ?? "");
   const [rows, setRows] = useState<VarianceRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const printAfterLoad = useRef(searchParams.get("history") === "1");
+
+  useEffect(() => {
+    if (searchParams.get("history") === "1") void runReport();
+    // History links intentionally generate the selected report once on open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!rows || !printAfterLoad.current) return;
+    printAfterLoad.current = false;
+    const frame = requestAnimationFrame(() => window.print());
+    return () => cancelAnimationFrame(frame);
+  }, [rows]);
 
   async function runReport(e?: FormEvent) {
     e?.preventDefault();
@@ -37,6 +55,11 @@ export function VarianceReportPage() {
     try {
       const data = (await getVarianceReport({ startDate, endDate, category: category || undefined })) as VarianceRow[];
       setRows(data);
+      const params = new URLSearchParams({ history: "1", startDate, endDate });
+      if (category) params.set("category", category);
+      if (searchParams.get("history") !== "1") {
+        recordReportHistory({ type: "Variance Report", scope: `${startDate} to ${endDate}`, route: `/variance-report?${params}` });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load report");
     }
@@ -44,7 +67,10 @@ export function VarianceReportPage() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Variance Report</h2>
+      <h2 style={{ margin: "-8px 0 0px" }}>Variance Report</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
+        Review differences between recorded stock and manual counts.
+      </p>
       <form onSubmit={runReport} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
         <Field label="From">
           <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
@@ -56,6 +82,9 @@ export function VarianceReportPage() {
           <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Premium (Liter)" />
         </Field>
         <Button type="submit">Run report</Button>
+        <Link to="/variance-report-history" className="ae-btn ae-btn-secondary ae-btn-sm" style={{ textDecoration: "none" }}>
+          Variance History
+        </Link>
       </form>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
@@ -87,6 +116,11 @@ export function VarianceReportPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }} className="no-print">
+            <Button variant="secondary" onClick={() => window.print()} title="Print or save as PDF">
+              <PrinterIcon /> PDF
+            </Button>
           </div>
         </>
       )}

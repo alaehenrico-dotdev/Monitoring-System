@@ -36,7 +36,13 @@ export async function getTotalStocksGrid(entryDate: Date) {
     const totalRemainingStock = toNum(online?.remainingStock) + toNum(offline?.remainingStock);
 
     const counts = manualByProduct.get(product.id) ?? [];
-    const totalManualCount = counts.length ? counts.reduce((sum, c) => sum + toNum(c.manualCount), 0) : null;
+    const totalCount = counts.find((count) => count.location === "TOTAL");
+    const locationCount = counts.filter((count) => count.location !== "TOTAL");
+    const totalManualCount = totalCount
+      ? toNum(totalCount.manualCount)
+      : locationCount.length
+        ? locationCount.reduce((sum, c) => sum + toNum(c.manualCount), 0)
+        : null;
     const totalVariance = totalManualCount === null ? null : totalRemainingStock - totalManualCount;
 
     return {

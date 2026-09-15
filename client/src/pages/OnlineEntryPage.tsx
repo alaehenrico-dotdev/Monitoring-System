@@ -4,8 +4,8 @@ import { getOnlineGrid, saveOnlineEntry } from "../api/onlineStock";
 import { useAuth } from "../context/AuthContext";
 import { Button, TextInput } from "../components/ui";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
-import { CsvTools } from "../components/CsvTools";
-import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
+import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PrinterIcon, UndoIcon } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { Modal } from "../components/Modal";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
@@ -43,9 +43,7 @@ export function OnlineEntryPage() {
   // exactly what's about to be submitted first (Section 3.1).
   const { pending, displayRows, stage, clear, clearAll, pendingCount } = usePendingEntryChanges(rows);
 
-  // Search only affects what's displayed in the grid - CsvTools keeps
-  // working off the full, unfiltered `rows` so import-matching and export
-  // still cover every product regardless of the current search text.
+  // Search only affects what's displayed in the grid.
   const visibleRows = displayRows?.filter((r) => matchesSearch([r.product.name, r.product.category], query));
 
   useEffect(() => {
@@ -151,48 +149,14 @@ export function OnlineEntryPage() {
     if (failed.length) setError(`Failed to undo: ${failed.join(", ")}.`);
   }
 
-  // PDF export just prints the current page, which would otherwise silently
-  // include cells that are only staged locally and were never actually
-  // saved - this pauses that print behind a confirmation whenever there's
-  // anything still unsaved (see CsvTools' onBeforePrint), resolved once the
-  // user picks Save & Print / Print Anyway / Cancel in the modal below.
-  const [printConfirmResolve, setPrintConfirmResolve] = useState<((proceed: boolean) => void) | null>(null);
-
-  function handleBeforePrint(): Promise<boolean> {
-    if (pendingCount === 0) return Promise.resolve(true);
-    return new Promise<boolean>((resolve) => setPrintConfirmResolve(() => resolve));
-  }
-
-  function resolvePrintConfirm(proceed: boolean) {
-    printConfirmResolve?.(proceed);
-    setPrintConfirmResolve(null);
-  }
-
-  async function handleSaveThenPrint() {
-    resolvePrintConfirm(await handleSaveAll());
-  }
-
-  // CSV import applies every editable column present in the file for one
-  // product/date in a single request, then merges the result exactly like a
-  // manual cell edit would (Section 3.1 - bulk correction via a spreadsheet
-  // file instead of retyping cell by cell). Bypasses the staging above and
-  // saves immediately - it's already a deliberate, reviewed bulk action of
-  // its own (the file itself is the "preview"), not a cell someone is still
-  // in the middle of typing.
-  async function handleImportRow(productId: number, values: Record<string, number>) {
-    const saved = await saveOnlineEntry(productId, date, values);
-    mergeEntry(productId, saved);
-  }
-
   return (
     <div>
-      <h2 style={{ margin: "0 0 3px" }}>Daily Online Stock Monitoring - {formatDateDisplay(date)}</h2>
+      <h2 style={{ margin: "-8px 0 0px" }}>Daily Online Stock Monitoring - {formatDateDisplay(date)}</h2>
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
         Stocks In/Out transfers entered here mirror automatically onto the Offline table (Section 4.3).
       </p>
-      <Toolbar className="no-print">
+      <Toolbar className="no-print ae-toolbar-entry">
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
           {canEdit && (
             <Button
               type="button"
@@ -200,52 +164,25 @@ export function OnlineEntryPage() {
               size="sm"
               onClick={handleUndoLastSave}
               disabled={!lastSavedBatch || undoing}
-              title="Revert the changes from your last Save"
+              aria-label="Undo last save"
+              title="Undo last save"
+              style={{ width: 30, height: 30, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
             >
-              {undoing ? "Undoing…" : "Undo"}
+              <UndoIcon />
             </Button>
           )}
           <SearchInput value={query} onChange={setQuery} placeholder="Search product or category…" />
+          <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
         </div>
         <ToolbarControls>
-          {rows && (
-            <>
-              <CsvTools
-                filenamePrefix="online-stock"
-                date={date}
-                rows={rows}
-                columns={columns}
-                onImportRow={handleImportRow}
-                canImport={canEdit}
-                onBeforePrint={handleBeforePrint}
-              />
-              <ToolbarDivider />
-            </>
-          )}
           {canEdit && (
-            <>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowPreview(true)}
-                disabled={pendingCount === 0}
-                title="Review unsaved changes before saving"
-              >
-                Preview{pendingCount > 0 ? ` (${pendingCount})` : ""}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleSaveAll}
-                disabled={pendingCount === 0 || saving}
-                title="Save every unsaved change"
-              >
-                {saving ? "Saving…" : `Save${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
-              </Button>
-              <ToolbarDivider />
-            </>
+            <Button className="ae-toolbar-save" type="button" variant="secondary" size="sm" onClick={() => setShowPreview(true)} disabled={pendingCount === 0} title="Review and save changes">
+              Save{pendingCount > 0 ? ` (${pendingCount})` : ""}
+            </Button>
           )}
+          <Button className="ae-toolbar-save" type="button" variant="secondary" size="sm" onClick={() => window.print()} title="Print or save as PDF">
+            <PrinterIcon /> PDF
+          </Button>
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
       </Toolbar>
@@ -267,26 +204,6 @@ export function OnlineEntryPage() {
             </Button>
             <Button type="button" size="sm" onClick={handleSaveAll} disabled={pendingCount === 0 || saving}>
               {saving ? "Saving…" : `Save (${pendingCount})`}
-            </Button>
-          </div>
-        </Modal>
-      )}
-      {printConfirmResolve && (
-        <Modal title="Unsaved changes" onClose={() => resolvePrintConfirm(false)}>
-          <p style={{ marginTop: 0 }}>
-            You have {pendingCount} unsaved change{pendingCount === 1 ? "" : "s"}. The PDF will reflect exactly what's on
-            screen either way (including any unsaved edits) - Save first if you want those durably recorded too, not just
-            printed.
-          </p>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
-            <Button type="button" variant="secondary" size="sm" onClick={() => resolvePrintConfirm(false)}>
-              Cancel
-            </Button>
-            <Button type="button" variant="secondary" size="sm" onClick={() => resolvePrintConfirm(true)}>
-              Print anyway
-            </Button>
-            <Button type="button" size="sm" onClick={handleSaveThenPrint} disabled={saving}>
-              {saving ? "Saving…" : "Save & Print"}
             </Button>
           </div>
         </Modal>

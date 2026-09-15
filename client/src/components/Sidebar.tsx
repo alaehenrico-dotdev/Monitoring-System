@@ -44,6 +44,7 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
   {
     heading: "Data Entry",
     links: [
+      { to: "/dashboard", label: "Dashboard", abbr: "DB", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/online", label: "Online Entry", abbr: "ON", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/offline", label: "Offline Entry", abbr: "OF", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/total-stocks", label: "Total Stocks", abbr: "TS", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
@@ -256,7 +257,7 @@ export function Sidebar() {
             transition={spring}
             style={{ pointerEvents: collapsed ? "none" : "auto", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
           >
-            <div style={{ display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+            <div className="ae-sidebar-nav" style={{ display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
               {sections.map((section) => {
                 const visible = section.links.filter((l) => !user || l.roles.includes(user.role));
                 if (visible.length === 0) return null;

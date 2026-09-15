@@ -65,8 +65,8 @@ export function ChangeLogPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 3px" }}>Change Log</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, marginBottom: 8 }}>
+      <h2 style={{ margin: "-8px 0 0px" }}>Change Log</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
         Every create/update/delete across the app, attributed and timestamped - click a row to see exactly what changed.
       </p>
 

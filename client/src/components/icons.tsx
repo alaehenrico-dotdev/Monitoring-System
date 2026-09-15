@@ -34,6 +34,15 @@ export function PlusIcon() {
   );
 }
 
+export function UndoIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5.5 4 2.5 7l3 3" />
+      <path d="M3 7h6.5a4 4 0 0 1 4 4v1" />
+    </svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

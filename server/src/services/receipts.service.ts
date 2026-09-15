@@ -3,6 +3,7 @@ import { recordChange } from "./changeLog.service";
 import { addFulfillmentFromReceipt } from "./dailyOnlineStock.service";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
+import { productRepository } from "../repositories/productRepository";
 
 const TABLE = "receipts";
 
@@ -30,6 +31,10 @@ export interface CreateReceiptInput {
  */
 export async function createReceipt(input: CreateReceiptInput, createdById?: number) {
   if (!input.items.length) throw HttpError.badRequest("A receipt needs at least one order item");
+
+  const productIds = [...new Set(input.items.map((item) => item.productId))];
+  const products = await Promise.all(productIds.map((productId) => productRepository.findActiveById(productId)));
+  if (products.some((product) => !product)) throw HttpError.badRequest("Receipt contains an inactive or unknown product");
 
   const receipt = await receiptRepository.create({
     orderDate: input.orderDate,

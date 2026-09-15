@@ -21,6 +21,7 @@ export async function getOfflineStockGrid(req: Request, res: Response) {
 
 export async function putOfflineStockEntry(req: Request, res: Response) {
   const productId = Number(req.params.productId);
+  if (!Number.isSafeInteger(productId) || productId <= 0) throw HttpError.badRequest("Invalid product id");
   const entryDate = parseDateOnly(req.query.date ?? req.body?.date);
   const parsed = entrySchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid offline stock entry", parsed.error.flatten());

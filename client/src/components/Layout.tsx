@@ -13,7 +13,7 @@ export function Layout() {
     <div className="app-shell" style={{ fontFamily: fonts.body, height: "100vh", display: "flex", overflow: "hidden" }}>
       <Sidebar />
 
-      <main className="ae-main" style={{ flex: 1, height: "100%", overflow: "auto", background: colors.paper, color: colors.ink }}>
+      <main className="ae-main" style={{ flex: 1, height: "100%", overflowX: "hidden", overflowY: "auto", background: colors.paper, color: colors.ink }}>
         <Outlet />
       </main>
     </div>

@@ -57,6 +57,8 @@ interface CsvToolsProps {
   onImportRow: (productId: number, values: Record<string, number>) => Promise<void>;
   /// Writers only - readers can still Export but shouldn't see Import.
   canImport: boolean;
+  /// Keeps the toolbar footprint stable while a grid is loading.
+  disabled?: boolean;
   /// Runs before PDF/print - on the data entry pages this is where an
   /// unsaved-changes confirmation lives (Section 3.1), since printing the
   /// current page can otherwise ship a PDF of edits that were never
@@ -74,7 +76,7 @@ interface CsvToolsProps {
  * re-import, which is the more common real-world bulk-correction workflow
  * than pasting a raw block of cells.
  */
-export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, canImport, onBeforePrint }: CsvToolsProps) {
+export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, canImport, disabled = false, onBeforePrint }: CsvToolsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -238,7 +240,7 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <div className="ae-segment-group" aria-label="Export/Import" title="Export/Import">
-        <button type="button" className="ae-segment-btn" onClick={handleExport} title="Export">
+        <button type="button" className="ae-segment-btn" onClick={handleExport} disabled={disabled} title="Export">
           <UploadIcon />
           <span className="ae-segment-label">Export</span>
         </button>
@@ -250,6 +252,7 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
             if (onBeforePrint && !(await onBeforePrint())) return;
             window.print();
           }}
+          disabled={disabled}
           title="Export as PDF (choose 'Save as PDF' in the print dialog)"
         >
           <PrinterIcon />
@@ -262,7 +265,7 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
               type="button"
               className="ae-segment-btn"
               onClick={() => fileInputRef.current?.click()}
-              disabled={busy}
+              disabled={disabled || busy}
               title={busy ? "Importing…" : "Import"}
             >
               <DownloadIcon />

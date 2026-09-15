@@ -47,7 +47,10 @@ export function ProductsAdminPage() {
 
   return (
     <div>
-      <h2 style={{ marginTop: 0 }}>Product &amp; Category Master List</h2>
+      <h2 style={{ margin: "-8px 0 0px" }}>Product &amp; Category Master List</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
+        Manage the products and categories used throughout the system.
+      </p>
 
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 20 }}>
         <Field label="Product name">

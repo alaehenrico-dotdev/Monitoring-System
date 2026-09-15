@@ -37,6 +37,8 @@ export async function saveManualCount(
   manualCount: number,
   userId?: number
 ) {
+  const product = await productRepository.findActiveById(productId);
+  if (!product) throw HttpError.notFound("Active product not found");
   const systemRemainingStock = await getSystemRemainingStock(productId, entryDate, location);
   const variance = calculateVariance(systemRemainingStock, manualCount);
 

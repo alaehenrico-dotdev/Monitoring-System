@@ -49,7 +49,7 @@ export function Modal({ title, onClose, children, width = 640 }: { title: string
         style={{
           background: colors.paper,
           color: colors.ink,
-          borderRadius: 12,
+          borderRadius: 0,
           boxShadow: "0 12px 40px rgba(20, 17, 13, 0.3)",
           width: "100%",
           maxWidth: width,

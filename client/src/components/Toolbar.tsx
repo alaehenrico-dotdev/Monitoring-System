@@ -1,5 +1,7 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+const COMPACT_EXIT_BUFFER = 32;
+
 /**
  * Card-style toolbar strip - the consistent home for a page's date/location
  * filters on one side and its action controls (CSV export/import, zoom) on
@@ -19,6 +21,8 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 export function Toolbar({ children, className = "" }: { children: ReactNode; className?: string }) {
   const rowRef = useRef<HTMLDivElement>(null);
   const sizerRef = useRef<HTMLDivElement>(null);
+  const compactRef = useRef(false);
+  const frameRef = useRef<number | null>(null);
   const [compact, setCompact] = useState(false);
 
   useLayoutEffect(() => {
@@ -34,7 +38,22 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
       if (!row || !sizer) return;
       const needed = sizer.getBoundingClientRect().width;
       const available = row.clientWidth;
-      setCompact(needed > available);
+      // Use hysteresis while the sidebar is animating: entering compact mode
+      // happens as soon as space is tight, but leaving it waits for a clear
+      // amount of spare room so the labels do not flicker at the threshold.
+      const nextCompact = compactRef.current ? available < needed + COMPACT_EXIT_BUFFER : needed > available;
+      if (nextCompact !== compactRef.current) {
+        compactRef.current = nextCompact;
+        setCompact(nextCompact);
+      }
+    }
+
+    function scheduleMeasure() {
+      if (frameRef.current !== null) return;
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        measure();
+      });
     }
 
     measure();
@@ -42,11 +61,17 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
     // expand/collapse, window resize) or the hidden sizer's own natural
     // width changes (e.g. an "Importing…" status message is longer than
     // "Import").
-    const ro = new ResizeObserver(measure);
+    const ro = new ResizeObserver(scheduleMeasure);
     ro.observe(row);
     ro.observe(sizer);
-    return () => ro.disconnect();
-  }, [children]);
+    return () => {
+      ro.disconnect();
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+    };
+  }, []);
 
   return (
     <>

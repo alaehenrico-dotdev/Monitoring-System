@@ -47,6 +47,10 @@ export const productRepository = {
     return prisma.product.findUnique({ where: { id } });
   },
 
+  findActiveById(id: number) {
+    return prisma.product.findFirst({ where: { id, isActive: true } });
+  },
+
   findByNameAndCategory(name: string, category: string) {
     return prisma.product.findFirst({ where: { name, category } });
   },

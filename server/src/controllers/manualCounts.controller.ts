@@ -16,6 +16,7 @@ export async function getManualCounts(req: Request, res: Response) {
 
 export async function putManualCount(req: Request, res: Response) {
   const productId = Number(req.params.productId);
+  if (!Number.isSafeInteger(productId) || productId <= 0) throw HttpError.badRequest("Invalid product id");
   const entryDate = parseDateOnly(req.query.date ?? req.body?.date);
   const location = locationSchema.parse(req.query.location ?? req.body?.location);
   const parsed = entrySchema.safeParse(req.body);

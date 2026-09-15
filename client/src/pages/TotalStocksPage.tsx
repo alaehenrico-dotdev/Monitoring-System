@@ -60,7 +60,10 @@ export function TotalStocksPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "0 0 3px" }}>Total Stocks (Online + Offline) - {formatDateDisplay(date)}</h2>
+      <h2 style={{ margin: "-8px 0 0px" }}>Total Stocks (Online + Offline) - {formatDateDisplay(date)}</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
+        Review combined online and offline stock balances.
+      </p>
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
