@@ -82,7 +82,7 @@ export function VarianceReportPage() {
           <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Premium (Liter)" />
         </Field>
         <Button type="submit">Run report</Button>
-        <Link to="/variance-report-history" className="ae-btn ae-btn-secondary ae-btn-sm" style={{ textDecoration: "none" }}>
+        <Link to="/variance-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
           Variance History
         </Link>
       </form>
@@ -96,7 +96,7 @@ export function VarianceReportPage() {
             <table className="ae-table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
-                  {["Date", "Location", "Category", "Product", "System", "Manual Count", "Variance", "Counted By"].map((h) => (
+                  {["Date", "Location", "Category", "SKU", "System", "Manual Count", "Variance", "Counted By"].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>

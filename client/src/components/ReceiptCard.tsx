@@ -28,15 +28,16 @@ function zigzagBottomClipPath(width: number, tooth: number, depth: number): stri
  * editable entry form (ReceiptsPage) render as the exact same physical
  * receipt, one with static text, one with inputs in place of the values.
  */
-export function ReceiptPaper({ children, testId }: { children: ReactNode; testId?: string }) {
+export function ReceiptPaper({ children, testId, className = "" }: { children: ReactNode; testId?: string; className?: string }) {
   return (
     <div
       data-testid={testId}
+      className={`ae-receipt-paper ${className}`.trim()}
       style={{
         width: RECEIPT_CARD_WIDTH,
         background: "#FFFFFF",
         fontFamily: "'Courier New', Courier, monospace",
-        color: colors.ink,
+        color: colors.staticInk,
         // A visible outline (not just a shadow) so the torn/zigzag bottom
         // edge reads clearly even though the card and page background are
         // close in tone - a shadow alone washes out against warm paper tones.
@@ -52,7 +53,7 @@ export function ReceiptPaper({ children, testId }: { children: ReactNode; testId
         <div style={{ fontFamily: fonts.wordmark, fontWeight: 800, color: colors.red, fontSize: 14, marginTop: 6 }}>
           ALA EH! FOOD PRODUCTS
         </div>
-        <div style={{ fontSize: 10, letterSpacing: 2, color: colors.subtleInk }}>SALES RECEIPT</div>
+        <div style={{ fontSize: 10, letterSpacing: 2, color: colors.staticSubtleInk }}>SALES RECEIPT</div>
       </div>
       {children}
     </div>
@@ -76,7 +77,7 @@ export function ReceiptCard({ receipt, isPreview }: { receipt: Receipt; isPrevie
       <Divider />
 
       {receipt.items.length === 0 ? (
-        <div style={{ fontSize: 12, color: colors.subtleInk, textAlign: "center", padding: "6px 0" }}>No items yet</div>
+        <div style={{ fontSize: 12, color: colors.staticSubtleInk, textAlign: "center", padding: "6px 0" }}>No items yet</div>
       ) : (
         receipt.items.map((it) => (
           <div key={it.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginBottom: 3 }}>
@@ -93,13 +94,13 @@ export function ReceiptCard({ receipt, isPreview }: { receipt: Receipt; isPrevie
       </div>
       <Divider dashed />
 
-      <div style={{ textAlign: "center", fontSize: 10.5, color: colors.subtleInk, marginTop: 8 }}>
+      <div style={{ textAlign: "center", fontSize: 10.5, color: colors.staticSubtleInk, marginTop: 8 }}>
         {isPreview ? (
           <div style={{ fontWeight: 700, letterSpacing: 1, color: colors.warningText }}>PREVIEW - NOT YET SAVED</div>
         ) : (
           <>
             <div>Logged by {receipt.createdBy?.name ?? "system"}</div>
-            <div style={{ marginTop: 6, fontWeight: 700, letterSpacing: 1.5, color: colors.ink }}>* * * THANK YOU! * * *</div>
+            <div style={{ marginTop: 6, fontWeight: 700, letterSpacing: 1.5, color: colors.staticInk }}>* * * THANK YOU! * * *</div>
           </>
         )}
       </div>
@@ -118,7 +119,7 @@ export function Row({ label, value }: { label: string; value: string }) {
   };
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 2 }}>
-      <span style={{ color: colors.subtleInk, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: colors.staticSubtleInk, flexShrink: 0 }}>{label}</span>
       <span style={style}>{value}</span>
     </div>
   );

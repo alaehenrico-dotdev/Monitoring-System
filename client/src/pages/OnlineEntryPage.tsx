@@ -5,8 +5,10 @@ import { useAuth } from "../context/AuthContext";
 import { Button, TextInput } from "../components/ui";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
-import { PrinterIcon, UndoIcon } from "../components/icons";
+import { CsvTools } from "../components/CsvTools";
+import { PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
+import { CategoryFilter } from "../components/CategoryFilter";
 import { Modal } from "../components/Modal";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
 import { describePendingChanges, usePendingEntryChanges, type PendingByProduct } from "../hooks/usePendingEntryChanges";
@@ -26,6 +28,7 @@ export function OnlineEntryPage() {
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("online-entry");
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   // One level of Undo for the most recent Save - the pre-save value of
@@ -43,8 +46,13 @@ export function OnlineEntryPage() {
   // exactly what's about to be submitted first (Section 3.1).
   const { pending, displayRows, stage, clear, clearAll, pendingCount } = usePendingEntryChanges(rows);
 
-  // Search only affects what's displayed in the grid.
-  const visibleRows = displayRows?.filter((r) => matchesSearch([r.product.name, r.product.category], query));
+  // Search and the category dropdown only affect what's displayed in the
+  // grid - both are local filters over the same already-loaded rows, not a
+  // separate request per category.
+  const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
+  const visibleRows = displayRows?.filter(
+    (r) => matchesSearch([r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+  );
 
   useEffect(() => {
     setRows(null);
@@ -125,6 +133,17 @@ export function OnlineEntryPage() {
     return failed.length === 0;
   }
 
+  // CSV import (Section 3.1) writes straight through to the save endpoint,
+  // same as handleSaveAll - it's its own explicit action, not another cell
+  // edit to stage and preview. Any pending edit already staged for this
+  // product is dropped afterward: the import just made the server the
+  // authoritative value for whatever columns it touched.
+  async function handleImportRow(productId: number, values: Record<string, number>) {
+    const saved = await saveOnlineEntry(productId, date, values);
+    mergeEntry(productId, saved);
+    clear(productId);
+  }
+
   // Re-submits the pre-save values captured above through the same save
   // endpoint - an undo is its own tracked edit (shows up in the Change Log
   // like any other save), not a silent rewrite of history. One level only:
@@ -156,7 +175,7 @@ export function OnlineEntryPage() {
         Stocks In/Out transfers entered here mirror automatically onto the Offline table (Section 4.3).
       </p>
       <Toolbar className="no-print ae-toolbar-entry">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           {canEdit && (
             <Button
               type="button"
@@ -171,18 +190,41 @@ export function OnlineEntryPage() {
               <UndoIcon />
             </Button>
           )}
-          <SearchInput value={query} onChange={setQuery} placeholder="Search product or category…" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
+          <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
         </div>
         <ToolbarControls>
           {canEdit && (
             <Button className="ae-toolbar-save" type="button" variant="secondary" size="sm" onClick={() => setShowPreview(true)} disabled={pendingCount === 0} title="Review and save changes">
-              Save{pendingCount > 0 ? ` (${pendingCount})` : ""}
+              <SaveIcon />
+              <span className="ae-toolbar-btn-label">Save{pendingCount > 0 ? ` (${pendingCount})` : ""}</span>
             </Button>
           )}
-          <Button className="ae-toolbar-save" type="button" variant="secondary" size="sm" onClick={() => window.print()} title="Print or save as PDF">
-            <PrinterIcon /> PDF
+          <Button
+            className="ae-toolbar-save"
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => window.print()}
+            disabled={pendingCount > 0}
+            title={pendingCount > 0 ? "Save your changes first - PDF reflects only saved data" : "Print or save as PDF"}
+          >
+            <PrinterIcon />
+            <span className="ae-toolbar-btn-label">PDF</span>
           </Button>
+          {canEdit && rows && (
+            <CsvTools
+              filenamePrefix="online-entry"
+              date={date}
+              rows={rows}
+              columns={columns}
+              onImportRow={handleImportRow}
+              canImport
+              showExport={false}
+              showPdf={false}
+            />
+          )}
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
       </Toolbar>

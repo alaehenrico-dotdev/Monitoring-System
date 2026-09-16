@@ -1,9 +1,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { MinusIcon, PlusIcon } from "./icons";
+import { Select } from "./ui";
 
 const MIN = 25;
 const MAX = 200;
-const STEP = 25;
 const PRESETS = [25, 50, 75, 100, 125, 150, 175, 200];
 
 function clamp(value: number): number {
@@ -36,47 +35,20 @@ export function useZoom(key: string) {
 }
 
 /**
- * Excel-style zoom toggle: 25%-200% in 25% steps. Rendered as a single
- * segmented pill - [−] | 100% ▾ | [+] - the way Figma, Google Docs, and
- * Excel itself present a zoom control, rather than three separately
- * bordered boxes with gaps between them.
+ * Excel-style zoom level, 25%-200% in 25% steps - a single dropdown button
+ * showing the current level; picking a preset applies it immediately. One
+ * control, same shape as every other toolbar dropdown (category/location
+ * filters), rather than its own one-off [-] | 100% | [+] segmented pill.
  */
 export function ZoomControl({ zoom, onChange }: { zoom: number; onChange: (zoom: number) => void }) {
   return (
-    <div className="ae-segment-group" aria-label="Zoom" title="Zoom">
-      <button
-        type="button"
-        className="ae-segment-btn ae-segment-btn-icon"
-        aria-label="Zoom out"
-        onClick={() => onChange(zoom - STEP)}
-        disabled={zoom <= MIN}
-      >
-        <MinusIcon />
-      </button>
-      <div className="ae-segment-divider" />
-      <select
-        className="ae-segment-select"
-        aria-label="Zoom level"
-        value={zoom}
-        onChange={(e) => onChange(Number(e.target.value))}
-      >
-        {PRESETS.map((p) => (
-          <option key={p} value={p}>
-            {p}%
-          </option>
-        ))}
-      </select>
-      <div className="ae-segment-divider" />
-      <button
-        type="button"
-        className="ae-segment-btn ae-segment-btn-icon"
-        aria-label="Zoom in"
-        onClick={() => onChange(zoom + STEP)}
-        disabled={zoom >= MAX}
-      >
-        <PlusIcon />
-      </button>
-    </div>
+    <Select aria-label="Zoom level" title="Zoom" value={zoom} onChange={(e) => onChange(Number(e.target.value))}>
+      {PRESETS.map((p) => (
+        <option key={p} value={p}>
+          {p}%
+        </option>
+      ))}
+    </Select>
   );
 }
 

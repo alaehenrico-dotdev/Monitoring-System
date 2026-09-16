@@ -2,11 +2,51 @@
   box-sizing: border-box;
 }
 
+/* Light/dark theme tokens (see ThemeContext.tsx, which toggles the
+   data-theme attribute on <html>, and theme.ts's `colors` object, whose
+   paper/ink/subtleInk/border/warningBg/warningText re-export these same
+   vars so every page's inline styles pick up the theme automatically
+   instead of needing per-page dark-mode overrides). Brand colors (black,
+   gold, yellow, cream, red...) are intentionally NOT theme tokens - they
+   stay fixed on the sidebar, dashboard, login screen, and table headers,
+   which are permanently dark by design in both modes. */
+:root {
+  --ae-bg: #fffcf5;
+  --ae-bg-alt: #f3ecd8;
+  --ae-surface: #ffffff;
+  --ae-surface-hover: #f3ecd8;
+  --ae-text: #241d14;
+  --ae-text-muted: #6b6255;
+  --ae-border: #e7dfc9;
+  --ae-border-soft: #f1ebd8;
+  --ae-row-hover: rgba(20, 17, 13, 0.035);
+  --ae-warning-bg: #f7e7c2;
+  --ae-warning-text: #8b6a1e;
+  --ae-header-bg: #e7dfc9;
+  --ae-header-rule: #14110d;
+}
+
+:root[data-theme="dark"] {
+  --ae-bg: #14110d;
+  --ae-bg-alt: #1d1812;
+  --ae-surface: #241e15;
+  --ae-surface-hover: #2e2718;
+  --ae-text: #f1e9d0;
+  --ae-text-muted: #a89a7d;
+  --ae-border: #3a3020;
+  --ae-border-soft: #2a2418;
+  --ae-row-hover: rgba(255, 255, 255, 0.045);
+  --ae-warning-bg: #3d2f14;
+  --ae-warning-text: #e4b94d;
+  --ae-header-bg: #2a2318;
+  --ae-header-rule: #c99a2e;
+}
+
 body {
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  color: #241d14;
-  background: #fffcf5;
+  color: var(--ae-text);
+  background: var(--ae-bg);
 }
 
 table input[type="number"] {
@@ -38,12 +78,12 @@ table input[type="number"] {
   z-index: 1;
   text-align: left;
   padding: 6px 8px;
-  background: #e7dfc9;
-  color: #241d14;
+  background: var(--ae-header-bg);
+  color: var(--ae-text);
   font-weight: 700;
   white-space: nowrap;
-  border-bottom: 2px solid #14110d;
-  border-right: 1px solid #d3c8a0;
+  border-bottom: 2px solid var(--ae-header-rule);
+  border-right: 1px solid var(--ae-border-soft);
 }
 .ae-table th:last-child {
   border-right: none;
@@ -51,18 +91,19 @@ table input[type="number"] {
 .ae-table td {
   text-align: right;
   padding: 4px 8px;
-  border-bottom: 1px solid #e7dfc9;
-  border-right: 1px solid #f1ebd8;
+  border-bottom: 1px solid var(--ae-border);
+  border-right: 1px solid var(--ae-border-soft);
   transition: background-color 120ms ease;
 }
 .ae-table td:last-child {
   border-right: none;
 }
-/* rgba, not a flat hex - it blends with whatever's already showing through
-   the cell (a flagged row's warning tint, a subtotal shade) instead of
-   flattening every row to one hover color regardless of its own meaning. */
+/* A themed var, not a flat hex - it blends with whatever's already showing
+   through the cell (a flagged row's warning tint, a subtotal shade) instead
+   of flattening every row to one hover color regardless of its own meaning,
+   and it flips direction (darken vs lighten) between light and dark mode. */
 .ae-table tbody tr:hover td {
-  background-color: rgba(20, 17, 13, 0.035);
+  background-color: var(--ae-row-hover);
 }
 /* Products Admin is the one grid that's all text, no numbers - opts out
    of the numeric-grid right-align default. */
@@ -97,7 +138,7 @@ table input[type="number"] {
    (shrink-to-fit) height, same as before. */
 .ae-table-scroll {
   overflow-x: auto;
-  border: 1px solid #e7dfc9;
+  border: 1px solid var(--ae-border);
   border-radius: 0;
   flex: 1;
   min-height: 0;
@@ -116,10 +157,10 @@ table input[type="number"] {
   font-family: inherit;
   font-size: 13px;
   padding: 7px 10px;
-  border: 1px solid #e7dfc9;
+  border: 1px solid var(--ae-border);
   border-radius: 999px;
-  background: #fff;
-  color: #241d14;
+  background: var(--ae-surface);
+  color: var(--ae-text);
   transition:
     border-color 120ms ease,
     box-shadow 120ms ease,
@@ -137,14 +178,54 @@ table input[type="number"] {
 }
 .ae-input:disabled,
 .ae-select:disabled {
-  background: #f3efe4;
-  color: #8a8272;
+  background: var(--ae-surface-hover);
+  color: var(--ae-text-muted);
   cursor: not-allowed;
 }
-/* Tighter padding variant for dense data-grid cells (Section 3.1) - keeps
-   the same border/focus treatment without inflating row height. */
+/* Tighter padding variant for dense data-grid cells (Section 3.1) - a
+   static dark chip (background/border/text fixed, not the themed --ae-*
+   vars) so every cell reads the same crisp yellow-bordered, white-numbered
+   field regardless of light/dark mode, rather than blending into the row
+   behind it (the themed --ae-border reads as barely-there in dark mode -
+   too close in tone to the cell's own --ae-surface fill). Focus adds a
+   white glow around the same yellow border, so
+   the active cell is still unmistakable across a full grid of otherwise
+   identical ones. */
 .ae-input-cell {
   padding: 3px 6px;
+  background: #14110d;
+  color: #fff;
+  border-width: 1px;
+  border-color: #ffd400;
+}
+.ae-input-cell:hover:not(:disabled):not(:focus) {
+  border-color: #ffd400;
+}
+.ae-input-cell:focus {
+  border-color: #ffd400;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45);
+}
+.ae-input-cell:disabled {
+  background: #14110d;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+/* The editable receipt form (ReceiptsPage) renders its inputs/selects
+   inside ReceiptPaper's fixed white card - a simulated printed receipt that
+   stays paper-white in both themes (see colors.staticInk/staticSubtleInk in
+   theme.ts). Its form controls need the same treatment: pinned to their
+   light-mode look regardless of --ae-* theme vars, or they'd render as dark
+   pills on a white receipt in dark mode. */
+.ae-receipt-paper .ae-input,
+.ae-receipt-paper .ae-select {
+  background: #fff;
+  color: #241d14;
+  border-color: #e7dfc9;
+}
+.ae-receipt-paper .ae-input:disabled,
+.ae-receipt-paper .ae-select:disabled {
+  background: #f3efe4;
+  color: #8a8272;
 }
 
 /* Date fields (every <input type="date"> renders through TextInput/.ae-input
@@ -219,7 +300,7 @@ table input[type="number"] {
 .ae-btn-secondary {
   background: transparent;
   border-color: #8b6a1e;
-  color: #241d14;
+  color: var(--ae-text);
 }
 .ae-btn-ghost {
   background: transparent;
@@ -234,16 +315,26 @@ table input[type="number"] {
 
 /* Toolbar - the card strip holding a page's date/location fields and its
    action controls (CSV export/import, zoom). Gives the controls a defined
-   home instead of floating loose against the page background. */
+   home instead of floating loose against the page background.
+
+   `flex-start` (not `space-between`) plus `margin-left: auto` on
+   .ae-toolbar-controls: filter controls (date/search/category) stay
+   grouped together on the left with a normal gap, and the action controls
+   (Save...Zoom) stay grouped together on the right, pinned to the pill's
+   right edge - the auto margin is what pushes them there, not the
+   left/right flex children each claiming half the row via space-between
+   (which just spaces the two clusters apart with no floor on how tight
+   that gap can get, and reads as one wide, disconnected gap on a page with
+   few controls on either side, like Total Stocks). */
 .ae-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 10px;
   padding: 5px 6px;
   margin: 0 -20px 10px;
-  background: #fff;
+  background: var(--ae-surface);
   border-radius: 999px;
   box-shadow: 0 1px 3px rgba(20, 17, 13, 0.06);
   position: relative;
@@ -251,7 +342,8 @@ table input[type="number"] {
 .ae-toolbar-controls {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
+  margin-left: auto;
   flex-wrap: wrap;
 }
 .ae-toolbar-divider {
@@ -340,15 +432,6 @@ table input[type="number"] {
 .ae-toolbar .ae-segment-btn:active:not(:disabled) {
   background: #c99a2e;
 }
-.ae-toolbar .ae-segment-select:focus {
-  background: #e4b94d;
-  color: #14110d;
-}
-.ae-toolbar .ae-segment-select {
-  color: #14110d;
-  font-weight: 700;
-}
-
 /* .ae-toolbar--compact is applied by Toolbar.tsx, not a width breakpoint -
    it measures the toolbar's actual one-line natural width (via a hidden,
    always-full clone) against how much room is really available (which
@@ -356,24 +439,103 @@ table input[type="number"] {
    Layout.tsx) and only adds this class when the full-label layout would
    genuinely not fit. So labels never disappear "just in case" at some
    guessed pixel width - only once there's literally not enough space for
-   them. Segment buttons drop their text label (kept for screen readers via
-   the button's own title/aria-label) and fall back to icon-only, gaps
-   tighten, and the search box narrows, so the toolbar keeps to one line
-   instead of wrapping. */
+   them.
+
+   Every rule below exists to make that one-line promise actually hold: ALL
+   of a toolbar's controls shrink together (not just segment groups), so
+   there's no wide left-over control still forcing a second line once the
+   others have gone icon-only. Segment buttons AND standalone buttons
+   (Save/PDF, via .ae-toolbar-btn-label - see OnlineEntryPage etc.) drop
+   their text label (kept for screen readers via the button's own
+   title/aria-label) and shrink to a plain icon square; selects and the
+   date field clip to a fixed width with an ellipsis instead of pushing the
+   row wider; the search box narrows. `!important` on the date field only:
+   it's the one control whose width a page sets inline (style={{maxWidth}}),
+   which otherwise beats any class rule regardless of specificity.
+
+   `flex-wrap: nowrap` (overriding the base .ae-toolbar's own `wrap`, plus
+   .ae-toolbar-controls' own `wrap`) plus `overflow: hidden` is the actual
+   "never two lines" guarantee, not just a side effect of everything above
+   being narrower: those shrink the controls enough that this essentially
+   never engages in practice, but it's what makes the promise absolute
+   instead of "narrower, but still wraps below some width nobody tested." A
+   page's own left-side control cluster (the div directly inside Toolbar -
+   see OnlineEntryPage etc.) sets its own `flexWrap: "nowrap"` inline for
+   the same reason, since compact only ever narrows individual controls,
+   not that wrapper's own wrap behavior. */
 .ae-toolbar--compact {
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 .ae-toolbar--compact .ae-toolbar-controls {
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 .ae-toolbar--compact .ae-segment-label {
   display: none;
 }
+/* Icon-only segment buttons (CsvTools' Export/PDF/Import) otherwise stay
+   flush segments of one joined pill - fine when they carry a text label,
+   but next to the standalone icon buttons (Save/PDF/Undo, which are
+   already perfect circles - a square .ae-btn at a fixed size with its
+   999px border-radius) that reads as an inconsistent mix of shapes once
+   everything is icon-only. Breaking the group's shared pill background out
+   into individually circular buttons (and hiding the now-pointless
+   dividers between them) makes every icon button in a compact toolbar the
+   same shape. */
+.ae-toolbar--compact .ae-segment-group {
+  background: transparent;
+  border: none;
+  gap: 4px;
+}
+.ae-toolbar--compact .ae-segment-divider {
+  display: none;
+}
 .ae-toolbar--compact .ae-segment-btn {
-  padding: 0 8px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  background: #ffd400;
+}
+.ae-toolbar--compact .ae-segment-btn:hover:not(:disabled) {
+  background: #e4b94d;
+}
+.ae-toolbar--compact .ae-segment-btn:active:not(:disabled) {
+  background: #c99a2e;
 }
 .ae-toolbar--compact input[type="search"] {
-  width: 120px !important;
+  width: 96px !important;
+}
+.ae-toolbar--compact .ae-toolbar-btn-label {
+  display: none;
+}
+.ae-toolbar--compact .ae-toolbar-save {
+  min-width: 32px;
+  width: 32px;
+  padding: 0;
+}
+/* Buttons and segment-groups are already icon-sized in compact mode - never
+   let flex-shrink compress them further (that's what garbles an icon into
+   an unrecognizable sliver at extreme widths). If there's still not enough
+   room after that, the search/select boxes above give first (their own
+   compact max-widths can still shrink smaller under real pressure) and,
+   failing that, .ae-toolbar's own `overflow: hidden` clips the least
+   important trailing controls - never a squashed icon. */
+.ae-toolbar--compact .ae-btn,
+.ae-toolbar--compact .ae-segment-group {
+  flex-shrink: 0;
+}
+.ae-toolbar--compact .ae-select {
+  max-width: 68px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-toolbar--compact .ae-input[type="date"] {
+  max-width: 110px !important;
 }
 
 /* Entry toolbars contain the largest action cluster. Keep their outer row
@@ -405,14 +567,14 @@ table input[type="number"] {
   display: flex;
   align-items: stretch;
   height: 32px;
-  border: 1px solid #e7dfc9;
+  border: 1px solid var(--ae-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--ae-surface);
   overflow: hidden;
 }
 .ae-segment-divider {
   width: 1px;
-  background: #e7dfc9;
+  background: var(--ae-border);
 }
 .ae-segment-btn {
   display: flex;
@@ -421,7 +583,7 @@ table input[type="number"] {
   gap: 6px;
   border: none;
   background: transparent;
-  color: #241d14;
+  color: var(--ae-text);
   font-family: inherit;
   font-size: 12.5px;
   font-weight: 600;
@@ -430,36 +592,14 @@ table input[type="number"] {
   transition: background-color 120ms ease;
 }
 .ae-segment-btn:hover:not(:disabled) {
-  background: #f3ecd8;
+  background: var(--ae-surface-hover);
 }
 .ae-segment-btn:active:not(:disabled) {
-  background: #e7dfc9;
+  background: var(--ae-border);
 }
 .ae-segment-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-.ae-segment-btn-icon {
-  width: 32px;
-  padding: 0;
-  flex-shrink: 0;
-}
-.ae-segment-select {
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #241d14;
-  text-align: center;
-  text-align-last: center;
-  padding: 0 8px;
-  cursor: pointer;
-  min-width: 68px;
-}
-.ae-segment-select:focus {
-  outline: none;
-  background: #f3ecd8;
 }
 
 /* Main content pane (see Layout.tsx) - padding lives here rather than

@@ -5,23 +5,10 @@ import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
 import { Select } from "../components/ui";
 import { matchesSearch } from "../utils/search";
+import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
 
-const TABLE_LABELS: Record<string, string> = {
-  daily_online_stock: "Online Stock",
-  daily_offline_stock: "Offline Stock",
-  manual_counts: "Manual Count",
-  products: "Products",
-  receipts: "Receipts",
-};
-
 const TABLE_FILTERS = ["", ...Object.keys(TABLE_LABELS)];
-
-const ACTION_COLOR: Record<ChangeLogEntry["action"], string> = {
-  CREATE: colors.warningText,
-  UPDATE: colors.ink,
-  DELETE: colors.danger,
-};
 
 /**
  * Section 4.8 - Change Log: every create/edit to a stock entry, manual
@@ -134,7 +121,7 @@ function ChangeLogRow({ entry, expanded, onToggle }: { entry: ChangeLogEntry; ex
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={6} style={{ padding: "8px 12px 16px", background: "#faf7ee", borderBottom: `1px solid ${colors.border}` }}>
+          <td colSpan={6} style={{ padding: "8px 12px 16px", background: colors.paperAlt, borderBottom: `1px solid ${colors.border}` }}>
             {diffs.length === 0 ? (
               <span style={{ fontSize: 12.5, color: colors.subtleInk }}>
                 {entry.action === "CREATE" ? "New record - no prior value to compare." : "No field-level differences recorded."}
@@ -212,5 +199,5 @@ const dayHeadingStyle: CSSProperties = {
   fontWeight: 700,
   color: colors.subtleInk,
   borderBottom: `1px solid ${colors.border}`,
-  background: "#faf7ee",
+  background: colors.paperAlt,
 };

@@ -1,11 +1,14 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
-import { Select, TextInput } from "../components/ui";
+import { Button, Select, TextInput } from "../components/ui";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
 import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
+import { CategoryFilter } from "../components/CategoryFilter";
+import { SaveIcon } from "../components/icons";
+import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
@@ -33,9 +36,13 @@ export function ManualCountPage() {
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("manual-count");
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   function load() {
     setRows(null);
+    setDrafts({});
     getManualCountGrid(date, location)
       .then(setRows)
       .catch((e) => setError(e.message));
@@ -43,28 +50,71 @@ export function ManualCountPage() {
 
   useEffect(load, [date, location]);
 
-  async function commit(productId: number) {
-    const draft = drafts[productId];
-    if (draft === undefined || draft === "") return;
-    setError(null);
-    try {
-      const saved = await saveManualCount(productId, date, location, Number(draft));
-      setDrafts((d) => {
-        const next = { ...d };
-        delete next[productId];
-        return next;
-      });
-      // Merge the recalculated row (system remaining stock + variance) in
-      // directly instead of re-fetching the whole grid for one edit.
-      setRows((prev) =>
-        prev?.map((r) => (r.product.id === productId ? { ...r, entry: saved, isSaved: true, isFlagged: Number(saved.variance) !== 0 } : r)) ??
-        prev
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+  // Warn before navigating/closing the tab with staged-but-unsaved counts -
+  // same guard as Online/Offline Entry, now that a typed count no longer
+  // saves on blur.
+  useEffect(() => {
+    if (Object.keys(drafts).length === 0) return;
+    function onBeforeUnload(e: BeforeUnloadEvent) {
+      e.preventDefault();
     }
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [drafts]);
+
+  // Typing a count only stages a local draft (see the input's onChange
+  // below) - it no longer saves on blur. Save opens a quick confirm step
+  // (below) listing exactly what's about to be written, then this flushes
+  // every staged count in one pass, same "per-product save endpoint"
+  // pattern as Online/Offline Entry. PDF stays disabled the whole time a
+  // draft is unsaved (see pdfDisabled on CsvTools below), so a printed
+  // sheet can never show a count that was typed but never actually
+  // persisted.
+  async function handleSaveAll() {
+    setError(null);
+    setSaving(true);
+    const failed: string[] = [];
+    const succeeded: number[] = [];
+    for (const [productIdStr, draft] of Object.entries(drafts)) {
+      const productId = Number(productIdStr);
+      if (draft === "") {
+        succeeded.push(productId);
+        continue;
+      }
+      try {
+        const saved = await saveManualCount(productId, date, location, Number(draft));
+        // Merge the recalculated row (system remaining stock + variance) in
+        // directly instead of re-fetching the whole grid for one edit.
+        setRows((prev) =>
+          prev?.map((r) => (r.product.id === productId ? { ...r, entry: saved, isSaved: true, isFlagged: Number(saved.variance) !== 0 } : r)) ??
+          prev
+        );
+        succeeded.push(productId);
+      } catch (e) {
+        const name = rows?.find((r) => r.product.id === productId)?.product.name ?? `#${productId}`;
+        failed.push(name);
+      }
+    }
+    setDrafts((d) => {
+      const next = { ...d };
+      for (const id of succeeded) delete next[id];
+      return next;
+    });
+    setSaving(false);
+    setShowConfirm(false);
+    if (failed.length) setError(`Failed to save: ${failed.join(", ")} - still unsaved, try Save again.`);
   }
 
+  const pendingCount = Object.keys(drafts).length;
+  // What the confirm modal lists - one row per staged (non-blank) draft,
+  // resolved against the last-loaded rows for the product name/old count.
+  const pendingChanges = Object.entries(drafts)
+    .filter(([, draft]) => draft !== "")
+    .map(([productIdStr, draft]) => {
+      const productId = Number(productIdStr);
+      const row = rows?.find((r) => r.product.id === productId);
+      return { productId, name: row?.product.name ?? `#${productId}`, oldValue: row?.entry.manualCount ?? "—", newValue: draft };
+    });
   const flaggedCount = rows?.filter((r) => r.isFlagged).length ?? 0;
 
   // Nulls (not yet counted) export as blank cells rather than "0", which
@@ -78,7 +128,10 @@ export function ManualCountPage() {
     },
   }));
 
-  const visibleRows = rows?.filter((r) => matchesSearch([r.product.name, r.product.category], query));
+  const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
+  const visibleRows = rows?.filter(
+    (r) => matchesSearch([r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+  );
 
   return (
     <div>
@@ -87,7 +140,7 @@ export function ManualCountPage() {
         Review and correct manual counts for the selected date.
       </p>
       <Toolbar className="no-print">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
           <Select aria-label="Location" value={location} onChange={(e) => setLocation(e.target.value as StockLocation)}>
             {LOCATIONS.map((l) => (
@@ -96,14 +149,30 @@ export function ManualCountPage() {
               </option>
             ))}
           </Select>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search product or category…" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
+          <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
           {flaggedCount > 0 && (
-            <span style={{ color: colors.warningText, fontSize: 13, fontWeight: 600 }}>
-              ⚠ {flaggedCount} product(s) with a non-zero variance
+            <span
+              style={{ color: colors.warningText, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}
+              title={`${flaggedCount} product(s) with a non-zero variance`}
+            >
+              ⚠ {flaggedCount} flagged
             </span>
           )}
         </div>
         <ToolbarControls>
+          <Button
+            className="ae-toolbar-save"
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowConfirm(true)}
+            disabled={pendingCount === 0 || saving}
+            title="Review and save changes"
+          >
+            <SaveIcon />
+            <span className="ae-toolbar-btn-label">{saving ? "Saving…" : `Save${pendingCount > 0 ? ` (${pendingCount})` : ""}`}</span>
+          </Button>
           {csvRows && (
             <>
               <CsvTools
@@ -113,6 +182,7 @@ export function ManualCountPage() {
                 columns={csvColumns}
                 onImportRow={async () => {}}
                 canImport={false}
+                pdfDisabled={pendingCount > 0}
               />
               <ToolbarDivider />
             </>
@@ -133,7 +203,7 @@ export function ManualCountPage() {
             <table className="ae-table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
-                  {["Category", "Product", "System Remaining", "Manual Count", "Variance"].map((h) => (
+                  {["Category", "SKU", "System Remaining", "Manual Count", "Variance"].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -156,7 +226,6 @@ export function ManualCountPage() {
                         type="number"
                         value={drafts[r.product.id] ?? r.entry.manualCount ?? ""}
                         onChange={(e) => setDrafts((d) => ({ ...d, [r.product.id]: e.target.value }))}
-                        onBlur={() => commit(r.product.id)}
                         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                         style={{ width: 64, textAlign: "right" }}
                       />
@@ -168,6 +237,40 @@ export function ManualCountPage() {
             </table>
           </div>
         </div>
+      )}
+      {showConfirm && (
+        <Modal title="Confirm manual counts" onClose={() => setShowConfirm(false)}>
+          {pendingChanges.length === 0 ? (
+            <p style={{ margin: 0, color: colors.subtleInk, fontSize: 13 }}>No unsaved changes.</p>
+          ) : (
+            <table className="ae-table" style={{ minWidth: 0 }}>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Old count</th>
+                  <th>New count</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingChanges.map((c) => (
+                  <tr key={c.productId}>
+                    <td style={{ textAlign: "left" }}>{c.name}</td>
+                    <td>{c.oldValue}</td>
+                    <td style={{ fontWeight: 700, color: colors.red }}>{c.newValue}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowConfirm(false)}>
+              Keep editing
+            </Button>
+            <Button type="button" size="sm" onClick={handleSaveAll} disabled={pendingCount === 0 || saving}>
+              {saving ? "Saving…" : `Save (${pendingCount})`}
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );

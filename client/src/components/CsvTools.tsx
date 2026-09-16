@@ -57,8 +57,19 @@ interface CsvToolsProps {
   onImportRow: (productId: number, values: Record<string, number>) => Promise<void>;
   /// Writers only - readers can still Export but shouldn't see Import.
   canImport: boolean;
+  /// Hide the Export segment - e.g. a page that already has its own Export
+  /// control and only wants this component for Import. Defaults to shown.
+  showExport?: boolean;
+  /// Hide the PDF segment - e.g. a page that already has its own PDF/print
+  /// button and only wants this component for Import, so it isn't shown
+  /// twice. Defaults to shown.
+  showPdf?: boolean;
   /// Keeps the toolbar footprint stable while a grid is loading.
   disabled?: boolean;
+  /// Disables just the PDF segment (Export/Import stay usable) - e.g. a
+  /// page with unsaved edits, where a PDF taken now wouldn't reflect them
+  /// yet. Defaults to false.
+  pdfDisabled?: boolean;
   /// Runs before PDF/print - on the data entry pages this is where an
   /// unsaved-changes confirmation lives (Section 3.1), since printing the
   /// current page can otherwise ship a PDF of edits that were never
@@ -76,7 +87,19 @@ interface CsvToolsProps {
  * re-import, which is the more common real-world bulk-correction workflow
  * than pasting a raw block of cells.
  */
-export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, canImport, disabled = false, onBeforePrint }: CsvToolsProps) {
+export function CsvTools({
+  filenamePrefix,
+  date,
+  rows,
+  columns,
+  onImportRow,
+  canImport,
+  showExport = true,
+  showPdf = true,
+  disabled = false,
+  pdfDisabled = false,
+  onBeforePrint,
+}: CsvToolsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -86,7 +109,7 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
     // spreadsheet edited outside the app tends to use ALL-CAPS headers) -
     // parsing already lowercases before comparing (see handleImportFile),
     // so this is purely cosmetic and doesn't affect what re-imports.
-    const headers = ["Category", "Product", ...columns.map((c) => c.label)].map((h) => h.toUpperCase());
+    const headers = ["Category", "SKU", ...columns.map((c) => c.label)].map((h) => h.toUpperCase());
     const csvRows = rows.map((r) => [r.product.category, r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
     downloadCsv(`${filenamePrefix}-${date}.csv`, toCsv(headers, csvRows));
   }
@@ -105,14 +128,16 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
       // row actually has a product-name cell in it instead of assuming row
       // 0, so those files still import instead of failing outright. Some
       // real-world exports (see Section 8.1) header this column "Products"
-      // (plural) rather than "Product".
+      // (plural) rather than "Product" - both spellings (and this app's own
+      // "SKU"/"SKUs", per the Section 4.1 renaming) are accepted so neither
+      // an old export nor the current business file re-imports.
       const headerRowIdx = table.findIndex((row) =>
-        row.some((cell) => ["product", "products"].includes(cell.trim().toLowerCase())),
+        row.some((cell) => ["product", "products", "sku", "skus"].includes(cell.trim().toLowerCase())),
       );
-      if (headerRowIdx === -1) throw new Error('Expected a "Product" column - re-export the grid and edit that file');
+      if (headerRowIdx === -1) throw new Error('Expected a "SKU" (or "Product") column - re-export the grid and edit that file');
 
       const header = table[headerRowIdx].map((h) => h.trim().toLowerCase());
-      const productIdx = header.findIndex((h) => h === "product" || h === "products");
+      const productIdx = header.findIndex((h) => ["product", "products", "sku", "skus"].includes(h));
       const categoryIdx = header.indexOf("category");
 
       const editableColumns = columns.filter((c) => c.editable || c.importable);
@@ -218,13 +243,13 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
       if (unmatchedExamples.length) {
         summary += ` Unrecognized, e.g. ${unmatchedExamples.join(", ")}.`;
         // Show what's actually loaded side-by-side with what the file
-        // said, rather than sending the user off to Products Admin to
+        // said, rather than sending the user off to the SKUs admin page to
         // check by hand - if this list is empty, or its own names don't
         // resemble the "Unrecognized" examples above, that's the mismatch.
         summary +=
           rows.length === 0
-            ? " No products are currently loaded for this date/page, so nothing could match."
-            : ` For comparison, ${rows.length} products are loaded here, e.g. ${rows
+            ? " No SKUs are currently loaded for this date/page, so nothing could match."
+            : ` For comparison, ${rows.length} SKUs are loaded here, e.g. ${rows
                 .slice(0, 3)
                 .map((r) => `"${r.product.name}" in "${r.product.category}"`)
                 .join(", ")}.`;
@@ -240,27 +265,33 @@ export function CsvTools({ filenamePrefix, date, rows, columns, onImportRow, can
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
       <div className="ae-segment-group" aria-label="Export/Import" title="Export/Import">
-        <button type="button" className="ae-segment-btn" onClick={handleExport} disabled={disabled} title="Export">
-          <UploadIcon />
-          <span className="ae-segment-label">Export</span>
-        </button>
-        <div className="ae-segment-divider" />
-        <button
-          type="button"
-          className="ae-segment-btn"
-          onClick={async () => {
-            if (onBeforePrint && !(await onBeforePrint())) return;
-            window.print();
-          }}
-          disabled={disabled}
-          title="Export as PDF (choose 'Save as PDF' in the print dialog)"
-        >
-          <PrinterIcon />
-          <span className="ae-segment-label">PDF</span>
-        </button>
+        {showExport && (
+          <>
+            <button type="button" className="ae-segment-btn" onClick={handleExport} disabled={disabled} title="Export">
+              <UploadIcon />
+              <span className="ae-segment-label">Export</span>
+            </button>
+            {showPdf && <div className="ae-segment-divider" />}
+          </>
+        )}
+        {showPdf && (
+          <button
+            type="button"
+            className="ae-segment-btn"
+            onClick={async () => {
+              if (onBeforePrint && !(await onBeforePrint())) return;
+              window.print();
+            }}
+            disabled={disabled || pdfDisabled}
+            title={pdfDisabled ? "Save your changes first - PDF reflects only saved data" : "Export as PDF (choose 'Save as PDF' in the print dialog)"}
+          >
+            <PrinterIcon />
+            <span className="ae-segment-label">PDF</span>
+          </button>
+        )}
         {canImport && (
           <>
-            <div className="ae-segment-divider" />
+            {(showExport || showPdf) && <div className="ae-segment-divider" />}
             <button
               type="button"
               className="ae-segment-btn"

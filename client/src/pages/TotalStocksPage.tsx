@@ -7,6 +7,7 @@ import { CsvTools } from "../components/CsvTools";
 import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
+import { CategoryFilter } from "../components/CategoryFilter";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
@@ -32,6 +33,7 @@ export function TotalStocksPage() {
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("total-stocks");
   const [query, setQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   useEffect(() => {
     setRows(null);
@@ -56,7 +58,10 @@ export function TotalStocksPage() {
     },
   }));
 
-  const visibleRows = rows?.filter((r) => matchesSearch([r.product.name, r.product.category], query));
+  const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
+  const visibleRows = rows?.filter(
+    (r) => matchesSearch([r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+  );
 
   return (
     <div>
@@ -65,9 +70,10 @@ export function TotalStocksPage() {
         Review combined online and offline stock balances.
       </p>
       <Toolbar className="no-print">
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
-          <SearchInput value={query} onChange={setQuery} placeholder="Search product or category…" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
+          <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
         </div>
         <ToolbarControls>
           {csvRows && (

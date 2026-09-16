@@ -16,7 +16,7 @@ export function ProductsAdminPage() {
   function reload() {
     listProducts()
       .then(setProducts)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load products"));
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load SKUs"));
   }
 
   useEffect(reload, []);
@@ -36,7 +36,7 @@ export function ProductsAdminPage() {
       // Append locally instead of re-fetching the whole (60+ product) list.
       setProducts((prev) => (prev ? [...prev, created] : [created]));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add product");
+      setError(err instanceof Error ? err.message : "Failed to add SKU");
     }
   }
 
@@ -47,13 +47,13 @@ export function ProductsAdminPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Product &amp; Category Master List</h2>
+      <h2 style={{ margin: "-8px 0 0px" }}>SKU &amp; Category Master List</h2>
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Manage the products and categories used throughout the system.
+        Manage the SKUs and categories used throughout the system.
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 20 }}>
-        <Field label="Product name">
+        <Field label="SKU name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Category">
@@ -62,7 +62,7 @@ export function ProductsAdminPage() {
         <Field label="Unit">
           <TextInput value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. Gallon" />
         </Field>
-        <Button type="submit">Add product</Button>
+        <Button type="submit">Add SKU</Button>
       </form>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 
@@ -73,7 +73,7 @@ export function ProductsAdminPage() {
           <table className="ae-table ae-table--left" style={{ minWidth: 560 }}>
             <thead>
               <tr>
-                {["Category", "Product", "Unit", ""].map((h) => (
+                {["Category", "SKU", "Unit", ""].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>

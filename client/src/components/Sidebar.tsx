@@ -1,37 +1,33 @@
-import { useEffect, useRef, useState, type CSSProperties, type FocusEvent, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type FocusEvent,
+  type MouseEvent,
+} from "react";
 import { motion, type Transition } from "framer-motion";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./LogoMark";
+import { PinIcon } from "./icons";
 import { colors, fonts } from "../theme";
 
-/**
- * Section: nav rail. Three states, spring-animated with Framer Motion:
- *
- * - Rail (default) - a 72px icon-only strip.
- * - Expanded - hovering the rail (mouse, or Tab-focusing a link inside)
- *   grows it to 256px, revealing full labels and section headings; it
- *   shrinks back on mouseLeave/blur.
- * - Collapsed - clicking the brand logo folds the whole rail down into a
- *   single still 40x40 icon in the top-left corner; clicking that icon
- *   springs it back to the rail.
- *
- * The rail itself is `position: fixed` (so its width/height/border-radius/
- * position can all spring-animate freely between very different shapes -
- * a tall 72px strip vs. a 40x40 circle - without a normal flex layout
- * fighting that). A same-sized `motion.div` spacer sits in main's actual
- * flex flow instead, animated in lockstep, so the page content next to it
- * reflows smoothly rather than jumping when the rail's width changes.
- */
-
-const RAIL_WIDTH = 72;
+const RAIL_WIDTH = 56;
 const EXPANDED_WIDTH = 256;
 const ICON_SIZE = 40;
 const ICON_INSET = 16;
+const TAB_BADGE_SIZE = 36;
 
 const SIDEBAR_COLLAPSED_KEY = "ae-sidebar-collapsed-icon";
+const SIDEBAR_PINNED_KEY = "ae-sidebar-pinned";
 
-const spring: Transition = { type: "spring", stiffness: 340, damping: 32, mass: 0.8 };
+const spring: Transition = {
+  type: "spring",
+  stiffness: 340,
+  damping: 32,
+  mass: 0.8,
+};
 
 interface NavLinkDef {
   to: string;
@@ -63,7 +59,7 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
     heading: "Admin",
     links: [
       { to: "/change-log", label: "Change Log", abbr: "CL", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/products", label: "Products", abbr: "PR", roles: ["SUPERVISOR_ADMIN"] },
+      { to: "/products", label: "SKUs", abbr: "SK", roles: ["SUPERVISOR_ADMIN"] },
     ],
   },
 ];
@@ -76,14 +72,61 @@ function readInitialCollapsed(): boolean {
   }
 }
 
+function readInitialPinned(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_PINNED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+const NAV_STYLE_TAG_ID = "ae-sidebar-nav-style";
+// Hover rules live here (not inline) because they need `!important` to win
+// against the tabs' own inline `background`/`color`, which is set per-row
+// based on `isActive`. `:not([aria-current="page"])` keeps hover from ever
+// fighting the active tab's own solid highlight - React Router sets
+// aria-current="page" on the active NavLink automatically, so this needs
+// no extra prop threading.
+const NAV_STYLE = `
+  .ae-sidebar-nav {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* old Edge / IE */
+  }
+  .ae-sidebar-nav::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, new Edge */
+    width: 0;
+    height: 0;
+  }
+  .ae-sidebar-tab:hover:not([aria-current="page"]) {
+    background: color-mix(in srgb, ${colors.yellow} 16%, transparent) !important;
+    color: ${colors.yellow} !important;
+  }
+  .ae-sidebar-tab:hover:not([aria-current="page"]) .ae-sidebar-tab-badge {
+    background: color-mix(in srgb, ${colors.yellow} 22%, transparent);
+    color: ${colors.yellow};
+  }
+  .ae-sidebar-logo {
+    transition: transform 0.25s ease;
+  }
+  .ae-sidebar-logo:hover {
+    transform: scale(1.08) rotate(-4deg);
+  }
+  .ae-sidebar-logo:active {
+    transform: scale(0.94) rotate(0deg);
+  }
+`;
+
 export function Sidebar() {
   const { user, logout } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [collapsed, setCollapsed] = useState(readInitialCollapsed);
+  const [pinned, setPinned] = useState(readInitialPinned);
   const [isMouseOver, setIsMouseOver] = useState(false);
   const [isFocusWithin, setIsFocusWithin] = useState(false);
-  const [viewportHeight, setViewportHeight] = useState(() => (typeof window !== "undefined" ? window.innerHeight : 900));
+  const [viewportHeight, setViewportHeight] = useState(() =>
+    typeof window !== "undefined" ? window.innerHeight : 900,
+  );
 
   useEffect(() => {
     try {
@@ -93,27 +136,34 @@ export function Sidebar() {
     }
   }, [collapsed]);
 
-  // Collapsed no longer reserves any in-flow width (see spacerWidth below) -
-  // the floating icon sits on top of main's content instead of pushing it
-  // over, so the table/toolbar can use every pixel horizontally. That would
-  // otherwise leave the icon overlapping whatever's at the very top-left of
-  // the page (a heading, an intro line) - this class lets index.css nudge
-  // just that heading over so it starts beside the icon instead of behind
-  // it, without every page needing to know the sidebar exists.
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_PINNED_KEY, pinned ? "1" : "0");
+    } catch {
+      // Ignore - still works for this session, just won't be remembered.
+    }
+  }, [pinned]);
+
+  useEffect(() => {
+    if (document.getElementById(NAV_STYLE_TAG_ID)) return;
+    const style = document.createElement("style");
+    style.id = NAV_STYLE_TAG_ID;
+    style.textContent = NAV_STYLE;
+    document.head.appendChild(style);
+  }, []);
+
   useEffect(() => {
     document.body.classList.toggle("ae-sidebar-collapsed-icon", collapsed);
     return () => document.body.classList.remove("ae-sidebar-collapsed-icon");
   }, [collapsed]);
 
   useEffect(() => {
-    // Resize fires far faster than React (or Framer Motion) needs to know
-    // about it - coalesce to one update per animation frame instead of one
-    // setState per event, so dragging the window edge doesn't spam
-    // re-renders.
     let frame = 0;
     function onResize() {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => setViewportHeight(window.innerHeight));
+      frame = requestAnimationFrame(() =>
+        setViewportHeight(window.innerHeight),
+      );
     }
     window.addEventListener("resize", onResize);
     return () => {
@@ -122,11 +172,15 @@ export function Sidebar() {
     };
   }, []);
 
-  // Hover (mouse) and keyboard focus both count as "expanded" - matches
-  // hovering the rail with a mouse. Only meaningful while not collapsed;
-  // the collapsed icon only ever opens back up via a click (see below).
-  const hovered = !collapsed && (isMouseOver || isFocusWithin);
-  const state: "rail" | "expanded" | "collapsed" = collapsed ? "collapsed" : hovered ? "expanded" : "rail";
+  // Pinned holds the sidebar in "expanded" permanently (no hover needed) -
+  // same effect as isMouseOver/isFocusWithin, just sourced from a click
+  // instead of the pointer, and remembered across reloads.
+  const hovered = !collapsed && (isMouseOver || isFocusWithin || pinned);
+  const state: "rail" | "expanded" | "collapsed" = collapsed
+    ? "collapsed"
+    : hovered
+      ? "expanded"
+      : "rail";
 
   function handleBlur(e: FocusEvent<HTMLDivElement>) {
     if (!containerRef.current?.contains(e.relatedTarget as Node | null)) {
@@ -134,11 +188,6 @@ export function Sidebar() {
     }
   }
 
-  // A clicked NavLink keeps keyboard focus afterward, which would
-  // otherwise keep isFocusWithin (and so "expanded") true even once the
-  // mouse has moved away and navigation is done - blurring right after
-  // the click lets the rail fold back to the rail state like a plain
-  // hover-out would, so it always stays minimized once you're done with it.
   function blurAfterClick(e: MouseEvent<HTMLElement>) {
     e.currentTarget.blur();
   }
@@ -147,30 +196,24 @@ export function Sidebar() {
     setCollapsed((prev) => !prev);
   }
 
-  const width = state === "collapsed" ? ICON_SIZE : state === "expanded" ? EXPANDED_WIDTH : RAIL_WIDTH;
-  const height = state === "collapsed" ? ICON_SIZE : viewportHeight;
-  // The corner inset is expressed as a transform (x/y), not top/left -
-  // top/left are layout properties (the browser has to reflow to move
-  // them), while x/y are compositor-only, so this one part of the spring
-  // animation is effectively free instead of triggering layout on every
-  // frame. `top`/`left` themselves stay a constant 0 in the style prop.
-  const inset = state === "collapsed" ? ICON_INSET : 0;
-  // Same 4-value corner template in every state (top-left top-right
-  // bottom-right bottom-left) so Framer Motion's string interpolation
-  // tweens each corner independently instead of snapping - flush against
-  // the edge at rest, a touch more rounded once popped out on hover, and a
-  // perfect circle (half of 40px) once folded down to just the icon.
-  const borderRadius = state === "collapsed" ? "20px 20px 20px 20px" : state === "expanded" ? "0px 20px 20px 0px" : "0px 14px 14px 0px";
+  function togglePinned() {
+    setPinned((prev) => !prev);
+  }
 
-  // Reserves exactly as much width in the normal flex flow as the fixed
-  // rail visually needs, so main never renders underneath it and never has
-  // to jump when the rail's own width changes - it just reflows in step
-  // with the same spring. Collapsed reserves nothing at all - the whole
-  // point of folding down to just the icon is to hand every pixel of that
-  // space back to the toolbar/table (a real gain on a narrow screen, where
-  // even the icon's own inset was a meaningful slice of the width), so the
-  // floating icon is left to sit on top of main's content in that state
-  // instead of pushing it over.
+  const width =
+    state === "collapsed"
+      ? ICON_SIZE
+      : state === "expanded"
+        ? EXPANDED_WIDTH
+        : RAIL_WIDTH;
+  const height = state === "collapsed" ? ICON_SIZE : viewportHeight;
+  const inset = state === "collapsed" ? ICON_INSET : 0;
+  const borderRadius =
+    state === "collapsed"
+      ? "70px 70px 70px 70px"
+      : state === "expanded"
+        ? "0px 0px 0px 0px"
+        : "0px 0px 0px 0px";
   const spacerWidth = state === "collapsed" ? 0 : width;
 
   return (
@@ -197,18 +240,73 @@ export function Sidebar() {
           left: 0,
           zIndex: 50,
           overflow: "hidden",
-          background: colors.blackSoft,
+          background: `color-mix(in srgb, ${colors.black} 82%, transparent)`,
+          backdropFilter: "blur(20px) saturate(120%)",
+          WebkitBackdropFilter: "blur(20px) saturate(120%)",
+          // The static border is only drawn when NOT expanded. While
+          // expanded, the border is rendered by the animated overlay below
+          // so it can pulse without fighting this element's own width/height
+          // spring transition (animating two different `transition`
+          // configs on one element isn't possible with framer-motion).
+          border:
+            state === "expanded"
+              ? "1px solid transparent"
+              : `1px solid ${colors.yellow}`,
           color: colors.cream,
-          boxShadow: state === "collapsed" ? "0 4px 16px rgba(20,17,13,0.35)" : "none",
+          boxShadow:
+            state === "collapsed"
+              ? "0 8px 24px rgba(0,0,0,0.55)"
+              : "0 8px 32px rgba(0,0,0,0.4)",
         }}
       >
-        <div style={{ padding: state === "collapsed" ? 0 : "20px 14px", height: "100%", display: "flex", flexDirection: "column" }}>
+        {state === "expanded" && (
+          <motion.div
+            aria-hidden
+            // Gradient-border trick: this element is padded by exactly the
+            // border width, filled with a moving gradient, then masked so
+            // only that padding ring (not the center) is visible - the
+            // `xor`/`exclude` composite punches the content-box out of the
+            // full box, leaving a ring the same shape as `borderRadius`.
+            style={{
+              position: "absolute",
+              inset: 0,
+              borderRadius: "inherit",
+              padding: 1.5,
+              pointerEvents: "none",
+              // Black stops between each highlight color are what make the
+              // sweep read clearly - without them the yellow/gold/cream
+              // trio blends into one continuous warm glow with too little
+              // contrast against the dark sidebar background.
+              backgroundImage: `linear-gradient(115deg, ${colors.black}, ${colors.yellow}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.cream}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.yellow}, ${colors.black})`,
+              backgroundSize: "400% 400%",
+              WebkitMask:
+                "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+              WebkitMaskComposite: "xor",
+              maskComposite: "exclude",
+            }}
+            animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+            transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }}
+          />
+        )}
+        <div
+          style={{
+            padding: state === "collapsed" ? 0 : "20px 0",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           <div
+            className="ae-sidebar-logo"
             onClick={(e) => {
               toggleCollapsed();
               blurAfterClick(e);
             }}
             onKeyDown={(e) => {
+              // Ignore key events bubbling up from the pin button below -
+              // it's its own focusable control, not part of this row's
+              // collapse/expand toggle.
+              if (e.target !== e.currentTarget) return;
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
                 toggleCollapsed();
@@ -217,49 +315,121 @@ export function Sidebar() {
             role="button"
             tabIndex={0}
             title={collapsed ? "Expand sidebar" : "Collapse sidebar into icon"}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar into icon"}
+            aria-label={
+              collapsed ? "Expand sidebar" : "Collapse sidebar into icon"
+            }
             style={{
               display: "flex",
               alignItems: "center",
-              // Always flex-start (never centered) so the logo's own
-              // position never drifts by a couple of px between rail and
-              // expanded just because the row briefly has no other
-              // content to sit beside - it should only ever move when
-              // .collapsed actually repositions the whole rail.
               justifyContent: "flex-start",
               gap: state === "expanded" ? 10 : 0,
               width: state === "collapsed" ? ICON_SIZE : "100%",
+              boxSizing: "border-box",
+              paddingLeft:
+                state === "collapsed" ? 0 : state === "expanded" ? 14 : 8,
+              paddingRight:
+                state === "collapsed" ? 0 : state === "expanded" ? 14 : 8,
               height: state === "collapsed" ? ICON_SIZE : "auto",
               marginBottom: state === "collapsed" ? 0 : 20,
               cursor: "pointer",
               flexShrink: 0,
             }}
           >
-            {/* Constant 40x40 in every state - never scaled or resized, so
-                this is the one visual anchor the rest of the rail folds
-                down to or grows out from. */}
             <LogoMark size={ICON_SIZE} />
             {state === "expanded" && (
               <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
-                <h1 style={{ fontFamily: fonts.wordmark, fontSize: 16, fontWeight: 800, color: colors.yellow, margin: 0, lineHeight: 1.1 }}>
+                <h1
+                  style={{
+                    fontFamily: fonts.wordmark,
+                    fontSize: 16,
+                    fontWeight: 800,
+                    color: colors.yellow,
+                    margin: 0,
+                    lineHeight: 1.1,
+                  }}
+                >
                   Ala Eh!
                 </h1>
-                <p style={{ fontSize: 10.5, color: colors.cream, opacity: 0.75, margin: 0, letterSpacing: 0.3 }}>Stocks Monitoring</p>
+                <p
+                  style={{
+                    fontSize: 10.5,
+                    color: colors.cream,
+                    opacity: 0.75,
+                    margin: 0,
+                    letterSpacing: 0.3,
+                  }}
+                >
+                  Stocks Monitoring
+                </p>
               </div>
+            )}
+            {state === "expanded" && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePinned();
+                  // Otherwise this button stays DOM-focused after the
+                  // click, and focus-within (see `hovered` above) would
+                  // keep the sidebar expanded regardless of `pinned` until
+                  // something else steals focus - same reason toggleCollapsed
+                  // blurs its own trigger.
+                  blurAfterClick(e);
+                }}
+                title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
+                aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
+                aria-pressed={pinned}
+                style={{
+                  marginLeft: "auto",
+                  flexShrink: 0,
+                  width: 26,
+                  height: 26,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "50%",
+                  border: "none",
+                  background: pinned ? colors.yellow : "transparent",
+                  color: pinned ? colors.black : colors.cream,
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  transition: "background-color 0.15s ease, color 0.15s ease",
+                }}
+              >
+                <PinIcon filled={pinned} />
+              </button>
             )}
           </div>
 
-          {/* Everything except the logo - fades/scales/slides away as the
-              rail folds into the icon, instead of just vanishing, so the
-              collapse reads as one continuous motion. */}
           <motion.div
-            animate={{ opacity: collapsed ? 0 : 1, scale: collapsed ? 0.6 : 1, y: collapsed ? -20 : 0 }}
+            animate={{
+              opacity: collapsed ? 0 : 1,
+              scale: collapsed ? 0.6 : 1,
+              y: collapsed ? -20 : 0,
+            }}
             transition={spring}
-            style={{ pointerEvents: collapsed ? "none" : "auto", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+            style={{
+              pointerEvents: collapsed ? "none" : "auto",
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
           >
-            <div className="ae-sidebar-nav" style={{ display: "flex", flexDirection: "column", gap: 14, overflowY: "auto" }}>
+            <div
+              className="ae-sidebar-nav"
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+                overflowY: "auto",
+                overflowX: "hidden",
+              }}
+            >
               {sections.map((section) => {
-                const visible = section.links.filter((l) => !user || l.roles.includes(user.role));
+                const visible = section.links.filter(
+                  (l) => !user || l.roles.includes(user.role),
+                );
                 if (visible.length === 0) return null;
                 return (
                   <div key={section.heading}>
@@ -267,7 +437,7 @@ export function Sidebar() {
                       <p
                         style={{
                           margin: "0 0 4px",
-                          padding: "0 10px",
+                          padding: "0 14px",
                           fontSize: 10.5,
                           fontWeight: 700,
                           letterSpacing: 0.6,
@@ -279,7 +449,7 @@ export function Sidebar() {
                         {section.heading}
                       </p>
                     )}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                    <div style={{ display: "flex", flexDirection: "column" }}>
                       {visible.map((l) => (
                         <NavLink
                           key={l.to}
@@ -287,21 +457,68 @@ export function Sidebar() {
                           title={l.label}
                           tabIndex={collapsed ? -1 : undefined}
                           onClick={blurAfterClick}
+                          className="ae-sidebar-tab"
                           style={({ isActive }): CSSProperties => ({
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: state === "expanded" ? "flex-start" : "center",
-                            padding: state === "expanded" ? "8px 10px" : "8px 4px",
-                            borderRadius: 6,
+                            justifyContent:
+                              state === "expanded" ? "flex-start" : "center",
+                            width: "100%",
+                            boxSizing: "border-box",
+                            margin: 0,
+                            padding:
+                              state === "expanded" ? "10px 14px" : "6px 0",
+                            borderRadius: 0,
                             textDecoration: "none",
-                            color: isActive ? colors.black : colors.cream,
-                            background: isActive ? colors.yellow : "transparent",
-                            fontWeight: isActive ? 700 : 500,
+                            color:
+                              state === "expanded"
+                                ? isActive
+                                  ? colors.black
+                                  : colors.cream
+                                : colors.cream,
+                            background:
+                              state === "expanded"
+                                ? isActive
+                                  ? colors.yellow
+                                  : "transparent"
+                                : "transparent",
+                            fontWeight:
+                              state === "expanded"
+                                ? isActive
+                                  ? 700
+                                  : 500
+                                : 500,
                             fontSize: 13.5,
+                            fontFamily: "inherit",
                             whiteSpace: "nowrap",
+                            transition: "background-color 0.15s ease, color 0.15s ease",
                           })}
                         >
-                          {state === "expanded" ? l.label : l.abbr}
+                          {({ isActive }: { isActive: boolean }) =>
+                            state === "expanded" ? (
+                              l.label
+                            ) : (
+                              <span
+                                className="ae-sidebar-tab-badge"
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: TAB_BADGE_SIZE,
+                                  height: TAB_BADGE_SIZE,
+                                  borderRadius: "50%",
+                                  background: isActive
+                                    ? colors.yellow
+                                    : "transparent",
+                                  color: isActive ? colors.black : colors.cream,
+                                  fontWeight: isActive ? 700 : 500,
+                                  transition: "background-color 0.15s ease, color 0.15s ease",
+                                }}
+                              >
+                                {l.abbr}
+                              </span>
+                            )
+                          }
                         </NavLink>
                       ))}
                     </div>
@@ -313,24 +530,23 @@ export function Sidebar() {
             <div style={{ flex: 1 }} />
 
             {user && (
-              // Border spans the full rail width (negative margin cancels
-              // the padding above); the text/button inside is padded back
-              // in so its left edge lines up with the link labels.
               <div
                 style={{
                   fontSize: 12,
                   color: colors.cream,
                   opacity: 0.85,
-                  margin: "0 -14px",
-                  padding: state === "expanded" ? "12px 24px 4px" : "12px 8px 4px",
-                  borderTop: `1px solid ${colors.goldDark}`,
+                  padding:
+                    state === "expanded" ? "12px 14px 4px" : "12px 8px 4px",
+                  borderTop: `1px solid color-mix(in srgb, ${colors.cream} 18%, transparent)`,
                   flexShrink: 0,
                 }}
               >
                 {state === "expanded" && (
                   <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
                     <div style={{ fontWeight: 600 }}>{user.name}</div>
-                    <div style={{ opacity: 0.75, marginBottom: 8 }}>{user.role.replace(/_/g, " ")}</div>
+                    <div style={{ opacity: 0.75, marginBottom: 8 }}>
+                      {user.role.replace(/_/g, " ")}
+                    </div>
                   </div>
                 )}
                 <button
@@ -340,11 +556,12 @@ export function Sidebar() {
                   style={{
                     width: state === "expanded" ? "auto" : "100%",
                     fontSize: 12,
+                    fontFamily: "inherit",
                     cursor: "pointer",
                     background: "transparent",
                     color: colors.gold,
-                    border: `1px solid ${colors.goldDark}`,
-                    borderRadius: 5,
+                    border: `1px solid color-mix(in srgb, ${colors.gold} 55%, transparent)`,
+                    borderRadius: 0,
                     padding: state === "expanded" ? "4px 10px" : "4px 0",
                   }}
                 >
