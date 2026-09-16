@@ -1,8 +1,12 @@
+import { useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
+import { BackToTop } from "./BackToTop";
 import { colors, fonts } from "../theme";
 
 export function Layout() {
+  const mainRef = useRef<HTMLElement>(null);
+
   return (
     // Fixed to the viewport height (not minHeight) with overflow hidden, so
     // the nav and main below are two independently-scrolling panes instead
@@ -13,9 +17,14 @@ export function Layout() {
     <div className="app-shell" style={{ fontFamily: fonts.body, height: "100vh", display: "flex", overflow: "hidden" }}>
       <Sidebar />
 
-      <main className="ae-main" style={{ flex: 1, height: "100%", overflowX: "hidden", overflowY: "auto", background: colors.paper, color: colors.ink }}>
+      <main
+        ref={mainRef}
+        className="ae-main"
+        style={{ flex: 1, height: "100%", overflowX: "hidden", overflowY: "auto", background: colors.paper, color: colors.ink }}
+      >
         <Outlet />
       </main>
+      <BackToTop containerRef={mainRef} />
     </div>
   );
 }

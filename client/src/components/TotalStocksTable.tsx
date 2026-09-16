@@ -24,7 +24,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
       <table className="ae-table" style={{ minWidth: 640 }}>
         <thead>
           <tr>
-            {["Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"].map((h) => (
+            {["SKU", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"].map((h) => (
               <th key={h}>{h}</th>
             ))}
           </tr>
@@ -78,5 +78,5 @@ const categoryRowStyle: CSSProperties = {
   color: colors.yellow,
   borderLeft: `4px solid ${colors.red}`,
 };
-const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: "#F3ECD8" };
+const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: colors.paperAlt };
 const grandTotalRowStyle: CSSProperties = { fontWeight: 700, background: colors.warningBg, borderTop: `2px solid ${colors.black}` };

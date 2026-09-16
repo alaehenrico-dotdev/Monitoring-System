@@ -18,6 +18,12 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// Vertical offset for the three top-level columns (entry form, preview,
+// recent receipts) so their content lines up with the receipt paper below
+// it, which reserves this much space internally for its own header/logo.
+// Single source so all three stay in sync if that header height changes.
+const RECEIPT_COLUMN_TOP = 34;
+
 interface LineItem {
   productId: number;
   quantity: string;
@@ -49,11 +55,6 @@ export function ReceiptsPage() {
   const [items, setItems] = useState<LineItem[]>([{ productId: 0, quantity: "" }]);
 
   useEffect(() => {
-    // Every fetch here needs its own .catch - without one, a failed request
-    // (an expired session, a network blip) left `receipts` stuck at `null`
-    // forever with nothing telling the user why: the "Recent Receipts"
-    // table below just silently stays on "Loading…" instead of showing an
-    // error or falling back to an empty list.
     listReceipts()
       .then(setReceipts)
       .catch((e) => {
@@ -62,7 +63,7 @@ export function ReceiptsPage() {
       });
     listProducts()
       .then(setProducts)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load products"));
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load SKUs"));
   }, []);
 
   function updateItem(index: number, patch: Partial<LineItem>) {
@@ -95,9 +96,6 @@ export function ReceiptsPage() {
         postToFulfillment,
         items: validItems.map((it) => ({ productId: it.productId, quantity: Number(it.quantity) })),
       });
-      // The create endpoint already returns the full receipt (with items and
-      // product names populated) - prepend it locally instead of re-fetching
-      // the whole list.
       setReceipts((prev) => [saved, ...(prev ?? [])]);
       setCustomer("");
       setLocation("");
@@ -110,20 +108,12 @@ export function ReceiptsPage() {
     }
   }
 
-  // Prints just the receipt preview dialog, not the page it was opened from
-  // - see the `body.ae-printing-receipt` rules in index.css and Modal's own
-  // doc comment for how the dialog stays on the page while everything else
-  // is hidden. `window.print()` blocks until the print dialog is dismissed
-  // in every browser this app targets, so it's safe to remove the class
-  // immediately after rather than needing an `afterprint` listener.
   function handlePrintReceipt() {
     document.body.classList.add("ae-printing-receipt");
     window.print();
     document.body.classList.remove("ae-printing-receipt");
   }
 
-  // Mirrors the draft form state into the exact shape ReceiptCard expects,
-  // so the right-hand preview is always exactly what Save would produce.
   const previewReceipt: Receipt = useMemo(() => {
     const previewItems = items
       .map((it, idx) => {
@@ -147,9 +137,6 @@ export function ReceiptsPage() {
     };
   }, [orderDate, customer, location, items, products, user, salesRepName]);
 
-  // Newest first - matches the order the create endpoint's response gets
-  // prepended in, so a freshly-saved receipt appears at the top without a
-  // re-sort.
   const visibleReceipts = receipts
     ?.filter((r) => matchesSearch([r.customer, r.location, r.salesRepName, ...r.items.map((it) => it.product.name)], query))
     .sort((a, b) => (a.orderDate < b.orderDate ? 1 : a.orderDate > b.orderDate ? -1 : b.id - a.id));
@@ -162,14 +149,14 @@ export function ReceiptsPage() {
       </p>
 
       <Toolbar>
-        <SearchInput value={query} onChange={setQuery} placeholder="Search customer, location, sales rep, or product…" />
+        <SearchInput value={query} onChange={setQuery} placeholder="Search customer, location, sales rep, or SKU…" />
         <ToolbarControls>
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
       </Toolbar>
 
       <div style={{ ...zoomStyle(zoom), display: "flex", gap: 28, flex: 1, minHeight: 0, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 0 }}>
-        <form onSubmit={handleSubmit} style={{ marginTop: 34 }}>
+        <form onSubmit={handleSubmit} style={{ marginTop: RECEIPT_COLUMN_TOP }}>
           <ReceiptPaper>
             <Divider />
             <FormRow label="Date">
@@ -217,7 +204,7 @@ export function ReceiptsPage() {
                   onChange={(e) => updateItem(i, { productId: Number(e.target.value) })}
                   style={{ flex: 1, minWidth: 0, fontSize: 11, padding: "4px 4px" }}
                 >
-                  <option value={0}>Select product…</option>
+                  <option value={0}>Select SKU…</option>
                   {products.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.category} — {p.name}
@@ -261,17 +248,26 @@ export function ReceiptsPage() {
           </ReceiptPaper>
         </form>
 
-        <div style={{ marginTop: 34 }}>
+        <div style={{ marginTop: RECEIPT_COLUMN_TOP }}>
           <ReceiptCard receipt={previewReceipt} isPreview />
         </div>
-        <div style={{ display: "flex", flexDirection: "column", flex: "1 1 420px", minWidth: 320, minHeight: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: "1 1 420px",
+            minWidth: 320,
+            minHeight: 0,
+            marginTop: RECEIPT_COLUMN_TOP,
+          }}
+        >
           <h3 style={{ margin: "0 0 12px" }}>Recent Receipts</h3>
           {!receipts ? (
             <p>Loading…</p>
           ) : visibleReceipts?.length === 0 ? (
             <p style={{ color: colors.subtleInk }}>{receipts.length === 0 ? "No receipts logged yet." : "No receipts match your search."}</p>
           ) : (
-            <div className="table-scroll" style={{ ...zoomStyle(zoom), flex: 1, minHeight: 0, overflow: "auto", border: "1px solid #e7dfc9", borderRadius: 10 }}>
+            <div className="table-scroll" style={{ ...zoomStyle(zoom), flex: 1, minHeight: 0, overflow: "auto", border: `1px solid ${colors.border}`, borderRadius: 0 }}>
               <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
                 <thead>
                   <tr>

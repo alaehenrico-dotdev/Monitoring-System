@@ -101,7 +101,7 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
       <table className="ae-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
-            <th>Product</th>
+            <th>SKU</th>
             {columns.map((c) => (
               <th key={c.key}>{c.label}</th>
             ))}
@@ -171,7 +171,7 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
 // and inflating every row's height. Border/padding/alignment defaults
 // otherwise come from the shared .ae-table CSS (index.css).
 const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };
-const lockedStyle: CSSProperties = { background: "#faf7ee", color: colors.subtleInk };
+const lockedStyle: CSSProperties = { background: colors.paperAlt, color: colors.subtleInk };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
 const inputStyle: CSSProperties = { width: 64, textAlign: "right" };
@@ -183,5 +183,5 @@ const categoryRowStyle: CSSProperties = {
   color: colors.yellow,
   borderLeft: `4px solid ${colors.red}`,
 };
-const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: "#F3ECD8" };
+const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: colors.paperAlt };
 const grandTotalRowStyle: CSSProperties = { fontWeight: 700, background: colors.warningBg, borderTop: `2px solid ${colors.black}` };

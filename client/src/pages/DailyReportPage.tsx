@@ -96,7 +96,7 @@ export function DailyReportPage() {
               </Button>
             </>
           )}
-          <Link to="/daily-report-history" className="ae-btn ae-btn-secondary ae-btn-sm" style={{ textDecoration: "none" }}>
+          <Link to="/daily-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
             Daily History
           </Link>
         </div>
@@ -132,13 +132,13 @@ interface CsvSectionRow {
 }
 
 function section(title: string, date: string, rows: CsvSectionRow[], columns: { key: string; label: string }[]): string {
-  const headers = ["Category", "Product", ...columns.map((c) => c.label)];
+  const headers = ["Category", "SKU", ...columns.map((c) => c.label)];
   const csvRows = rows.map((r) => [r.product.category, r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
   return `${title} - ${date}\r\n${toCsv(headers, csvRows)}`;
 }
 
 function totalSection(date: string, rows: DailyReport["total"]): string {
-  const headers = ["Category", "Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"];
+  const headers = ["Category", "SKU", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"];
   const csvRows = rows.map((r) => [
     r.product.category,
     r.product.name,

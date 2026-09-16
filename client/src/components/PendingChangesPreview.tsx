@@ -13,7 +13,7 @@ export function PendingChangesPreview({ items }: { items: PendingChangeDetail[] 
     <table className="ae-table" style={{ minWidth: 0 }}>
       <thead>
         <tr>
-          <th>Product</th>
+          <th>SKU</th>
           <th>Category</th>
           <th>Field</th>
           <th>Old value</th>
