@@ -13,7 +13,12 @@ export function Layout() {
     // of one flex row that stretches to match whichever side is taller.
     // Sidebar renders both the fixed, spring-animated rail itself and the
     // in-flow spacer that reserves its current width (see Sidebar.tsx) -
-    // main just needs to be its normal flex sibling.
+    // main just needs to be its normal flex sibling. Plain `<main>`, not a
+    // `layout`-animated one: main's real width tracks the spacer's real
+    // (animate-driven) width every frame already, which reads as one smooth
+    // push. A `layout` FLIP here instead fakes the resize with a transform,
+    // which visibly squishes the real content inside (grid text) while it
+    // animates - a worse result than just letting it reflow for real.
     <div className="app-shell" style={{ fontFamily: fonts.body, height: "100vh", display: "flex", overflow: "hidden" }}>
       <Sidebar />
 

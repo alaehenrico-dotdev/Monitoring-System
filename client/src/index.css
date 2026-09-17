@@ -101,7 +101,10 @@ table input[type="number"] {
 /* A themed var, not a flat hex - it blends with whatever's already showing
    through the cell (a flagged row's warning tint, a subtotal shade) instead
    of flattening every row to one hover color regardless of its own meaning,
-   and it flips direction (darken vs lighten) between light and dark mode. */
+   and it flips direction (darken vs lighten) between light and dark mode.
+   This is the hover *fill* only - the animated hover *border* around the
+   whole row is a separate, JS-positioned element (.ae-row-ring, below),
+   not something this selector can draw itself. */
 .ae-table tbody tr:hover td {
   background-color: var(--ae-row-hover);
 }
@@ -109,6 +112,52 @@ table input[type="number"] {
    of the numeric-grid right-align default. */
 .ae-table--left td {
   text-align: left;
+}
+
+@keyframes ae-row-ring-sweep {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Full-row hover border - the table-row equivalent of the expanded
+   sidebar's own gradient-border ring (Sidebar.tsx's
+   .ae-sidebar-gradient-sweep): identical technique (an empty div, padded by
+   the border width, filled with a moving gradient, then
+   mask-composite: exclude'd down to just that padding ring) and identical
+   color stops/angle/13s timing, so the two read as one effect used in two
+   places rather than two different effects that happen to share a name.
+
+   The sidebar can do this with a plain CSS `:hover`/state class because
+   it's one single paintable box. A <tr> isn't - it's a row of separate
+   <td> boxes with no shared element to wrap and mask into a ring. So this
+   class only supplies the ring's *look*; RowGlowScroll.tsx supplies the
+   *shape*, by measuring whichever <tr> is actually under the pointer and
+   rendering exactly one of these divs, positioned absolutely to match that
+   row's rect. That's what makes the border read as one continuous line
+   around the whole row instead of a per-cell approximation. */
+.ae-row-ring {
+  position: absolute;
+  z-index: 0;
+  box-sizing: border-box;
+  padding: 1px;
+  pointer-events: none;
+  background-image: linear-gradient(
+    115deg,
+    #14110d, #ffd400, #14110d, #c99a2e, #14110d,
+    #f1e9d0, #14110d, #c99a2e, #14110d, #ffd400, #14110d
+  );
+  background-size: 400% 400%;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ae-row-ring-sweep 13s linear infinite;
 }
 
 /* Wrapper for the grids - a defined card edge (rounded corners, hairline
@@ -137,6 +186,13 @@ table input[type="number"] {
    chain, flex:1 is simply inert and this just falls back to its natural
    (shrink-to-fit) height, same as before. */
 .ae-table-scroll {
+  /* Establishes the containing block for .ae-row-ring (below): its
+     top/left are computed in RowGlowScroll.tsx as content-coordinates
+     within THIS element specifically (getBoundingClientRect delta plus
+     this element's own scrollTop/scrollLeft), so the ring has to be
+     positioned relative to this box, not any further-out ancestor, or it
+     would land in the wrong place the moment this wrapper scrolls. */
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--ae-border);
   border-radius: 0;
@@ -371,6 +427,10 @@ table input[type="number"] {
      inside a toolbar. */
   background-color: #ffd400;
   color: #14110d;
+  /* Compact mode (.ae-toolbar--compact below) clips these to a fixed
+     max-width - transition it so that clip animates in step with the
+     surrounding buttons' own `layout` resize instead of snapping. */
+  transition: max-width 200ms ease;
 }
 .ae-toolbar .ae-input:focus,
 .ae-toolbar .ae-select:focus {
@@ -402,6 +462,7 @@ table input[type="number"] {
   align-items: center;
   justify-content: center;
   gap: 5px;
+  transition: gap 200ms ease;
 }
 .ae-toolbar .ae-btn-secondary {
   background: #ffd400;
@@ -473,8 +534,26 @@ table input[type="number"] {
   flex-wrap: nowrap;
   flex-shrink: 0;
 }
-.ae-toolbar--compact .ae-segment-label {
-  display: none;
+/* .ae-segment-label/.ae-toolbar-btn-label: collapse via max-width + opacity
+   (transitioned below), not `display: none` - `display` can't be animated,
+   so the old rule popped the label away instantly the same frame the
+   button itself (Section: toolbar, now `layout`-animated) starts smoothly
+   resizing around it. This keeps the text fading/shrinking in step with
+   that resize instead of visibly outrunning it. */
+.ae-segment-label,
+.ae-toolbar-btn-label {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 200ms ease,
+    opacity 150ms ease;
+}
+.ae-toolbar--compact .ae-segment-label,
+.ae-toolbar--compact .ae-toolbar-btn-label {
+  max-width: 0;
+  opacity: 0;
 }
 /* Icon-only segment buttons (CsvTools' Export/PDF/Import) otherwise stay
    flush segments of one joined pill - fine when they carry a text label,
@@ -497,6 +576,7 @@ table input[type="number"] {
   width: 32px;
   height: 32px;
   padding: 0;
+  gap: 0;
   border-radius: 50%;
   background: #ffd400;
 }
@@ -509,13 +589,11 @@ table input[type="number"] {
 .ae-toolbar--compact input[type="search"] {
   width: 96px !important;
 }
-.ae-toolbar--compact .ae-toolbar-btn-label {
-  display: none;
-}
 .ae-toolbar--compact .ae-toolbar-save {
   min-width: 32px;
   width: 32px;
   padding: 0;
+  gap: 0;
 }
 /* Buttons and segment-groups are already icon-sized in compact mode - never
    let flex-shrink compress them further (that's what garbles an icon into
@@ -589,7 +667,9 @@ table input[type="number"] {
   font-weight: 600;
   padding: 0 12px;
   cursor: pointer;
-  transition: background-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    gap 200ms ease;
 }
 .ae-segment-btn:hover:not(:disabled) {
   background: var(--ae-surface-hover);
@@ -793,6 +873,25 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     display: none !important;
   }
 
+  /* Route this print job through the named `receipt` page size below
+     instead of the browser's default Letter/A4 - scoped to this one body
+     class so every other print path keeps using whatever page size it
+     already had. Set here on `body` itself, not further down on
+     `.ae-modal-panel` (which is what it's actually sizing) - switching a
+     descendant to a different named page forces a page break there, so
+     the *ancestor* content up to that point still prints as one leading
+     page under the old (default Letter/A4) page type first. Named from
+     the very first printed box instead, there's no earlier default-page
+     content left to spill onto a blank page of its own. */
+  body.ae-printing-receipt {
+    page: receipt;
+    /* Some printers/PDF exporters default to stripping background colors to
+       save ink - without this the logo's red banner and gold rings would be
+       liable to print washed out or missing. */
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   /* Strip the dialog's own on-screen chrome (dark backdrop, centering,
      scroll clamp, header bar) so what prints is just the receipt paper
      itself, not a screenshot of a dialog box containing it. */
@@ -808,4 +907,57 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     max-width: none !important;
     width: auto !important;
   }
+
+  /* The on-screen "paper card" look (drop shadow, outline, torn zigzag
+     edge) is a UI affordance for the entry form and preview, not something
+     a real thermal printer reproduces - a physical receipt is just plain
+     black ink on the roll itself, so strip all three for print. Actual
+     physical sizing (matching real 80mm hardware regardless of how large
+     the on-screen preview has been made) is handled by a `zoom` rule
+     injected at print time in ReceiptsPage's handlePrintReceipt, since it
+     depends on the current RECEIPT_CARD_WIDTH constant.  */
+  body.ae-printing-receipt .ae-receipt-paper {
+    box-shadow: none !important;
+    border: none !important;
+    clip-path: none !important;
+    margin: 0 !important;
+  }
+
+  /* The receipt-preview dialog's own content padding (Modal.tsx) is a
+     screen-only affordance too - without zeroing it, the printed page
+     would carry an 18px blank margin around the actual receipt on every
+     side, on top of the physical paper it's now sized to match exactly.
+     The flex centering that keeps the card centered on screen (ReceiptsPage)
+     is dropped too, in favor of plain block flow - a flex container's
+     alignment can otherwise leave uneven blank space beside the card if
+     the container is ever wider than the card itself. */
+  body.ae-printing-receipt .ae-modal-body {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  /* :not(.no-print) matters here - without it this beats the `.no-print`
+     rule above on any of this dialog's own direct children (e.g. the
+     Close/PDF button row), since as a compound selector it's more specific
+     than a single class, even though both declare !important. */
+  body.ae-printing-receipt .ae-modal-body > div:not(.no-print) {
+    display: block !important;
+  }
+}
+
+/* Standard 80mm thermal POS roll: printers feed a continuous strip, so only
+   the width is really fixed - the height below is just a generous fallback,
+   comfortably fitting the tallest realistic receipt rather than being exact.
+   handlePrintReceipt (ReceiptsPage.tsx) overrides it per print job with the
+   receipt's actual measured height via its own injected @page rule. Zero
+   margin because the roll has no fixed sheet edges to keep clear of the way
+   a cut page does.
+
+   Deliberately NOT nested inside @media print (unlike the rest of this
+   file's print rules): @page is inherently print-only on its own, and
+   nesting it inside @media is left undefined by spec - Chromium does not
+   reliably honor a nested copy, silently falling back to the default
+   Letter/A4 page instead. */
+@page receipt {
+  size: 80mm 500mm;
+  margin: 0;
 }

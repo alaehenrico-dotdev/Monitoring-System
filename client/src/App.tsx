@@ -17,6 +17,7 @@ import { ChangeLogPage } from "./pages/ChangeLogPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DailyReportHistoryPage } from "./pages/DailyReportHistoryPage";
 import { VarianceReportHistoryPage } from "./pages/VarianceReportHistoryPage";
+import { DataResetPage } from "./pages/DataResetPage";
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
                 <Route path="/daily-report" element={<DailyReportPage />} />
                 <Route path="/change-log" element={<ChangeLogPage />} />
                 <Route path="/products" element={<ProductsAdminPage />} />
+                <Route path="/data-reset" element={<DataResetPage />} />
               </Route>
             </Route>
           </Route>

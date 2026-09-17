@@ -1,6 +1,7 @@
 import { Fragment, type CSSProperties } from "react";
 import type { TotalStockRow } from "../types";
 import { colors } from "../theme";
+import { RowGlowScroll } from "./RowGlowScroll";
 
 /**
  * Section 4.5 - the Total Stocks grid, extracted so both TotalStocksPage and
@@ -20,7 +21,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
   const grandTotal = rows.reduce((sum, r) => sum + r.totalRemainingStock, 0);
 
   return (
-    <div className="ae-table-scroll table-scroll">
+    <RowGlowScroll>
       <table className="ae-table" style={{ minWidth: 640 }}>
         <thead>
           <tr>
@@ -65,7 +66,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
           </tr>
         </tbody>
       </table>
-    </div>
+    </RowGlowScroll>
   );
 }
 

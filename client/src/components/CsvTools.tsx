@@ -1,7 +1,9 @@
 import { useRef, useState } from "react";
+import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
 import type { Product } from "../types";
 import { colors } from "../theme";
+import { toolbarLayoutTransition } from "../motion";
 import { DownloadIcon, PrinterIcon, UploadIcon } from "./icons";
 
 export interface CsvColumn {
@@ -264,18 +266,43 @@ export function CsvTools({
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      <div className="ae-segment-group" aria-label="Export/Import" title="Export/Import">
+      {/* `layout` on the group and every segment button - compact mode
+          (index.css's .ae-toolbar--compact rules) turns this from one
+          joined pill with text labels into individually circular icon
+          buttons purely via a CSS class swap, which otherwise pops
+          instantly. `layout` makes that whole reshape (background,
+          border-radius, each button's own width) animate smoothly via
+          Framer's FLIP projection instead. */}
+      <motion.div
+        layout
+        transition={toolbarLayoutTransition}
+        className="ae-segment-group"
+        aria-label="Export/Import"
+        title="Export/Import"
+      >
         {showExport && (
           <>
-            <button type="button" className="ae-segment-btn" onClick={handleExport} disabled={disabled} title="Export">
+            <motion.button
+              layout
+              transition={toolbarLayoutTransition}
+              whileTap={{ scale: 0.94 }}
+              type="button"
+              className="ae-segment-btn"
+              onClick={handleExport}
+              disabled={disabled}
+              title="Export"
+            >
               <UploadIcon />
               <span className="ae-segment-label">Export</span>
-            </button>
+            </motion.button>
             {showPdf && <div className="ae-segment-divider" />}
           </>
         )}
         {showPdf && (
-          <button
+          <motion.button
+            layout
+            transition={toolbarLayoutTransition}
+            whileTap={{ scale: 0.94 }}
             type="button"
             className="ae-segment-btn"
             onClick={async () => {
@@ -287,12 +314,15 @@ export function CsvTools({
           >
             <PrinterIcon />
             <span className="ae-segment-label">PDF</span>
-          </button>
+          </motion.button>
         )}
         {canImport && (
           <>
             {(showExport || showPdf) && <div className="ae-segment-divider" />}
-            <button
+            <motion.button
+              layout
+              transition={toolbarLayoutTransition}
+              whileTap={{ scale: 0.94 }}
               type="button"
               className="ae-segment-btn"
               onClick={() => fileInputRef.current?.click()}
@@ -301,7 +331,7 @@ export function CsvTools({
             >
               <DownloadIcon />
               <span className="ae-segment-label">{busy ? "Importing…" : "Import"}</span>
-            </button>
+            </motion.button>
             <input
               ref={fileInputRef}
               type="file"
@@ -315,7 +345,7 @@ export function CsvTools({
             />
           </>
         )}
-      </div>
+      </motion.div>
       {message && <span style={{ fontSize: 12, color: colors.subtleInk }}>{message}</span>}
     </div>
   );

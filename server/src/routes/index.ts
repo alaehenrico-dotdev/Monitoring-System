@@ -10,6 +10,7 @@ import totalStocksRoutes from "./totalStocks.routes";
 import receiptsRoutes from "./receipts.routes";
 import reportsRoutes from "./reports.routes";
 import changeLogRoutes from "./changeLog.routes";
+import dataResetRoutes from "./dataReset.routes";
 
 /// Single mount point for every feature's router (Section 3 - the app is
 /// organized around Daily Online Entry, Daily Offline Entry, Manual Count &
@@ -27,5 +28,6 @@ router.use("/total-stocks", totalStocksRoutes);
 router.use("/receipts", receiptsRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/change-log", changeLogRoutes);
+router.use("/data-reset", dataResetRoutes);
 
 export default router;

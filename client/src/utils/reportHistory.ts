@@ -31,3 +31,19 @@ export function recordReportHistory(entry: Omit<ReportHistoryEntry, "id" | "gene
     // Report viewing still works when browser storage is unavailable.
   }
 }
+
+/**
+ * This list only ever records that a report was generated/opened, on this
+ * browser - it isn't backend data, so a Data Reset (server/src/services/
+ * dataReset.service.ts) can't touch it by wiping tables. Called on a
+ * successful reset (DataResetPage.tsx) so old entries don't linger pointing
+ * at what's now empty/zeroed data, contradicting the reset's "clean slate".
+ */
+export function clearReportHistory(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    window.dispatchEvent(new Event("report-history-changed"));
+  } catch {
+    // Nothing to clean up if storage is unavailable in the first place.
+  }
+}

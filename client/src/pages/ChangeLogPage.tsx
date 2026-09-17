@@ -7,6 +7,7 @@ import { Select } from "../components/ui";
 import { matchesSearch } from "../utils/search";
 import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
+import { RowGlowScroll } from "../components/RowGlowScroll";
 
 const TABLE_FILTERS = ["", ...Object.keys(TABLE_LABELS)];
 
@@ -76,7 +77,7 @@ export function ChangeLogPage() {
       ) : filtered && filtered.length === 0 ? (
         <p style={{ color: colors.subtleInk }}>No matching entries.</p>
       ) : (
-        <div className="ae-table-scroll table-scroll">
+        <RowGlowScroll>
           <table className="ae-table" style={{ minWidth: 720 }}>
             <thead>
               <tr>
@@ -100,7 +101,7 @@ export function ChangeLogPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </RowGlowScroll>
       )}
     </div>
   );

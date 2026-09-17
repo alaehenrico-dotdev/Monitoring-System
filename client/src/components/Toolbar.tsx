@@ -1,4 +1,6 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { motion } from "motion/react";
+import { toolbarLayoutTransition } from "../motion";
 
 const COMPACT_EXIT_BUFFER = 32;
 
@@ -75,9 +77,14 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
 
   return (
     <>
-      <div className={`ae-toolbar ${compact ? "ae-toolbar--compact" : ""} ${className}`.trim()} ref={rowRef}>
+      <motion.div
+        layout
+        transition={toolbarLayoutTransition}
+        className={`ae-toolbar ${compact ? "ae-toolbar--compact" : ""} ${className}`.trim()}
+        ref={rowRef}
+      >
         {children}
-      </div>
+      </motion.div>
       {/* A sibling of the real row, not a child of it - critical, because
          .ae-toolbar--compact's rules (hide the label, shrink the search
          box, ...) are plain descendant selectors. Nesting the sizer inside
@@ -105,7 +112,11 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
 /// Groups a page's action controls (CSV tools, zoom) so they sit together
 /// with a shared gap, ready to be separated from each other by a ToolbarDivider.
 export function ToolbarControls({ children }: { children: ReactNode }) {
-  return <div className="ae-toolbar-controls">{children}</div>;
+  return (
+    <motion.div layout transition={toolbarLayoutTransition} className="ae-toolbar-controls">
+      {children}
+    </motion.div>
+  );
 }
 
 /// A thin vertical hairline between two control groups (e.g. CSV tools and
