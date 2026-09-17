@@ -3,6 +3,7 @@ import { createProduct, deactivateProduct, listProducts } from "../api/products"
 import type { Product } from "../types";
 import { Button, Field, TextInput } from "../components/ui";
 import { colors } from "../theme";
+import { RowGlowScroll } from "../components/RowGlowScroll";
 
 /// Section 4.1 - Admins can add, rename, deactivate, or re-categorize
 /// products without a developer; new SKUs appear in every grid automatically.
@@ -69,7 +70,7 @@ export function ProductsAdminPage() {
       {!products ? (
         <p>Loading…</p>
       ) : (
-        <div className="ae-table-scroll table-scroll">
+        <RowGlowScroll>
           <table className="ae-table ae-table--left" style={{ minWidth: 560 }}>
             <thead>
               <tr>
@@ -93,7 +94,7 @@ export function ProductsAdminPage() {
               ))}
             </tbody>
           </table>
-        </div>
+        </RowGlowScroll>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { colors } from "../theme";
 import { readReportHistory, type ReportHistoryEntry } from "../utils/reportHistory";
+import { RowGlowScroll } from "./RowGlowScroll";
 
 export function ReportHistoryTable({ type }: { type: ReportHistoryEntry["type"] }) {
   const [history, setHistory] = useState<ReportHistoryEntry[]>(() => readReportHistory().filter((entry) => entry.type === type));
@@ -17,7 +18,7 @@ export function ReportHistoryTable({ type }: { type: ReportHistoryEntry["type"] 
   return history.length === 0 ? (
     <p style={{ color: colors.subtleInk }}>No generated {type} entries yet.</p>
   ) : (
-    <div className="ae-table-scroll table-scroll">
+    <RowGlowScroll>
       <table className="ae-table ae-table--left">
         <thead>
           <tr>
@@ -40,6 +41,6 @@ export function ReportHistoryTable({ type }: { type: ReportHistoryEntry["type"] 
           ))}
         </tbody>
       </table>
-    </div>
+    </RowGlowScroll>
   );
 }

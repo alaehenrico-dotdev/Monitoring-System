@@ -3,7 +3,7 @@ import { createReceipt, listReceipts } from "../api/receipts";
 import { listProducts } from "../api/products";
 import type { Product, Receipt } from "../types";
 import { colors } from "../theme";
-import { Divider, ReceiptCard, ReceiptPaper } from "../components/ReceiptCard";
+import { Divider, ReceiptCard, ReceiptPaper, RECEIPT_CARD_WIDTH } from "../components/ReceiptCard";
 import { Button, Select } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
@@ -14,15 +14,40 @@ import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { PrinterIcon } from "../components/icons";
 
+// Standard 80mm thermal POS roll: ~72mm is actually printable once the
+// roll's own unprintable side margins are accounted for. In CSS pixels
+// (96px/in ÷ 25.4mm/in) that's ~272px - what the receipt paper should
+// physically measure once printed, no matter how large it's been made to
+// look on screen for readability while filling it in.
+const THERMAL_PRINT_WIDTH_PX = 272;
+
+// Shared by both the on-screen "saved receipt" modal preview and the print
+// path - how much to shrink the (deliberately oversized, easy-to-fill-in)
+// RECEIPT_CARD_WIDTH paper down to true 80mm-roll proportions. Kept as one
+// constant, derived from RECEIPT_CARD_WIDTH, so both places stay in sync if
+// either width constant ever changes.
+const RECEIPT_THERMAL_SCALE = THERMAL_PRINT_WIDTH_PX / RECEIPT_CARD_WIDTH;
+
+// CSS px are defined as 1/96 inch regardless of screen DPI, so this is a
+// fixed conversion (not a measurement) - used to turn the receipt paper's
+// on-screen pixel height into the mm figure @page needs.
+const PX_PER_MM = 96 / 25.4;
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// Vertical offset for the three top-level columns (entry form, preview,
-// recent receipts) so their content lines up with the receipt paper below
-// it, which reserves this much space internally for its own header/logo.
-// Single source so all three stay in sync if that header height changes.
-const RECEIPT_COLUMN_TOP = 34;
+// Small top nudge only, now that the receipt paper's own (larger) header
+// carries most of the visual weight that used to be reserved as blank
+// margin above the card - the card grows upward into that space instead
+// of leaving it empty.
+const RECEIPT_COLUMN_TOP = 8;
+
+// "Recent Receipts" is capped to roughly this many rows tall before it
+// scrolls internally, rather than growing the page indefinitely as more
+// receipts pile up - a sticky header plus twenty ~23px data rows.
+const RECEIPT_LIST_VISIBLE_ROWS = 20;
+const RECEIPT_LIST_MAX_HEIGHT = 29 + RECEIPT_LIST_VISIBLE_ROWS * 23;
 
 interface LineItem {
   productId: number;
@@ -109,9 +134,35 @@ export function ReceiptsPage() {
   }
 
   function handlePrintReceipt() {
+    // The `receipt` named page (index.css) can only give the roll a fixed
+    // *width* - its height has to match this particular receipt's actual
+    // content (more line items = a taller strip), which isn't knowable until
+    // it's rendered. `size: <width> auto` looks like the answer but isn't:
+    // the CSS `size` property's grammar doesn't accept `auto` paired with a
+    // length, so browsers silently drop the whole declaration and fall back
+    // to a default Letter/A4 page - which is exactly the oversized preview
+    // this is fixing. Measuring the on-screen receipt (already rendered at
+    // true thermal size below, via the same `paperStyle` zoom) and injecting
+    // an explicit height in mm is the only way to get a real fixed page size
+    // out of it. Scoped to `.ae-modal-panel` specifically, not just
+    // `.ae-receipt-paper` - the entry form and its live preview above render
+    // that same class at full (unscaled) size, and being earlier in the DOM
+    // than this portaled dialog, a bare query would match one of those
+    // instead of the receipt actually being printed.
+    const paperEl = document.querySelector<HTMLElement>(".ae-modal-panel .ae-receipt-paper");
+    const heightMM = paperEl ? paperEl.getBoundingClientRect().height / PX_PER_MM : 200;
+
+    // Deliberately not wrapped in `@media print` - see the comment on the
+    // static `@page receipt` fallback in index.css for why.
+    const printStyle = document.createElement("style");
+    printStyle.textContent = `@page receipt { size: 80mm ${heightMM.toFixed(2)}mm; margin: 0; }`;
+    document.head.appendChild(printStyle);
+
     document.body.classList.add("ae-printing-receipt");
     window.print();
     document.body.classList.remove("ae-printing-receipt");
+
+    document.head.removeChild(printStyle);
   }
 
   const previewReceipt: Receipt = useMemo(() => {
@@ -155,8 +206,27 @@ export function ReceiptsPage() {
         </ToolbarControls>
       </Toolbar>
 
-      <div style={{ ...zoomStyle(zoom), display: "flex", gap: 28, flex: 1, minHeight: 0, flexWrap: "wrap", alignItems: "flex-start", marginBottom: 0 }}>
-        <form onSubmit={handleSubmit} style={{ marginTop: RECEIPT_COLUMN_TOP }}>
+      {/* Everything below the toolbar zooms together as one unit - keeping
+          a single source of truth here (rather than also re-applying
+          zoomStyle down on the recent-receipts table) avoids compounding
+          the scale twice on that table. */}
+      <div style={zoomStyle(zoom)}>
+        {/* Entry form + live preview - always side by side and centered as
+            a pair, never wrapped or squeezed narrower than their fixed
+            paper width. This row is what scrolls (in either direction)
+            once zooming in - or a narrow viewport - makes the pair wider
+            or taller than the space available. */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            flexWrap: "nowrap",
+            gap: 28,
+            overflow: "auto",
+            padding: "0 4px 20px",
+          }}
+        >
+        <form onSubmit={handleSubmit} style={{ marginTop: RECEIPT_COLUMN_TOP, flexShrink: 0 }}>
           <ReceiptPaper>
             <Divider />
             <FormRow label="Date">
@@ -248,26 +318,30 @@ export function ReceiptsPage() {
           </ReceiptPaper>
         </form>
 
-        <div style={{ marginTop: RECEIPT_COLUMN_TOP }}>
-          <ReceiptCard receipt={previewReceipt} isPreview />
+          <div style={{ marginTop: RECEIPT_COLUMN_TOP, flexShrink: 0 }}>
+            <ReceiptCard receipt={previewReceipt} isPreview />
+          </div>
         </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: "1 1 420px",
-            minWidth: 320,
-            minHeight: 0,
-            marginTop: RECEIPT_COLUMN_TOP,
-          }}
-        >
+
+        {/* Recent receipts - full page width below the form/preview pair,
+            tall enough to read ~20 rows at a glance; anything beyond that
+            scrolls internally instead of growing the page indefinitely. */}
+        <div style={{ marginTop: 4 }}>
           <h3 style={{ margin: "0 0 12px" }}>Recent Receipts</h3>
           {!receipts ? (
             <p>Loading…</p>
           ) : visibleReceipts?.length === 0 ? (
             <p style={{ color: colors.subtleInk }}>{receipts.length === 0 ? "No receipts logged yet." : "No receipts match your search."}</p>
           ) : (
-            <div className="table-scroll" style={{ ...zoomStyle(zoom), flex: 1, minHeight: 0, overflow: "auto", border: `1px solid ${colors.border}`, borderRadius: 0 }}>
+            <div
+              className="table-scroll"
+              style={{
+                maxHeight: RECEIPT_LIST_MAX_HEIGHT,
+                overflow: "auto",
+                border: `1px solid ${colors.border}`,
+                borderRadius: 0,
+              }}
+            >
               <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
                 <thead>
                   <tr>
@@ -300,8 +374,18 @@ export function ReceiptsPage() {
       </div>
 
       {selectedReceipt && (
-        <Modal title={`Receipt #${String(selectedReceipt.id).padStart(6, "0")}`} onClose={() => setSelectedReceipt(null)} width={340}>
-          <ReceiptCard receipt={selectedReceipt} />
+        <Modal
+          title={`Receipt #${String(selectedReceipt.id).padStart(6, "0")}`}
+          onClose={() => setSelectedReceipt(null)}
+          width={THERMAL_PRINT_WIDTH_PX + 96}
+        >
+          {/* Rendered at true 80mm-roll size (via zoom, same mechanism as
+              the print path) rather than the large RECEIPT_CARD_WIDTH used
+              by the entry form / live preview pair above - this modal is
+              showing what was actually printed, so it should look like it. */}
+          <div style={{ display: "flex", justifyContent: "center", overflowX: "auto" }}>
+            <ReceiptCard receipt={selectedReceipt} paperStyle={{ zoom: RECEIPT_THERMAL_SCALE }} />
+          </div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }} className="no-print">
             <Button type="button" variant="secondary" size="sm" onClick={() => setSelectedReceipt(null)}>
               Close
@@ -318,9 +402,9 @@ export function ReceiptsPage() {
 
 function FormRow({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12, marginBottom: 4 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 5 }}>
       <span style={{ color: colors.subtleInk, flexShrink: 0 }}>{label}</span>
-      <div style={{ maxWidth: 190, flex: 1 }}>{children}</div>
+      <div style={{ maxWidth: 320, flex: 1 }}>{children}</div>
     </div>
   );
 }
@@ -328,9 +412,9 @@ function FormRow({ label, children }: { label: string; children: ReactNode }) {
 const receiptInputStyle: CSSProperties = {
   width: "100%",
   fontFamily: "'Courier New', Courier, monospace",
-  fontSize: 12,
+  fontSize: 13,
   textAlign: "right",
-  padding: "3px 6px",
+  padding: "4px 6px",
 };
 
 const removeButtonStyle: CSSProperties = {

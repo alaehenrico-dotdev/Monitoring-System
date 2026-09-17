@@ -6,12 +6,13 @@ import {
   type FocusEvent,
   type MouseEvent,
 } from "react";
-import { motion, type Transition } from "framer-motion";
+import { motion } from "motion/react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./LogoMark";
 import { PinIcon } from "./icons";
 import { colors, fonts } from "../theme";
+import { sidebarSpring } from "../motion";
 
 const RAIL_WIDTH = 56;
 const EXPANDED_WIDTH = 256;
@@ -21,13 +22,6 @@ const TAB_BADGE_SIZE = 36;
 
 const SIDEBAR_COLLAPSED_KEY = "ae-sidebar-collapsed-icon";
 const SIDEBAR_PINNED_KEY = "ae-sidebar-pinned";
-
-const spring: Transition = {
-  type: "spring",
-  stiffness: 340,
-  damping: 32,
-  mass: 0.8,
-};
 
 interface NavLinkDef {
   to: string;
@@ -60,6 +54,12 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
     links: [
       { to: "/change-log", label: "Change Log", abbr: "CL", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/products", label: "SKUs", abbr: "SK", roles: ["SUPERVISOR_ADMIN"] },
+    ],
+  },
+  {
+    heading: "Danger Zone",
+    links: [
+      { to: "/data-reset", label: "Data Reset", abbr: "RS", roles: ["SUPERVISOR_ADMIN"] },
     ],
   },
 ];
@@ -113,6 +113,13 @@ const NAV_STYLE = `
   }
   .ae-sidebar-logo:active {
     transform: scale(0.94) rotate(0deg);
+  }
+  @keyframes ae-sidebar-gradient-position {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .ae-sidebar-gradient-sweep {
+    animation: ae-sidebar-gradient-position 13s linear infinite;
   }
 `;
 
@@ -218,11 +225,20 @@ export function Sidebar() {
 
   return (
     <>
+      {/* Real `animate={{ width: ... }}`, not `layout` - `layout` FLIPs a
+          resize via a transform (scale) trick, which visually squishes
+          whatever's actually rendered inside the box while it's mid-
+          transition. That's invisible on this plain-color spacer, but the
+          same trick on `<main>` (see Layout.tsx) visibly distorted real
+          page content (grid text) while resizing, which read as ugly rather
+          than smooth. Animating the real `width` instead costs an extra
+          reflow per frame, but is what makes both this spacer and main's
+          own resize (Layout.tsx) actually smooth rather than faked. */}
       <motion.div
         className="no-print"
         aria-hidden
         animate={{ width: spacerWidth }}
-        transition={spring}
+        transition={sidebarSpring}
         style={{ flexShrink: 0, height: "100%" }}
       />
       <motion.div
@@ -233,7 +249,7 @@ export function Sidebar() {
         onFocus={() => setIsFocusWithin(true)}
         onBlur={handleBlur}
         animate={{ width, height, x: inset, y: inset, borderRadius }}
-        transition={spring}
+        transition={sidebarSpring}
         style={{
           position: "fixed",
           top: 0,
@@ -260,18 +276,27 @@ export function Sidebar() {
         }}
       >
         {state === "expanded" && (
-          <motion.div
+          // Gradient-border trick: this element is padded by exactly the
+          // border width, filled with a moving gradient, then masked so
+          // only that padding ring (not the center) is visible - the
+          // `xor`/`exclude` composite punches the content-box out of the
+          // full box, leaving a ring the same shape as `borderRadius`.
+          //
+          // A plain CSS `animation` (see NAV_STYLE), not a Framer Motion
+          // `animate` loop - `background-position` never runs on the
+          // compositor, so a JS-driven `repeat: Infinity` was repainting
+          // this whole viewport-height layer forever, on the main thread,
+          // for as long as the sidebar stayed expanded (indefinitely, once
+          // pinned). The native CSS engine runs the identical keyframes
+          // without that per-frame JS/React overhead.
+          <div
             aria-hidden
-            // Gradient-border trick: this element is padded by exactly the
-            // border width, filled with a moving gradient, then masked so
-            // only that padding ring (not the center) is visible - the
-            // `xor`/`exclude` composite punches the content-box out of the
-            // full box, leaving a ring the same shape as `borderRadius`.
+            className="ae-sidebar-gradient-sweep"
             style={{
               position: "absolute",
               inset: 0,
               borderRadius: "inherit",
-              padding: 1.5,
+              padding: 1,
               pointerEvents: "none",
               // Black stops between each highlight color are what make the
               // sweep read clearly - without them the yellow/gold/cream
@@ -284,8 +309,6 @@ export function Sidebar() {
               WebkitMaskComposite: "xor",
               maskComposite: "exclude",
             }}
-            animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-            transition={{ duration: 3.2, repeat: Infinity, ease: "linear" }}
           />
         )}
         <div
@@ -407,7 +430,7 @@ export function Sidebar() {
               scale: collapsed ? 0.6 : 1,
               y: collapsed ? -20 : 0,
             }}
-            transition={spring}
+            transition={sidebarSpring}
             style={{
               pointerEvents: collapsed ? "none" : "auto",
               flex: 1,

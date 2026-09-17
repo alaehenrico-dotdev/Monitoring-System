@@ -5,6 +5,7 @@ import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
 import { PrinterIcon } from "../components/icons";
+import { RowGlowScroll } from "../components/RowGlowScroll";
 
 interface VarianceRow {
   id: number;
@@ -92,7 +93,7 @@ export function VarianceReportPage() {
       {rows && (
         <>
           <p style={{ fontSize: 13, color: colors.subtleInk }}>{rows.length} flagged variance(s) found.</p>
-          <div className="ae-table-scroll table-scroll">
+          <RowGlowScroll>
             <table className="ae-table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
@@ -116,7 +117,7 @@ export function VarianceReportPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+          </RowGlowScroll>
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }} className="no-print">
             <Button variant="secondary" onClick={() => window.print()} title="Print or save as PDF">
               <PrinterIcon /> PDF

@@ -15,4 +15,5 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
   receiptsAutoPostDefault: (process.env.RECEIPTS_AUTO_POST_DEFAULT ?? "true") === "true",
+  dataResetPasscode: required("DATA_RESET_PASSCODE", "127001"),
 };

@@ -88,7 +88,7 @@ export function Modal({ title, onClose, children, width = 640 }: { title: string
             ✕
           </button>
         </div>
-        <div style={{ padding: 18, overflowY: "auto" }}>{children}</div>
+        <div style={{ padding: 18, overflowY: "auto" }} className="ae-modal-body">{children}</div>
       </div>
     </div>,
     document.body,

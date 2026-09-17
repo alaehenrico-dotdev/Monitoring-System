@@ -3,7 +3,7 @@ import type { Receipt } from "../types";
 import { colors, fonts } from "../theme";
 import { LogoMark } from "./LogoMark";
 
-export const RECEIPT_CARD_WIDTH = 300;
+export const RECEIPT_CARD_WIDTH = 460;
 const TOOTH = 18; // px per zigzag segment along the bottom edge
 const DEPTH = 11; // px the zigzag dips down
 
@@ -27,8 +27,26 @@ function zigzagBottomClipPath(width: number, tooth: number, depth: number): stri
  * centered logo header - factored out so the read-only output card and the
  * editable entry form (ReceiptsPage) render as the exact same physical
  * receipt, one with static text, one with inputs in place of the values.
+ *
+ * `style` is an optional override merged in *after* the shell's own fixed
+ * layout properties (width/border/clipPath/padding), so a caller can only
+ * add to or override them - e.g. a `zoom` factor to physically shrink the
+ * rendered box for an on-screen thermal-size preview - without fighting the
+ * clip-path math, which still keys off the same real `RECEIPT_CARD_WIDTH`
+ * regardless of any zoom applied on top (`zoom` reflows the box itself, so
+ * the polygon and the visual edge still line up at any scale).
  */
-export function ReceiptPaper({ children, testId, className = "" }: { children: ReactNode; testId?: string; className?: string }) {
+export function ReceiptPaper({
+  children,
+  testId,
+  className = "",
+  style,
+}: {
+  children: ReactNode;
+  testId?: string;
+  className?: string;
+  style?: CSSProperties;
+}) {
   return (
     <div
       data-testid={testId}
@@ -44,16 +62,17 @@ export function ReceiptPaper({ children, testId, className = "" }: { children: R
         border: `1.5px solid ${colors.goldDark}`,
         boxShadow: "0 8px 18px rgba(20,17,13,0.22)",
         clipPath: zigzagBottomClipPath(RECEIPT_CARD_WIDTH, TOOTH, DEPTH),
-        padding: "20px 22px",
-        paddingBottom: DEPTH + 16,
+        padding: "28px 32px",
+        paddingBottom: DEPTH + 24,
+        ...style,
       }}
     >
-      <div style={{ textAlign: "center", marginBottom: 10 }}>
-        <LogoMark size={40} />
-        <div style={{ fontFamily: fonts.wordmark, fontWeight: 800, color: colors.red, fontSize: 14, marginTop: 6 }}>
+      <div style={{ textAlign: "center", marginBottom: 14 }}>
+        <LogoMark size={52} />
+        <div style={{ fontFamily: fonts.wordmark, fontWeight: 800, color: colors.red, fontSize: 17, marginTop: 8 }}>
           ALA EH! FOOD PRODUCTS
         </div>
-        <div style={{ fontSize: 10, letterSpacing: 2, color: colors.staticSubtleInk }}>SALES RECEIPT</div>
+        <div style={{ fontSize: 11.5, letterSpacing: 2, color: colors.staticSubtleInk }}>SALES RECEIPT</div>
       </div>
       {children}
     </div>
@@ -63,11 +82,24 @@ export function ReceiptPaper({ children, testId, className = "" }: { children: R
 /// Read-only rendering of a saved (or live-preview) receipt. `isPreview`
 /// softens a couple of lines that don't make sense before the receipt has
 /// actually been saved (no receipt number yet, no "logged by" audit trail).
-export function ReceiptCard({ receipt, isPreview }: { receipt: Receipt; isPreview?: boolean }) {
+///
+/// `paperStyle` is passed straight through to the underlying `ReceiptPaper`
+/// shell - used by the saved/recent-receipt modal to render this same card
+/// at true thermal-roll size (via `zoom`) without affecting the large entry
+/// form / live preview pair on the main page, which never pass this prop.
+export function ReceiptCard({
+  receipt,
+  isPreview,
+  paperStyle,
+}: {
+  receipt: Receipt;
+  isPreview?: boolean;
+  paperStyle?: CSSProperties;
+}) {
   const totalItems = receipt.items.reduce((sum, it) => sum + Number(it.quantity), 0);
 
   return (
-    <ReceiptPaper testId="receipt-card">
+    <ReceiptPaper testId="receipt-card" style={paperStyle}>
       <Divider />
       <Row label="Receipt #" value={isPreview ? "(unsaved)" : `#${String(receipt.id).padStart(6, "0")}`} />
       <Row label="Date" value={receipt.orderDate.slice(0, 10)} />
@@ -77,10 +109,10 @@ export function ReceiptCard({ receipt, isPreview }: { receipt: Receipt; isPrevie
       <Divider />
 
       {receipt.items.length === 0 ? (
-        <div style={{ fontSize: 12, color: colors.staticSubtleInk, textAlign: "center", padding: "6px 0" }}>No items yet</div>
+        <div style={{ fontSize: 13, color: colors.staticSubtleInk, textAlign: "center", padding: "8px 0" }}>No items yet</div>
       ) : (
         receipt.items.map((it) => (
-          <div key={it.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12.5, marginBottom: 3 }}>
+          <div key={it.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13.5, marginBottom: 4 }}>
             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.product.name}</span>
             <span style={{ flexShrink: 0 }}>x{Number(it.quantity)}</span>
           </div>
@@ -88,13 +120,13 @@ export function ReceiptCard({ receipt, isPreview }: { receipt: Receipt; isPrevie
       )}
 
       <Divider />
-      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 13 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14 }}>
         <span>TOTAL ITEMS</span>
         <span>{totalItems}</span>
       </div>
       <Divider dashed />
 
-      <div style={{ textAlign: "center", fontSize: 10.5, color: colors.staticSubtleInk, marginTop: 8 }}>
+      <div style={{ textAlign: "center", fontSize: 11.5, color: colors.staticSubtleInk, marginTop: 10 }}>
         {isPreview ? (
           <div style={{ fontWeight: 700, letterSpacing: 1, color: colors.warningText }}>PREVIEW - NOT YET SAVED</div>
         ) : (
@@ -112,13 +144,13 @@ export function Row({ label, value }: { label: string; value: string }) {
   const style: CSSProperties = {
     fontWeight: 600,
     textAlign: "right",
-    maxWidth: 190,
+    maxWidth: 320,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   };
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 12, marginBottom: 2 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13, marginBottom: 3 }}>
       <span style={{ color: colors.staticSubtleInk, flexShrink: 0 }}>{label}</span>
       <span style={style}>{value}</span>
     </div>

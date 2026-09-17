@@ -1,6 +1,7 @@
 import { Fragment, useState, type CSSProperties, type KeyboardEvent } from "react";
 import type { Product } from "../types";
 import { colors } from "../theme";
+import { RowGlowScroll } from "./RowGlowScroll";
 
 export interface GridRow {
   product: Product;
@@ -97,7 +98,7 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
   const allProductIds = rows.map((r) => r.product.id);
 
   return (
-    <div className="ae-table-scroll table-scroll">
+    <RowGlowScroll>
       <table className="ae-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
@@ -162,7 +163,7 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
           </tr>
         </tbody>
       </table>
-    </div>
+    </RowGlowScroll>
   );
 }
 
