@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { ArrowUpIcon } from "./icons";
+import { useCursorGlow, CursorGlowOverlay } from "./CursorGlow";
 
 const SHOW_AFTER_PX = 400;
 
@@ -16,9 +17,15 @@ const SHOW_AFTER_PX = 400;
 /// wrapper (.ae-grid-fill/.ae-table-scroll, Section 3.1) that scrolls
 /// internally instead, sticky header and all. Whichever element last
 /// scrolled past the threshold is what gets scrolled back to top.
+///
+/// Carries the same cursor-follow border sweep + interior spotlight as the
+/// page toolbars (Toolbar.tsx) - see CursorGlow.tsx for the shared
+/// mechanics.
 export function BackToTop({ containerRef }: { containerRef: RefObject<HTMLElement> }) {
   const [visible, setVisible] = useState(false);
   const scrolledElRef = useRef<Element | null>(null);
+  const { hostRef, gradientRef, spotlightRef, handlePointerMove, handlePointerLeave } =
+    useCursorGlow<HTMLButtonElement>();
 
   useEffect(() => {
     const container = containerRef.current;
@@ -42,9 +49,15 @@ export function BackToTop({ containerRef }: { containerRef: RefObject<HTMLElemen
 
   return (
     <button
+      ref={hostRef}
       type="button"
       className="no-print"
       onClick={() => scrolledElRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+      onMouseMove={handlePointerMove}
+      onMouseLeave={(e) => {
+        handlePointerLeave();
+        e.currentTarget.style.transform = "scale(1)";
+      }}
       title="Back to top"
       aria-label="Back to top"
       style={{
@@ -55,7 +68,10 @@ export function BackToTop({ containerRef }: { containerRef: RefObject<HTMLElemen
         width: 40,
         height: 40,
         borderRadius: "50%",
-        border: "1px solid var(--ae-border)",
+        // Transparent, same width as before - the visible ring is now
+        // drawn by the CursorGlowOverlay below, so swapping it in never
+        // shifts the button's size.
+        border: "1px solid transparent",
         background: "var(--ae-surface)",
         color: "var(--ae-text)",
         cursor: "pointer",
@@ -67,8 +83,8 @@ export function BackToTop({ containerRef }: { containerRef: RefObject<HTMLElemen
       }}
       onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
+      <CursorGlowOverlay gradientRef={gradientRef} spotlightRef={spotlightRef} borderWidth={1} spotlightRadius={40} />
       <ArrowUpIcon />
     </button>
   );

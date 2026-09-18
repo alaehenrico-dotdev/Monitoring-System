@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import type { Receipt } from "../types";
 import { colors, fonts } from "../theme";
 import { LogoMark } from "./LogoMark";
@@ -6,6 +7,13 @@ import { LogoMark } from "./LogoMark";
 export const RECEIPT_CARD_WIDTH = 460;
 const TOOTH = 18; // px per zigzag segment along the bottom edge
 const DEPTH = 11; // px the zigzag dips down
+
+// Physical size of the printed QR box, in the same design pixels as the
+// rest of the receipt (RECEIPT_CARD_WIDTH etc). Thermal printers are low-DPI
+// and slightly blurry, so this is sized generously enough to still scan
+// reliably after `handlePrintReceipt`'s zoom shrinks it down to a 58mm/80mm
+// roll - too small here and it degrades to unscannable at print scale.
+const QR_SIZE = 84;
 
 /// Deterministic sawtooth clip-path for the bottom edge, computed from a
 /// fixed card width - reads as a torn thermal-receipt edge without relying on
@@ -20,6 +28,16 @@ function zigzagBottomClipPath(width: number, tooth: number, depth: number): stri
   }
   points.push(`0 calc(100% - ${depth}px)`);
   return `polygon(${points.join(", ")})`;
+}
+
+// What the printed QR code encodes for a saved receipt. Defaults to just
+// the receipt number (e.g. "RECEIPT#000123") so it's useful for quick
+// lookup/search by staff with no dependency on a public-facing URL or
+// routing scheme existing yet. Swap this one line for a URL (e.g.
+// `${window.location.origin}/receipts/${receipt.id}`) if/when a
+// receipt-detail page a scanner should land on exists.
+function receiptQrValue(receipt: Receipt): string {
+  return `RECEIPT#${String(receipt.id).padStart(6, "0")}`;
 }
 
 /**
@@ -81,7 +99,9 @@ export function ReceiptPaper({
 
 /// Read-only rendering of a saved (or live-preview) receipt. `isPreview`
 /// softens a couple of lines that don't make sense before the receipt has
-/// actually been saved (no receipt number yet, no "logged by" audit trail).
+/// actually been saved (no receipt number yet, no "logged by" audit trail) -
+/// the QR code is skipped for the same reason: there's nothing stable yet
+/// to encode until the receipt has a real, saved id.
 ///
 /// `paperStyle` is passed straight through to the underlying `ReceiptPaper`
 /// shell - used by the saved/recent-receipt modal to render this same card
@@ -125,6 +145,18 @@ export function ReceiptCard({
         <span>{totalItems}</span>
       </div>
       <Divider dashed />
+
+      {!isPreview && (
+        // Rendered as SVG (not canvas) specifically because this same
+        // markup gets cloned verbatim into the print-only iframe in
+        // ReceiptsPage.handlePrintReceipt - a canvas's drawn bitmap
+        // wouldn't survive that outerHTML clone, but an SVG's markup does,
+        // and it also stays crisp under the iframe's `zoom` scaling instead
+        // of pixelating like a fixed-resolution raster would.
+        <div style={{ display: "flex", justifyContent: "center", margin: "10px 0 2px" }}>
+          <QRCodeSVG value={receiptQrValue(receipt)} size={QR_SIZE} level="M" />
+        </div>
+      )}
 
       <div style={{ textAlign: "center", fontSize: 11.5, color: colors.staticSubtleInk, marginTop: 10 }}>
         {isPreview ? (

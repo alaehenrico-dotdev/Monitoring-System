@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { getVarianceReport } from "../api/manualCounts";
-import { Button, Field, TextInput } from "../components/ui";
+import { Button, TextInput } from "../components/ui";
+import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
@@ -72,21 +73,33 @@ export function VarianceReportPage() {
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
         Review differences between recorded stock and manual counts.
       </p>
-      <form onSubmit={runReport} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 16, flexWrap: "wrap" }}>
-        <Field label="From">
-          <TextInput type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        </Field>
-        <Field label="To">
-          <TextInput type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-        </Field>
-        <Field label="Category (optional)">
-          <TextInput value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Premium (Liter)" />
-        </Field>
-        <Button type="submit">Run report</Button>
-        <Link to="/variance-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
-          Variance History
-        </Link>
-      </form>
+      <Toolbar className="no-print">
+        <form
+          onSubmit={runReport}
+          style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}
+        >
+          <TextInput type="date" aria-label="From" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ maxWidth: 160 }} />
+          <TextInput type="date" aria-label="To" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ maxWidth: 160 }} />
+          <TextInput
+            aria-label="Category (optional)"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="e.g. Premium (Liter)"
+            style={{ maxWidth: 200 }}
+          />
+          <Button type="submit">Run report</Button>
+        </form>
+        <ToolbarControls>
+          {rows && (
+            <Button variant="secondary" onClick={() => window.print()} title="Print or save as PDF">
+              <PrinterIcon /> PDF
+            </Button>
+          )}
+          <Link to="/variance-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
+            Variance History
+          </Link>
+        </ToolbarControls>
+      </Toolbar>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 
@@ -107,7 +120,7 @@ export function VarianceReportPage() {
                   <tr key={r.id}>
                     <td style={{ whiteSpace: "nowrap" }}>{r.entryDate.slice(0, 10)}</td>
                     <td>{r.location}</td>
-                    <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>{r.product.category}</td>
+                    <td style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.ink }}>{r.product.category}</td>
                     <td style={nameCellStyle}>{r.product.name}</td>
                     <td>{r.systemRemainingStock}</td>
                     <td>{r.manualCount}</td>
@@ -118,15 +131,12 @@ export function VarianceReportPage() {
               </tbody>
             </table>
           </RowGlowScroll>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }} className="no-print">
-            <Button variant="secondary" onClick={() => window.print()} title="Print or save as PDF">
-              <PrinterIcon /> PDF
-            </Button>
-          </div>
         </>
       )}
+
+      {!rows && !error && <p style={{ fontSize: 13, color: colors.subtleInk }}>Pick a date range and click Run report to build the report.</p>}
     </div>
   );
 }
 
-const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };

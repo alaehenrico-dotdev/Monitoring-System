@@ -2,6 +2,7 @@ import { Fragment, useState, type CSSProperties, type KeyboardEvent } from "reac
 import type { Product } from "../types";
 import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
+import { NumberCellInput } from "./ui";
 
 export interface GridRow {
   product: Product;
@@ -132,12 +133,10 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
                     }
                     return (
                       <td key={col.key}>
-                        <input
-                          className="ae-input ae-input-cell"
+                        <NumberCellInput
                           data-cell={draftKey}
-                          type="number"
                           value={displayValue}
-                          onChange={(e) => setDrafts((d) => ({ ...d, [draftKey]: e.target.value }))}
+                          onChange={(v) => setDrafts((d) => ({ ...d, [draftKey]: v }))}
                           onBlur={() => commit(row.product.id, col.key)}
                           onKeyDown={(e) => handleKeyDown(e, row.product.id, col.key, allProductIds)}
                           style={inputStyle}
@@ -171,8 +170,8 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
 // White") just widens this one column instead of breaking to a second line
 // and inflating every row's height. Border/padding/alignment defaults
 // otherwise come from the shared .ae-table CSS (index.css).
-const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };
-const lockedStyle: CSSProperties = { background: colors.paperAlt, color: colors.subtleInk };
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };
+const lockedStyle: CSSProperties = { background: colors.paperAlt, color: "var(--ae-num-text)" };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
 const inputStyle: CSSProperties = { width: 64, textAlign: "right" };

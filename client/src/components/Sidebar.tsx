@@ -121,6 +121,10 @@ const NAV_STYLE = `
   .ae-sidebar-gradient-sweep {
     animation: ae-sidebar-gradient-position 13s linear infinite;
   }
+  .ae-sidebar-tab-spotlight {
+    opacity: var(--spotlight-opacity, 0);
+    transition: opacity 220ms ease;
+  }
 `;
 
 export function Sidebar() {
@@ -199,6 +203,26 @@ export function Sidebar() {
     e.currentTarget.blur();
   }
 
+  // Same cursor-follow trick as the toolbar (Toolbar.tsx): write `--mx`/
+  // `--my` straight onto the tab element via `style.setProperty` instead of
+  // through React state, so tracking the pointer across the nav never
+  // triggers a sidebar re-render. Each tab gets its own overlay, so the
+  // glow only ever appears under whichever tab is actually hovered.
+  function handleTabPointerMove(e: MouseEvent<HTMLAnchorElement>) {
+    const el = e.currentTarget;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    el.style.setProperty("--mx", `${x}%`);
+    el.style.setProperty("--my", `${y}%`);
+    el.style.setProperty("--spotlight-opacity", "1");
+  }
+
+  function handleTabPointerLeave(e: MouseEvent<HTMLAnchorElement>) {
+    e.currentTarget.style.setProperty("--spotlight-opacity", "0");
+  }
+
   function toggleCollapsed() {
     setCollapsed((prev) => !prev);
   }
@@ -266,8 +290,8 @@ export function Sidebar() {
           // configs on one element isn't possible with framer-motion).
           border:
             state === "expanded"
-              ? "1px solid transparent"
-              : `1px solid ${colors.yellow}`,
+              ? "0.5px solid transparent"
+              : `0.5px solid ${colors.yellow}`,
           color: colors.cream,
           boxShadow:
             state === "collapsed"
@@ -296,7 +320,7 @@ export function Sidebar() {
               position: "absolute",
               inset: 0,
               borderRadius: "inherit",
-              padding: 1,
+              padding: 0.5,
               pointerEvents: "none",
               // Black stops between each highlight color are what make the
               // sweep read clearly - without them the yellow/gold/cream
@@ -480,8 +504,11 @@ export function Sidebar() {
                           title={l.label}
                           tabIndex={collapsed ? -1 : undefined}
                           onClick={blurAfterClick}
+                          onMouseMove={handleTabPointerMove}
+                          onMouseLeave={handleTabPointerLeave}
                           className="ae-sidebar-tab"
                           style={({ isActive }): CSSProperties => ({
+                            position: "relative",
                             display: "flex",
                             alignItems: "center",
                             justifyContent:
@@ -517,31 +544,52 @@ export function Sidebar() {
                             transition: "background-color 0.15s ease, color 0.15s ease",
                           })}
                         >
-                          {({ isActive }: { isActive: boolean }) =>
-                            state === "expanded" ? (
-                              l.label
-                            ) : (
-                              <span
-                                className="ae-sidebar-tab-badge"
+                          {({ isActive }: { isActive: boolean }) => (
+                            <>
+                              {/* Interior cursor-follow glow, same trick as
+                                  the toolbar's spotlight (Toolbar.tsx): a
+                                  soft white radial gradient centered on
+                                  `--mx`/`--my`, faded in/out purely via the
+                                  `--spotlight-opacity` custom property set
+                                  in handleTabPointerMove/Leave above - no
+                                  React re-render involved. */}
+                              <div
+                                aria-hidden
+                                className="ae-sidebar-tab-spotlight"
                                 style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  width: TAB_BADGE_SIZE,
-                                  height: TAB_BADGE_SIZE,
-                                  borderRadius: "50%",
-                                  background: isActive
-                                    ? colors.yellow
-                                    : "transparent",
-                                  color: isActive ? colors.black : colors.cream,
-                                  fontWeight: isActive ? 700 : 500,
-                                  transition: "background-color 0.15s ease, color 0.15s ease",
+                                  position: "absolute",
+                                  inset: 0,
+                                  pointerEvents: "none",
+                                  mixBlendMode: "screen",
+                                  background:
+                                    "radial-gradient(circle 90px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.3), rgba(255,255,255,0.06) 55%, transparent 75%)",
                                 }}
-                              >
-                                {l.abbr}
-                              </span>
-                            )
-                          }
+                              />
+                              {state === "expanded" ? (
+                                l.label
+                              ) : (
+                                <span
+                                  className="ae-sidebar-tab-badge"
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    width: TAB_BADGE_SIZE,
+                                    height: TAB_BADGE_SIZE,
+                                    borderRadius: "50%",
+                                    background: isActive
+                                      ? colors.yellow
+                                      : "transparent",
+                                    color: isActive ? colors.black : colors.cream,
+                                    fontWeight: isActive ? 700 : 500,
+                                    transition: "background-color 0.15s ease, color 0.15s ease",
+                                  }}
+                                >
+                                  {l.abbr}
+                                </span>
+                              )}
+                            </>
+                          )}
                         </NavLink>
                       ))}
                     </div>
