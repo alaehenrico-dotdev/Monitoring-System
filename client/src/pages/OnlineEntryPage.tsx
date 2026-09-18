@@ -133,15 +133,19 @@ export function OnlineEntryPage() {
     return failed.length === 0;
   }
 
-  // CSV import (Section 3.1) writes straight through to the save endpoint,
-  // same as handleSaveAll - it's its own explicit action, not another cell
-  // edit to stage and preview. Any pending edit already staged for this
-  // product is dropped afterward: the import just made the server the
-  // authoritative value for whatever columns it touched.
+  // CSV import (Section 3.1) stages every column it touched exactly like a
+  // manual cell edit - it used to write straight through to the save
+  // endpoint the instant a row was parsed, which meant an imported file's
+  // numbers (and anything mirrored/recalculated from them, like the Offline
+  // table or the calculated Online/Remaining Stock columns) went live across
+  // the system before the user ever got a chance to review or save. Routing
+  // it through `stage` means Save is the same explicit, previewable step for
+  // an import as it already is for a typed edit.
   async function handleImportRow(productId: number, values: Record<string, number>) {
-    const saved = await saveOnlineEntry(productId, date, values);
-    mergeEntry(productId, saved);
-    clear(productId);
+    const savedRow = rows?.find((r) => r.product.id === productId);
+    for (const [key, value] of Object.entries(values)) {
+      stage(productId, key, value, Number(savedRow?.entry[key] ?? 0));
+    }
   }
 
   // Re-submits the pre-save values captured above through the same save

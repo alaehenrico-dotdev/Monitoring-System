@@ -24,6 +24,7 @@
   --ae-warning-text: #8b6a1e;
   --ae-header-bg: #e7dfc9;
   --ae-header-rule: #14110d;
+  --ae-num-text: var(--ae-text);
 }
 
 :root[data-theme="dark"] {
@@ -40,6 +41,7 @@
   --ae-warning-text: #e4b94d;
   --ae-header-bg: #2a2318;
   --ae-header-rule: #c99a2e;
+  --ae-num-text: #fff;
 }
 
 body {
@@ -61,11 +63,14 @@ table input[type="number"] {
 /* Data grid tables (Section 3.1: StockGrid, TotalStocksTable, Manual Count,
    Change Log, Variance Report, Products) - a shared "Google Sheets" grid
    look built once here instead of six pages each hand-rolling their own
-   thStyle/tdStyle: a real vertical line between every column (not just
-   horizontal row lines), a sticky header, and a soft per-row hover
-   highlight. `border-collapse: separate` (not the tables' old inline
-   `collapse`) is what lets the sticky header render correctly - collapsed
-   borders and position:sticky don't reliably mix across browsers. */
+   thStyle/tdStyle: horizontal row lines only (no vertical column dividers -
+   those cut across the row-hover ring/spotlight's continuous edge, see
+   RowGlowScroll.tsx, making the cursor-follow effect read as broken into
+   per-cell segments instead of one smooth line/glow around the whole row),
+   a sticky header, and a soft per-row hover highlight. `border-collapse:
+   separate` (not the tables' old inline `collapse`) is what lets the sticky
+   header render correctly - collapsed borders and position:sticky don't
+   reliably mix across browsers. */
 .ae-table {
   border-collapse: separate;
   border-spacing: 0;
@@ -83,20 +88,27 @@ table input[type="number"] {
   font-weight: 700;
   white-space: nowrap;
   border-bottom: 2px solid var(--ae-header-rule);
-  border-right: 1px solid var(--ae-border-soft);
-}
-.ae-table th:last-child {
-  border-right: none;
 }
 .ae-table td {
   text-align: right;
   padding: 4px 8px;
   border-bottom: 1px solid var(--ae-border);
-  border-right: 1px solid var(--ae-border-soft);
   transition: background-color 120ms ease;
 }
-.ae-table td:last-child {
-  border-right: none;
+/* Numeric/value cells (the default right-aligned cell in every grid -
+   label cells opt out of this alignment explicitly, see nameCellStyle etc.
+   across StockGrid/TotalStocksTable/ManualCountPage/VarianceReportPage/
+   ChangeLogPage/PendingChangesPreview) read crisp white in dark mode
+   instead of the slightly warmer --ae-text cream, so a grid's numbers pop
+   against its label column. `--ae-num-text` is just `--ae-text` in light
+   mode (no change there - flat white would be invisible against the
+   light-mode table background). `.ae-table--left` (Products Admin, Report
+   History, Receipts history) opts every cell out by default since those
+   tables are mostly labels; Receipts' two genuinely numeric columns
+   (Items, Total Qty) opt back in with an inline `color: var(--ae-num-text)`
+   instead. */
+.ae-table:not(.ae-table--left) td {
+  color: var(--ae-num-text);
 }
 /* A themed var, not a flat hex - it blends with whatever's already showing
    through the cell (a flagged row's warning tint, a subtotal shade) instead
@@ -124,40 +136,51 @@ table input[type="number"] {
   }
 }
 
-/* Full-row hover border - the table-row equivalent of the expanded
-   sidebar's own gradient-border ring (Sidebar.tsx's
-   .ae-sidebar-gradient-sweep): identical technique (an empty div, padded by
-   the border width, filled with a moving gradient, then
-   mask-composite: exclude'd down to just that padding ring) and identical
-   color stops/angle/13s timing, so the two read as one effect used in two
-   places rather than two different effects that happen to share a name.
-
-   The sidebar can do this with a plain CSS `:hover`/state class because
-   it's one single paintable box. A <tr> isn't - it's a row of separate
-   <td> boxes with no shared element to wrap and mask into a ring. So this
-   class only supplies the ring's *look*; RowGlowScroll.tsx supplies the
-   *shape*, by measuring whichever <tr> is actually under the pointer and
-   rendering exactly one of these divs, positioned absolutely to match that
-   row's rect. That's what makes the border read as one continuous line
-   around the whole row instead of a per-cell approximation. */
+/* Row hover border - top and bottom edges only, no left/right sides (a full
+   box outline on a wide-but-short row made the short vertical edges look
+   like an odd little tick at each end rather than a clean line, and cut
+   into the same space as the interior spotlight below). RowGlowScroll.tsx
+   renders two of these divs per hovered row - one pinned to the row's top
+   edge, one to its bottom - each just a thin animated-gradient bar the full
+   width of the row, rather than a single ring-shaped div. Same color
+   stops/13s timing as the sidebar's own gradient sweep (Sidebar.tsx's
+   .ae-sidebar-gradient-sweep) so it reads as the same effect, just a bar
+   instead of a ring. */
 .ae-row-ring {
   position: absolute;
   z-index: 0;
-  box-sizing: border-box;
-  padding: 1px;
+  height: 1.5px;
   pointer-events: none;
   background-image: linear-gradient(
-    115deg,
+    90deg,
     #14110d, #ffd400, #14110d, #c99a2e, #14110d,
     #f1e9d0, #14110d, #c99a2e, #14110d, #ffd400, #14110d
   );
-  background-size: 400% 400%;
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
+  background-size: 400% 100%;
   animation: ae-row-ring-sweep 13s linear infinite;
+}
+
+/* Interior cursor-follow glow for whichever row is under the pointer - same
+   trick as the toolbar's spotlight (Toolbar.tsx's .ae-toolbar-spotlight) and
+   the sidebar tabs' (Sidebar.tsx's .ae-sidebar-tab-spotlight): a soft white
+   radial gradient centered on `--mx`/`--my`, written straight onto this div
+   from RowGlowScroll.tsx's mousemove handler rather than through React
+   state, so tracking the pointer across a row never re-renders the table.
+   Sits inside the same absolutely-positioned rect as .ae-row-ring (both
+   siblings, both sized/positioned by RowGlowScroll.tsx to match the hovered
+   <tr>), `mix-blend-mode: screen` so it brightens the row's own hover fill
+   instead of sitting as a flat white patch on top of it. */
+.ae-row-spotlight {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle 160px at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.3),
+    rgba(255, 255, 255, 0.07) 55%,
+    transparent 75%
+  );
 }
 
 /* Wrapper for the grids - a defined card edge (rounded corners, hairline
@@ -194,7 +217,7 @@ table input[type="number"] {
      would land in the wrong place the moment this wrapper scrolls. */
   position: relative;
   overflow-x: auto;
-  border: 1px solid var(--ae-border);
+  border: 0.5px solid var(--ae-border);
   border-radius: 0;
   flex: 1;
   min-height: 0;
@@ -264,6 +287,74 @@ table input[type="number"] {
 .ae-input-cell:disabled {
   background: #14110d;
   color: rgba(255, 255, 255, 0.55);
+}
+
+/* Custom stepper for grid-cell number inputs (NumberCellInput in ui.tsx),
+   replacing the browser's native spin buttons: those render in unthemed
+   OS chrome against the cell's dark/gold fill, and their built-in
+   ArrowUp/ArrowDown stepping collides with the grid's own arrow-key row
+   navigation. Hidden until hover/focus so a dense grid full of cells
+   doesn't show a stepper on every one at rest. */
+.ae-number-cell {
+  position: relative;
+  display: inline-flex;
+}
+.ae-number-cell .ae-input-cell {
+  flex: 1;
+  min-width: 0;
+  padding-right: 18px;
+}
+.ae-number-cell input[type="number"]::-webkit-inner-spin-button,
+.ae-number-cell input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.ae-number-cell input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.ae-number-cell-spin {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  bottom: 3px;
+  width: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+.ae-number-cell:hover .ae-number-cell-spin,
+.ae-number-cell:focus-within .ae-number-cell-spin {
+  opacity: 1;
+  pointer-events: auto;
+}
+.ae-number-cell-spin button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+.ae-number-cell-spin button:hover {
+  background: rgba(255, 212, 0, 0.18);
+}
+.ae-number-cell-spin button::before {
+  content: "";
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+.ae-number-cell-spin-up::before {
+  border-bottom: 5px solid #ffd400;
+}
+.ae-number-cell-spin-down::before {
+  border-top: 5px solid #ffd400;
 }
 
 /* The editable receipt form (ReceiptsPage) renders its inputs/selects

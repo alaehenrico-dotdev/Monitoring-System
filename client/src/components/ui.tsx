@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, LabelHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, KeyboardEvent, LabelHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import { motion } from "motion/react";
 import { colors } from "../theme";
 import { toolbarLayoutTransition } from "../motion";
@@ -14,6 +14,51 @@ import { toolbarLayoutTransition } from "../motion";
 
 export function TextInput({ className = "", ...rest }: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={`ae-input ${className}`.trim()} {...rest} />;
+}
+
+interface NumberCellInputProps {
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
+  step?: number;
+  className?: string;
+  style?: CSSProperties;
+  "data-cell"?: string;
+}
+
+/**
+ * A grid-cell number input (.ae-input-cell) with its own up/down stepper
+ * instead of the browser's native one. The native spin buttons are hidden
+ * in CSS (see .ae-number-cell in index.css) because their scroll-wheel/
+ * ArrowUp/ArrowDown stepping fights with the grid's own arrow-key row
+ * navigation (StockGrid's handleKeyDown moves between cells on those keys),
+ * and their unthemed OS styling stands out against the dark cell fill.
+ * These replacement buttons only ever run onChange - never onBlur's commit
+ * directly - so a click steps the draft value exactly like typing would.
+ */
+export function NumberCellInput({ value, onChange, onBlur, onKeyDown, step = 1, className = "", style, ...rest }: NumberCellInputProps) {
+  function stepBy(delta: number) {
+    onChange(String((Number(value) || 0) + delta));
+  }
+  return (
+    <span className="ae-number-cell" style={style}>
+      <input
+        className={`ae-input ae-input-cell ${className}`.trim()}
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        onKeyDown={onKeyDown}
+        {...rest}
+      />
+      <span className="ae-number-cell-spin">
+        {/* mousedown keeps focus on the input (rather than the button) so clicking never fires the input's own onBlur commit first */}
+        <button type="button" tabIndex={-1} aria-label="Increase" className="ae-number-cell-spin-up" onMouseDown={(e) => e.preventDefault()} onClick={() => stepBy(step)} />
+        <button type="button" tabIndex={-1} aria-label="Decrease" className="ae-number-cell-spin-down" onMouseDown={(e) => e.preventDefault()} onClick={() => stepBy(-step)} />
+      </span>
+    </span>
+  );
 }
 
 export function Select({ className = "", children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {

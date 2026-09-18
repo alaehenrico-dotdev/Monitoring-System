@@ -114,10 +114,10 @@ function ChangeLogRow({ entry, expanded, onToggle }: { entry: ChangeLogEntry; ex
     <>
       <tr style={{ cursor: "pointer" }} onClick={onToggle}>
         <td style={{ whiteSpace: "nowrap" }}>{new Date(entry.changedAt).toLocaleString()}</td>
-        <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>{TABLE_LABELS[entry.tableName] ?? entry.tableName}</td>
+        <td style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.ink }}>{TABLE_LABELS[entry.tableName] ?? entry.tableName}</td>
         <td>#{entry.recordId}</td>
         <td style={{ textAlign: "left", fontWeight: 700, color: ACTION_COLOR[entry.action] }}>{entry.action}</td>
-        <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>{entry.changedBy?.name ?? "system"}</td>
+        <td style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.ink }}>{entry.changedBy?.name ?? "system"}</td>
         <td style={{ color: colors.subtleInk }}>{expanded ? "▲" : "▼"}</td>
       </tr>
       {expanded && (
@@ -141,7 +141,7 @@ function ChangeLogRow({ entry, expanded, onToggle }: { entry: ChangeLogEntry; ex
                 <tbody>
                   {diffs.map((d) => (
                     <tr key={d.key}>
-                      <td style={{ textAlign: "left", padding: "3px 10px" }}>{d.key}</td>
+                      <td style={{ textAlign: "left", padding: "3px 10px", color: colors.ink }}>{d.key}</td>
                       <td style={{ padding: "3px 10px" }}>{d.before}</td>
                       <td style={{ padding: "3px 10px", fontWeight: 600 }}>{d.after}</td>
                     </tr>

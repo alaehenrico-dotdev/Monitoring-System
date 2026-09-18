@@ -1,8 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { AnimatePresence, motion } from "motion/react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
-import { Button, Select, TextInput } from "../components/ui";
+import { Button, NumberCellInput, Select, TextInput } from "../components/ui";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
 import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
@@ -12,7 +11,6 @@ import { SaveIcon } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
-import { toolbarLayoutTransition } from "../motion";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 
@@ -143,12 +141,7 @@ export function ManualCountPage() {
         Review and correct manual counts for the selected date.
       </p>
       <Toolbar className="no-print">
-        {/* `layout` - matches ToolbarControls (Toolbar.tsx) on the other
-            side of this row. Without it, this cluster doesn't react when
-            the flagged-count badge mounts/unmounts or its own label
-            collapses in compact mode, so the other controls in it would
-            jump sideways instead of sliding smoothly. */}
-        <motion.div layout transition={toolbarLayoutTransition} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
           <Select aria-label="Location" value={location} onChange={(e) => setLocation(e.target.value as StockLocation)}>
             {LOCATIONS.map((l) => (
@@ -159,29 +152,16 @@ export function ManualCountPage() {
           </Select>
           <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
           <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
-          <AnimatePresence initial={false}>
-            {flaggedCount > 0 && (
-              <motion.span
-                layout
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                transition={toolbarLayoutTransition}
-                style={{ color: colors.warningText, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}
-                title={`${flaggedCount} product(s) with a non-zero variance`}
-              >
-                {/* The " flagged" word reuses .ae-toolbar-btn-label (index.css)
-                    - the same collapsible label every other toolbar control's
-                    text uses, so this badge shrinks to a bare "⚠ N" in
-                    compact mode instead of being the one control left un-
-                    handled by that pattern, at risk of getting clipped by
-                    .ae-toolbar--compact's overflow:hidden instead. */}
-                ⚠ {flaggedCount}
-                <span className="ae-toolbar-btn-label"> flagged</span>
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </motion.div>
+          {flaggedCount > 0 && (
+            <span
+              style={{ color: colors.warningText, fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0 }}
+              title={`${flaggedCount} product(s) with a non-zero variance`}
+            >
+              ⚠ {flaggedCount}
+              <span className="ae-toolbar-btn-label"> flagged</span>
+            </span>
+          )}
+        </div>
         <ToolbarControls>
           <Button
             className="ae-toolbar-save"
@@ -235,19 +215,11 @@ export function ManualCountPage() {
                   <tr key={r.product.id} style={r.isFlagged ? { background: colors.warningBg } : undefined}>
                     <td style={nameCellStyle}>{r.product.category}</td>
                     <td style={nameCellStyle}>{r.product.name}</td>
-                    {/* Prisma Decimal fields serialize as JSON strings once a row is
-                        persisted (unlike the plain-number preview shown before a
-                        row is saved), so this is wrapped in Number() rather than
-                        relying on .toLocaleString() alone - a bare string's
-                        .toLocaleString() is a silent no-op, not a crash, but it
-                        would drop thousands-separator formatting on saved rows. */}
                     <td>{Number(r.entry.systemRemainingStock).toLocaleString()}</td>
                     <td>
-                      <input
-                        className="ae-input ae-input-cell"
-                        type="number"
-                        value={drafts[r.product.id] ?? r.entry.manualCount ?? ""}
-                        onChange={(e) => setDrafts((d) => ({ ...d, [r.product.id]: e.target.value }))}
+                      <NumberCellInput
+                        value={String(drafts[r.product.id] ?? r.entry.manualCount ?? "")}
+                        onChange={(v) => setDrafts((d) => ({ ...d, [r.product.id]: v }))}
                         onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
                         style={{ width: 64, textAlign: "right" }}
                       />
@@ -276,7 +248,7 @@ export function ManualCountPage() {
               <tbody>
                 {pendingChanges.map((c) => (
                   <tr key={c.productId}>
-                    <td style={{ textAlign: "left" }}>{c.name}</td>
+                    <td style={{ textAlign: "left", color: colors.ink }}>{c.name}</td>
                     <td>{c.oldValue}</td>
                     <td style={{ fontWeight: 700, color: colors.red }}>{c.newValue}</td>
                   </tr>
@@ -298,4 +270,4 @@ export function ManualCountPage() {
   );
 }
 
-const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };

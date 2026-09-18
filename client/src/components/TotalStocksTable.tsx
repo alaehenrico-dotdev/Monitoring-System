@@ -70,7 +70,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
   );
 }
 
-const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap" };
+const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };
 const categoryRowStyle: CSSProperties = {
   textAlign: "left",
   fontWeight: 700,

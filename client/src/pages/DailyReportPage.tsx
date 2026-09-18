@@ -3,7 +3,7 @@ import { getDailyReport, type DailyReport } from "../api/reports";
 import { Button, TextInput } from "../components/ui";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
-import { Toolbar } from "../components/Toolbar";
+import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { onlineStockColumns, offlineStockColumns } from "../config/stockColumns";
 import { toCsv, downloadCsv } from "../utils/csv";
 import { formatDateDisplay } from "../utils/dateFormat";
@@ -81,11 +81,16 @@ export function DailyReportPage() {
 
   return (
     <div>
+      <h2 style={{ margin: "-8px 0 0px" }}>Daily Report - {formatDateDisplay(date)}</h2>
+      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
+        Generate a printable snapshot of a given date's Online, Offline, and Total stock.
+      </p>
       <Toolbar className="no-print">
-        <h2 style={{ margin: 0 }}>Daily Report - {formatDateDisplay(date)}</h2>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           <Button onClick={load}>Generate</Button>
+        </div>
+        <ToolbarControls>
           {report && (
             <>
               <Button variant="secondary" onClick={handleExport}>
@@ -99,7 +104,7 @@ export function DailyReportPage() {
           <Link to="/daily-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
             Daily History
           </Link>
-        </div>
+        </ToolbarControls>
       </Toolbar>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}

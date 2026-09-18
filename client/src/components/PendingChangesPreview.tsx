@@ -23,9 +23,9 @@ export function PendingChangesPreview({ items }: { items: PendingChangeDetail[] 
       <tbody>
         {items.map((item, i) => (
           <tr key={`${item.productId}-${item.label}-${i}`}>
-            <td style={{ textAlign: "left" }}>{item.name}</td>
-            <td style={{ textAlign: "left" }}>{item.category}</td>
-            <td style={{ textAlign: "left" }}>{item.label}</td>
+            <td style={{ textAlign: "left", color: colors.ink }}>{item.name}</td>
+            <td style={{ textAlign: "left", color: colors.ink }}>{item.category}</td>
+            <td style={{ textAlign: "left", color: colors.ink }}>{item.label}</td>
             <td>{item.oldValue.toLocaleString()}</td>
             <td style={{ fontWeight: 700, color: colors.red }}>{item.newValue.toLocaleString()}</td>
           </tr>

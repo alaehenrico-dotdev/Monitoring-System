@@ -42,7 +42,17 @@ export function useZoom(key: string) {
  */
 export function ZoomControl({ zoom, onChange }: { zoom: number; onChange: (zoom: number) => void }) {
   return (
-    <Select aria-label="Zoom level" title="Zoom" value={zoom} onChange={(e) => onChange(Number(e.target.value))}>
+    <Select
+      aria-label="Zoom level"
+      title="Zoom"
+      value={zoom}
+      onChange={(e) => onChange(Number(e.target.value))}
+      // Reserve enough width/right-padding for the widest label ("200%")
+      // plus Select's own dropdown-arrow icon. Without this, the closed
+      // select's text collides with (or renders under) the arrow at this
+      // control's default/inherited width.
+      style={{ minWidth: 76, paddingRight: 26, textAlign: "right" }}
+    >
       {PRESETS.map((p) => (
         <option key={p} value={p}>
           {p}%
