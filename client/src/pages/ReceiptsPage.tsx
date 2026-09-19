@@ -17,6 +17,7 @@ import {
   RECEIPT_CARD_WIDTH,
 } from "../components/ReceiptCard";
 import { Button, Select } from "../components/ui";
+import { DatePicker } from "../components/DatePicker";
 import { useAuth } from "../context/AuthContext";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
@@ -453,13 +454,7 @@ export function ReceiptsPage() {
               <Divider />
 
               <FormRow label="Date">
-                <input
-                  type="date"
-                  className="ae-input"
-                  style={receiptInputStyle}
-                  value={orderDate}
-                  onChange={(e) => setOrderDate(e.target.value)}
-                />
+                <DatePicker aria-label="Order date" style={receiptInputStyle} value={orderDate} onChange={setOrderDate} />
               </FormRow>
 
               <FormRow label="Customer">

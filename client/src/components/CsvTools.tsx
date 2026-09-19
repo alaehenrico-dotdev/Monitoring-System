@@ -2,6 +2,9 @@ import { useRef, useState } from "react";
 import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
 import { downloadExcel, toExcelTable } from "../utils/excel";
+import { downloadTablePdf } from "../utils/tablePdf";
+import { pdfFileName, stockGridSection } from "../utils/pdfTables";
+import { formatDateDisplay } from "../utils/dateFormat";
 import type { Product } from "../types";
 import { toolbarLayoutTransition } from "../motion";
 import { DownloadIcon, PrinterIcon, UploadIcon } from "./icons";
@@ -87,6 +90,20 @@ interface CsvToolsProps {
   /// format. Ignored when `canImport` is true, since re-import always parses
   /// CSV, never this .xls.
   exportFormat?: "csv" | "excel";
+  /// What the PDF segment produces. The PDF is built from the same `rows` and
+  /// `columns` as Export (via utils/tablePdf.ts, not by printing the page),
+  /// so all the formats agree. Everything here is optional - the title
+  /// defaults to the file prefix and the subtitle to the date.
+  pdf?: {
+    title?: string;
+    subtitle?: string;
+    /// Small extra lines under the subtitle (e.g. active filters).
+    notes?: string[];
+    /// Which value columns get subtotals / a grand total. Defaults to all.
+    sumKeys?: string[];
+    /// Tints rows whose value under this key is non-zero (e.g. "variance").
+    flagKey?: string;
+  };
 }
 
 /**
@@ -110,6 +127,7 @@ export function CsvTools({
   pdfDisabled = false,
   onBeforePrint,
   exportFormat = "csv",
+  pdf,
 }: CsvToolsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -138,6 +156,22 @@ export function CsvTools({
     const headers = ["Category", "SKU", ...columns.map((c) => c.label)].map((h) => h.toUpperCase());
     const dataRows = rows.map((r) => [r.product.category, r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
     downloadCsv(`${filenamePrefix}-${date}.csv`, toCsv(headers, dataRows));
+  }
+
+  async function handlePdf() {
+    if (onBeforePrint && !(await onBeforePrint())) return;
+    try {
+      downloadTablePdf({
+        filename: pdfFileName(filenamePrefix, date),
+        title: pdf?.title ?? filenamePrefix.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+        subtitle: pdf?.subtitle ?? formatDateDisplay(date),
+        notes: pdf?.notes,
+        sections: [stockGridSection(rows, columns, { sumKeys: pdf?.sumKeys, flagKey: pdf?.flagKey })],
+      });
+    } catch (err) {
+      setMessage(err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed");
+      setMessageVariant("error");
+    }
   }
 
   async function handleImportFile(file: File) {
@@ -334,12 +368,9 @@ export function CsvTools({
             whileTap={{ scale: 0.94 }}
             type="button"
             className="ae-segment-btn"
-            onClick={async () => {
-              if (onBeforePrint && !(await onBeforePrint())) return;
-              window.print();
-            }}
+            onClick={() => void handlePdf()}
             disabled={disabled || pdfDisabled}
-            title={pdfDisabled ? "Save your changes first - PDF reflects only saved data" : "Export as PDF (choose 'Save as PDF' in the print dialog)"}
+            title={pdfDisabled ? "Save your changes first - PDF reflects only saved data" : "Download as PDF"}
           >
             <PrinterIcon />
             <span className="ae-segment-label">PDF</span>

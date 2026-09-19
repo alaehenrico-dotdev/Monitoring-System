@@ -17,6 +17,9 @@ import { sidebarSpring } from "../motion";
 const RAIL_WIDTH = 56;
 const EXPANDED_WIDTH = 256;
 const ICON_SIZE = 40;
+// Must match the transition / animation length of .ae-logo-ring and
+// .ae-logo-glint in index.css - a new spin is ignored until the last is done.
+const LOGO_SPIN_MS = 1100;
 const ICON_INSET = 16;
 const TAB_BADGE_SIZE = 36;
 
@@ -105,14 +108,26 @@ const NAV_STYLE = `
     background: color-mix(in srgb, ${colors.yellow} 22%, transparent);
     color: ${colors.yellow};
   }
-  .ae-sidebar-logo {
-    transition: transform 0.25s ease;
+  /* Only the seal reacts - not the whole row. The row used to scale and
+     tilt as one piece, which wobbled the "Ala Eh!" text and the pin button
+     along with the logo. The border lettering also spins and a light streak
+     crosses the seal on hover (see LogoMark's spin prop and .ae-logo-*
+     in index.css). */
+  .ae-sidebar-logo .ae-logo-mark {
+    display: block;
+    flex-shrink: 0;
+    overflow: visible;
+    transition:
+      transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+      filter 0.25s ease;
   }
-  .ae-sidebar-logo:hover {
-    transform: scale(1.08) rotate(-4deg);
+  .ae-sidebar-logo:hover .ae-logo-mark,
+  .ae-sidebar-logo:focus-visible .ae-logo-mark {
+    transform: scale(1.06);
+    filter: drop-shadow(0 0 6px color-mix(in srgb, ${colors.gold} 60%, transparent));
   }
-  .ae-sidebar-logo:active {
-    transform: scale(0.94) rotate(0deg);
+  .ae-sidebar-logo:active .ae-logo-mark {
+    transform: scale(0.93);
   }
   @keyframes ae-sidebar-gradient-position {
     0%, 100% { background-position: 0% 50%; }
@@ -135,6 +150,10 @@ export function Sidebar() {
   const [pinned, setPinned] = useState(readInitialPinned);
   const [isMouseOver, setIsMouseOver] = useState(false);
   const [isFocusWithin, setIsFocusWithin] = useState(false);
+  // How many times the logo's ring has been sent round (LogoMark's `spin`);
+  // bumped when the pointer enters the logo row, at most once per turn.
+  const [logoSpin, setLogoSpin] = useState(0);
+  const lastSpinAtRef = useRef(0);
   const [viewportHeight, setViewportHeight] = useState(() =>
     typeof window !== "undefined" ? window.innerHeight : 900,
   );
@@ -345,6 +364,12 @@ export function Sidebar() {
         >
           <div
             className="ae-sidebar-logo"
+            onMouseEnter={() => {
+              const now = performance.now();
+              if (now - lastSpinAtRef.current < LOGO_SPIN_MS) return;
+              lastSpinAtRef.current = now;
+              setLogoSpin((n) => n + 1);
+            }}
             onClick={(e) => {
               toggleCollapsed();
               blurAfterClick(e);
@@ -382,7 +407,7 @@ export function Sidebar() {
               flexShrink: 0,
             }}
           >
-            <LogoMark size={ICON_SIZE} />
+            <LogoMark size={ICON_SIZE} spin={logoSpin} />
             {state === "expanded" && (
               <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
                 <h1

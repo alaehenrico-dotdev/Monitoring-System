@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOfflineGrid, saveOfflineEntry } from "../api/offlineStock";
 import { useAuth } from "../context/AuthContext";
-import { Button, TextInput } from "../components/ui";
+import { Button } from "../components/ui";
+import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { CsvTools } from "../components/CsvTools";
@@ -16,6 +17,8 @@ import { describePendingChanges, usePendingEntryChanges, type PendingByProduct }
 import { offlineStockColumns as columns } from "../config/stockColumns";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { downloadTablePdf } from "../utils/tablePdf";
+import { filterNotes, pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { getCurrentShiftAndDate, otherShift, SHIFT_LABELS, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
 import type { Shift } from "../types";
@@ -195,13 +198,32 @@ export function OfflineEntryPage() {
     if (failed.length) setError(`Failed to undo: ${failed.join(", ")}.`);
   }
 
+  // PDF of the grid as currently filtered (search / category), with every
+  // category fully listed. Built from the row data by utils/tablePdf.ts - not
+  // by printing the page - so the layout is the same on every page and
+  // always fits the paper. Disabled while edits are unsaved (see the button).
+  function handlePdf() {
+    if (!visibleRows) return;
+    try {
+      downloadTablePdf({
+        filename: pdfFileName("offline-stock", date, shift),
+        title: "Daily Offline Stock Monitoring",
+        subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`,
+        notes: filterNotes({ category: categoryFilter, query }),
+        sections: [stockGridSection(visibleRows, columns)],
+      });
+    } catch (e) {
+      setError(e instanceof Error ? `PDF failed: ${e.message}` : "PDF failed");
+    }
+  }
+
   return (
     <div>
       <h2 style={{ margin: "-8px 0 0px" }}>
         Daily Offline Stock Monitoring - {formatDateDisplay(date)} - {SHIFT_SHORT_LABELS[shift]} Shift
       </h2>
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Stocks In/Out transfers here mirror automatically onto the Online table (Section 4.3).
+        Stocks In/Out transfers here mirror automatically onto the Online table.
       </p>
       <Toolbar className="no-print ae-toolbar-entry">
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
@@ -221,7 +243,7 @@ export function OfflineEntryPage() {
           )}
           <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
           <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
-          <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
+          <DatePicker aria-label="Date" value={date} onChange={setDate} todayValue={getCurrentShiftAndDate().date} style={{ maxWidth: 180 }} />
           <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
         </div>
         <ToolbarControls>
@@ -236,9 +258,9 @@ export function OfflineEntryPage() {
             type="button"
             variant="secondary"
             size="sm"
-            onClick={() => window.print()}
-            disabled={pendingCount > 0}
-            title={pendingCount > 0 ? "Save your changes first - PDF reflects only saved data" : "Print or save as PDF"}
+            onClick={handlePdf}
+            disabled={pendingCount > 0 || !visibleRows}
+            title={pendingCount > 0 ? "Save your changes first - PDF reflects only saved data" : "Download as PDF"}
           >
             <PrinterIcon />
             <span className="ae-toolbar-btn-label">PDF</span>

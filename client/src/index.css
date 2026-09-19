@@ -337,32 +337,249 @@ table input[type="number"] {
   color: #8a8272;
 }
 
-.ae-input[type="date"] {
+/* ---- Date picker (components/DatePicker.tsx) ---------------------------
+   The trigger is a <button> styled as an .ae-input; the calendar dialog is
+   portaled to <body>, so its rules key off .ae-datepicker rather than any
+   ancestor. The header band is always brand-black (like the table headers),
+   and the selected day is brand-yellow, in both themes. */
+.ae-date-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 136px;
+  text-align: left;
+  white-space: nowrap;
   cursor: pointer;
 }
-.ae-input[type="date"]::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  opacity: 0.65;
-  transition: opacity 120ms ease;
+.ae-date-trigger[aria-expanded="true"] {
+  border-color: #c99a2e;
+  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.18);
 }
-.ae-input[type="date"]:hover::-webkit-calendar-picker-indicator,
-.ae-input[type="date"]:focus::-webkit-calendar-picker-indicator {
-  opacity: 1;
+.ae-date-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ae-date-trigger-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: #8b6a1e;
+  transition: color 120ms ease;
+}
+.ae-date-trigger:hover:not(:disabled) .ae-date-trigger-icon,
+.ae-date-trigger[aria-expanded="true"] .ae-date-trigger-icon {
+  color: #c99a2e;
+}
+:root[data-theme="dark"] .ae-date-trigger-icon {
+  color: #ffd400;
+}
+:root[data-theme="dark"] .ae-receipt-paper .ae-date-trigger-icon {
+  color: #8b6a1e; /* the receipt paper stays white in dark mode - yellow would vanish on it */
+}
+/* Compact and circle toolbar tiers squeeze the field to ~100px / ~84px, so
+   they swap to the numeric "9/19/26" form (circle also drops the icon). The
+   circle tier's class list includes .ae-toolbar--compact, so the first two
+   rules cover both. */
+.ae-date-short {
+  display: none;
+}
+.ae-toolbar--compact .ae-date-long {
+  display: none;
+}
+.ae-toolbar--compact .ae-date-short {
+  display: inline;
+}
+.ae-toolbar--circle .ae-date-trigger-icon {
+  display: none;
 }
 
-/* Dark mode only - the browser's default calendar-icon glyph is a dark
-   near-black shape that all but disappears against .ae-input's dark
-   surface. Swapped for a brand-yellow (#FFD400) version of the same glyph
-   instead of just inverting it to white, so it reads as an intentional
-   accent rather than a generic mono icon. Light mode is untouched - the
-   default dark glyph already has enough contrast against the light/paper
-   input background there. */
-:root[data-theme="dark"] .ae-input[type="date"]::-webkit-calendar-picker-indicator {
+.ae-datepicker {
+  position: fixed;
+  z-index: 300; /* above Modal (200) so a picker inside a dialog still shows */
+  overflow: hidden;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 0;
+  box-shadow: 0 16px 48px rgba(20, 17, 13, 0.35);
+  font-size: 13px;
+  user-select: none;
+  outline: none;
+}
+.ae-datepicker button {
+  font-family: inherit;
+}
+.ae-datepicker-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  background: #14110d;
+  color: #f1e9d0;
+}
+.ae-datepicker-title {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ae-datepicker-title:hover {
+  background: rgba(255, 212, 0, 0.14);
+}
+.ae-datepicker-nav {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #ffd400;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.ae-datepicker-nav:hover {
+  background: rgba(255, 212, 0, 0.16);
+  border-color: rgba(255, 212, 0, 0.5);
+}
+.ae-datepicker-title:focus-visible,
+.ae-datepicker-nav:focus-visible {
+  outline: 2px solid #ffd400;
+  outline-offset: 1px;
+}
+.ae-datepicker-body {
+  min-height: 262px; /* days view height, so switching to months doesn't shrink the dialog */
+  padding: 10px 12px 6px;
+}
+.ae-datepicker-weekdays,
+.ae-datepicker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.ae-datepicker-weekday {
+  padding: 4px 0 6px;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ae-text-muted);
+}
+.ae-datepicker-day {
+  width: 34px;
+  height: 34px;
+  margin: 1px auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.ae-datepicker-day:hover {
+  background: var(--ae-surface-hover);
+}
+.ae-datepicker-day--outside {
+  color: var(--ae-text-muted);
+  opacity: 0.55;
+}
+.ae-datepicker-day--today {
+  border-color: #c99a2e;
+  font-weight: 700;
+}
+.ae-datepicker-day--selected,
+.ae-datepicker-day--selected:hover {
+  background: #ffd400;
+  border-color: #ffd400;
+  color: #14110d;
+  font-weight: 800;
   opacity: 1;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23FFD400' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='3.5' width='12' height='11' rx='1.5'/%3E%3Cpath d='M5 1.5v3M11 1.5v3M2 6.5h12'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 15px 15px;
+}
+.ae-datepicker-day:focus-visible,
+.ae-datepicker-month:focus-visible,
+.ae-datepicker-today:focus-visible {
+  outline: 2px solid #c99a2e;
+  outline-offset: 1px;
+}
+.ae-datepicker-months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 6px 0;
+}
+.ae-datepicker-month {
+  padding: 14px 0;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.ae-datepicker-month:hover {
+  background: var(--ae-surface-hover);
+}
+.ae-datepicker-month--selected,
+.ae-datepicker-month--selected:hover {
+  background: #ffd400;
+  border-color: #ffd400;
+  color: #14110d;
+  font-weight: 800;
+}
+.ae-datepicker-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  border-top: 1px solid var(--ae-border-soft);
+}
+.ae-datepicker-foot-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--ae-text-muted);
+}
+.ae-datepicker-today {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid #8b6a1e;
+  border-radius: 999px;
+  background: transparent;
+  color: #c99a2e;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ae-datepicker-today:hover {
+  background: rgba(201, 154, 46, 0.14);
+}
+@media print {
+  .ae-datepicker {
+    display: none !important;
+  }
 }
 
 .ae-select {
@@ -592,7 +809,7 @@ table input[type="number"] {
   min-width: 72px;
 }
 .ae-toolbar .ae-select,
-.ae-toolbar .ae-input[type="date"] {
+.ae-toolbar .ae-date-trigger {
   flex: 0 1 auto;
 }
 
@@ -615,7 +832,7 @@ table input[type="number"] {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ae-toolbar--compact .ae-input[type="date"] {
+.ae-toolbar--compact .ae-date-trigger {
   flex: 1 1 110px !important;
   width: 110px !important;
   min-width: 96px !important;
@@ -634,7 +851,7 @@ table input[type="number"] {
   min-width: 48px !important;
   max-width: 120px !important;
 }
-.ae-toolbar--circle .ae-input[type="date"] {
+.ae-toolbar--circle .ae-date-trigger {
   flex: 1 1 84px !important;
   width: 84px !important;
   min-width: 68px !important;
@@ -1052,4 +1269,208 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
 @page receipt {
   size: 80mm 500mm;
   margin: 0;
+}
+/* =========================================================================
+   Dashboard (pages/DashboardPage.tsx)
+   =========================================================================
+   Uses the same surfaces as the rest of the app - theme tokens, the
+   toolbar's gold hairline on summary tiles, .ae-table for the activity
+   list - so it follows the light/dark toggle. */
+/* Page subtitle: larger than the 13px used on other pages, and full-contrast
+   (pure white in dark mode; the normal ink color in light mode, where white
+   would disappear against the paper background). */
+.ae-dash-subtitle {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--ae-text);
+}
+:root[data-theme="dark"] .ae-dash-subtitle {
+  color: #ffffff;
+}
+.ae-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin: 12px 0 24px;
+  flex-shrink: 0;
+}
+.ae-dash-stat {
+  position: relative;
+  overflow: hidden;
+  padding: 16px 18px;
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 0;
+  box-shadow: 0 1px 3px rgba(20, 17, 13, 0.06);
+}
+.ae-dash-stat--alert {
+  border-color: #c1272d;
+}
+/* Cursor-follow glow - same idea as the toolbar's, tinted brand gold. */
+.ae-dash-stat-spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--spotlight-opacity, 0);
+  transition: opacity 220ms ease;
+  background: radial-gradient(circle 180px at var(--mx, 50%) var(--my, 50%), rgba(201, 154, 46, 0.2), rgba(201, 154, 46, 0.07) 55%, transparent 75%);
+}
+.ae-dash-stat-value {
+  position: relative;
+  margin-bottom: 8px;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ae-text);
+}
+.ae-dash-stat-label {
+  position: relative;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+.ae-dash-stat--alert .ae-dash-stat-value,
+.ae-dash-stat--alert .ae-dash-stat-label {
+  color: #c1272d;
+}
+:root[data-theme="dark"] .ae-dash-stat--alert .ae-dash-stat-value,
+:root[data-theme="dark"] .ae-dash-stat--alert .ae-dash-stat-label {
+  color: #ef5a5f;
+}
+
+.ae-dash-section {
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+.ae-dash-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-dash-link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ae-warning-text);
+  text-decoration: none;
+}
+.ae-dash-link:hover {
+  text-decoration: underline;
+}
+.ae-dash-card {
+  overflow: hidden;
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  border-radius: 0;
+}
+
+.ae-dash-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 24px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--ae-border-soft);
+  border-left: 3px solid transparent;
+  color: var(--ae-text);
+  text-decoration: none;
+  transition: background-color 120ms ease;
+}
+.ae-dash-row:last-child {
+  border-bottom: none;
+}
+.ae-dash-row:hover {
+  background: var(--ae-row-hover);
+}
+.ae-dash-row:focus-visible {
+  outline: 2px solid #c99a2e;
+  outline-offset: -2px;
+}
+.ae-dash-row-headline {
+  font-size: 14px;
+  font-weight: 500;
+}
+.ae-dash-row-action {
+  flex-shrink: 0;
+  font-size: 12.5px;
+  color: var(--ae-text-muted);
+}
+.ae-dash-row--muted .ae-dash-row-headline {
+  color: var(--ae-text-muted);
+}
+/* Needs-attention row: the same flagged-row tint the stock grids use. */
+.ae-dash-row--alert,
+.ae-dash-row--alert:hover {
+  background: var(--ae-warning-bg);
+  border-left-color: #c1272d;
+}
+.ae-dash-row--alert .ae-dash-row-headline {
+  font-weight: 700;
+}
+
+.ae-dash-table-scroll {
+  overflow-x: auto;
+}
+.ae-dash-card .ae-table th,
+.ae-dash-card .ae-table td {
+  padding: 8px 12px;
+}
+.ae-dash-card .ae-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.ae-dash-cell-link {
+  color: var(--ae-text);
+  text-decoration: none;
+}
+.ae-dash-cell-link:hover {
+  text-decoration: underline;
+}
+.ae-dash-cell-link:focus-visible {
+  outline: 2px solid #c99a2e;
+  outline-offset: 2px;
+}
+
+/* =========================================================================
+   Logo seal animation (components/LogoMark.tsx, hover wiring in Sidebar.tsx)
+   =========================================================================
+   The border lettering turns one full revolution per hover (its `rotate()`
+   is set from LogoMark's `spin` prop), and a soft light streak crosses the
+   seal. Keep the 1.1s / 1100ms in step with LOGO_SPIN_MS in Sidebar.tsx. */
+.ae-logo-ring {
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.35, 1);
+}
+@keyframes ae-logo-glint {
+  from {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    transform: translateX(340px);
+    opacity: 0;
+  }
+}
+.ae-logo-glint {
+  animation: ae-logo-glint 0.9s ease-in-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-logo-ring {
+    transition: none;
+  }
+  .ae-logo-glint {
+    display: none;
+  }
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getTotalStocks } from "../api/totalStocks";
 import type { TotalStockRow } from "../types";
-import { TextInput } from "../components/ui";
+import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
 import { TotalStocksTable } from "../components/TotalStocksTable";
@@ -71,14 +71,23 @@ export function TotalStocksPage() {
       </p>
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-          <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
+          <DatePicker aria-label="Date" value={date} onChange={setDate} style={{ maxWidth: 180 }} />
           <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
           <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
         </div>
         <ToolbarControls>
           {csvRows && (
             <>
-              <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} canImport={false} exportFormat="excel" />
+              <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} canImport={false}
+                exportFormat="excel"
+                pdf={{
+                  title: "Total Stocks (Online + Offline)",
+                  subtitle: formatDateDisplay(date),
+                  // Same as TotalStocksTable: only the three "remaining" columns are summed.
+                  sumKeys: ["onlineRemainingStock", "offlineRemainingStock", "totalRemainingStock"],
+                  flagKey: "totalVariance",
+                }}
+              />
               <ToolbarDivider />
             </>
           )}
