@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
 import { Button, NumberCellInput, Select, TextInput } from "../components/ui";
@@ -7,16 +7,15 @@ import { CsvTools } from "../components/CsvTools";
 import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
-import { SaveIcon } from "../components/icons";
+import { ShiftFilter } from "../components/ShiftFilter";
+import { ChevronIcon, SaveIcon } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import type { Shift } from "../types";
 
 const LOCATIONS: StockLocation[] = ["ONLINE", "OFFLINE", "TOTAL"];
 
@@ -26,14 +25,49 @@ const csvColumns = [
   { key: "variance", label: "Variance" },
 ];
 
+function toNum(v: number | string | null | undefined): number {
+  if (v === null || v === undefined || v === "") return 0;
+  return Number(v);
+}
+
+/// Same sessionStorage pattern as usePendingEntryChanges (Online/Offline
+/// Entry) - see that file for the fuller rationale. Kept as a plain inline
+/// helper rather than reusing that hook, since its `PendingByProduct` shape
+/// (per-column edits) doesn't fit this page's flatter "one draft string per
+/// product" shape.
+function loadDrafts(storageKey: string): Record<number, string> {
+  try {
+    const raw = sessionStorage.getItem(storageKey);
+    return raw ? (JSON.parse(raw) as Record<number, string>) : {};
+  } catch {
+    return {};
+  }
+}
+
 /// Section 4.4 - the supervisor (or encoder on duty) enters the physical
 /// count; Variance = System Remaining Stock - Manual Count is always
 /// system-calculated, never typed directly.
 export function ManualCountPage() {
-  const [date, setDate] = useState(today());
+  // Date and shift default together (see getCurrentShiftAndDate) - Night
+  // crosses midnight, so they can't be defaulted independently without
+  // risking a wrong-day shift right after 12am.
+  const [{ date, shift }, setDateShift] = useState(getCurrentShiftAndDate);
+  const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
+  const setShift = (s: Shift) => setDateShift((prev) => ({ ...prev, shift: s }));
   const [location, setLocation] = useState<StockLocation>("ONLINE");
   const [rows, setRows] = useState<ManualCountGridRow[] | null>(null);
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  // Which categories are expanded - absent means collapsed (the default), a
+  // category with a pending draft force-expands regardless of this map. See
+  // StockGrid's identical `expandedOverride`/`pending` pair (Online/Offline
+  // Entry) for the fuller rationale - same behavior here.
+  const [expandedOverride, setExpandedOverride] = useState<Record<string, boolean>>({});
+  // Staged-but-unsaved counts, persisted to sessionStorage under this
+  // date+shift+location's own key - same reasoning as usePendingEntryChanges
+  // (Online/Offline Entry): survives navigating to a different page and back,
+  // or switching date/shift/location and back, instead of always starting
+  // empty.
+  const draftsStorageKey = `ala-eh-manual-count-pending:${date}:${shift}:${location}`;
+  const [drafts, setDrafts] = useState<Record<number, string>>(() => loadDrafts(draftsStorageKey));
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("manual-count");
   const [query, setQuery] = useState("");
@@ -43,13 +77,30 @@ export function ManualCountPage() {
 
   function load() {
     setRows(null);
-    setDrafts({});
-    getManualCountGrid(date, location)
+    getManualCountGrid(date, shift, location)
       .then(setRows)
       .catch((e) => setError(e.message));
   }
 
-  useEffect(load, [date, location]);
+  useEffect(load, [date, shift, location]);
+
+  // Re-derives drafts from storage whenever the key itself changes (a
+  // different date/shift/location) - not cleared here the way `setRows(null)`
+  // above is, so whichever combination is being left keeps what it had
+  // staged (still there if switched back to) and the one being loaded picks
+  // up whatever it already had staged.
+  useEffect(() => {
+    setDrafts(loadDrafts(draftsStorageKey));
+  }, [draftsStorageKey]);
+
+  useEffect(() => {
+    try {
+      if (Object.keys(drafts).length === 0) sessionStorage.removeItem(draftsStorageKey);
+      else sessionStorage.setItem(draftsStorageKey, JSON.stringify(drafts));
+    } catch {
+      // Best effort - editing still works either way.
+    }
+  }, [drafts, draftsStorageKey]);
 
   // Warn before navigating/closing the tab with staged-but-unsaved counts -
   // same guard as Online/Offline Entry, now that a typed count no longer
@@ -83,7 +134,7 @@ export function ManualCountPage() {
         continue;
       }
       try {
-        const saved = await saveManualCount(productId, date, location, Number(draft));
+        const saved = await saveManualCount(productId, date, shift, location, Number(draft));
         // Merge the recalculated row (system remaining stock + variance) in
         // directly instead of re-fetching the whole grid for one edit.
         setRows((prev) =>
@@ -131,18 +182,29 @@ export function ManualCountPage() {
 
   const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
   const visibleRows = rows?.filter(
-    (r) => matchesSearch([r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+    (r) => matchesSearch([r.product.sku, r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
   );
+  // Grouped the same way as StockGrid/TotalStocksTable, for the same
+  // collapsible-category treatment.
+  const groupedRows = new Map<string, ManualCountGridRow[]>();
+  for (const r of visibleRows ?? []) {
+    const list = groupedRows.get(r.product.category) ?? [];
+    list.push(r);
+    groupedRows.set(r.product.category, list);
+  }
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Manual Counting &amp; Variance - {formatDateDisplay(date)}</h2>
+      <h2 style={{ margin: "-8px 0 0px" }}>
+        Manual Counting &amp; Variance - {formatDateDisplay(date)} - {SHIFT_SHORT_LABELS[shift]} Shift
+      </h2>
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
         Review and correct manual counts for the selected date.
       </p>
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
           <Select aria-label="Location" value={location} onChange={(e) => setLocation(e.target.value as StockLocation)}>
             {LOCATIONS.map((l) => (
               <option key={l} value={l}>
@@ -178,13 +240,14 @@ export function ManualCountPage() {
           {csvRows && (
             <>
               <CsvTools
-                filenamePrefix={`manual-count-${location.toLowerCase()}`}
+                filenamePrefix={`manual-count-${location.toLowerCase()}-${shift.toLowerCase()}`}
                 date={date}
                 rows={csvRows}
                 columns={csvColumns}
                 onImportRow={async () => {}}
                 canImport={false}
                 pdfDisabled={pendingCount > 0}
+                exportFormat="excel"
               />
               <ToolbarDivider />
             </>
@@ -201,32 +264,74 @@ export function ManualCountPage() {
               inner wrapper, not the page - at high zoom the table scrolls
               sideways in place instead of pushing the whole page (heading,
               date/location fields) off to the right. */}
-          <RowGlowScroll>
+          <RowGlowScroll focusStorageKey={`ala-eh-focus:manual-count:${date}:${shift}:${location}`}>
             <table className="ae-table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
-                  {["Category", "SKU", "System Remaining", "Manual Count", "Variance"].map((h) => (
+                  {["SKU", "Product", "System Remaining", "Manual Count", "Variance"].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {(visibleRows ?? []).map((r) => (
-                  <tr key={r.product.id} style={r.isFlagged ? { background: colors.warningBg } : undefined}>
-                    <td style={nameCellStyle}>{r.product.category}</td>
-                    <td style={nameCellStyle}>{r.product.name}</td>
-                    <td>{Number(r.entry.systemRemainingStock).toLocaleString()}</td>
-                    <td>
-                      <NumberCellInput
-                        value={String(drafts[r.product.id] ?? r.entry.manualCount ?? "")}
-                        onChange={(v) => setDrafts((d) => ({ ...d, [r.product.id]: v }))}
-                        onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
-                        style={{ width: 64, textAlign: "right" }}
-                      />
-                    </td>
-                    <td style={{ fontWeight: r.isFlagged ? 700 : 400 }}>{r.entry.variance ?? "—"}</td>
-                  </tr>
-                ))}
+                {[...groupedRows.entries()].map(([category, groupRows]) => {
+                  const hasPending = groupRows.some((r) => drafts[r.product.id] !== undefined);
+                  const isExpanded = hasPending || !!expandedOverride[category];
+                  const isCollapsed = !isExpanded;
+                  return (
+                    <Fragment key={category}>
+                      <tr>
+                        <td colSpan={5} style={{ padding: 0 }}>
+                          <button
+                            type="button"
+                            onClick={() => setExpandedOverride((e) => ({ ...e, [category]: !isExpanded }))}
+                            aria-expanded={!isCollapsed}
+                            title={hasPending ? `${category} has unsaved counts, so it stays expanded` : isCollapsed ? `Expand ${category}` : `Collapse ${category}`}
+                            style={categoryToggleStyle}
+                          >
+                            <span style={{ display: "inline-flex", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 120ms ease" }}>
+                              <ChevronIcon />
+                            </span>
+                            {category}
+                          </button>
+                        </td>
+                      </tr>
+                      {groupRows.map((r) => (
+                        <tr
+                          key={r.product.id}
+                          data-row-id={r.product.id}
+                          className={isCollapsed ? "ae-row-collapsed" : undefined}
+                          style={r.isFlagged ? { background: colors.warningBg } : undefined}
+                        >
+                          <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
+                          <td style={nameCellStyle}>{r.product.name}</td>
+                          <td>{Number(r.entry.systemRemainingStock).toLocaleString()}</td>
+                          <td>
+                            <NumberCellInput
+                              value={String(drafts[r.product.id] ?? r.entry.manualCount ?? "")}
+                              onChange={(v) => setDrafts((d) => ({ ...d, [r.product.id]: v }))}
+                              onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLInputElement).blur()}
+                              style={{ width: 64, textAlign: "right" }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: r.isFlagged ? 700 : 400 }}>{r.entry.variance ?? "—"}</td>
+                        </tr>
+                      ))}
+                      <tr style={subtotalRowStyle}>
+                        <td colSpan={2}>Subtotal - {category}</td>
+                        <td>{groupRows.reduce((sum, r) => sum + toNum(r.entry.systemRemainingStock), 0).toLocaleString()}</td>
+                        <td>{groupRows.reduce((sum, r) => sum + toNum(r.entry.manualCount), 0).toLocaleString()}</td>
+                        <td>{groupRows.reduce((sum, r) => sum + toNum(r.entry.variance), 0).toLocaleString()}</td>
+                      </tr>
+                    </Fragment>
+                  );
+                })}
+                <tr style={grandTotalRowStyle}>
+                  <td colSpan={2}>GRAND TOTAL</td>
+                  <td>{(visibleRows ?? []).reduce((sum, r) => sum + toNum(r.entry.systemRemainingStock), 0).toLocaleString()}</td>
+                  <td>{(visibleRows ?? []).reduce((sum, r) => sum + toNum(r.entry.manualCount), 0).toLocaleString()}</td>
+                  <td>{(visibleRows ?? []).reduce((sum, r) => sum + toNum(r.entry.variance), 0).toLocaleString()}</td>
+                </tr>
               </tbody>
             </table>
           </RowGlowScroll>
@@ -271,3 +376,23 @@ export function ManualCountPage() {
 }
 
 const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };
+const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.subtleInk, fontVariantNumeric: "tabular-nums" };
+// Same three styles as StockGrid/TotalStocksTable - see StockGrid's
+// categoryToggleStyle doc comment for why this is a real <button>.
+const categoryToggleStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  width: "100%",
+  textAlign: "left",
+  font: "inherit",
+  fontWeight: 700,
+  padding: "6px 8px",
+  border: "none",
+  borderLeft: `4px solid ${colors.red}`,
+  background: colors.black,
+  color: colors.yellow,
+  cursor: "pointer",
+};
+const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: colors.paperAlt };
+const grandTotalRowStyle: CSSProperties = { fontWeight: 700, background: colors.warningBg, borderTop: `2px solid ${colors.black}` };

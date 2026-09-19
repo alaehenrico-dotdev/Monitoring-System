@@ -15,51 +15,63 @@ const prisma = new PrismaClient();
 // product), and "Cassava" appears only in the online report's New Products
 // section, not the offline one - kept once here since it's still one
 // product shared by both grids, just with no offline activity that month.
-const PRODUCT_CATEGORIES: { category: string; unit: string; products: string[] }[] = [
+//
+// `sku` (the "updated skus.pdf" business gave the app its first real SKU
+// codes - AFP001-AFP070) is matched onto each product by exact name+category
+// against this same list, so an already-seeded product just gets its sku
+// backfilled in place (see seedProducts below) rather than creating a
+// duplicate row. Every code from that PDF maps to a product below except
+// NSC's own "Toyomansi" - that row has no corresponding sized entry on the
+// new sheet at all (every other "Toyomansi" already has one: 350ML, Liter,
+// Gallon, Container), so it's left without a sku rather than guessed at.
+const PRODUCT_CATEGORIES: { category: string; unit: string; products: { name: string; sku?: string }[] }[] = [
   {
     category: "Premium (350ML)",
     unit: "350 mL bottle",
     products: [
-      "Special",
-      "Fish Sauce",
-      "Cane Vinegar White",
-      "Cane Vinegar Red",
-      "Toyo Mansi",
-      "Liquid Seasoning",
-      "Premium Black for Guisado",
-      "Sukang Maligalig 350ML",
+      { name: "Special", sku: "AFP001" },
+      { name: "Fish Sauce", sku: "AFP002" },
+      { name: "Cane Vinegar White", sku: "AFP003" },
+      { name: "Cane Vinegar Red", sku: "AFP004" },
+      { name: "Toyo Mansi", sku: "AFP005" },
+      { name: "Liquid Seasoning", sku: "AFP044" },
+      { name: "Premium Black for Guisado", sku: "AFP006" },
+      { name: "Sukang Maligalig 350ML", sku: "AFP050" },
     ],
   },
   {
     category: "Class A (Liter)",
     unit: "Liter",
     products: [
-      "Sweet A",
-      "Special A",
-      "More Sweet A",
-      "Dark Soysauce A",
-      "Fish Sauce A",
-      "Cane Vinegar White A",
-      "Oyster Sauce A",
-      "Oyster Sauce Dark A",
-      "Toyo Mansi",
-      "Catsup A",
-      "Catsup for Burger",
-      "Jampong Hot Chili Sauce",
+      { name: "Sweet A", sku: "AFP007" },
+      { name: "Special A", sku: "AFP008" },
+      { name: "More Sweet A", sku: "AFP009" },
+      { name: "Dark Soysauce A", sku: "AFP010" },
+      { name: "Fish Sauce A", sku: "AFP011" },
+      { name: "Cane Vinegar White A", sku: "AFP012" },
+      { name: "Oyster Sauce A", sku: "AFP013" },
+      { name: "Oyster Sauce Dark A", sku: "AFP014" },
+      { name: "Toyo Mansi", sku: "AFP015" },
+      { name: "Catsup A", sku: "AFP016" },
+      { name: "Catsup for Burger", sku: "AFP017" },
+      { name: "Jampong Hot Chili Sauce", sku: "AFP056" },
+      // New on the updated sheet - the Gallon size of this already existed
+      // as an exception in Class A (Gallon) below; this is its Liter sibling.
+      { name: "Sweet Chami", sku: "AFP065" },
     ],
   },
   {
     category: "Premium (Liter)",
     unit: "Liter",
     products: [
-      "Sweet",
-      "Special",
-      "Fish Sauce",
-      "Patis Puro",
-      "Cane Vinegar White",
-      "Cane Vinegar Red",
-      "Liquid Seasoning",
-      "Premium Black for Guisado",
+      { name: "Sweet", sku: "AFP018" },
+      { name: "Special", sku: "AFP019" },
+      { name: "Fish Sauce", sku: "AFP020" },
+      { name: "Patis Puro", sku: "AFP021" },
+      { name: "Cane Vinegar White", sku: "AFP022" },
+      { name: "Cane Vinegar Red", sku: "AFP023" },
+      { name: "Liquid Seasoning", sku: "AFP024" },
+      { name: "Premium Black for Guisado", sku: "AFP025" },
     ],
   },
   {
@@ -70,57 +82,92 @@ const PRODUCT_CATEGORIES: { category: string; unit: string; products: string[] }
     category: "Class A (Gallon)",
     unit: "Gallon",
     products: [
-      "Sweet A",
-      "Special A",
-      "More Sweet A",
-      "Dark Soysauce A",
-      "Fish Sauce A",
-      "Cane Vinegar White A",
-      "Cane Vinegar Red",
-      "Oyster Sauce A",
-      "Oyster Sauce Dark A",
-      "Toyo Mansi",
-      "Catsup A",
-      "Catsup for Burger",
-      "Jampong Hot Chili Sauce",
-      "Sweet Chami",
-      "Distilled Cane Vinegar White",
+      { name: "Sweet A", sku: "AFP026" },
+      { name: "Special A", sku: "AFP027" },
+      { name: "More Sweet A", sku: "AFP028" },
+      { name: "Dark Soysauce A", sku: "AFP029" },
+      { name: "Fish Sauce A", sku: "AFP030" },
+      { name: "Cane Vinegar White A", sku: "AFP031" },
+      { name: "Cane Vinegar Red", sku: "AFP032" },
+      { name: "Oyster Sauce A", sku: "AFP033" },
+      { name: "Oyster Sauce Dark A", sku: "AFP034" },
+      { name: "Toyo Mansi", sku: "AFP035" },
+      { name: "Catsup A", sku: "AFP036" },
+      { name: "Catsup for Burger", sku: "AFP037" },
+      { name: "Jampong Hot Chili Sauce", sku: "AFP057" },
+      { name: "Sweet Chami", sku: "AFP058" },
+      { name: "Distilled Cane Vinegar White", sku: "AFP055" },
     ],
   },
   {
     category: "Premium (3.785L P.E.T.)",
     unit: "3.785 L",
-    products: ["Sweet", "Special", "Fish Sauce", "Cane Vinegar White", "Cane Vinegar Red", "Liquid Seasoning"],
+    products: [
+      { name: "Sweet", sku: "AFP038" },
+      { name: "Special", sku: "AFP039" },
+      { name: "Fish Sauce", sku: "AFP040" },
+      { name: "Cane Vinegar White", sku: "AFP041" },
+      { name: "Cane Vinegar Red", sku: "AFP042" },
+      { name: "Liquid Seasoning", sku: "AFP043" },
+    ],
+  },
+  {
+    // New on the updated sheet - same "Liquid Seasoning" product line as
+    // 350ML/Liter/Gallon/P.E.T. above, just at a size (600ML) none of those
+    // came in before.
+    category: "Premium (600ML)",
+    unit: "600 mL bottle",
+    products: [{ name: "Liquid Seasoning", sku: "AFP045" }],
   },
   {
     category: "New Products",
     unit: "Mixed (L / gal / kg)",
     products: [
-      "Palm Oil Liter",
-      "Palm Oil Gallon",
-      "Sukang Maligalig 750ML",
-      "Takoyaki Sauce Liter",
-      "Cassava",
-      "Retail Salt",
-      "Sack of Salt",
-      "Chili Powder 1kg",
-      "Black Pepper 1kg",
-      "Onion Powder 1kg",
+      { name: "Palm Oil Liter", sku: "AFP069" },
+      { name: "Palm Oil Gallon", sku: "AFP070" },
+      { name: "Sukang Maligalig 750ML", sku: "AFP046" },
+      { name: "Takoyaki Sauce Liter", sku: "AFP049" },
+      { name: "Cassava", sku: "AFP051" },
+      { name: "Retail Salt", sku: "AFP052" },
+      { name: "Sack of Salt", sku: "AFP053" },
+      { name: "Chili Powder 1kg", sku: "AFP067" },
+      { name: "Black Pepper 1kg", sku: "AFP068" },
+      { name: "Onion Powder 1kg", sku: "AFP066" },
+      // New on the updated sheet.
+      { name: "Toyomansi Sachet", sku: "AFP047" },
+      { name: "Takoyaki Sauce Gallon", sku: "AFP048" },
+      { name: "Fried Chicken Sauce Gallon", sku: "AFP054" },
     ],
   },
   {
     category: "NSC",
     unit: "-",
-    products: ["Toyomansi"],
+    products: [{ name: "Toyomansi" }],
+  },
+  {
+    // New category on the updated sheet - the same "A" soy sauce line sold
+    // by the container instead of by Liter/Gallon.
+    category: "Container",
+    unit: "Container",
+    products: [
+      { name: "Sweet A", sku: "AFP059" },
+      { name: "Special A", sku: "AFP060" },
+      { name: "More Sweet A", sku: "AFP061" },
+      { name: "Cane Vinegar White A", sku: "AFP062" },
+      { name: "Special", sku: "AFP063" },
+      { name: "Toyo Mansi", sku: "AFP064" },
+    ],
   },
 ];
 
 async function seedProducts() {
   let sortOrder = 0;
   for (const group of PRODUCT_CATEGORIES) {
-    for (const name of group.products) {
+    for (const { name, sku } of group.products) {
       sortOrder += 1;
-      // No natural unique key in the doc beyond name+category, so upsert by hand.
+      // No natural unique key in the doc beyond name+category, so upsert by
+      // hand - this is also what backfills `sku` onto a product that was
+      // seeded before it existed, rather than creating a duplicate row.
       const existing = await prisma.product.findFirst({
         where: { name, category: group.category },
         select: { id: true },
@@ -128,11 +175,11 @@ async function seedProducts() {
       if (existing) {
         await prisma.product.update({
           where: { id: existing.id },
-          data: { unit: group.unit, sortOrder },
+          data: { unit: group.unit, sortOrder, ...(sku ? { sku } : {}) },
         });
       } else {
         await prisma.product.create({
-          data: { name, category: group.category, unit: group.unit, sortOrder },
+          data: { name, category: group.category, unit: group.unit, sortOrder, sku },
         });
       }
     }

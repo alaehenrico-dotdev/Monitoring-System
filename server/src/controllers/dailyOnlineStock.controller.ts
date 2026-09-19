@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { parseDateOnly } from "../utils/date";
+import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
 import { getOnlineGrid, saveOnlineEntry } from "../services/dailyOnlineStock.service";
 
@@ -19,16 +20,18 @@ const entrySchema = z.object({
 
 export async function getOnlineStockGrid(req: Request, res: Response) {
   const entryDate = parseDateOnly(req.query.date);
-  res.json(await getOnlineGrid(entryDate));
+  const shift = parseShift(req.query.shift);
+  res.json(await getOnlineGrid(entryDate, shift));
 }
 
 export async function putOnlineStockEntry(req: Request, res: Response) {
   const productId = Number(req.params.productId);
   if (!Number.isSafeInteger(productId) || productId <= 0) throw HttpError.badRequest("Invalid product id");
   const entryDate = parseDateOnly(req.query.date ?? req.body?.date);
+  const shift = parseShift(req.query.shift ?? req.body?.shift);
   const parsed = entrySchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid online stock entry", parsed.error.flatten());
 
-  const saved = await saveOnlineEntry(productId, entryDate, parsed.data, req.user?.id);
+  const saved = await saveOnlineEntry(productId, entryDate, shift, parsed.data, req.user?.id);
   res.json(saved);
 }

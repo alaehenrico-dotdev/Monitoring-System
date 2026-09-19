@@ -7,11 +7,11 @@ export async function listProducts(includeInactive = false) {
 }
 
 export async function createProduct(
-  data: { name: string; category: string; unit: string; sortOrder?: number },
+  data: { sku?: string; name: string; category: string; unit: string; sortOrder?: number },
   changedById?: number
 ) {
   const sortOrder = data.sortOrder ?? (await productRepository.nextSortOrder(data.category));
-  const product = await productRepository.create({ name: data.name, category: data.category, unit: data.unit, sortOrder });
+  const product = await productRepository.create({ sku: data.sku, name: data.name, category: data.category, unit: data.unit, sortOrder });
 
   await recordChange({ tableName: "products", recordId: product.id, action: "CREATE", changedById, newValue: product });
   return product;
@@ -19,7 +19,7 @@ export async function createProduct(
 
 export async function updateProduct(
   id: number,
-  data: Partial<{ name: string; category: string; unit: string; sortOrder: number; isActive: boolean }>,
+  data: Partial<{ sku: string | null; name: string; category: string; unit: string; sortOrder: number; isActive: boolean }>,
   changedById?: number
 ) {
   const existing = await productRepository.findById(id);

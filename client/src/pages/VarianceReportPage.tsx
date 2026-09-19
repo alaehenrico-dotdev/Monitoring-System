@@ -15,7 +15,7 @@ interface VarianceRow {
   systemRemainingStock: string;
   manualCount: string;
   variance: string;
-  product: { id: number; name: string; category: string };
+  product: { id: number; sku: string | null; name: string; category: string };
   countedBy: { name: string } | null;
 }
 
@@ -110,7 +110,7 @@ export function VarianceReportPage() {
             <table className="ae-table" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
-                  {["Date", "Location", "Category", "SKU", "System", "Manual Count", "Variance", "Counted By"].map((h) => (
+                  {["Date", "Location", "Category", "SKU", "Product", "System", "Manual Count", "Variance", "Counted By"].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
                 </tr>
@@ -121,6 +121,7 @@ export function VarianceReportPage() {
                     <td style={{ whiteSpace: "nowrap" }}>{r.entryDate.slice(0, 10)}</td>
                     <td>{r.location}</td>
                     <td style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.ink }}>{r.product.category}</td>
+                    <td style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.subtleInk, fontVariantNumeric: "tabular-nums" }}>{r.product.sku ?? "—"}</td>
                     <td style={nameCellStyle}>{r.product.name}</td>
                     <td>{r.systemRemainingStock}</td>
                     <td>{r.manualCount}</td>

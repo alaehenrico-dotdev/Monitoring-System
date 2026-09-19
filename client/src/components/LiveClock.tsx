@@ -38,14 +38,14 @@ export function LiveClock() {
         // Transparent, same width as before - the visible ring is now
         // drawn by the CursorGlowOverlay below, so swapping it in never
         // shifts the pill's size.
-        border: "1px solid transparent",
+        border: "0.5px solid transparent",
         borderRadius: 999,
         padding: "8px 14px",
         flexShrink: 0,
         boxShadow: "0 1px 4px rgba(20,17,13,0.1)",
       }}
     >
-      <CursorGlowOverlay gradientRef={gradientRef} spotlightRef={spotlightRef} borderWidth={1} spotlightRadius={50} />
+      <CursorGlowOverlay gradientRef={gradientRef} spotlightRef={spotlightRef} borderWidth={0.5} spotlightRadius={50} />
       {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
     </div>
   );

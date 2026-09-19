@@ -9,6 +9,7 @@ import { RowGlowScroll } from "../components/RowGlowScroll";
 /// products without a developer; new SKUs appear in every grid automatically.
 export function ProductsAdminPage() {
   const [products, setProducts] = useState<Product[] | null>(null);
+  const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [unit, setUnit] = useState("");
@@ -30,7 +31,8 @@ export function ProductsAdminPage() {
       return;
     }
     try {
-      const created = await createProduct({ name, category, unit });
+      const created = await createProduct({ sku: sku || undefined, name, category, unit });
+      setSku("");
       setName("");
       setCategory("");
       setUnit("");
@@ -54,7 +56,10 @@ export function ProductsAdminPage() {
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 20 }}>
-        <Field label="SKU name">
+        <Field label="SKU code">
+          <TextInput value={sku} onChange={(e) => setSku(e.target.value)} placeholder="e.g. AFP071" style={{ width: 100 }} />
+        </Field>
+        <Field label="Product name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="Category">
@@ -74,7 +79,7 @@ export function ProductsAdminPage() {
           <table className="ae-table ae-table--left" style={{ minWidth: 560 }}>
             <thead>
               <tr>
-                {["Category", "SKU", "Unit", ""].map((h) => (
+                {["Category", "SKU", "Product", "Unit", ""].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -83,6 +88,7 @@ export function ProductsAdminPage() {
               {products.map((p) => (
                 <tr key={p.id}>
                   <td style={{ whiteSpace: "nowrap" }}>{p.category}</td>
+                  <td style={{ whiteSpace: "nowrap", color: p.sku ? colors.ink : colors.subtleInk }}>{p.sku ?? "—"}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{p.name}</td>
                   <td>{p.unit}</td>
                   <td>

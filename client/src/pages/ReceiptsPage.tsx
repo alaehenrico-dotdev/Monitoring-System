@@ -24,6 +24,7 @@ import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { generateReceiptPdf } from "../utils/receiptPdf";
 import { PrinterIcon } from "../components/icons";
 /*
  * ============================================================
@@ -388,6 +389,7 @@ export function ReceiptsPage() {
           r.location,
           r.salesRepName,
           ...r.items.map((it) => it.product.name),
+          ...r.items.map((it) => it.product.sku),
         ],
         query
       )

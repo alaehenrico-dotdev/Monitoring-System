@@ -1,4 +1,4 @@
-import { StockLocation } from "@prisma/client";
+import { Shift, StockLocation } from "@prisma/client";
 import { manualCountRepository } from "../repositories/manualCountRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
@@ -10,22 +10,22 @@ import { HttpError } from "../utils/HttpError";
 const TABLE = "manual_counts";
 
 /// Section 4.4 - Variance = System Remaining Stock - Manual Count. The system
-/// figure is always pulled fresh from the matching daily table at save time,
-/// never typed, so it can't silently disappear the way an overwritten
-/// spreadsheet cell can (Section 2.1).
-export async function getSystemRemainingStock(productId: number, entryDate: Date, location: StockLocation) {
+/// figure is always pulled fresh from the matching daily table (same shift)
+/// at save time, never typed, so it can't silently disappear the way an
+/// overwritten spreadsheet cell can (Section 2.1).
+export async function getSystemRemainingStock(productId: number, entryDate: Date, shift: Shift, location: StockLocation) {
   if (location === "ONLINE") {
-    const row = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate);
+    const row = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
     return toNum(row?.remainingStock);
   }
   if (location === "OFFLINE") {
-    const row = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate);
+    const row = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift);
     return toNum(row?.remainingStock);
   }
   // TOTAL - Online + Offline remaining stock combined (Section 4.5).
   const [online, offline] = await Promise.all([
-    dailyOnlineStockRepository.findByProductAndDate(productId, entryDate),
-    dailyOfflineStockRepository.findByProductAndDate(productId, entryDate),
+    dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift),
+    dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift),
   ]);
   return toNum(online?.remainingStock) + toNum(offline?.remainingStock);
 }
@@ -33,17 +33,18 @@ export async function getSystemRemainingStock(productId: number, entryDate: Date
 export async function saveManualCount(
   productId: number,
   entryDate: Date,
+  shift: Shift,
   location: StockLocation,
   manualCount: number,
   userId?: number
 ) {
   const product = await productRepository.findActiveById(productId);
   if (!product) throw HttpError.notFound("Active product not found");
-  const systemRemainingStock = await getSystemRemainingStock(productId, entryDate, location);
+  const systemRemainingStock = await getSystemRemainingStock(productId, entryDate, shift, location);
   const variance = calculateVariance(systemRemainingStock, manualCount);
 
-  const existing = await manualCountRepository.findOne(productId, entryDate, location);
-  const data = { productId, entryDate, location, systemRemainingStock, manualCount, variance, countedById: userId };
+  const existing = await manualCountRepository.findOne(productId, entryDate, shift, location);
+  const data = { productId, entryDate, shift, location, systemRemainingStock, manualCount, variance, countedById: userId };
   const saved = await manualCountRepository.upsert(existing?.id, data);
 
   await recordChange({
@@ -64,16 +65,16 @@ export async function saveManualCount(
 /// This batches the daily table(s) this location actually needs into one
 /// fetch each, then computes every product's figure from those in-memory
 /// maps instead of querying per product.
-export async function getManualCountGrid(entryDate: Date, location: StockLocation) {
+export async function getManualCountGrid(entryDate: Date, shift: Shift, location: StockLocation) {
   const products = await productRepository.findActive();
-  const rows = await manualCountRepository.findAllForDateAndLocation(entryDate, location);
+  const rows = await manualCountRepository.findAllForDateAndLocation(entryDate, shift, location);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
 
   const needsOnline = location === "ONLINE" || location === "TOTAL";
   const needsOffline = location === "OFFLINE" || location === "TOTAL";
   const [onlineRows, offlineRows] = await Promise.all([
-    needsOnline ? dailyOnlineStockRepository.findAllForDate(entryDate) : Promise.resolve([]),
-    needsOffline ? dailyOfflineStockRepository.findAllForDate(entryDate) : Promise.resolve([]),
+    needsOnline ? dailyOnlineStockRepository.findAllForDate(entryDate, shift) : Promise.resolve([]),
+    needsOffline ? dailyOfflineStockRepository.findAllForDate(entryDate, shift) : Promise.resolve([]),
   ]);
   const onlineByProduct = new Map(onlineRows.map((r) => [r.productId, r]));
   const offlineByProduct = new Map(offlineRows.map((r) => [r.productId, r]));
@@ -91,22 +92,23 @@ export async function getManualCountGrid(entryDate: Date, location: StockLocatio
     const systemRemainingStock = systemRemainingStockFor(product.id);
     return {
       product,
-      entry: { productId: product.id, entryDate, location, systemRemainingStock, manualCount: null, variance: null },
+      entry: { productId: product.id, entryDate, shift, location, systemRemainingStock, manualCount: null, variance: null },
       isSaved: false,
       isFlagged: false,
     };
   });
 }
 
-/// Section 4.8 - Variance Report, filterable by product/category/location,
-/// across a date range, to spot recurring problem SKUs (Toyo Mansi, Oyster
-/// Sauce A per Section 4.4).
+/// Section 4.8 - Variance Report, filterable by product/category/location/
+/// shift, across a date range, to spot recurring problem SKUs (Toyo Mansi,
+/// Oyster Sauce A per Section 4.4).
 export async function getVarianceReport(filters: {
   startDate: Date;
   endDate: Date;
   productId?: number;
   category?: string;
   location?: StockLocation;
+  shift?: Shift;
   flaggedOnly?: boolean;
 }) {
   if (filters.startDate > filters.endDate) throw HttpError.badRequest("startDate must be before endDate");

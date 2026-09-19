@@ -81,6 +81,17 @@ export function SaveIcon() {
   );
 }
 
+/// Points right when collapsed, down when expanded (rotate via CSS on the
+/// caller's side) - used on category header rows (StockGrid, TotalStocksTable)
+/// to expand/collapse that category's product rows.
+export function ChevronIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4.5 6.5 8 10l3.5-3.5" />
+    </svg>
+  );
+}
+
 export function PrinterIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

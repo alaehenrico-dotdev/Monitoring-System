@@ -60,7 +60,7 @@ export function TotalStocksPage() {
 
   const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
   const visibleRows = rows?.filter(
-    (r) => matchesSearch([r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+    (r) => matchesSearch([r.product.sku, r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
   );
 
   return (
@@ -78,7 +78,7 @@ export function TotalStocksPage() {
         <ToolbarControls>
           {csvRows && (
             <>
-              <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} canImport={false} />
+              <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} canImport={false} exportFormat="excel" />
               <ToolbarDivider />
             </>
           )}
@@ -90,7 +90,10 @@ export function TotalStocksPage() {
         <p>Loading…</p>
       ) : (
         <div className="ae-grid-fill" style={zoomStyle(zoom)}>
-          <TotalStocksTable rows={visibleRows ?? []} />
+          {/* Keyed by date so switching it remounts the table fresh - every
+              category starts expanded again on a newly-loaded date, instead
+              of carrying over whatever was collapsed on the last one. */}
+          <TotalStocksTable key={date} rows={visibleRows ?? []} />
         </div>
       )}
     </div>

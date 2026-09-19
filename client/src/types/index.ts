@@ -1,5 +1,9 @@
 export type Role = "ONLINE_ENCODER" | "OFFLINE_ENCODER" | "SUPERVISOR_ADMIN";
 export type StockLocation = "ONLINE" | "OFFLINE" | "TOTAL";
+/// Entries are recorded per operating shift, not just per day: Morning
+/// (7am-4pm) and Night (4pm-1am). Night crosses midnight - see
+/// utils/shift.ts for how a wall-clock time maps to {shift, date}.
+export type Shift = "MORNING" | "NIGHT";
 
 export interface AuthUser {
   id: number;
@@ -10,6 +14,7 @@ export interface AuthUser {
 
 export interface Product {
   id: number;
+  sku: string | null;
   name: string;
   category: string;
   unit: string;
@@ -20,6 +25,7 @@ export interface Product {
 export interface OnlineEntry {
   productId: number;
   entryDate: string;
+  shift: Shift;
   openingStock: number;
   stockInOffToOl: number;
   stockOutOlToOff: number;
@@ -39,6 +45,7 @@ export interface OnlineGridRow {
 export interface OfflineEntry {
   productId: number;
   entryDate: string;
+  shift: Shift;
   openingStock: number;
   stockInOlToOff: number;
   stockOutOffToOl: number;
@@ -58,6 +65,7 @@ export interface OfflineGridRow {
 export interface ManualCountEntry {
   productId: number;
   entryDate: string;
+  shift: Shift;
   location: StockLocation;
   systemRemainingStock: number;
   manualCount: number | null;

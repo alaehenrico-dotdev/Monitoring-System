@@ -4,6 +4,7 @@ import { addFulfillmentFromReceipt } from "./dailyOnlineStock.service";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
 import { productRepository } from "../repositories/productRepository";
+import { getCurrentShiftAndDate } from "../utils/shift";
 
 const TABLE = "receipts";
 
@@ -49,8 +50,13 @@ export async function createReceipt(input: CreateReceiptInput, createdById?: num
 
   const shouldPost = input.postToFulfillment ?? env.receiptsAutoPostDefault;
   if (shouldPost) {
+    // Receipts don't carry a shift of their own (orderDate has no time
+    // component, and can be backdated) - fulfillment always posts into
+    // whichever shift is actually open right now, the same real-time
+    // default Online/Offline Entry itself uses when an encoder opens it.
+    const { shift } = getCurrentShiftAndDate();
     for (const item of input.items) {
-      await addFulfillmentFromReceipt(item.productId, input.orderDate, item.quantity, createdById);
+      await addFulfillmentFromReceipt(item.productId, input.orderDate, shift, item.quantity, createdById);
     }
   }
 

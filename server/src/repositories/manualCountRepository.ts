@@ -1,9 +1,10 @@
-import { StockLocation } from "@prisma/client";
+import { Shift, StockLocation } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 
 export interface ManualCountData {
   productId: number;
   entryDate: Date;
+  shift: Shift;
   location: StockLocation;
   systemRemainingStock: number;
   manualCount: number;
@@ -17,21 +18,25 @@ export interface VarianceReportFilters {
   productId?: number;
   category?: string;
   location?: StockLocation;
+  shift?: Shift;
 }
 
 /// Section 5.4 - manual_counts: physical count capture; variance is derived, never typed.
 export const manualCountRepository = {
-  findOne(productId: number, entryDate: Date, location: StockLocation) {
+  findOne(productId: number, entryDate: Date, shift: Shift, location: StockLocation) {
     return prisma.manualCount.findUnique({
-      where: { productId_entryDate_location: { productId, entryDate, location } },
+      where: { productId_entryDate_shift_location: { productId, entryDate, shift, location } },
     });
   },
 
-  findAllForDateAndLocation(entryDate: Date, location: StockLocation) {
-    return prisma.manualCount.findMany({ where: { entryDate, location } });
+  findAllForDateAndLocation(entryDate: Date, shift: Shift, location: StockLocation) {
+    return prisma.manualCount.findMany({ where: { entryDate, shift, location } });
   },
 
-  /// Used by the Total Stocks view (Section 4.5). A saved TOTAL count is the
+  /// Used by the Total Stocks view (Section 4.5), which is a per-date (not
+  /// per-shift) snapshot - both shifts saved so far for the date are
+  /// returned and totalStocks.service collapses each product/location down
+  /// to whichever shift is more recent. A saved TOTAL count is the
   /// authoritative combined count; ONLINE/OFFLINE counts remain the fallback.
   findForTotals(entryDate: Date) {
     return prisma.manualCount.findMany({ where: { entryDate, location: { in: ["ONLINE", "OFFLINE", "TOTAL"] } } });
@@ -43,17 +48,19 @@ export const manualCountRepository = {
       : prisma.manualCount.create({ data });
   },
 
-  /// Section 4.8 - Variance Report query, filterable by product/category/location.
+  /// Section 4.8 - Variance Report query, filterable by product/category/
+  /// location/shift.
   findForVarianceReport(filters: VarianceReportFilters) {
     return prisma.manualCount.findMany({
       where: {
         entryDate: { gte: filters.startDate, lte: filters.endDate },
         productId: filters.productId,
         location: filters.location,
+        shift: filters.shift,
         product: filters.category ? { category: filters.category } : undefined,
       },
       include: { product: true, countedBy: { select: { id: true, name: true, username: true } } },
-      orderBy: [{ entryDate: "desc" }, { product: { name: "asc" } }],
+      orderBy: [{ entryDate: "desc" }, { shift: "desc" }, { product: { name: "asc" } }],
     });
   },
 };

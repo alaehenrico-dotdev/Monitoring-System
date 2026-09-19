@@ -42,7 +42,7 @@ export function ThemeToggle() {
         // Transparent, same width as before - the visible ring is now
         // drawn by the CursorGlowOverlay below, so swapping it in never
         // shifts the button's size.
-        border: "1px solid transparent",
+        border: "0.5px solid transparent",
         background: "var(--ae-surface)",
         color: "var(--ae-text)",
         cursor: "pointer",
@@ -52,7 +52,7 @@ export function ThemeToggle() {
       onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
-      <CursorGlowOverlay gradientRef={gradientRef} spotlightRef={spotlightRef} borderWidth={1} spotlightRadius={40} />
+      <CursorGlowOverlay gradientRef={gradientRef} spotlightRef={spotlightRef} borderWidth={0.5} spotlightRadius={40} />
       {isDark ? <SunIcon /> : <MoonIcon />}
     </button>
   );
