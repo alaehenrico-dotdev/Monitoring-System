@@ -1,3 +1,4 @@
+import { Shift } from "@prisma/client";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
@@ -15,16 +16,16 @@ export interface OnlineEntryInput {
   fulfillmentOut?: number;
   rts?: number;
   /// Not part of the normal encoder-facing edit (Section 4.6 auto-carries
-  /// this forward from the prior day's Remaining Stock instead) - only
+  /// this forward from the prior shift's Remaining Stock instead) - only
   /// meant for a CSV import seeding a real starting balance on a product's
   /// very first date, where there's nothing to carry forward from yet.
   openingStock?: number;
 }
 
 /// Section 4.6 - auto carry-forward (delegated to the repository, which owns
-/// the "most recent prior date" query).
-export function computeOpeningStock(productId: number, entryDate: Date): Promise<number> {
-  return dailyOnlineStockRepository.getOpeningStock(productId, entryDate);
+/// the "immediately preceding shift" query).
+export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift): Promise<number> {
+  return dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift);
 }
 
 function calculate(opening: number, input: Required<Omit<OnlineEntryInput, "openingStock">>) {
@@ -33,21 +34,22 @@ function calculate(opening: number, input: Required<Omit<OnlineEntryInput, "open
   return { onlineStock, remainingStock };
 }
 
-/// One grid row per active product for the given date - persisted rows as-is,
-/// missing rows as a "virtual" preview using the carried-forward opening stock
-/// (Section 3.1: the grid always shows every product in the master list).
+/// One grid row per active product for the given date/shift - persisted rows
+/// as-is, missing rows as a "virtual" preview using the carried-forward
+/// opening stock (Section 3.1: the grid always shows every product in the
+/// master list).
 ///
 /// Opening stocks for every missing row are fetched in one batched call
-/// rather than one query per product - on a fresh date, most/all of the
+/// rather than one query per product - on a fresh shift, most/all of the
 /// ~60 products in the master list won't have a row yet, so the naive
 /// per-product await turned every grid load into an N+1 query storm.
-export async function getOnlineGrid(entryDate: Date) {
+export async function getOnlineGrid(entryDate: Date, shift: Shift) {
   const products = await productRepository.findActive();
-  const rows = await dailyOnlineStockRepository.findAllForDate(entryDate);
+  const rows = await dailyOnlineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
 
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
-  const openingStockByProduct = await dailyOnlineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate);
+  const openingStockByProduct = await dailyOnlineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
 
   return products.map((product) => {
     const existing = rowByProduct.get(product.id);
@@ -64,20 +66,20 @@ export async function getOnlineGrid(entryDate: Date) {
     const { onlineStock, remainingStock } = calculate(openingStock, zero);
     return {
       product,
-      entry: { productId: product.id, entryDate, openingStock, ...zero, onlineStock, remainingStock },
+      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, onlineStock, remainingStock },
       isSaved: false,
     };
   });
 }
 
-/// Encoder-facing upsert for one product/date cell row (Section 4.2).
-export async function saveOnlineEntry(productId: number, entryDate: Date, input: OnlineEntryInput, userId?: number) {
+/// Encoder-facing upsert for one product/date/shift cell row (Section 4.2).
+export async function saveOnlineEntry(productId: number, entryDate: Date, shift: Shift, input: OnlineEntryInput, userId?: number) {
   const product = await productRepository.findActiveById(productId);
   if (!product) throw HttpError.notFound("Active product not found");
-  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate);
+  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
 
   const openingStock =
-    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate));
+    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift));
   const merged: Required<Omit<OnlineEntryInput, "openingStock">> = {
     stockInOffToOl: input.stockInOffToOl ?? toNum(existing?.stockInOffToOl),
     stockOutOlToOff: input.stockOutOlToOff ?? toNum(existing?.stockOutOlToOff),
@@ -87,7 +89,7 @@ export async function saveOnlineEntry(productId: number, entryDate: Date, input:
   };
   const { onlineStock, remainingStock } = calculate(openingStock, merged);
 
-  const data = { productId, entryDate, openingStock, ...merged, onlineStock, remainingStock, encodedById: userId };
+  const data = { productId, entryDate, shift, openingStock, ...merged, onlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOnlineStockRepository.upsert(existing?.id, data);
 
   await recordChange({
@@ -102,10 +104,12 @@ export async function saveOnlineEntry(productId: number, entryDate: Date, input:
   // Section 4.3 "key change from Excel" - a transfer entered once here is
   // mirrored onto the Offline table by writing straight to its repository
   // (not by calling the Offline service), so the two stock services never
-  // depend on each other.
+  // depend on each other. Mirrored into the same shift, since a transfer is
+  // one real-world event happening within a single shift on both sides.
   await mirrorTransferToOffline(
     productId,
     entryDate,
+    shift,
     { stockOutOffToOl: merged.stockInOffToOl, stockInOlToOff: merged.stockOutOlToOff },
     userId
   );
@@ -116,10 +120,11 @@ export async function saveOnlineEntry(productId: number, entryDate: Date, input:
 async function mirrorTransferToOffline(
   productId: number,
   entryDate: Date,
+  shift: Shift,
   mirrored: { stockOutOffToOl: number; stockInOlToOff: number },
   userId?: number
 ) {
-  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate);
+  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift);
 
   // saveOnlineEntry calls this mirror unconditionally after every save, even
   // when only an unrelated field (e.g. Fulfillment Out) changed and the
@@ -133,7 +138,7 @@ async function mirrorTransferToOffline(
     return; // nothing has actually transferred yet - don't create a blank row just to mirror zeros
   }
 
-  const openingStock = existing ? toNum(existing.openingStock) : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate);
+  const openingStock = existing ? toNum(existing.openingStock) : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift);
 
   const merged = {
     stockInOlToOff: mirrored.stockInOlToOff,
@@ -148,6 +153,7 @@ async function mirrorTransferToOffline(
   const data = {
     productId,
     entryDate,
+    shift,
     openingStock,
     ...merged,
     offlineStock,
@@ -169,9 +175,9 @@ async function mirrorTransferToOffline(
 }
 
 /// Section 4.7 - a saved Receipt can post its quantities straight into that
-/// date's Online Fulfillment (Out).
-export async function addFulfillmentFromReceipt(productId: number, entryDate: Date, additionalQty: number, userId?: number) {
-  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate);
+/// shift's Online Fulfillment (Out).
+export async function addFulfillmentFromReceipt(productId: number, entryDate: Date, shift: Shift, additionalQty: number, userId?: number) {
+  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
   const currentFulfillment = toNum(existing?.fulfillmentOut);
-  await saveOnlineEntry(productId, entryDate, { fulfillmentOut: currentFulfillment + additionalQty }, userId);
+  await saveOnlineEntry(productId, entryDate, shift, { fulfillmentOut: currentFulfillment + additionalQty }, userId);
 }

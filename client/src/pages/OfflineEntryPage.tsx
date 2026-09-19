@@ -9,21 +9,26 @@ import { CsvTools } from "../components/CsvTools";
 import { PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
+import { ShiftFilter } from "../components/ShiftFilter";
 import { Modal } from "../components/Modal";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
 import { describePendingChanges, usePendingEntryChanges, type PendingByProduct } from "../hooks/usePendingEntryChanges";
 import { offlineStockColumns as columns } from "../config/stockColumns";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { getCurrentShiftAndDate, otherShift, SHIFT_LABELS, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+import type { Shift } from "../types";
 
 export function OfflineEntryPage() {
   const { user } = useAuth();
-  const [date, setDate] = useState(today());
+  // Defaults to whatever shift+date an encoder opening this page right now
+  // is almost certainly working on (see getCurrentShiftAndDate) - date and
+  // shift are picked together, not independently, since Night crosses
+  // midnight and belongs to the *previous* calendar date after 12am.
+  const [{ date, shift }, setDateShift] = useState(getCurrentShiftAndDate);
+  const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
+  const setShift = (s: Shift) => setDateShift((prev) => ({ ...prev, shift: s }));
   const [rows, setRows] = useState<GridRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("offline-entry");
@@ -43,26 +48,46 @@ export function OfflineEntryPage() {
 
   // Cell edits are staged here instead of hitting the save endpoint
   // immediately - Save (below) flushes them all at once, and Preview shows
-  // exactly what's about to be submitted first (Section 3.1).
-  const { pending, displayRows, stage, clear, clearAll, pendingCount } = usePendingEntryChanges(rows);
+  // exactly what's about to be submitted first (Section 3.1). Persisted to
+  // sessionStorage under this date+shift's own key, so navigating to another
+  // page and back - or just switching shift/date and back - doesn't lose an
+  // edit still in progress.
+  const { pending, displayRows, stage, clear, pendingCount } = usePendingEntryChanges(rows, `ala-eh-pending:offline:${date}:${shift}`);
 
   // Search and the category dropdown only affect what's displayed in the
   // grid - both are local filters over the same already-loaded rows, not a
   // separate request per category.
   const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
   const visibleRows = displayRows?.filter(
-    (r) => matchesSearch([r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+    (r) => matchesSearch([r.product.sku, r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
   );
 
   useEffect(() => {
     setRows(null);
-    clearAll(); // pending edits belong to the date being left, not the one being loaded
-    setLastSavedBatch(null); // ditto for Undo - it can only ever apply to the date it was saved on
-    getOfflineGrid(date)
+    // Pending edits aren't cleared here - usePendingEntryChanges re-derives
+    // its own state from storage as soon as its date+shift-keyed storageKey
+    // changes, so the shift being left keeps whatever it had staged (still
+    // there if switched back to) and the one being loaded picks up whatever
+    // it already had staged (if any), instead of both always starting empty.
+    setLastSavedBatch(null); // Undo has no such persistence - it can only ever apply to the shift it was saved on
+    getOfflineGrid(date, shift)
       .then((data) => setRows(data as unknown as GridRow[]))
       .catch((e) => setError(e.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date]);
+  }, [date, shift]);
+
+  // Best-effort check of whether the *other* shift already has saved
+  // entries for this date - surfaced as a banner below, so switching (or
+  // auto-defaulting) across the 4pm/1am boundary doesn't silently open a
+  // second, near-empty record when the shift that's actually still open
+  // already has work in it. Never blocks the page if this call fails.
+  const [otherShiftCount, setOtherShiftCount] = useState<number | null>(null);
+  useEffect(() => {
+    setOtherShiftCount(null);
+    getOfflineGrid(date, otherShift(shift))
+      .then((data) => setOtherShiftCount((data as unknown as GridRow[]).filter((r) => r.isSaved).length))
+      .catch(() => setOtherShiftCount(null));
+  }, [date, shift]);
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
   // easy to forget Save is a separate step now that cells no longer commit
@@ -115,7 +140,7 @@ export function OfflineEntryPage() {
       for (const key of Object.keys(changes)) oldValues[key] = Number(priorRow?.entry[key] ?? 0);
 
       try {
-        const saved = await saveOfflineEntry(productId, date, changes);
+        const saved = await saveOfflineEntry(productId, date, shift, changes);
         mergeEntry(productId, saved);
         clear(productId);
         revertTo[productId] = oldValues;
@@ -158,7 +183,7 @@ export function OfflineEntryPage() {
     for (const [productIdStr, oldValues] of Object.entries(lastSavedBatch)) {
       const productId = Number(productIdStr);
       try {
-        const saved = await saveOfflineEntry(productId, date, oldValues);
+        const saved = await saveOfflineEntry(productId, date, shift, oldValues);
         mergeEntry(productId, saved);
       } catch (e) {
         const name = rows?.find((r) => r.product.id === productId)?.product.name ?? `#${productId}`;
@@ -172,7 +197,9 @@ export function OfflineEntryPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Daily Offline Stock Monitoring - {formatDateDisplay(date)}</h2>
+      <h2 style={{ margin: "-8px 0 0px" }}>
+        Daily Offline Stock Monitoring - {formatDateDisplay(date)} - {SHIFT_SHORT_LABELS[shift]} Shift
+      </h2>
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
         Stocks In/Out transfers here mirror automatically onto the Online table (Section 4.3).
       </p>
@@ -195,6 +222,7 @@ export function OfflineEntryPage() {
           <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
           <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
           <TextInput type="date" aria-label="Date" value={date} onChange={(e) => setDate(e.target.value)} style={{ maxWidth: 180 }} />
+          <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
         </div>
         <ToolbarControls>
           {canEdit && (
@@ -230,12 +258,33 @@ export function OfflineEntryPage() {
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
       </Toolbar>
+      {otherShiftCount !== null && otherShiftCount > 0 && (
+        <p style={{ fontSize: 12, color: colors.warningText, margin: "0 0 8px" }}>
+          ⚠ {SHIFT_LABELS[otherShift(shift)]} already has {otherShiftCount} saved entr{otherShiftCount === 1 ? "y" : "ies"} for {date} - double-check you're on the right shift before entering data.
+        </p>
+      )}
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
         <p>Loading…</p>
       ) : (
         <div className="ae-grid-fill" style={zoomStyle(zoom)}>
-          <StockGrid rows={visibleRows ?? []} columns={columns} onCommit={handleCommit} readOnly={!canEdit} />
+          {/* Keyed by date+shift so switching either remounts the grid fresh -
+              categories start collapsed again on a newly-loaded dataset
+              instead of carrying over whatever was expanded on the last one.
+              `pending` force-expands any category with a staged, unsaved
+              edit, and `focusStorageKey` restores whichever row was last
+              clicked - together, switching shifts/dates (or just navigating
+              away and back here) never leaves an in-progress edit hidden or
+              its row un-highlighted. */}
+          <StockGrid
+            key={`${date}-${shift}`}
+            rows={visibleRows ?? []}
+            columns={columns}
+            onCommit={handleCommit}
+            readOnly={!canEdit}
+            pending={pending}
+            focusStorageKey={`ala-eh-focus:offline:${date}:${shift}`}
+          />
         </div>
       )}
       {!canEdit && <p style={{ fontSize: 12, color: colors.subtleInk, marginTop: 8 }}>Read-only: your role can view but not edit Offline entries.</p>}

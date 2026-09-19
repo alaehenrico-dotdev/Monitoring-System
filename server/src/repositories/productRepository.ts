@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma";
 import { getOrSet, invalidatePrefix } from "../lib/cache";
 
 export interface ProductCreateData {
+  sku?: string;
   name: string;
   category: string;
   unit: string;
@@ -9,6 +10,7 @@ export interface ProductCreateData {
 }
 
 export interface ProductUpdateData {
+  sku?: string | null;
   name?: string;
   category?: string;
   unit?: string;

@@ -1,3 +1,4 @@
+import { Shift } from "@prisma/client";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { productRepository } from "../repositories/productRepository";
@@ -19,9 +20,9 @@ export interface OfflineEntryInput {
   openingStock?: number;
 }
 
-/// Section 4.6 - same carry-forward principle as the Online table.
-export function computeOpeningStock(productId: number, entryDate: Date): Promise<number> {
-  return dailyOfflineStockRepository.getOpeningStock(productId, entryDate);
+/// Section 4.6 - same shift-aware carry-forward principle as the Online table.
+export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift): Promise<number> {
+  return dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift);
 }
 
 function calculate(opening: number, input: Required<Omit<OfflineEntryInput, "openingStock">>) {
@@ -32,13 +33,13 @@ function calculate(opening: number, input: Required<Omit<OfflineEntryInput, "ope
 
 /// Same N+1 avoidance as getOnlineGrid - opening stocks for every unsaved
 /// row are fetched in one batched call instead of one query per product.
-export async function getOfflineGrid(entryDate: Date) {
+export async function getOfflineGrid(entryDate: Date, shift: Shift) {
   const products = await productRepository.findActive();
-  const rows = await dailyOfflineStockRepository.findAllForDate(entryDate);
+  const rows = await dailyOfflineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
 
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
-  const openingStockByProduct = await dailyOfflineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate);
+  const openingStockByProduct = await dailyOfflineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
 
   return products.map((product) => {
     const existing = rowByProduct.get(product.id);
@@ -55,20 +56,20 @@ export async function getOfflineGrid(entryDate: Date) {
     const { offlineStock, remainingStock } = calculate(openingStock, zero);
     return {
       product,
-      entry: { productId: product.id, entryDate, openingStock, ...zero, offlineStock, remainingStock },
+      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, offlineStock, remainingStock },
       isSaved: false,
     };
   });
 }
 
-/// Encoder-facing upsert for one product/date cell row (Section 4.3).
-export async function saveOfflineEntry(productId: number, entryDate: Date, input: OfflineEntryInput, userId?: number) {
+/// Encoder-facing upsert for one product/date/shift cell row (Section 4.3).
+export async function saveOfflineEntry(productId: number, entryDate: Date, shift: Shift, input: OfflineEntryInput, userId?: number) {
   const product = await productRepository.findActiveById(productId);
   if (!product) throw HttpError.notFound("Active product not found");
-  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate);
+  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift);
 
   const openingStock =
-    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate));
+    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift));
   const merged: Required<Omit<OfflineEntryInput, "openingStock">> = {
     stockInOlToOff: input.stockInOlToOff ?? toNum(existing?.stockInOlToOff),
     stockOutOffToOl: input.stockOutOffToOl ?? toNum(existing?.stockOutOffToOl),
@@ -78,7 +79,7 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, input
   };
   const { offlineStock, remainingStock } = calculate(openingStock, merged);
 
-  const data = { productId, entryDate, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
+  const data = { productId, entryDate, shift, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOfflineStockRepository.upsert(existing?.id, data);
 
   await recordChange({
@@ -93,9 +94,11 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, input
   // Section 4.3 - mirror this transfer back onto the Online table via its
   // repository directly, keeping the two stock services independent of
   // each other (see dailyOnlineStock.service.ts for the reverse direction).
+  // Mirrored into the same shift - see that file's own comment for why.
   await mirrorTransferToOnline(
     productId,
     entryDate,
+    shift,
     { stockInOffToOl: merged.stockOutOffToOl, stockOutOlToOff: merged.stockInOlToOff },
     userId
   );
@@ -106,10 +109,11 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, input
 async function mirrorTransferToOnline(
   productId: number,
   entryDate: Date,
+  shift: Shift,
   mirrored: { stockInOffToOl: number; stockOutOlToOff: number },
   userId?: number
 ) {
-  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate);
+  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
 
   // Same guard as the reverse direction in dailyOnlineStock.service.ts -
   // saveOfflineEntry mirrors unconditionally after every save, so without
@@ -122,7 +126,7 @@ async function mirrorTransferToOnline(
     return; // nothing has actually transferred yet - don't create a blank row just to mirror zeros
   }
 
-  const openingStock = existing ? toNum(existing.openingStock) : await dailyOnlineStockRepository.getOpeningStock(productId, entryDate);
+  const openingStock = existing ? toNum(existing.openingStock) : await dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift);
 
   const merged = {
     stockInOffToOl: mirrored.stockInOffToOl,
@@ -137,6 +141,7 @@ async function mirrorTransferToOnline(
   const data = {
     productId,
     entryDate,
+    shift,
     openingStock,
     ...merged,
     onlineStock,

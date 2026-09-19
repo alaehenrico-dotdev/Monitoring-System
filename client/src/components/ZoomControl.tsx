@@ -14,6 +14,7 @@ function clamp(value: number): number {
 /// remember their own zoom independently.
 export function useZoom(key: string) {
   const storageKey = `ala-eh-zoom:${key}`;
+
   const [zoom, setZoom] = useState<number>(() => {
     try {
       const saved = Number(localStorage.getItem(storageKey));
@@ -35,23 +36,39 @@ export function useZoom(key: string) {
 }
 
 /**
- * Excel-style zoom level, 25%-200% in 25% steps - a single dropdown button
- * showing the current level; picking a preset applies it immediately. One
- * control, same shape as every other toolbar dropdown (category/location
- * filters), rather than its own one-off [-] | 100% | [+] segmented pill.
+ * Excel-style zoom level, 25%-200% in 25% steps.
+ *
+ * This is intentionally a single native select so it behaves like the other
+ * toolbar filter controls.
+ *
+ * Its SIZE is owned entirely by the `.ae-zoom-control` rules in index.css
+ * (a fixed width per toolbar tier). Do not set width / minWidth / maxWidth /
+ * flex inline here: the toolbar measures hidden clones of its children to
+ * pick a tier, and inline sizing that disagrees with the stylesheet makes
+ * the real row wider than what was measured - that mismatch is what made
+ * the toolbar pop horizontal scrollbars on pages with a zoom control.
+ * Only sizing-neutral styling (padding, alignment) stays inline.
  */
-export function ZoomControl({ zoom, onChange }: { zoom: number; onChange: (zoom: number) => void }) {
+export function ZoomControl({
+  zoom,
+  onChange,
+}: {
+  zoom: number;
+  onChange: (zoom: number) => void;
+}) {
   return (
     <Select
+      className="ae-zoom-control"
       aria-label="Zoom level"
       title="Zoom"
       value={zoom}
       onChange={(e) => onChange(Number(e.target.value))}
-      // Reserve enough width/right-padding for the widest label ("200%")
-      // plus Select's own dropdown-arrow icon. Without this, the closed
-      // select's text collides with (or renders under) the arrow at this
-      // control's default/inherited width.
-      style={{ minWidth: 76, paddingRight: 26, textAlign: "right" }}
+      style={{
+        boxSizing: "border-box",
+        paddingLeft: 8,
+        paddingRight: 26,
+        textAlign: "right",
+      }}
     >
       {PRESETS.map((p) => (
         <option key={p} value={p}>

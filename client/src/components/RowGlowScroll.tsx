@@ -43,37 +43,55 @@ const RING_THICKNESS = 1.5;
 export function RowGlowScroll({
   children,
   className = "",
+  focusStorageKey,
 }: {
   children: ReactNode;
   className?: string;
+  /**
+   * Persists which row is click-focused (see `focusRing` below) to
+   * sessionStorage, keyed by this string, and restores it on mount - so the
+   * row someone was just editing is still marked when they navigate to a
+   * different page and back, not just while the pointer stays put. Read off
+   * each row's own `data-row-id` attribute (StockGrid sets this to the
+   * product id), so the caller controls what actually counts as "the same
+   * row" - typically scoped per date/shift, since row identity only means
+   * anything against one specific loaded grid. Omit for a table with no
+   * `data-row-id`s (or nothing worth restoring, e.g. a read-only report) to
+   * get the old, session-only-in-memory behavior.
+   */
+  focusStorageKey?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastRowRef = useRef<Element | null>(null);
   const spotlightRef = useRef<HTMLDivElement>(null);
   const [ring, setRing] = useState<RingRect | null>(null);
+  // The row last clicked - a persistent outline (as opposed to `ring`, which
+  // only ever tracks whichever row the pointer happens to be hovering right
+  // now) so a row someone just clicked into stays visibly marked after the
+  // pointer moves away, e.g. to reach for the keyboard.
+  const focusedRowRef = useRef<Element | null>(null);
+  const [focusRing, setFocusRing] = useState<RingRect | null>(null);
 
-  const measure = useCallback((row: Element | null) => {
+  // Content-coordinate space (this container's own scroll position baked
+  // in), not viewport coordinates - that's what lets a ring live as a normal
+  // absolutely-positioned child of this (position: relative, overflow: auto -
+  // see .ae-table-scroll in index.css) container and scroll together with
+  // the table for free, the same way any other in-flow content would,
+  // rather than needing its own scroll listener to stay lined up.
+  const rectOf = useCallback((row: Element | null): RingRect | null => {
     const scrollEl = scrollRef.current;
-    if (!scrollEl || !row) {
-      setRing(null);
-      return;
-    }
+    if (!scrollEl || !row) return null;
     const scrollRect = scrollEl.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
-    // Content-coordinate space (this container's own scroll position baked
-    // in), not viewport coordinates - that's what lets the ring live as a
-    // normal absolutely-positioned child of this (position: relative,
-    // overflow: auto - see .ae-table-scroll in index.css) container and
-    // scroll together with the table for free, the same way any other
-    // in-flow content would, rather than needing its own scroll listener
-    // to stay lined up.
-    setRing({
+    return {
       top: rowRect.top - scrollRect.top + scrollEl.scrollTop,
       left: rowRect.left - scrollRect.left + scrollEl.scrollLeft,
       width: rowRect.width,
       height: rowRect.height,
-    });
+    };
   }, []);
+
+  const measure = useCallback((row: Element | null) => setRing(rectOf(row)), [rectOf]);
 
   function handleMouseOver(e: ReactMouseEvent<HTMLDivElement>) {
     const row = (e.target as Element).closest("tbody tr");
@@ -90,6 +108,56 @@ export function RowGlowScroll({
     lastRowRef.current = null;
     setRing(null);
   }
+
+  // Clicking a row pins a persistent outline on it (see focusRing above) -
+  // clicking elsewhere in the same row (a different cell, to edit the next
+  // field) just re-pins the same row rather than toggling it off, so the
+  // outline doesn't flicker away mid-edit. Clicking outside any row (the
+  // scroll container's own background) clears it.
+  function handleClick(e: ReactMouseEvent<HTMLDivElement>) {
+    const row = (e.target as Element).closest("tbody tr");
+    focusedRowRef.current = row;
+    setFocusRing(rectOf(row));
+
+    if (!focusStorageKey) return;
+    try {
+      const rowId = row?.getAttribute("data-row-id");
+      if (rowId) sessionStorage.setItem(focusStorageKey, rowId);
+      else sessionStorage.removeItem(focusStorageKey);
+    } catch {
+      // Best effort - a private window or blocked site data just means the
+      // outline doesn't survive navigation, not that clicking breaks.
+    }
+  }
+
+  // Restores whatever row was focused last time, on mount and whenever
+  // `focusStorageKey` itself changes (a different date/shift) - this is what
+  // makes the outline survive navigating to a different page and back, since
+  // that unmounts this component entirely and loses `focusRing`/
+  // `focusedRowRef` otherwise. Only ever matches a row that's actually
+  // rendered right now (via its `data-row-id`), so a stale id left over from
+  // a product that's since been filtered/searched out, or removed, is
+  // silently ignored rather than restoring a ring pointed at nothing.
+  useEffect(() => {
+    if (!focusStorageKey) return;
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    let rowId: string | null = null;
+    try {
+      rowId = sessionStorage.getItem(focusStorageKey);
+    } catch {
+      rowId = null;
+    }
+    if (!rowId) return;
+    const row = scrollEl.querySelector(`tbody tr[data-row-id="${CSS.escape(rowId)}"]`);
+    if (!row) return;
+    focusedRowRef.current = row;
+    setFocusRing(rectOf(row));
+    // Deliberately mount/key-change only - re-running this on every
+    // `rectOf` identity change (it's stable anyway) would fight the
+    // ResizeObserver effect below for who gets the last word.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusStorageKey]);
 
   // Same cursor-follow trick as the toolbar/sidebar tabs (Toolbar.tsx,
   // Sidebar.tsx): write `--mx`/`--my` straight onto the spotlight div via
@@ -135,6 +203,28 @@ export function RowGlowScroll({
     };
   }, [ring, measure]);
 
+  // Same idea as the hover ring's re-measure above, but a ResizeObserver on
+  // the scroll container itself rather than a window resize listener - the
+  // focused row has to stay outlined long after the pointer has moved on
+  // (that's the whole point of it being a click-pinned selection, not a
+  // hover), including through layout changes a window resize would never
+  // fire for, like the Excel-style zoom control (ZoomControl.tsx) rescaling
+  // the table via CSS `zoom`.
+  useEffect(() => {
+    if (!focusRing) return;
+    const scrollEl = scrollRef.current;
+    if (!scrollEl) return;
+    const observer = new ResizeObserver(() => {
+      const row = focusedRowRef.current;
+      // The row can be detached (e.g. a filter/search narrowed the table
+      // out from under it) - drop the outline rather than leave it pinned
+      // to a stale, invisible element.
+      setFocusRing(row?.isConnected ? rectOf(row) : null);
+    });
+    observer.observe(scrollEl);
+    return () => observer.disconnect();
+  }, [focusRing, rectOf]);
+
   return (
     <div
       ref={scrollRef}
@@ -142,8 +232,21 @@ export function RowGlowScroll({
       onMouseOver={handleMouseOver}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
     >
       {children}
+      {focusRing && (
+        <div
+          aria-hidden
+          className="ae-row-focus"
+          style={{
+            top: focusRing.top,
+            left: focusRing.left,
+            width: focusRing.width,
+            height: focusRing.height,
+          }}
+        />
+      )}
       {ring && (
         <>
           <div

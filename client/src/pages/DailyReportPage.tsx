@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
-import { Button, TextInput } from "../components/ui";
+import { Button, Select, TextInput } from "../components/ui";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { CategoryFilter } from "../components/CategoryFilter";
 import { onlineStockColumns, offlineStockColumns } from "../config/stockColumns";
-import { toCsv, downloadCsv } from "../utils/csv";
+import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
@@ -15,6 +16,15 @@ import { PrinterIcon } from "../components/icons";
 function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
+
+type ReportSection = "all" | "online" | "offline" | "total";
+
+const SECTION_LABELS: Record<ReportSection, string> = {
+  all: "Full Report (Online + Offline + Total)",
+  online: "Online Only",
+  offline: "Offline Only",
+  total: "Total Stocks Only",
+};
 
 // StockGrid requires an onCommit handler, but read-only mode never calls it
 // (editable cells render as plain text, not inputs, when readOnly is set).
@@ -39,6 +49,21 @@ export function DailyReportPage() {
   const [date, setDate] = useState(searchParams.get("date") ?? today());
   const [report, setReport] = useState<DailyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Which part of the report to show/export - defaults to the full,
+  // three-section report (previous behavior). Picking a single section
+  // filters both the on-screen view (so Print/PDF reflects just that
+  // section) and Export CSV, instead of always forcing a combined
+  // multi-section file when someone only wants e.g. the Online numbers.
+  const [reportSection, setReportSection] = useState<ReportSection>("all");
+  // Narrows every section (and the CSV/PDF that come from them) to one
+  // category at a time - the same exact-match filter CategoryFilter already
+  // provides on the entry pages, so a report can be scoped to e.g. just
+  // "Class A (Liter)" instead of always covering every category at once.
+  const [categoryFilter, setCategoryFilter] = useState("");
+  // Bumped on every successful load - used to key the report's grids (below)
+  // so each Generate remounts them fresh, with every category starting
+  // expanded again, even when re-generating the same date.
+  const [reportVersion, setReportVersion] = useState(0);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
 
   useEffect(() => {
@@ -59,6 +84,7 @@ export function DailyReportPage() {
     getDailyReport(date)
       .then((nextReport) => {
         setReport(nextReport);
+        setReportVersion((v) => v + 1);
         if (searchParams.get("history") !== "1") {
           recordReportHistory({ type: "Daily Report", scope: nextReport.date, route: `/daily-report?history=1&date=${nextReport.date}` });
         }
@@ -66,17 +92,35 @@ export function DailyReportPage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to build report"));
   }
 
+  // Every category across all three sections (not just whichever section is
+  // currently selected) - so switching the section dropdown doesn't also
+  // reset an already-picked category filter to "no such option".
+  const categories = report
+    ? Array.from(new Set([...report.online, ...report.offline, ...report.total].map((r) => r.product.category))).sort()
+    : [];
+  const byCategory = <T extends { product: { category: string } }>(rows: T[]): T[] =>
+    categoryFilter ? rows.filter((r) => r.product.category === categoryFilter) : rows;
+
   function handleExport() {
     if (!report) return;
-    const sections = [
-      section("ONLINE STOCK MONITORING", report.date, report.online as unknown as CsvSectionRow[], onlineStockColumns),
-      section("OFFLINE STOCK MONITORING", report.date, report.offline as unknown as CsvSectionRow[], offlineStockColumns),
-      totalSection(report.date, report.total),
-    ];
-    // One file covering every section of the report, not one export per
-    // table - a Daily Report is meaningless split across three separate
-    // downloads that then have to be reassembled by hand.
-    downloadCsv(`daily-report-${report.date}.csv`, sections.join("\r\n\r\n"));
+    const online = section("ONLINE STOCK MONITORING", report.date, byCategory(report.online) as unknown as CsvSectionRow[], onlineStockColumns);
+    const offline = section("OFFLINE STOCK MONITORING", report.date, byCategory(report.offline) as unknown as CsvSectionRow[], offlineStockColumns);
+    const total = totalSection(report.date, byCategory(report.total));
+
+    // "Full Report" still combines every section into one file (previous,
+    // only behavior) - a Daily Report is meaningless split across three
+    // separate downloads that then have to be reassembled by hand. Excel
+    // opens several <table>s in one HTML file as one continuous sheet, so
+    // this is just as much "one file" as the old concatenated-CSV version
+    // was. Picking a single section instead exports just that table, for
+    // when only e.g. the Online numbers are needed rather than the whole
+    // thing.
+    if (reportSection === "all") {
+      downloadExcel(`daily-report-${report.date}.xls`, [online, offline, total].join(""));
+      return;
+    }
+    const bySection: Record<Exclude<ReportSection, "all">, string> = { online, offline, total };
+    downloadExcel(`daily-report-${reportSection}-${report.date}.xls`, bySection[reportSection]);
   }
 
   return (
@@ -88,13 +132,21 @@ export function DailyReportPage() {
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <Select aria-label="Report section" value={reportSection} onChange={(e) => setReportSection(e.target.value as ReportSection)} title="Which section to view/export">
+            {(Object.keys(SECTION_LABELS) as ReportSection[]).map((s) => (
+              <option key={s} value={s}>
+                {SECTION_LABELS[s]}
+              </option>
+            ))}
+          </Select>
+          {report && <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />}
           <Button onClick={load}>Generate</Button>
         </div>
         <ToolbarControls>
           {report && (
             <>
-              <Button variant="secondary" onClick={handleExport}>
-                Export CSV
+              <Button variant="secondary" onClick={handleExport} title={reportSection === "all" ? "Export all sections as one Excel file" : `Export just the ${SECTION_LABELS[reportSection]} as an Excel file`}>
+                Export Excel
               </Button>
               <Button variant="secondary" onClick={() => window.print()} title="Print or save as PDF">
                 <PrinterIcon /> PDF
@@ -111,18 +163,30 @@ export function DailyReportPage() {
 
       {report && (
         <div>
-          <h3 style={{ marginBottom: 8 }}>Online — {report.date}</h3>
-          <div style={{ marginBottom: 32 }}>
-            <StockGrid rows={report.online as unknown as GridRow[]} columns={onlineStockColumns} onCommit={noop} readOnly />
-          </div>
+          {(reportSection === "all" || reportSection === "online") && (
+            <>
+              <h3 style={{ marginBottom: 8 }}>Online — {report.date}</h3>
+              <div style={{ marginBottom: 32 }}>
+                <StockGrid key={`online-${reportVersion}`} rows={byCategory(report.online) as unknown as GridRow[]} columns={onlineStockColumns} onCommit={noop} readOnly />
+              </div>
+            </>
+          )}
 
-          <h3 style={{ marginBottom: 8 }}>Offline — {report.date}</h3>
-          <div style={{ marginBottom: 32 }}>
-            <StockGrid rows={report.offline as unknown as GridRow[]} columns={offlineStockColumns} onCommit={noop} readOnly />
-          </div>
+          {(reportSection === "all" || reportSection === "offline") && (
+            <>
+              <h3 style={{ marginBottom: 8 }}>Offline — {report.date}</h3>
+              <div style={{ marginBottom: 32 }}>
+                <StockGrid key={`offline-${reportVersion}`} rows={byCategory(report.offline) as unknown as GridRow[]} columns={offlineStockColumns} onCommit={noop} readOnly />
+              </div>
+            </>
+          )}
 
-          <h3 style={{ marginBottom: 8 }}>Total Stocks — {report.date}</h3>
-          <TotalStocksTable rows={report.total} />
+          {(reportSection === "all" || reportSection === "total") && (
+            <>
+              <h3 style={{ marginBottom: 8 }}>Total Stocks — {report.date}</h3>
+              <TotalStocksTable key={`total-${reportVersion}`} rows={byCategory(report.total)} />
+            </>
+          )}
         </div>
       )}
 
@@ -132,20 +196,21 @@ export function DailyReportPage() {
 }
 
 interface CsvSectionRow {
-  product: { category: string; name: string };
+  product: { category: string; sku: string | null; name: string };
   entry: Record<string, unknown>;
 }
 
 function section(title: string, date: string, rows: CsvSectionRow[], columns: { key: string; label: string }[]): string {
-  const headers = ["Category", "SKU", ...columns.map((c) => c.label)];
-  const csvRows = rows.map((r) => [r.product.category, r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
-  return `${title} - ${date}\r\n${toCsv(headers, csvRows)}`;
+  const headers = ["Category", "SKU", "Product", ...columns.map((c) => c.label)];
+  const excelRows = rows.map((r) => [r.product.category, r.product.sku ?? "", r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
+  return toExcelTable(headers, excelRows, `${title} - ${date}`);
 }
 
 function totalSection(date: string, rows: DailyReport["total"]): string {
-  const headers = ["Category", "SKU", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"];
-  const csvRows = rows.map((r) => [
+  const headers = ["Category", "SKU", "Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"];
+  const excelRows = rows.map((r) => [
     r.product.category,
+    r.product.sku ?? "",
     r.product.name,
     r.onlineRemainingStock,
     r.offlineRemainingStock,
@@ -153,5 +218,5 @@ function totalSection(date: string, rows: DailyReport["total"]): string {
     r.totalManualCount ?? "",
     r.totalVariance ?? "",
   ]);
-  return `TOTAL STOCKS - ${date}\r\n${toCsv(headers, csvRows)}`;
+  return toExcelTable(headers, excelRows, `TOTAL STOCKS - ${date}`);
 }

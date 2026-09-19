@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
+import { downloadExcel, toExcelTable } from "../utils/excel";
 import type { Product } from "../types";
-import { colors } from "../theme";
 import { toolbarLayoutTransition } from "../motion";
 import { DownloadIcon, PrinterIcon, UploadIcon } from "./icons";
+import { Toast, type ToastVariant } from "./Toast";
 
 export interface CsvColumn {
   key: string;
@@ -79,6 +80,13 @@ interface CsvToolsProps {
   /// pages with nothing to stage first (e.g. read-only reports) - print
   /// then proceeds unconditionally, same as before this existed.
   onBeforePrint?: () => boolean | Promise<boolean>;
+  /// "csv" (default) keeps the plain, re-importable .csv this grid's Import
+  /// segment expects. "excel" instead downloads a real .xls file Excel opens
+  /// directly - for read-only tables (Total Stocks, Manual Count) that never
+  /// import, so their export doesn't need to stay in a round-trippable
+  /// format. Ignored when `canImport` is true, since re-import always parses
+  /// CSV, never this .xls.
+  exportFormat?: "csv" | "excel";
 }
 
 /**
@@ -101,19 +109,35 @@ export function CsvTools({
   disabled = false,
   pdfDisabled = false,
   onBeforePrint,
+  exportFormat = "csv",
 }: CsvToolsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageVariant, setMessageVariant] = useState<ToastVariant>("info");
+  const asExcel = exportFormat === "excel" && !canImport;
 
   function handleExport() {
+    if (asExcel) {
+      // The real SKU code gets its own column here, alongside the product
+      // name - unlike the CSV path below, nothing re-imports an Excel
+      // export, so there's no "SKU" alias to preserve for a parser to match
+      // against (see handleImportFile's productIdx lookup).
+      const headers = ["Category", "SKU", "Product", ...columns.map((c) => c.label)];
+      const dataRows = rows.map((r) => [r.product.category, r.product.sku ?? "", r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
+      downloadExcel(`${filenamePrefix}-${date}.xls`, toExcelTable(headers, dataRows));
+      return;
+    }
     // Uppercased to match the convention of the files people re-import (a
     // spreadsheet edited outside the app tends to use ALL-CAPS headers) -
     // parsing already lowercases before comparing (see handleImportFile),
-    // so this is purely cosmetic and doesn't affect what re-imports.
+    // so this is purely cosmetic and doesn't affect what re-imports. "SKU"
+    // here is still the product name, not the real sku code - re-import
+    // matches products by this column (see productIdx below) and the code
+    // alone isn't always present/typed by whoever edited the file offline.
     const headers = ["Category", "SKU", ...columns.map((c) => c.label)].map((h) => h.toUpperCase());
-    const csvRows = rows.map((r) => [r.product.category, r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
-    downloadCsv(`${filenamePrefix}-${date}.csv`, toCsv(headers, csvRows));
+    const dataRows = rows.map((r) => [r.product.category, r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
+    downloadCsv(`${filenamePrefix}-${date}.csv`, toCsv(headers, dataRows));
   }
 
   async function handleImportFile(file: File) {
@@ -257,8 +281,13 @@ export function CsvTools({
                 .join(", ")}.`;
       }
       setMessage(summary);
+      // Worth reading in full, not glancing past - stays up until
+      // dismissed rather than auto-clearing while there's something
+      // unresolved (rows that didn't match anything).
+      setMessageVariant(unmatchedExamples.length ? "error" : "info");
     } catch (err) {
       setMessage(err instanceof Error ? `Import failed: ${err.message}` : "Import failed");
+      setMessageVariant("error");
     } finally {
       setBusy(false);
     }
@@ -290,10 +319,10 @@ export function CsvTools({
               className="ae-segment-btn"
               onClick={handleExport}
               disabled={disabled}
-              title="Export"
+              title={asExcel ? "Export as Excel (.xls)" : "Export"}
             >
               <UploadIcon />
-              <span className="ae-segment-label">Export</span>
+              <span className="ae-segment-label">{asExcel ? "Export Excel" : "Export"}</span>
             </motion.button>
             {showPdf && <div className="ae-segment-divider" />}
           </>
@@ -346,7 +375,12 @@ export function CsvTools({
           </>
         )}
       </motion.div>
-      {message && <span style={{ fontSize: 12, color: colors.subtleInk }}>{message}</span>}
+      <Toast
+        message={message}
+        onDismiss={() => setMessage(null)}
+        variant={messageVariant}
+        duration={messageVariant === "error" ? null : 6000}
+      />
     </div>
   );
 }

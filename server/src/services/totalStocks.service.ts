@@ -1,8 +1,25 @@
+import { Shift } from "@prisma/client";
 import { productRepository } from "../repositories/productRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { manualCountRepository } from "../repositories/manualCountRepository";
 import { toNum } from "../utils/stockMath";
+
+/// Online/Offline/Manual Count entries are now per-shift (Morning, Night),
+/// but Total Stocks is still a single per-date snapshot rather than
+/// exposing its own shift selector - this collapses whichever shift(s) have
+/// actually been saved for the date down to one row per key, preferring
+/// Night whenever both exist since it's the later, more up-to-date figure
+/// for that day.
+function collapseToLatestShift<T extends { shift: Shift }>(rows: T[], keyOf: (row: T) => string | number): Map<string | number, T> {
+  const byKey = new Map<string | number, T>();
+  for (const row of rows) {
+    const key = keyOf(row);
+    const current = byKey.get(key);
+    if (!current || row.shift === "NIGHT") byKey.set(key, row);
+  }
+  return byKey;
+}
 
 /**
  * Section 4.5 / 5.5 - total_stocks is not a manually-entered table but a
@@ -15,16 +32,22 @@ import { toNum } from "../utils/stockMath";
 export async function getTotalStocksGrid(entryDate: Date) {
   const products = await productRepository.findActive();
 
-  const [onlineRows, offlineRows, manualCounts] = await Promise.all([
-    dailyOnlineStockRepository.findAllForDate(entryDate),
-    dailyOfflineStockRepository.findAllForDate(entryDate),
+  const [onlineRowsMorning, onlineRowsNight, offlineRowsMorning, offlineRowsNight, manualCounts] = await Promise.all([
+    dailyOnlineStockRepository.findAllForDate(entryDate, "MORNING"),
+    dailyOnlineStockRepository.findAllForDate(entryDate, "NIGHT"),
+    dailyOfflineStockRepository.findAllForDate(entryDate, "MORNING"),
+    dailyOfflineStockRepository.findAllForDate(entryDate, "NIGHT"),
     manualCountRepository.findForTotals(entryDate),
   ]);
 
-  const onlineByProduct = new Map(onlineRows.map((r) => [r.productId, r]));
-  const offlineByProduct = new Map(offlineRows.map((r) => [r.productId, r]));
+  const onlineByProduct = collapseToLatestShift([...onlineRowsMorning, ...onlineRowsNight], (r) => r.productId);
+  const offlineByProduct = collapseToLatestShift([...offlineRowsMorning, ...offlineRowsNight], (r) => r.productId);
+  // Two shifts can each have saved a count for the same (product, location) -
+  // collapse those down to one row per (product, location) first, same as
+  // online/offline above, before grouping by product.
+  const collapsedManualCounts = collapseToLatestShift(manualCounts, (mc) => `${mc.productId}:${mc.location}`).values();
   const manualByProduct = new Map<number, typeof manualCounts>();
-  for (const mc of manualCounts) {
+  for (const mc of collapsedManualCounts) {
     const list = manualByProduct.get(mc.productId) ?? [];
     list.push(mc);
     manualByProduct.set(mc.productId, list);

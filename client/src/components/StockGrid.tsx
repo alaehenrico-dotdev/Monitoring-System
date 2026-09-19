@@ -3,6 +3,7 @@ import type { Product } from "../types";
 import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { NumberCellInput } from "./ui";
+import { ChevronIcon } from "./icons";
 
 export interface GridRow {
   product: Product;
@@ -35,6 +36,22 @@ interface StockGridProps {
   /** Called when an editable cell is committed (blur or Enter). */
   onCommit: (productId: number, key: string, value: number) => void | Promise<void>;
   readOnly?: boolean;
+  /**
+   * Staged-but-not-yet-saved edits, keyed by product id then column key -
+   * the same shape as usePendingEntryChanges' `pending` (kept structural
+   * rather than imported, to avoid a circular import - that hook already
+   * imports GridRow from this file). Any category containing a pending edit
+   * always renders expanded regardless of its collapsed/expanded state, so
+   * an in-progress edit can never end up hidden behind a collapsed category -
+   * on first load, after a CSV import stages edits across categories the
+   * encoder hasn't opened, or after navigating back to a page that still has
+   * edits staged. Omitted entirely on read-only tables (Daily Report), where
+   * there's nothing that could ever be "pending".
+   */
+  pending?: Record<number, Record<string, number>>;
+  /** Forwarded to RowGlowScroll - see its own doc comment. Restores/persists
+   *  which product row is click-focused across navigating away and back. */
+  focusStorageKey?: string;
 }
 
 function toNum(v: unknown): number {
@@ -49,8 +66,15 @@ function toNum(v: unknown): number {
  * shown but not directly editable, and a subtotal row per category plus a
  * grand total row sit at the bottom of the table.
  */
-export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps) {
+export function StockGrid({ rows, columns, onCommit, readOnly, pending, focusStorageKey }: StockGridProps) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Explicit expand/collapse choices, keyed by category name - absent means
+  // "no choice made yet", which defaults to collapsed (below), not expanded.
+  // Categories start collapsed so a long product list opens as a manageable
+  // overview rather than every SKU at once; a category is force-expanded
+  // regardless of this map whenever it has a pending edit (see `pending`
+  // above), so this map alone never determines the final visible state.
+  const [expandedOverride, setExpandedOverride] = useState<Record<string, boolean>>({});
 
   const groups = new Map<string, GridRow[]>();
   for (const row of rows) {
@@ -99,26 +123,48 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
   const allProductIds = rows.map((r) => r.product.id);
 
   return (
-    <RowGlowScroll>
+    <RowGlowScroll focusStorageKey={focusStorageKey}>
       <table className="ae-table" style={{ minWidth: 720 }}>
         <thead>
           <tr>
             <th>SKU</th>
+            <th>Product</th>
             {columns.map((c) => (
               <th key={c.key}>{c.label}</th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {[...groups.entries()].map(([category, groupRows]) => (
+          {[...groups.entries()].map(([category, groupRows]) => {
+            const hasPending = !!pending && groupRows.some((row) => pending[row.product.id]);
+            const isExpanded = hasPending || !!expandedOverride[category];
+            const isCollapsed = !isExpanded;
+            return (
             <Fragment key={category}>
               <tr key={`${category}-header`}>
-                <td colSpan={columns.length + 1} style={categoryRowStyle}>
-                  {category}
+                <td colSpan={columns.length + 2} style={{ padding: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedOverride((e) => ({ ...e, [category]: !isExpanded }))}
+                    aria-expanded={!isCollapsed}
+                    title={hasPending ? `${category} has unsaved edits, so it stays expanded` : isCollapsed ? `Expand ${category}` : `Collapse ${category}`}
+                    style={categoryToggleStyle}
+                  >
+                    <span style={{ display: "inline-flex", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 120ms ease" }}>
+                      <ChevronIcon />
+                    </span>
+                    {category}
+                  </button>
                 </td>
               </tr>
               {groupRows.map((row) => (
-                <tr key={row.product.id} style={row.isFlagged ? { background: colors.warningBg } : undefined}>
+                <tr
+                  key={row.product.id}
+                  data-row-id={row.product.id}
+                  className={isCollapsed ? "ae-row-collapsed" : undefined}
+                  style={row.isFlagged ? { background: colors.warningBg } : undefined}
+                >
+                  <td style={skuCellStyle}>{row.product.sku ?? "—"}</td>
                   <td style={nameCellStyle}>{row.product.name}</td>
                   {columns.map((col) => {
                     const draftKey = cellId(row.product.id, col.key);
@@ -147,15 +193,16 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
                 </tr>
               ))}
               <tr key={`${category}-subtotal`} style={subtotalRowStyle}>
-                <td>Subtotal - {category}</td>
+                <td colSpan={2}>Subtotal - {category}</td>
                 {columns.map((col) => (
                   <td key={col.key}>{groupRows.reduce((sum, r) => sum + toNum(r.entry[col.key]), 0).toLocaleString()}</td>
                 ))}
               </tr>
             </Fragment>
-          ))}
+            );
+          })}
           <tr style={grandTotalRowStyle}>
-            <td>GRAND TOTAL</td>
+            <td colSpan={2}>GRAND TOTAL</td>
             {columns.map((col) => (
               <td key={col.key}>{rows.reduce((sum, r) => sum + toNum(r.entry[col.key]), 0).toLocaleString()}</td>
             ))}
@@ -171,17 +218,29 @@ export function StockGrid({ rows, columns, onCommit, readOnly }: StockGridProps)
 // and inflating every row's height. Border/padding/alignment defaults
 // otherwise come from the shared .ae-table CSS (index.css).
 const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };
+const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.subtleInk, fontVariantNumeric: "tabular-nums" };
 const lockedStyle: CSSProperties = { background: colors.paperAlt, color: "var(--ae-num-text)" };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
 const inputStyle: CSSProperties = { width: 64, textAlign: "right" };
-const categoryRowStyle: CSSProperties = {
+// A real <button>, not just a styled <td> (the old categoryRowStyle) - the
+// whole category bar needs to be a single clickable/keyboard-focusable
+// target for the expand/collapse arrow, spanning every column exactly like
+// the row it replaces did.
+const categoryToggleStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  width: "100%",
   textAlign: "left",
+  font: "inherit",
   fontWeight: 700,
   padding: "6px 8px",
+  border: "none",
+  borderLeft: `4px solid ${colors.red}`,
   background: colors.black,
   color: colors.yellow,
-  borderLeft: `4px solid ${colors.red}`,
+  cursor: "pointer",
 };
 const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: colors.paperAlt };
 const grandTotalRowStyle: CSSProperties = { fontWeight: 700, background: colors.warningBg, borderTop: `2px solid ${colors.black}` };

@@ -22,6 +22,15 @@ enum StockLocation {
   TOTAL
 }
 
+/// Entries are recorded per operating shift, not just per day: Morning
+/// (7am-4pm) and Night (4pm-1am, crossing midnight). See server/src/utils/
+/// shift.ts for how a wall-clock time maps to {shift, date}, and Morning is
+/// always the shift immediately preceded by the previous date's Night.
+enum Shift {
+  MORNING
+  NIGHT
+}
+
 enum ChangeAction {
   CREATE
   UPDATE
@@ -51,6 +60,10 @@ model User {
 /// 5.1 products - master product list shared by every table in the system
 model Product {
   id        Int      @id @default(autoincrement())
+  // The actual SKU code (e.g. "AFP007"), separate from `name` - nullable
+  // since not every product has been assigned one yet (see seed.ts), unique
+  // when present so two products can never claim the same code.
+  sku       String?  @unique
   name      String
   category  String
   unit      String
@@ -73,6 +86,7 @@ model DailyOnlineStock {
   productId         Int
   product           Product  @relation(fields: [productId], references: [id])
   entryDate         DateTime @db.Date
+  shift             Shift    @default(NIGHT)
   openingStock      Decimal  @default(0) @db.Decimal(14, 2)
   stockInOffToOl    Decimal  @default(0) @db.Decimal(14, 2)
   stockOutOlToOff   Decimal  @default(0) @db.Decimal(14, 2)
@@ -80,13 +94,13 @@ model DailyOnlineStock {
   productionIn      Decimal  @default(0) @db.Decimal(14, 2)
   fulfillmentOut    Decimal  @default(0) @db.Decimal(14, 2) // can be auto-posted from receipts
   rts               Decimal  @default(0) @db.Decimal(14, 2)
-  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next day's opening
+  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
   encodedById       Int?
   encodedBy         User?    @relation("OnlineEncodedBy", fields: [encodedById], references: [id])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  @@unique([productId, entryDate])
+  @@unique([productId, entryDate, shift])
   @@map("daily_online_stock")
 }
 
@@ -96,6 +110,7 @@ model DailyOfflineStock {
   productId         Int
   product           Product  @relation(fields: [productId], references: [id])
   entryDate         DateTime @db.Date
+  shift             Shift    @default(NIGHT)
   openingStock      Decimal  @default(0) @db.Decimal(14, 2)
   stockInOlToOff    Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockOutOlToOff
   stockOutOffToOl   Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockInOffToOl
@@ -103,13 +118,13 @@ model DailyOfflineStock {
   productionIn      Decimal  @default(0) @db.Decimal(14, 2)
   deliveryOut       Decimal  @default(0) @db.Decimal(14, 2)
   backloads         Decimal  @default(0) @db.Decimal(14, 2)
-  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next day's opening
+  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
   encodedById       Int?
   encodedBy         User?    @relation("OfflineEncodedBy", fields: [encodedById], references: [id])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  @@unique([productId, entryDate])
+  @@unique([productId, entryDate, shift])
   @@map("daily_offline_stock")
 }
 
@@ -119,6 +134,7 @@ model ManualCount {
   productId            Int
   product              Product       @relation(fields: [productId], references: [id])
   entryDate            DateTime      @db.Date
+  shift                Shift         @default(NIGHT)
   location             StockLocation
   systemRemainingStock Decimal       @db.Decimal(14, 2)
   manualCount          Decimal       @db.Decimal(14, 2)
@@ -128,7 +144,7 @@ model ManualCount {
   createdAt            DateTime      @default(now())
   updatedAt            DateTime      @updatedAt
 
-  @@unique([productId, entryDate, location])
+  @@unique([productId, entryDate, shift, location])
   @@map("manual_counts")
 }
 

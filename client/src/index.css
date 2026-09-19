@@ -25,6 +25,14 @@
   --ae-header-bg: #e7dfc9;
   --ae-header-rule: #14110d;
   --ae-num-text: var(--ae-text);
+
+  /* Toolbar tokens - brand colors, identical in light and dark mode so the
+     toolbar border and its action buttons are always visible. */
+  --ae-toolbar-border: #c99a2e;
+  --ae-btn-yellow: #ffd400;
+  --ae-btn-yellow-hover: #e4b94d;
+  --ae-btn-yellow-active: #c99a2e;
+  --ae-btn-yellow-text: #14110d;
 }
 
 :root[data-theme="dark"] {
@@ -60,17 +68,6 @@ table input[type="number"] {
   color: #14110d;
 }
 
-/* Data grid tables (Section 3.1: StockGrid, TotalStocksTable, Manual Count,
-   Change Log, Variance Report, Products) - a shared "Google Sheets" grid
-   look built once here instead of six pages each hand-rolling their own
-   thStyle/tdStyle: horizontal row lines only (no vertical column dividers -
-   those cut across the row-hover ring/spotlight's continuous edge, see
-   RowGlowScroll.tsx, making the cursor-follow effect read as broken into
-   per-cell segments instead of one smooth line/glow around the whole row),
-   a sticky header, and a soft per-row hover highlight. `border-collapse:
-   separate` (not the tables' old inline `collapse`) is what lets the sticky
-   header render correctly - collapsed borders and position:sticky don't
-   reliably mix across browsers. */
 .ae-table {
   border-collapse: separate;
   border-spacing: 0;
@@ -92,36 +89,15 @@ table input[type="number"] {
 .ae-table td {
   text-align: right;
   padding: 4px 8px;
-  border-bottom: 1px solid var(--ae-border);
+  border-bottom: 0.5px solid var(--ae-border);
   transition: background-color 120ms ease;
 }
-/* Numeric/value cells (the default right-aligned cell in every grid -
-   label cells opt out of this alignment explicitly, see nameCellStyle etc.
-   across StockGrid/TotalStocksTable/ManualCountPage/VarianceReportPage/
-   ChangeLogPage/PendingChangesPreview) read crisp white in dark mode
-   instead of the slightly warmer --ae-text cream, so a grid's numbers pop
-   against its label column. `--ae-num-text` is just `--ae-text` in light
-   mode (no change there - flat white would be invisible against the
-   light-mode table background). `.ae-table--left` (Products Admin, Report
-   History, Receipts history) opts every cell out by default since those
-   tables are mostly labels; Receipts' two genuinely numeric columns
-   (Items, Total Qty) opt back in with an inline `color: var(--ae-num-text)`
-   instead. */
 .ae-table:not(.ae-table--left) td {
   color: var(--ae-num-text);
 }
-/* A themed var, not a flat hex - it blends with whatever's already showing
-   through the cell (a flagged row's warning tint, a subtotal shade) instead
-   of flattening every row to one hover color regardless of its own meaning,
-   and it flips direction (darken vs lighten) between light and dark mode.
-   This is the hover *fill* only - the animated hover *border* around the
-   whole row is a separate, JS-positioned element (.ae-row-ring, below),
-   not something this selector can draw itself. */
 .ae-table tbody tr:hover td {
   background-color: var(--ae-row-hover);
 }
-/* Products Admin is the one grid that's all text, no numbers - opts out
-   of the numeric-grid right-align default. */
 .ae-table--left td {
   text-align: left;
 }
@@ -136,16 +112,6 @@ table input[type="number"] {
   }
 }
 
-/* Row hover border - top and bottom edges only, no left/right sides (a full
-   box outline on a wide-but-short row made the short vertical edges look
-   like an odd little tick at each end rather than a clean line, and cut
-   into the same space as the interior spotlight below). RowGlowScroll.tsx
-   renders two of these divs per hovered row - one pinned to the row's top
-   edge, one to its bottom - each just a thin animated-gradient bar the full
-   width of the row, rather than a single ring-shaped div. Same color
-   stops/13s timing as the sidebar's own gradient sweep (Sidebar.tsx's
-   .ae-sidebar-gradient-sweep) so it reads as the same effect, just a bar
-   instead of a ring. */
 .ae-row-ring {
   position: absolute;
   z-index: 0;
@@ -160,61 +126,42 @@ table input[type="number"] {
   animation: ae-row-ring-sweep 13s linear infinite;
 }
 
-/* Interior cursor-follow glow for whichever row is under the pointer - same
-   trick as the toolbar's spotlight (Toolbar.tsx's .ae-toolbar-spotlight) and
-   the sidebar tabs' (Sidebar.tsx's .ae-sidebar-tab-spotlight): a soft white
-   radial gradient centered on `--mx`/`--my`, written straight onto this div
-   from RowGlowScroll.tsx's mousemove handler rather than through React
-   state, so tracking the pointer across a row never re-renders the table.
-   Sits inside the same absolutely-positioned rect as .ae-row-ring (both
-   siblings, both sized/positioned by RowGlowScroll.tsx to match the hovered
-   <tr>), `mix-blend-mode: screen` so it brightens the row's own hover fill
-   instead of sitting as a flat white patch on top of it. */
 .ae-row-spotlight {
   position: absolute;
   z-index: 0;
   pointer-events: none;
   mix-blend-mode: screen;
+  /* Same white cursor-follow glow as the sidebar tabs/toolbar
+     (.ae-sidebar-tab-spotlight, .ae-toolbar::before) - same radius and
+     opacity as the sidebar's, so a row's hover reads as the same effect
+     used everywhere else instead of a smaller, table-specific one. */
   background: radial-gradient(
-    circle 160px at var(--mx, 50%) var(--my, 50%),
+    circle 90px at var(--mx, 50%) var(--my, 50%),
     rgba(255, 255, 255, 0.3),
-    rgba(255, 255, 255, 0.07) 55%,
+    rgba(255, 255, 255, 0.06) 55%,
     transparent 75%
   );
 }
 
-/* Wrapper for the grids - a defined card edge (rounded corners, hairline
-   border) instead of the table just floating loose against the page
-   background, and the boundary the horizontal scrollbar belongs to on a
-   wide table.
-   `overflow-x: auto` here has a real consequence worth flagging: per the
-   CSS overflow spec, once one axis is something other than `visible`, a
-   `visible` other axis computes to `auto` too - there's no such thing as
-   "scroll only sideways". That silently turns this wrapper itself into
-   the nearest scrolling ancestor, which is exactly what `.ae-table th`'s
-   `position: sticky` sticks to - so without a bounded height here, the
-   header would scroll away with the rest of the table instead of freezing
-   in place, since it'd be "stuck" to a container that itself scrolls along
-   with the page rather than to main's outer scroll.
-   `flex: 1; min-height: 0` (rather than a guessed `max-height`) is what
-   gives it that bounded height correctly: inside the flex-column chain
-   below (.ae-main > its page, and optionally .ae-grid-fill), this wrapper
-   grows to fill exactly whatever room is actually left below the page's
-   own heading/toolbar - no blank strip under a short grid, and no
-   guessed number that's wrong for pages with more or less stuff above the
-   table. `min-height: 0` is required, not decorative - a flex item's
-   default min-height is `auto` (≈ its content's height), which would
-   otherwise let this grow taller than the flex container instead of
-   scrolling internally. On a page that doesn't opt into the flex-fill
-   chain, flex:1 is simply inert and this just falls back to its natural
-   (shrink-to-fit) height, same as before. */
+/* The row last clicked (RowGlowScroll) - a full, thin outline rather than
+   .ae-row-ring's top/bottom-only sweep, so a click-selected row reads as
+   distinctly "pinned" instead of just currently hovered. Sits just inside
+   the row's edges (box-sizing: border-box + inset 0) so the border doesn't
+   add to the row's footprint or nudge the column widths of an adjacent
+   cell. */
+.ae-row-focus {
+  position: absolute;
+  /* Same z-index as .ae-row-ring (not the sticky header's 1) - stays under
+     the header rather than painting over it if a focused row ever scrolls
+     to sit right at the header's edge. */
+  z-index: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
 .ae-table-scroll {
-  /* Establishes the containing block for .ae-row-ring (below): its
-     top/left are computed in RowGlowScroll.tsx as content-coordinates
-     within THIS element specifically (getBoundingClientRect delta plus
-     this element's own scrollTop/scrollLeft), so the ring has to be
-     positioned relative to this box, not any further-out ancestor, or it
-     would land in the wrong place the moment this wrapper scrolls. */
   position: relative;
   overflow-x: auto;
   border: 0.5px solid var(--ae-border);
@@ -227,10 +174,46 @@ table input[type="number"] {
   border-bottom: 0;
 }
 
-/* Shared form controls (see client/src/components/ui.tsx) - every text
-   field, date field, select, and button in the app renders through these
-   classes so alignment, spacing, borders, and focus states match everywhere
-   instead of each page inlining its own one-off styles. */
+/* Themed scrollbars for table containers and the main content pane - a
+   thin, pill-shaped thumb (same border-radius: 999px as .ae-input/.ae-select)
+   that turns brand gold on hover, instead of the OS-default bar clashing
+   with the dark/paper theme. Toolbar and sidebar-nav scrollbars stay hidden
+   (see their own ::-webkit-scrollbar rules) - those are intentionally
+   invisible, unlike these, which need to stay visible/grabbable. */
+.ae-table-scroll,
+.table-scroll,
+.ae-main {
+  scrollbar-width: thin;
+  scrollbar-color: var(--ae-border) var(--ae-bg-alt);
+}
+.ae-table-scroll::-webkit-scrollbar,
+.table-scroll::-webkit-scrollbar,
+.ae-main::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.ae-table-scroll::-webkit-scrollbar-track,
+.table-scroll::-webkit-scrollbar-track,
+.ae-main::-webkit-scrollbar-track {
+  background: var(--ae-bg-alt);
+}
+.ae-table-scroll::-webkit-scrollbar-thumb,
+.table-scroll::-webkit-scrollbar-thumb,
+.ae-main::-webkit-scrollbar-thumb {
+  background-color: var(--ae-border);
+  border-radius: 999px;
+  border: 2px solid var(--ae-bg-alt);
+}
+.ae-table-scroll::-webkit-scrollbar-thumb:hover,
+.table-scroll::-webkit-scrollbar-thumb:hover,
+.ae-main::-webkit-scrollbar-thumb:hover {
+  background-color: #c99a2e;
+}
+.ae-table-scroll::-webkit-scrollbar-corner,
+.table-scroll::-webkit-scrollbar-corner {
+  background: var(--ae-bg-alt);
+}
+
 .ae-input,
 .ae-select {
   font-family: inherit;
@@ -261,15 +244,6 @@ table input[type="number"] {
   color: var(--ae-text-muted);
   cursor: not-allowed;
 }
-/* Tighter padding variant for dense data-grid cells (Section 3.1) - a
-   static dark chip (background/border/text fixed, not the themed --ae-*
-   vars) so every cell reads the same crisp yellow-bordered, white-numbered
-   field regardless of light/dark mode, rather than blending into the row
-   behind it (the themed --ae-border reads as barely-there in dark mode -
-   too close in tone to the cell's own --ae-surface fill). Focus adds a
-   white glow around the same yellow border, so
-   the active cell is still unmistakable across a full grid of otherwise
-   identical ones. */
 .ae-input-cell {
   padding: 3px 6px;
   background: #14110d;
@@ -289,12 +263,6 @@ table input[type="number"] {
   color: rgba(255, 255, 255, 0.55);
 }
 
-/* Custom stepper for grid-cell number inputs (NumberCellInput in ui.tsx),
-   replacing the browser's native spin buttons: those render in unthemed
-   OS chrome against the cell's dark/gold fill, and their built-in
-   ArrowUp/ArrowDown stepping collides with the grid's own arrow-key row
-   navigation. Hidden until hover/focus so a dense grid full of cells
-   doesn't show a stepper on every one at rest. */
 .ae-number-cell {
   position: relative;
   display: inline-flex;
@@ -357,12 +325,6 @@ table input[type="number"] {
   border-top: 5px solid #ffd400;
 }
 
-/* The editable receipt form (ReceiptsPage) renders its inputs/selects
-   inside ReceiptPaper's fixed white card - a simulated printed receipt that
-   stays paper-white in both themes (see colors.staticInk/staticSubtleInk in
-   theme.ts). Its form controls need the same treatment: pinned to their
-   light-mode look regardless of --ae-* theme vars, or they'd render as dark
-   pills on a white receipt in dark mode. */
 .ae-receipt-paper .ae-input,
 .ae-receipt-paper .ae-select {
   background: #fff;
@@ -375,11 +337,6 @@ table input[type="number"] {
   color: #8a8272;
 }
 
-/* Date fields (every <input type="date"> renders through TextInput/.ae-input
-   - see ui.tsx) - just a cursor/hover polish on the native picker icon
-   rather than fighting cross-browser CSS filters to recolor it exactly;
-   the surrounding field's own hover/focus/radius treatment above is what
-   actually carries the "redesigned" look. */
 .ae-input[type="date"] {
   cursor: pointer;
 }
@@ -393,9 +350,21 @@ table input[type="number"] {
   opacity: 1;
 }
 
-/* Dropdowns - a real custom chevron (branded gold, matching the app's
-   accent) instead of each OS/browser's own native arrow, so <select>
-   reads as a deliberately designed control rather than unstyled HTML. */
+/* Dark mode only - the browser's default calendar-icon glyph is a dark
+   near-black shape that all but disappears against .ae-input's dark
+   surface. Swapped for a brand-yellow (#FFD400) version of the same glyph
+   instead of just inverting it to white, so it reads as an intentional
+   accent rather than a generic mono icon. Light mode is untouched - the
+   default dark glyph already has enough contrast against the light/paper
+   input background there. */
+:root[data-theme="dark"] .ae-input[type="date"]::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23FFD400' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='3.5' width='12' height='11' rx='1.5'/%3E%3Cpath d='M5 1.5v3M11 1.5v3M2 6.5h12'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 15px 15px;
+}
+
 .ae-select {
   appearance: none;
   -webkit-appearance: none;
@@ -460,177 +429,293 @@ table input[type="number"] {
   color: #c1272d;
 }
 
-/* Toolbar - the card strip holding a page's date/location fields and its
-   action controls (CSV export/import, zoom). Gives the controls a defined
-   home instead of floating loose against the page background.
+/* =========================================================================
+   Toolbar
+   =========================================================================
+   Toolbar.tsx picks ONE tier (full / compact / circle) by measuring hidden
+   clones; this file only says what each tier looks like.
 
-   `flex-start` (not `space-between`) plus `margin-left: auto` on
-   .ae-toolbar-controls: filter controls (date/search/category) stay
-   grouped together on the left with a normal gap, and the action controls
-   (Save...Zoom) stay grouped together on the right, pinned to the pill's
-   right edge - the auto margin is what pushes them there, not the
-   left/right flex children each claiming half the row via space-between
-   (which just spaces the two clusters apart with no floor on how tight
-   that gap can get, and reads as one wide, disconnected gap on a page with
-   few controls on either side, like Total Stocks). */
+   - full:    labeled controls.
+   - compact: labels disappear, controls tighten (.ae-toolbar--compact).
+   - circle:  smallest form, round icon buttons (.ae-toolbar--compact
+              .ae-toolbar--circle - both classes are present, circle rules
+              come last so they win).
+
+   The row never wraps. If even the circle tier is wider than the viewport,
+   the toolbar scrolls horizontally.
+
+   No blank space, at any tier: the search box (and, in compact/circle,
+   the selects and date pickers) are elastic - each has a per-tier
+   flex-basis (the width the tier is measured with) and is allowed to GROW
+   into whatever room is left, so widening the window or collapsing the
+   sidebar is absorbed by the filters instead of leaving an empty gap.
+   Fixed widths are only used for buttons.
+
+   Every width that matters for measuring is set with `!important` so a
+   page's inline width can't make the real row and the hidden measuring
+   clones disagree.
+
+   The border is a plain, static 1px gold line (no gradient overlay and no
+   hover state on it) so it is always visible in light and dark mode. The
+   only effect is the cursor-follow spotlight (.ae-toolbar::before), which
+   glows inside the toolbar and never touches the border itself.
+   ========================================================================= */
+
 .ae-toolbar {
+  --ae-toolbar-gap: 8px;
+
   display: flex;
+  align-items: center;
   justify-content: flex-start;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 10px;
+  flex-wrap: nowrap;
+  gap: var(--ae-toolbar-gap);
   padding: 5px 6px;
   margin: 0 -20px 10px;
   background: var(--ae-surface);
-  border-radius: 999px;
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 9999px;
   box-shadow: 0 1px 3px rgba(20, 17, 13, 0.06);
   position: relative;
+
+  /* Never let the page's column layout squash the toolbar. Pages render as
+     `.ae-main > div { display: flex; flex-direction: column; min-height: 0 }`,
+     so when the content below is taller than the viewport (a loaded Daily
+     Report, the Receipts form + list) the column has negative free space and
+     shrinks whatever it can. Anything with overflow other than `visible`
+     (this row) is allowed to shrink to 0 height, so the toolbar collapsed and
+     clipped its controls. It must always keep its natural height. */
+  flex-shrink: 0;
+
+  /* Never wrap. Full and compact are measured to fit, so they simply clip;
+     only the floor tier can be genuinely too wide, and it scrolls (see
+     .ae-toolbar--circle). The scrollbar itself is always hidden: a 1px
+     overflow used to pop a scrollbar in and out, which changed the row's
+     height and made the whole toolbar glitch. */
+  overflow-x: hidden;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  transition:
+    gap 180ms ease,
+    padding 180ms ease;
 }
+.ae-toolbar--compact {
+  --ae-toolbar-gap: 6px;
+}
+.ae-toolbar--circle {
+  --ae-toolbar-gap: 4px;
+  /* Only tier that can be wider than the viewport. */
+  overflow-x: auto;
+}
+.ae-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Cursor-follow spotlight: a soft white glow centered on the pointer.
+   --mx / --my / --spotlight-opacity are written by Toolbar.tsx on
+   mousemove / mouseleave (no React state involved); the fade in/out is this
+   CSS transition. It's a pseudo-element, not a child, so it doesn't count as
+   the row's first child (which the filter-cluster rules below rely on) and
+   it never affects the measured width. pointer-events: none keeps it from
+   ever intercepting a click. */
+.ae-toolbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background: radial-gradient(
+    circle 220px at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 75%
+  );
+  opacity: var(--spotlight-opacity, 0);
+  transition: opacity 220ms ease;
+}
+
+/* Filter cluster (first child of the toolbar). It takes all leftover width
+   and its elastic children split it. The :not() keeps this from matching
+   on a page whose first child is ToolbarControls. */
+.ae-toolbar > div:first-child:not(.ae-toolbar-controls) {
+  display: flex;
+  align-items: center;
+  gap: var(--ae-toolbar-gap);
+  flex: 1 1 auto;
+  min-width: 0;
+  transition: gap 180ms ease;
+}
+/* Floor tier: don't crush the filters below their minimum - let the row
+   scroll instead. */
+.ae-toolbar--circle > div:first-child:not(.ae-toolbar-controls) {
+  flex: 1 0 auto;
+}
+
+/* Action group (CSV / PDF / zoom ...): never shrinks. */
 .ae-toolbar-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: auto;
-  flex-wrap: wrap;
-}
-.ae-toolbar-divider {
-  width: 1px;
-  align-self: stretch;
-  min-height: 26px;
-  background: rgba(36, 29, 20, 0.1);
+  gap: var(--ae-toolbar-gap);
+  flex: 0 0 auto;
+  min-width: 0;
+  margin-left: 0;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  transition: gap 180ms ease;
 }
 
-/* Toolbar-scoped chrome: buttons, inputs, and segment groups nested inside
-   .ae-toolbar drop their hairline borders in favor of a light fill, shrink
-   their padding a touch, and round up further - closer to the flat,
-   pill-shaped controls in the Google Sheets toolbar. Scoped to .ae-toolbar
-   so the same components used elsewhere (forms, tables) keep their bordered
-   look. */
+/* Hairline between two control groups. */
+.ae-toolbar .ae-toolbar-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  min-width: 1px;
+  height: 24px;
+  background: var(--ae-toolbar-border);
+}
+
+/* ---- Filters: borders always visible, no hover-only border ------------- */
 .ae-toolbar .ae-input,
 .ae-toolbar .ae-select {
-  border: none;
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-weight: 700;
-  /* background-color, not the `background` shorthand - a shorthand also
-     resets background-image to none, which would silently strip
-     .ae-select's own chevron image (below) whenever a select is used
-     inside a toolbar. */
-  background-color: #ffd400;
-  color: #14110d;
-  /* Compact mode (.ae-toolbar--compact below) clips these to a fixed
-     max-width - transition it so that clip animates in step with the
-     surrounding buttons' own `layout` resize instead of snapping. */
-  transition: max-width 200ms ease;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-color: var(--ae-toolbar-border);
 }
-.ae-toolbar .ae-input:focus,
-.ae-toolbar .ae-select:focus {
-  box-shadow: 0 0 0 2px rgba(201, 154, 46, 0.35);
-  background-color: #ffd400;
-  color: #14110d;
+
+/* ---- Filters: sizing per tier ------------------------------------------ */
+/* full */
+.ae-toolbar input[type="search"] {
+  flex: 1 1 180px;
+  width: 180px !important;
+  min-width: 72px;
 }
-.ae-toolbar .ae-input:disabled,
-.ae-toolbar .ae-select:disabled {
-  background-color: #e4b94d;
-  color: #14110d;
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-input[type="date"] {
+  flex: 0 1 auto;
+}
+
+/* compact
+   flex / min-width / max-width are !important too: a page (or ZoomControl)
+   that sets them inline would otherwise make the real row and the hidden
+   measuring clone size the same control differently, and the row would end
+   up wider than what was measured. */
+.ae-toolbar--compact input[type="search"] {
+  flex: 3 1 110px !important;
+  width: 110px !important;
+  min-width: 72px;
+}
+.ae-toolbar--compact .ae-select {
+  flex: 1 1 88px !important;
+  width: 88px !important;
+  min-width: 64px !important;
+  max-width: 160px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-toolbar--compact .ae-input[type="date"] {
+  flex: 1 1 110px !important;
+  width: 110px !important;
+  min-width: 96px !important;
+  max-width: 160px !important;
+}
+
+/* circle */
+.ae-toolbar--circle input[type="search"] {
+  flex: 3 1 72px !important;
+  width: 72px !important;
+  min-width: 56px;
+}
+.ae-toolbar--circle .ae-select {
+  flex: 1 1 64px !important;
+  width: 64px !important;
+  min-width: 48px !important;
+  max-width: 120px !important;
+}
+.ae-toolbar--circle .ae-input[type="date"] {
+  flex: 1 1 84px !important;
+  width: 84px !important;
+  min-width: 68px !important;
+  max-width: 130px !important;
+}
+
+/* Zoom select (ZoomControl.tsx, className "ae-zoom-control").
+   It lives in ToolbarControls, which never shrinks, so it must be a fixed
+   width per tier - NOT one of the elastic filter selects above. These rules
+   come after them with equal specificity, so they win in every tier (circle
+   last, so it beats compact). ZoomControl no longer sets any sizing inline;
+   this is the single source of truth. */
+.ae-toolbar .ae-zoom-control {
+  flex: 0 0 76px !important;
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+}
+.ae-toolbar--compact .ae-zoom-control {
+  flex: 0 0 72px !important;
+  width: 72px !important;
+  min-width: 72px !important;
+  max-width: 72px !important;
+}
+.ae-toolbar--circle .ae-zoom-control {
+  flex: 0 0 68px !important;
+  width: 68px !important;
+  min-width: 68px !important;
+  max-width: 68px !important;
+}
+
+/* ---- Buttons: always yellow -------------------------------------------- */
+/* Save, PDF, Import, CSV export, zoom... every toolbar action is yellow in
+   every tier and in both themes. Only a danger button keeps its own look. */
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-group {
+  flex: 0 0 auto;
 }
 .ae-toolbar .ae-btn {
-  border: none;
-  border-radius: 999px;
-  padding: 6px 14px;
-  background: #ffd400;
-  color: #14110d;
-  font-weight: 700;
+  white-space: nowrap;
 }
-.ae-toolbar .ae-btn-sm {
-  padding: 4px 9px;
+.ae-toolbar .ae-btn:not(.ae-btn-danger),
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-btn {
+  background: var(--ae-btn-yellow);
+  color: var(--ae-btn-yellow-text);
 }
+.ae-toolbar .ae-btn:not(.ae-btn-danger),
 .ae-toolbar .ae-toolbar-save {
-  height: 32px;
-  min-width: 72px;
-  padding: 6px 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  transition: gap 200ms ease;
+  border-color: var(--ae-btn-yellow-active);
 }
-.ae-toolbar .ae-btn-secondary {
-  background: #ffd400;
+.ae-toolbar .ae-btn:not(.ae-btn-danger):hover:not(:disabled),
+.ae-toolbar .ae-toolbar-save:hover:not(:disabled),
+.ae-toolbar .ae-segment-btn:hover:not(:disabled) {
+  background: var(--ae-btn-yellow-hover);
 }
-.ae-toolbar .ae-btn-ghost {
-  background: #ffd400;
+.ae-toolbar .ae-btn:not(.ae-btn-danger):active:not(:disabled),
+.ae-toolbar .ae-toolbar-save:active:not(:disabled),
+.ae-toolbar .ae-segment-btn:active:not(:disabled) {
+  background: var(--ae-btn-yellow-active);
 }
-.ae-toolbar .ae-btn-danger {
-  background: #ffd400;
-  color: #14110d;
-}
+
+/* Segmented group (e.g. Import | Export | PDF): a yellow pill in full mode.
+   Selector is .ae-toolbar-prefixed so it beats the generic .ae-segment-group
+   further down the file (which is a surface-colored, 8px-radius box). */
 .ae-toolbar .ae-segment-group {
+  background: var(--ae-btn-yellow);
   border: none;
   border-radius: 999px;
-  background: #ffd400;
+  transition: gap 220ms ease;
 }
 .ae-toolbar .ae-segment-divider {
-  background: #c99a2e;
+  background: var(--ae-btn-yellow-active);
 }
 .ae-toolbar .ae-segment-btn {
   padding: 0 10px;
-  color: #14110d;
   font-weight: 700;
 }
-.ae-toolbar .ae-segment-btn:hover:not(:disabled) {
-  background: #e4b94d;
-}
-.ae-toolbar .ae-segment-btn:active:not(:disabled) {
-  background: #c99a2e;
-}
-/* .ae-toolbar--compact is applied by Toolbar.tsx, not a width breakpoint -
-   it measures the toolbar's actual one-line natural width (via a hidden,
-   always-full clone) against how much room is really available (which
-   shrinks whenever the sidebar is expanded rather than collapsed, see
-   Layout.tsx) and only adds this class when the full-label layout would
-   genuinely not fit. So labels never disappear "just in case" at some
-   guessed pixel width - only once there's literally not enough space for
-   them.
 
-   Every rule below exists to make that one-line promise actually hold: ALL
-   of a toolbar's controls shrink together (not just segment groups), so
-   there's no wide left-over control still forcing a second line once the
-   others have gone icon-only. Segment buttons AND standalone buttons
-   (Save/PDF, via .ae-toolbar-btn-label - see OnlineEntryPage etc.) drop
-   their text label (kept for screen readers via the button's own
-   title/aria-label) and shrink to a plain icon square; selects and the
-   date field clip to a fixed width with an ellipsis instead of pushing the
-   row wider; the search box narrows. `!important` on the date field only:
-   it's the one control whose width a page sets inline (style={{maxWidth}}),
-   which otherwise beats any class rule regardless of specificity.
-
-   `flex-wrap: nowrap` (overriding the base .ae-toolbar's own `wrap`, plus
-   .ae-toolbar-controls' own `wrap`) plus `overflow: hidden` is the actual
-   "never two lines" guarantee, not just a side effect of everything above
-   being narrower: those shrink the controls enough that this essentially
-   never engages in practice, but it's what makes the promise absolute
-   instead of "narrower, but still wraps below some width nobody tested." A
-   page's own left-side control cluster (the div directly inside Toolbar -
-   see OnlineEntryPage etc.) sets its own `flexWrap: "nowrap"` inline for
-   the same reason, since compact only ever narrows individual controls,
-   not that wrapper's own wrap behavior. */
-.ae-toolbar--compact {
-  gap: 6px;
-  flex-wrap: nowrap;
-  overflow: hidden;
-}
-.ae-toolbar--compact .ae-toolbar-controls {
-  gap: 6px;
-  flex-wrap: nowrap;
-  flex-shrink: 0;
-}
-/* .ae-segment-label/.ae-toolbar-btn-label: collapse via max-width + opacity
-   (transitioned below), not `display: none` - `display` can't be animated,
-   so the old rule popped the label away instantly the same frame the
-   button itself (Section: toolbar, now `layout`-animated) starts smoothly
-   resizing around it. This keeps the text fading/shrinking in step with
-   that resize instead of visibly outrunning it. */
+/* Button labels collapse to nothing in compact/circle. */
 .ae-segment-label,
 .ae-toolbar-btn-label {
   display: inline-block;
@@ -638,26 +723,18 @@ table input[type="number"] {
   overflow: hidden;
   white-space: nowrap;
   transition:
-    max-width 200ms ease,
-    opacity 150ms ease;
+    max-width 220ms ease,
+    opacity 160ms ease;
 }
 .ae-toolbar--compact .ae-segment-label,
 .ae-toolbar--compact .ae-toolbar-btn-label {
   max-width: 0;
   opacity: 0;
 }
-/* Icon-only segment buttons (CsvTools' Export/PDF/Import) otherwise stay
-   flush segments of one joined pill - fine when they carry a text label,
-   but next to the standalone icon buttons (Save/PDF/Undo, which are
-   already perfect circles - a square .ae-btn at a fixed size with its
-   999px border-radius) that reads as an inconsistent mix of shapes once
-   everything is icon-only. Breaking the group's shared pill background out
-   into individually circular buttons (and hiding the now-pointless
-   dividers between them) makes every icon button in a compact toolbar the
-   same shape. */
+
+/* ---- Compact: icon-only buttons ---------------------------------------- */
 .ae-toolbar--compact .ae-segment-group {
   background: transparent;
-  border: none;
   gap: 4px;
 }
 .ae-toolbar--compact .ae-segment-divider {
@@ -666,53 +743,83 @@ table input[type="number"] {
 .ae-toolbar--compact .ae-segment-btn {
   width: 32px;
   height: 32px;
+  min-width: 32px;
   padding: 0;
   gap: 0;
   border-radius: 50%;
-  background: #ffd400;
 }
-.ae-toolbar--compact .ae-segment-btn:hover:not(:disabled) {
-  background: #e4b94d;
-}
-.ae-toolbar--compact .ae-segment-btn:active:not(:disabled) {
-  background: #c99a2e;
-}
-.ae-toolbar--compact input[type="search"] {
-  width: 96px !important;
-}
-.ae-toolbar--compact .ae-toolbar-save {
+.ae-toolbar--compact .ae-btn {
   min-width: 32px;
-  width: 32px;
-  padding: 0;
+  height: 32px;
+  padding: 0 10px;
+}
+.ae-toolbar--compact .ae-btn,
+.ae-toolbar--compact .ae-toolbar-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   gap: 0;
 }
-/* Buttons and segment-groups are already icon-sized in compact mode - never
-   let flex-shrink compress them further (that's what garbles an icon into
-   an unrecognizable sliver at extreme widths). If there's still not enough
-   room after that, the search/select boxes above give first (their own
-   compact max-widths can still shrink smaller under real pressure) and,
-   failing that, .ae-toolbar's own `overflow: hidden` clips the least
-   important trailing controls - never a squashed icon. */
-.ae-toolbar--compact .ae-btn,
-.ae-toolbar--compact .ae-segment-group {
-  flex-shrink: 0;
+.ae-toolbar--compact .ae-toolbar-save {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
 }
-.ae-toolbar--compact .ae-select {
-  max-width: 68px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ae-toolbar--compact .ae-input[type="date"] {
-  max-width: 110px !important;
+/* The gap: 0 above exists so an icon whose label collapsed to nothing stays
+   centered. A button whose text is NOT in a label span (e.g. "[icon] PDF")
+   keeps its text, so it needs its normal icon/text spacing back. */
+.ae-toolbar--compact .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
+  gap: 5px;
 }
 
-/* Entry toolbars contain the largest action cluster. Keep their outer row
-   stable while the sidebar changes width; compact mode handles the controls
-   themselves instead of allowing a one-frame wrap/bounce. */
+/* ---- Circle: floor tier, fixed-diameter round buttons ------------------- */
+.ae-toolbar--circle .ae-segment-group {
+  gap: 3px;
+}
+.ae-toolbar--circle .ae-segment-btn,
+.ae-toolbar--circle .ae-btn,
+.ae-toolbar--circle .ae-toolbar-save {
+  width: 28px;
+  min-width: 28px;
+  max-width: 28px;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  flex: 0 0 28px;
+}
+
+/* A button with no collapsible label (plain text like "Generate", "Export
+   CSV", "Daily History", or "[icon] PDF" written without a
+   .ae-toolbar-btn-label span) has nothing to hide, so squeezing it into a
+   28px circle just clips its text. It stays a pill and only gets tighter.
+   Separate rule on purpose: a browser without :has() drops just this rule
+   and keeps the old behavior. */
+.ae-toolbar--circle .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+/* Toolbar entries always remain a single horizontal strip. */
 .ae-toolbar-entry {
   flex-wrap: nowrap;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.ae-toolbar-entry::-webkit-scrollbar {
+  display: none;
 }
 .ae-toolbar-entry .ae-toolbar-controls {
   flex-wrap: nowrap;
@@ -727,11 +834,6 @@ table input[type="number"] {
   display: none;
 }
 
-/* Segmented control group - the "one cohesive pill" pattern used by zoom
-   controls (Figma, Google Docs) and grouped toolbar actions everywhere else:
-   a single bordered, rounded container with borderless segments inside,
-   separated by hairlines, each segment showing state on hover/press rather
-   than carrying its own permanent border. */
 .ae-segment-group {
   display: flex;
   align-items: stretch;
@@ -760,7 +862,11 @@ table input[type="number"] {
   cursor: pointer;
   transition:
     background-color 120ms ease,
-    gap 200ms ease;
+    gap 220ms ease,
+    width 220ms ease,
+    height 220ms ease,
+    padding 220ms ease,
+    border-radius 220ms ease;
 }
 .ae-segment-btn:hover:not(:disabled) {
   background: var(--ae-surface-hover);
@@ -773,31 +879,18 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
-/* Main content pane (see Layout.tsx) - padding lives here rather than
-   inline so it can shrink at narrower widths instead of eating a fixed
-   24px on every side of a phone/tablet viewport.
-   A flex column, so a page's one root element (whatever <Outlet/> rendered)
-   can be told to fill the rest of main's height below - see `.ae-main > div`
-   and `.ae-grid-fill` just below. */
 .ae-main {
   min-width: 0;
   padding: 24px;
   display: flex;
   flex-direction: column;
 }
-/* Compact page heading rhythm - only ever wins for the longhand margin a
-   page's own inline style leaves untouched (e.g. a page that zeroes just
-   marginTop keeps that override, but picks up this tighter marginBottom
-   instead of the browser's ~1em UA default). Pages that set their own full
-   margin inline still take precedence, per the normal cascade. */
 .ae-main h2 {
   margin: -8px 0 0;
 }
 .ae-main p {
   margin: 0 0 8px;
 }
-/* The toolbar extends beyond main's padding, so the page title and intro
-   line follow its left edge when the sidebar is in its normal rail state. */
 .ae-main > div > h2:first-child,
 .ae-main > div > h2:first-child + p {
   position: relative;
@@ -806,25 +899,12 @@ table input[type="number"] {
 .ae-main > div > h2:first-child {
   margin-top: -16px !important;
 }
-/* Every page renders exactly one root element - stretch it to fill
-   whatever height main actually has, and make it a flex column in turn,
-   so that a page's own "make this part fill the rest" wrapper
-   (`.ae-grid-fill`, or `.ae-table-scroll` directly when there's no zoom
-   wrapper in between) has something to flex against. Pages that don't use
-   either are unaffected - their children just stack at natural height,
-   the same as plain block layout would. */
 .ae-main > div {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
 }
-/* Opt-in wrapper around a zoom-scaled grid (Online/Offline Entry, Manual
-   Count, Total Stocks) - stretches to fill whatever's left below the
-   heading/toolbar so the grid inside it (via .ae-table-scroll's own
-   flex: 1) extends to the bottom of the screen instead of leaving blank
-   space under a short one, while still scrolling internally - sticky
-   header and all - if it's taller than that. */
 .ae-grid-fill {
   display: flex;
   flex-direction: column;
@@ -832,18 +912,6 @@ table input[type="number"] {
   min-height: 0;
 }
 
-/* Sidebar folded down to just its floating icon (see Sidebar.tsx) - the
-   icon reserves no width any more so the table/toolbar can use the full
-   row, but it still floats over the top-left corner (16px inset + 40px
-   icon). Only the page's own top heading (and the intro line right under
-   it, if there is one) sits at that same corner, so just those two get
-   pushed clear of the icon horizontally - beside it, not below it - while
-   everything else on the page (including the table, which is further down
-   the page regardless) keeps using the full width all the way to the left
-   edge. `h2:first-child` matches regardless of how deep the heading is
-   nested (a page's own root div, or - on pages that put the heading inside
-   their Toolbar, like Daily Report - the toolbar's row), as long as it's
-   the first thing in its immediate parent, which holds for every page. */
 body.ae-sidebar-collapsed-icon .ae-main {
   padding-top: 16px;
 }
@@ -855,13 +923,14 @@ body.ae-sidebar-collapsed-icon .ae-main h2:first-child + p {
 body.ae-sidebar-collapsed-icon .ae-main h2:first-child {
   margin-top: -8px !important;
 }
-/* Pages without an intro paragraph put the toolbar immediately after the
-   title. Keep a small gap in the floating-logo state so the logo has clear
-   space beside the toolbar instead of overlapping its top edge. */
 body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   margin-top: 20px;
 }
 
+/* Small screens only adjust page padding / edge-to-edge margins. Toolbar
+   gap, padding and control sizes are owned by the tier classes above - the
+   old per-breakpoint overrides here (a fixed 72px search box, a 10px gap)
+   were what left blank space on narrow widths. */
 @media (max-width: 900px) {
   .ae-main {
     padding: 16px;
@@ -889,27 +958,27 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   }
   .ae-main > div > h2:first-child,
   .ae-main > div > h2:first-child + p {
-    left: -6px;
-  }
-  .ae-main > div > h2:first-child,
-  .ae-main > div > h2:first-child + p {
     left: -12px;
   }
   .ae-table-scroll {
     margin: 0 -12px -12px;
   }
-  .ae-toolbar {
-    padding: 6px 8px;
-    gap: 10px;
-  }
+}
+
+/* A collapsed category (StockGrid, TotalStocksTable) hides its product rows
+   on screen but should still print/PDF in full - a printed grid missing
+   whatever happened to be collapsed at the time would be a silent data gap,
+   not just a display convenience. See the print override below. */
+.ae-row-collapsed {
+  display: none;
 }
 
 @media print {
-  /* Printing should output the data sheet itself, not a snapshot of the app
-     chrome - hides the sidebar nav and any page's own toolbar (date pickers,
-     Generate/Print buttons) that opts in via this class. */
   .no-print {
     display: none !important;
+  }
+  .ae-row-collapsed {
+    display: table-row !important;
   }
 
   body,
@@ -917,14 +986,6 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     background: #fff !important;
   }
 
-  /* The app shell (Layout.tsx) is pinned to exactly one viewport's height
-     with overflow:hidden, on purpose, so the sidebar and the content pane
-     scroll independently on screen (see the comment in Layout.tsx). At print
-     time that fixed height silently clips everything past the first screen's
-     worth of content - overriding main's own overflow wasn't enough, since
-     its *parent* was still the one enforcing the 100vh/hidden box. Print
-     needs the whole document to flow naturally so the browser can paginate
-     across as many physical pages as the content needs. */
   .app-shell {
     display: block !important;
     height: auto !important;
@@ -937,10 +998,6 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     overflow: visible !important;
   }
 
-  /* The grid tables' own horizontal-scroll wrapper (StockGrid,
-     TotalStocksTable, Manual Count) has no meaning on a printed page - lift
-     the constraint so the full table prints instead of being clipped to
-     whatever fit the screen's scrollable viewport. */
   .table-scroll {
     overflow: visible !important;
   }
@@ -953,39 +1010,16 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     page-break-inside: avoid;
   }
 
-  /* Printing one receipt from its preview dialog (Section 4.7, ReceiptsPage)
-     should output just that receipt, not the page it was opened from
-     underneath it - the dialog is portaled straight onto <body> (see
-     Modal.tsx) specifically so it's a sibling of .app-shell, not a
-     descendant, which is what lets hiding .app-shell here leave the dialog
-     as the only thing left to print. Scoped to this one body class so every
-     other print path (the page-level PDF button, Ctrl+P) is unaffected. */
   body.ae-printing-receipt .app-shell {
     display: none !important;
   }
 
-  /* Route this print job through the named `receipt` page size below
-     instead of the browser's default Letter/A4 - scoped to this one body
-     class so every other print path keeps using whatever page size it
-     already had. Set here on `body` itself, not further down on
-     `.ae-modal-panel` (which is what it's actually sizing) - switching a
-     descendant to a different named page forces a page break there, so
-     the *ancestor* content up to that point still prints as one leading
-     page under the old (default Letter/A4) page type first. Named from
-     the very first printed box instead, there's no earlier default-page
-     content left to spill onto a blank page of its own. */
   body.ae-printing-receipt {
     page: receipt;
-    /* Some printers/PDF exporters default to stripping background colors to
-       save ink - without this the logo's red banner and gold rings would be
-       liable to print washed out or missing. */
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  /* Strip the dialog's own on-screen chrome (dark backdrop, centering,
-     scroll clamp, header bar) so what prints is just the receipt paper
-     itself, not a screenshot of a dialog box containing it. */
   body.ae-printing-receipt .ae-modal-overlay {
     position: static !important;
     background: none !important;
@@ -999,14 +1033,6 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     width: auto !important;
   }
 
-  /* The on-screen "paper card" look (drop shadow, outline, torn zigzag
-     edge) is a UI affordance for the entry form and preview, not something
-     a real thermal printer reproduces - a physical receipt is just plain
-     black ink on the roll itself, so strip all three for print. Actual
-     physical sizing (matching real 80mm hardware regardless of how large
-     the on-screen preview has been made) is handled by a `zoom` rule
-     injected at print time in ReceiptsPage's handlePrintReceipt, since it
-     depends on the current RECEIPT_CARD_WIDTH constant.  */
   body.ae-printing-receipt .ae-receipt-paper {
     box-shadow: none !important;
     border: none !important;
@@ -1014,40 +1040,15 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     margin: 0 !important;
   }
 
-  /* The receipt-preview dialog's own content padding (Modal.tsx) is a
-     screen-only affordance too - without zeroing it, the printed page
-     would carry an 18px blank margin around the actual receipt on every
-     side, on top of the physical paper it's now sized to match exactly.
-     The flex centering that keeps the card centered on screen (ReceiptsPage)
-     is dropped too, in favor of plain block flow - a flex container's
-     alignment can otherwise leave uneven blank space beside the card if
-     the container is ever wider than the card itself. */
   body.ae-printing-receipt .ae-modal-body {
     padding: 0 !important;
     overflow: visible !important;
   }
-  /* :not(.no-print) matters here - without it this beats the `.no-print`
-     rule above on any of this dialog's own direct children (e.g. the
-     Close/PDF button row), since as a compound selector it's more specific
-     than a single class, even though both declare !important. */
   body.ae-printing-receipt .ae-modal-body > div:not(.no-print) {
     display: block !important;
   }
 }
 
-/* Standard 80mm thermal POS roll: printers feed a continuous strip, so only
-   the width is really fixed - the height below is just a generous fallback,
-   comfortably fitting the tallest realistic receipt rather than being exact.
-   handlePrintReceipt (ReceiptsPage.tsx) overrides it per print job with the
-   receipt's actual measured height via its own injected @page rule. Zero
-   margin because the roll has no fixed sheet edges to keep clear of the way
-   a cut page does.
-
-   Deliberately NOT nested inside @media print (unlike the rest of this
-   file's print rules): @page is inherently print-only on its own, and
-   nesting it inside @media is left undefined by spec - Chromium does not
-   reliably honor a nested copy, silently falling back to the default
-   Letter/A4 page instead. */
 @page receipt {
   size: 80mm 500mm;
   margin: 0;

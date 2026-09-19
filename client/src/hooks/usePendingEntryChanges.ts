@@ -1,8 +1,25 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { GridRow } from "../components/StockGrid";
 
 /// productId -> { columnKey -> staged value }
 export type PendingByProduct = Record<number, Record<string, number>>;
+
+/// sessionStorage (not localStorage - this is in-progress work for the
+/// current browser session, not a durable per-viewer preference like zoom)
+/// so navigating to another page and back - or closing/reopening the Save
+/// preview - doesn't lose it, while closing the tab does, same as any other
+/// unsaved form data would. Best-effort: a private window or blocked site
+/// data just means pending edits don't survive navigation, not that editing
+/// itself breaks.
+function loadPending(storageKey: string | undefined): PendingByProduct {
+  if (!storageKey) return {};
+  try {
+    const raw = sessionStorage.getItem(storageKey);
+    return raw ? (JSON.parse(raw) as PendingByProduct) : {};
+  } catch {
+    return {};
+  }
+}
 
 /**
  * Section 3.1 - "Save" / "Preview" on the Online/Offline Entry grids: a cell
@@ -18,9 +35,39 @@ export type PendingByProduct = Record<number, Record<string, number>>;
  * like a CSV import already behaves. Recomputing them locally would mean
  * duplicating the server's own stock-math formulas just for an in-progress
  * preview.
+ *
+ * `storageKey` (typically namespaced by page + date + shift, since pending
+ * edits only make sense against one specific grid) persists the pending set
+ * to sessionStorage as it changes, and reloads it whenever `storageKey`
+ * itself changes - not just on first mount. That's what makes an in-progress
+ * edit survive switching to a different page and back (the whole page
+ * unmounts and remounts, losing ordinary component state) and, on the same
+ * page, switching date/shift away and back (no remount, but the caller's own
+ * effect for that already clears local rows/state - this hook re-derives its
+ * own state from storage on the same schedule instead of being told to
+ * clear). Omit `storageKey` to get the old, in-memory-only behavior.
  */
-export function usePendingEntryChanges(rows: GridRow[] | null) {
-  const [pending, setPending] = useState<PendingByProduct>({});
+export function usePendingEntryChanges(rows: GridRow[] | null, storageKey?: string) {
+  const [pending, setPending] = useState<PendingByProduct>(() => loadPending(storageKey));
+
+  // Re-derives pending from storage only when the key itself changes (a
+  // different date/shift/page) - the persistence effect below is what reacts
+  // to every actual edit.
+  useEffect(() => {
+    setPending(loadPending(storageKey));
+  }, [storageKey]);
+
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      // No trailing empty `{}` entries left behind once every edit in a
+      // given date/shift is saved or discarded.
+      if (Object.keys(pending).length === 0) sessionStorage.removeItem(storageKey);
+      else sessionStorage.setItem(storageKey, JSON.stringify(pending));
+    } catch {
+      // Best effort, per the note above - editing still works either way.
+    }
+  }, [pending, storageKey]);
 
   // What the grid should actually render - the last-saved rows with any
   // staged-but-not-yet-saved edits overlaid on top, so typing a value shows

@@ -4,13 +4,14 @@ import { createProduct, deactivateProduct, listProducts, updateProduct } from ".
 import { HttpError } from "../utils/HttpError";
 
 const createSchema = z.object({
+  sku: z.string().min(1).optional(),
   name: z.string().min(1),
   category: z.string().min(1),
   unit: z.string().min(1),
   sortOrder: z.number().optional(),
 });
 
-const updateSchema = createSchema.partial().extend({ isActive: z.boolean().optional() });
+const updateSchema = createSchema.partial().extend({ isActive: z.boolean().optional(), sku: z.string().min(1).nullable().optional() });
 
 export async function getProducts(req: Request, res: Response) {
   const includeInactive = req.query.includeInactive === "true";
