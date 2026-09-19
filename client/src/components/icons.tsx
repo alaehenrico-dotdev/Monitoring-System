@@ -101,3 +101,29 @@ export function PrinterIcon() {
     </svg>
   );
 }
+
+
+export function CalendarIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2" y="3.5" width="12" height="11" rx="1.5" />
+      <path d="M5 1.5v3M11 1.5v3M2 6.5h12" />
+    </svg>
+  );
+}
+
+export function ChevronLeftIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 3.5 5.5 8l4.5 4.5" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3.5 10.5 8 6 12.5" />
+    </svg>
+  );
+}

@@ -15,7 +15,21 @@ import { colors } from "../theme";
  * this dialog on the page if it isn't itself a descendant of `.app-shell`
  * to begin with.
  */
-export function Modal({ title, onClose, children, width = 640 }: { title: string; onClose: () => void; children: ReactNode; width?: number }) {
+/// `bordered` adds a thin, square-cornered outline around the panel - opt-in
+/// (used by AlertDialog) so every other dialog keeps its existing look.
+export function Modal({
+  title,
+  onClose,
+  children,
+  width = 640,
+  bordered = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  width?: number;
+  bordered?: boolean;
+}) {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -50,6 +64,7 @@ export function Modal({ title, onClose, children, width = 640 }: { title: string
           background: colors.paper,
           color: colors.ink,
           borderRadius: 0,
+          border: bordered ? `1px solid ${colors.ink}` : undefined,
           boxShadow: "0 12px 40px rgba(20, 17, 13, 0.3)",
           width: "100%",
           maxWidth: width,

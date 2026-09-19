@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
-import { Button, Select, TextInput } from "../components/ui";
+import { Button, Select } from "../components/ui";
+import { DatePicker } from "../components/DatePicker";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
@@ -8,10 +9,14 @@ import { CategoryFilter } from "../components/CategoryFilter";
 import { onlineStockColumns, offlineStockColumns } from "../config/stockColumns";
 import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { downloadTablePdf } from "../utils/tablePdf";
+import { filterNotes, pdfFileName, stockGridSection, totalStocksSection, type PdfSection } from "../utils/pdfTables";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
 import { PrinterIcon } from "../components/icons";
+import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
+import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -25,6 +30,28 @@ const SECTION_LABELS: Record<ReportSection, string> = {
   offline: "Offline Only",
   total: "Total Stocks Only",
 };
+
+// Not every row the report returns is real data: a date nobody has entered
+// anything for still comes back as one row per product, flagged isSaved:
+// false. If the flag is ever missing, fall back to "any non-zero stock
+// figure" rather than treating the row as empty - a report should never be
+// blocked just because a flag went missing.
+const NON_STOCK_KEYS = new Set(["productId", "entryDate", "shift"]);
+function rowHasSavedData(row: { isSaved?: boolean; entry: object }): boolean {
+  if (typeof row.isSaved === "boolean") return row.isSaved;
+  return Object.entries(row.entry).some(([k, v]) => !NON_STOCK_KEYS.has(k) && Number(v) !== 0 && !Number.isNaN(Number(v)));
+}
+
+/// Whether there's actually a report to show for this date: at least one
+/// saved Online/Offline entry, or a saved manual count (which the Total
+/// section reports on its own).
+function reportHasData(report: DailyReport): boolean {
+  return (
+    report.online.some(rowHasSavedData) ||
+    report.offline.some(rowHasSavedData) ||
+    report.total.some((r) => r.totalManualCount !== null && r.totalManualCount !== undefined)
+  );
+}
 
 // StockGrid requires an onCommit handler, but read-only mode never calls it
 // (editable cells render as plain text, not inputs, when readOnly is set).
@@ -65,6 +92,10 @@ export function DailyReportPage() {
   // expanded again, even when re-generating the same date.
   const [reportVersion, setReportVersion] = useState(0);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
+  // Alert dialogs shown instead of generating: unsaved entry/count edits for
+  // this date, or a date with nothing saved to report on.
+  const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(null);
+  const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("history") === "1") load();
@@ -72,17 +103,35 @@ export function DailyReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Opened from the report history: build the PDF as soon as the report has
+  // loaded (there's no DOM to wait for - the PDF is built from the data).
   useEffect(() => {
     if (!report || !printAfterLoad.current) return;
     printAfterLoad.current = false;
-    const frame = requestAnimationFrame(() => window.print());
-    return () => cancelAnimationFrame(frame);
+    handlePdf();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report]);
 
   function load() {
     setError(null);
+
+    // A report only reads saved data - staged edits for this date would be
+    // silently left out of it.
+    const unsaved = findUnsavedWork({ from: date, to: date });
+    if (unsaved.length > 0) {
+      setUnsavedWork(unsaved);
+      return;
+    }
+
     getDailyReport(date)
       .then((nextReport) => {
+        if (!reportHasData(nextReport)) {
+          // Clear any report still on screen from a different date, so it
+          // isn't left sitting next to a date picker that now says otherwise.
+          setReport(null);
+          setEmptyMessage(`No saved data for ${formatDateDisplay(date)}.`);
+          return;
+        }
         setReport(nextReport);
         setReportVersion((v) => v + 1);
         if (searchParams.get("history") !== "1") {
@@ -123,6 +172,34 @@ export function DailyReportPage() {
     downloadExcel(`daily-report-${reportSection}-${report.date}.xls`, bySection[reportSection]);
   }
 
+  // One PDF for whichever section(s) are selected, with the category filter
+  // applied - the same rows Export Excel uses, laid out by utils/tablePdf.ts
+  // (fixed page format, columns fitted to the page) instead of window.print().
+  function handlePdf() {
+    if (!report) return;
+    const sections: PdfSection[] = [];
+    if (reportSection === "all" || reportSection === "online") {
+      sections.push(stockGridSection(byCategory(report.online) as unknown as GridRow[], onlineStockColumns, { title: `ONLINE STOCK MONITORING - ${report.date}` }));
+    }
+    if (reportSection === "all" || reportSection === "offline") {
+      sections.push(stockGridSection(byCategory(report.offline) as unknown as GridRow[], offlineStockColumns, { title: `OFFLINE STOCK MONITORING - ${report.date}` }));
+    }
+    if (reportSection === "all" || reportSection === "total") {
+      sections.push(totalStocksSection(byCategory(report.total), { title: `TOTAL STOCKS - ${report.date}` }));
+    }
+    try {
+      downloadTablePdf({
+        filename: pdfFileName("daily-report", reportSection === "all" ? undefined : reportSection, report.date),
+        title: "Daily Report",
+        subtitle: formatDateDisplay(report.date),
+        notes: [...(reportSection === "all" ? [] : [SECTION_LABELS[reportSection]]), ...filterNotes({ category: categoryFilter })],
+        sections,
+      });
+    } catch (e) {
+      setError(e instanceof Error ? `PDF failed: ${e.message}` : "PDF failed");
+    }
+  }
+
   return (
     <div>
       <h2 style={{ margin: "-8px 0 0px" }}>Daily Report - {formatDateDisplay(date)}</h2>
@@ -131,7 +208,7 @@ export function DailyReportPage() {
       </p>
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-          <TextInput type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          <DatePicker aria-label="Date" value={date} onChange={setDate} />
           <Select aria-label="Report section" value={reportSection} onChange={(e) => setReportSection(e.target.value as ReportSection)} title="Which section to view/export">
             {(Object.keys(SECTION_LABELS) as ReportSection[]).map((s) => (
               <option key={s} value={s}>
@@ -148,7 +225,7 @@ export function DailyReportPage() {
               <Button variant="secondary" onClick={handleExport} title={reportSection === "all" ? "Export all sections as one Excel file" : `Export just the ${SECTION_LABELS[reportSection]} as an Excel file`}>
                 Export Excel
               </Button>
-              <Button variant="secondary" onClick={() => window.print()} title="Print or save as PDF">
+              <Button variant="secondary" onClick={handlePdf} title="Download as PDF">
                 <PrinterIcon /> PDF
               </Button>
             </>
@@ -191,6 +268,13 @@ export function DailyReportPage() {
       )}
 
       {!report && <p style={{ fontSize: 13, color: colors.subtleInk }}>Pick a date and click Generate to build the report.</p>}
+
+      {unsavedWork && <UnsavedWorkDialog items={unsavedWork} onClose={() => setUnsavedWork(null)} />}
+      {emptyMessage && (
+        <AlertDialog title="No report to generate" onClose={() => setEmptyMessage(null)}>
+          {emptyMessage}
+        </AlertDialog>
+      )}
     </div>
   );
 }
