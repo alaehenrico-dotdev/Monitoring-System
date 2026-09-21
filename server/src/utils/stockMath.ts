@@ -33,3 +33,15 @@ export function calculateOfflineRemaining(offlineStock: number, productionIn: nu
 export function calculateVariance(systemRemainingStock: number, manualCount: number): number {
   return systemRemainingStock - manualCount;
 }
+
+/// Negative-stock guard - a channel's own Remaining Stock is the actual
+/// current balance (it becomes next shift's Opening Stock), so a Stock Out
+/// (Fulfillment/Delivery) or a transfer-out larger than what a channel
+/// actually has on hand should be rejected by the service layer rather than
+/// silently persisted as a negative balance. Deliberately just this
+/// predicate, not the rejection itself (HttpError) - this file stays
+/// framework/DB-free by design (see the header comment above); the
+/// services decide what to do when this is true.
+export function isNegativeStock(remainingStock: number): boolean {
+  return remainingStock < 0;
+}

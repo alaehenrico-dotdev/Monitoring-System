@@ -20,6 +20,7 @@ import { formatDateDisplay } from "../utils/dateFormat";
 import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
+import { TableSkeleton } from "../components/Skeleton";
 import type { Shift } from "../types";
 
 const LOCATIONS: StockLocation[] = ["ONLINE", "OFFLINE", "TOTAL"];
@@ -336,7 +337,11 @@ export function ManualCountPage() {
       </Toolbar>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
-        <p>Loading…</p>
+        <TableSkeleton
+          headers={["SKU", "Product", "System Remaining", "Manual Count", "Variance"]}
+          minWidth={640}
+          label="Loading manual counts…"
+        />
       ) : (
         <div className="ae-grid-fill" style={zoomStyle(zoom)}>
           {/* Same containment as StockGrid: the scrollbar belongs to this
@@ -575,7 +580,7 @@ const nameCellStyle: CSSProperties = {
 const skuCellStyle: CSSProperties = {
   textAlign: "left",
   whiteSpace: "nowrap",
-  color: colors.subtleInk,
+  color: colors.yellow,
   fontVariantNumeric: "tabular-nums",
 };
 // Same three styles as StockGrid/TotalStocksTable - see StockGrid's

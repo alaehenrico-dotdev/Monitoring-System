@@ -11,6 +11,8 @@ import { PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { ShiftFilter } from "../components/ShiftFilter";
+import { TableSkeleton } from "../components/Skeleton";
+import { useTopProgress } from "../hooks/useTopProgress";
 import { Modal } from "../components/Modal";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
 import { describePendingChanges, usePendingEntryChanges, type PendingByProduct } from "../hooks/usePendingEntryChanges";
@@ -25,6 +27,7 @@ import type { Shift } from "../types";
 
 export function OfflineEntryPage() {
   const { user } = useAuth();
+  const progress = useTopProgress();
   // Defaults to whatever shift+date an encoder opening this page right now
   // is almost certainly working on (see getCurrentShiftAndDate) - date and
   // shift are picked together, not independently, since Night crosses
@@ -202,16 +205,18 @@ export function OfflineEntryPage() {
   // category fully listed. Built from the row data by utils/tablePdf.ts - not
   // by printing the page - so the layout is the same on every page and
   // always fits the paper. Disabled while edits are unsaved (see the button).
-  function handlePdf() {
+  async function handlePdf() {
     if (!visibleRows) return;
     try {
-      downloadTablePdf({
-        filename: pdfFileName("offline-stock", date, shift),
-        title: "Daily Offline Stock Monitoring",
-        subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`,
-        notes: filterNotes({ category: categoryFilter, query }),
-        sections: [stockGridSection(visibleRows, columns)],
-      });
+      await progress.track(() =>
+        downloadTablePdf({
+          filename: pdfFileName("offline-stock", date, shift),
+          title: "Daily Offline Stock Monitoring",
+          subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`,
+          notes: filterNotes({ category: categoryFilter, query }),
+          sections: [stockGridSection(visibleRows, columns)],
+        }),
+      );
     } catch (e) {
       setError(e instanceof Error ? `PDF failed: ${e.message}` : "PDF failed");
     }
@@ -287,7 +292,11 @@ export function OfflineEntryPage() {
       )}
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
-        <p>Loading…</p>
+        <TableSkeleton
+          headers={["SKU", "Product", ...columns.map((c) => c.label)]}
+          minWidth={720}
+          label="Loading offline entries…"
+        />
       ) : (
         <div className="ae-grid-fill" style={zoomStyle(zoom)}>
           {/* Keyed by date+shift so switching either remounts the grid fresh -

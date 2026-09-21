@@ -8,6 +8,7 @@ import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
+import { TableSkeleton } from "../components/Skeleton";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
@@ -96,7 +97,11 @@ export function TotalStocksPage() {
       </Toolbar>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
-        <p>Loading…</p>
+        <TableSkeleton
+          headers={["SKU", "Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"]}
+          minWidth={640}
+          label="Loading total stocks…"
+        />
       ) : (
         <div className="ae-grid-fill" style={zoomStyle(zoom)}>
           {/* Keyed by date so switching it remounts the table fresh - every

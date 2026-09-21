@@ -5,6 +5,7 @@ import { Button, Field, TextInput } from "../components/ui";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
+import { TableSkeleton } from "../components/Skeleton";
 
 /// Section 4.1 - Admins can add, rename, deactivate, or re-categorize
 /// products without a developer; new SKUs appear in every grid automatically.
@@ -109,7 +110,7 @@ export function ProductsAdminPage() {
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 
       {!products ? (
-        <p>Loading…</p>
+        <TableSkeleton headers={["Category", "SKU", "Product", "Unit", ""]} minWidth={560} label="Loading SKUs…" />
       ) : (
         <RowGlowScroll>
           <table className="ae-table ae-table--left" style={{ minWidth: 560 }}>
@@ -124,7 +125,7 @@ export function ProductsAdminPage() {
               {products.map((p) => (
                 <tr key={p.id} style={p.isActive ? undefined : { opacity: 0.55 }}>
                   <td style={{ whiteSpace: "nowrap" }}>{p.category}</td>
-                  <td style={{ whiteSpace: "nowrap", color: p.sku ? colors.ink : colors.subtleInk }}>{p.sku ?? "—"}</td>
+                  <td style={{ whiteSpace: "nowrap", color: p.sku ? colors.yellow : colors.subtleInk }}>{p.sku ?? "—"}</td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     {p.name}
                     {!p.isActive && (

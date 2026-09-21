@@ -98,7 +98,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
 }
 
 const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };
-const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.subtleInk, fontVariantNumeric: "tabular-nums" };
+const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.yellow, fontVariantNumeric: "tabular-nums" };
 // See StockGrid's identical categoryToggleStyle - a real <button> spanning
 // every column so the expand/collapse arrow has one clickable/keyboard-
 // focusable target instead of a styled, inert <td>.

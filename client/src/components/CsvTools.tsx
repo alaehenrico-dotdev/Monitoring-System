@@ -9,6 +9,7 @@ import type { Product } from "../types";
 import { toolbarLayoutTransition } from "../motion";
 import { DownloadIcon, PrinterIcon, UploadIcon } from "./icons";
 import { Toast, type ToastVariant } from "./Toast";
+import { useTopProgress } from "../hooks/useTopProgress";
 
 export interface CsvColumn {
   key: string;
@@ -130,6 +131,7 @@ export function CsvTools({
   pdf,
 }: CsvToolsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const progress = useTopProgress();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageVariant, setMessageVariant] = useState<ToastVariant>("info");
@@ -161,13 +163,18 @@ export function CsvTools({
   async function handlePdf() {
     if (onBeforePrint && !(await onBeforePrint())) return;
     try {
-      downloadTablePdf({
-        filename: pdfFileName(filenamePrefix, date),
-        title: pdf?.title ?? filenamePrefix.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-        subtitle: pdf?.subtitle ?? formatDateDisplay(date),
-        notes: pdf?.notes,
-        sections: [stockGridSection(rows, columns, { sumKeys: pdf?.sumKeys, flagKey: pdf?.flagKey })],
-      });
+      // No real byte/row progress for a synchronous local PDF build (Section:
+      // Loading system) - track() eases the bar toward 90% and holds it
+      // there for as long as this actually takes, instead of a fake timer.
+      await progress.track(() =>
+        downloadTablePdf({
+          filename: pdfFileName(filenamePrefix, date),
+          title: pdf?.title ?? filenamePrefix.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+          subtitle: pdf?.subtitle ?? formatDateDisplay(date),
+          notes: pdf?.notes,
+          sections: [stockGridSection(rows, columns, { sumKeys: pdf?.sumKeys, flagKey: pdf?.flagKey })],
+        }),
+      );
     } catch (err) {
       setMessage(err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed");
       setMessageVariant("error");
@@ -177,6 +184,7 @@ export function CsvTools({
   async function handleImportFile(file: File) {
     setBusy(true);
     setMessage(null);
+    progress.start();
     try {
       const text = await file.text();
       const table = parseCsv(text);
@@ -235,7 +243,14 @@ export function CsvTools({
       // artifact), not blanks, but it's still a section header, not a
       // product named "Class A (Gallon)".
       const knownCategoryNames = new Set(rows.map((r) => categoryKey(r.product.category)));
-      for (const line of table.slice(headerRowIdx + 1)) {
+      const importLines = table.slice(headerRowIdx + 1);
+      let linesSeen = 0;
+      for (const line of importLines) {
+        // Every line advances the bar, including the skip/continue paths
+        // below - it's a real "how far through the file are we" progress
+        // signal (Section: Loading system), not a synthetic timer.
+        linesSeen++;
+        progress.set(Math.round((linesSeen / (importLines.length || 1)) * 100));
         const productName = line[productIdx]?.trim();
         if (!productName) continue;
 
@@ -319,9 +334,11 @@ export function CsvTools({
       // dismissed rather than auto-clearing while there's something
       // unresolved (rows that didn't match anything).
       setMessageVariant(unmatchedExamples.length ? "error" : "info");
+      progress.done();
     } catch (err) {
       setMessage(err instanceof Error ? `Import failed: ${err.message}` : "Import failed");
       setMessageVariant("error");
+      progress.fail();
     } finally {
       setBusy(false);
     }

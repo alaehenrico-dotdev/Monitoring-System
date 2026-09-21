@@ -60,9 +60,9 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
     ],
   },
   {
-    heading: "Danger Zone",
+    heading: "Settings",
     links: [
-      { to: "/data-reset", label: "Data Reset", abbr: "RS", roles: ["SUPERVISOR_ADMIN"] },
+      { to: "/settings", label: "Settings", abbr: "ST", roles: ["SUPERVISOR_ADMIN"] },
     ],
   },
 ];

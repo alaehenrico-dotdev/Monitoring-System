@@ -218,7 +218,7 @@ export function StockGrid({ rows, columns, onCommit, readOnly, pending, focusSto
 // and inflating every row's height. Border/padding/alignment defaults
 // otherwise come from the shared .ae-table CSS (index.css).
 const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };
-const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.subtleInk, fontVariantNumeric: "tabular-nums" };
+const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.yellow, fontVariantNumeric: "tabular-nums" };
 const lockedStyle: CSSProperties = { background: colors.paperAlt, color: "var(--ae-num-text)" };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.

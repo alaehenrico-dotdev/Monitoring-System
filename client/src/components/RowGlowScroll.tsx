@@ -142,7 +142,7 @@ export function RowGlowScroll({
     if (!focusStorageKey) return;
     const scrollEl = scrollRef.current;
     if (!scrollEl) return;
-    let rowId: string | null = null;
+    let rowId: string | null;
     try {
       rowId = sessionStorage.getItem(focusStorageKey);
     } catch {

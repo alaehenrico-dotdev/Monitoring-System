@@ -30,14 +30,16 @@ function zigzagBottomClipPath(width: number, tooth: number, depth: number): stri
   return `polygon(${points.join(", ")})`;
 }
 
-// What the printed QR code encodes for a saved receipt. Defaults to just
-// the receipt number (e.g. "RECEIPT#000123") so it's useful for quick
-// lookup/search by staff with no dependency on a public-facing URL or
-// routing scheme existing yet. Swap this one line for a URL (e.g.
-// `${window.location.origin}/receipts/${receipt.id}`) if/when a
-// receipt-detail page a scanner should land on exists.
+// What the printed QR code encodes for a saved receipt: the server-issued
+// encrypted token (receipt.qrToken - see server/src/utils/receiptQrToken.ts),
+// not the plain id. A printed receipt physically leaves the authenticated
+// app - anyone can pick it up and scan it - so unlike every other id in
+// this app (all plain integers; access here is role-based, not per-owner,
+// so a bare id alone doesn't expose anything a valid session couldn't
+// already see) this is the one id actually worth not handing out in the
+// clear.
 function receiptQrValue(receipt: Receipt): string {
-  return `RECEIPT#${String(receipt.id).padStart(6, "0")}`;
+  return receipt.qrToken;
 }
 
 /**
