@@ -41,3 +41,20 @@ export const fonts = {
   wordmark: "'Baloo 2', system-ui, sans-serif",
   body: "system-ui, -apple-system, 'Segoe UI', sans-serif",
 } as const;
+
+/**
+ * Shared timing/easing for the app's loading system (Skeleton.tsx,
+ * TopProgressBar.tsx, ProgressiveImage.tsx) - one place to retune "how fast
+ * things shimmer/glide" instead of every component hardcoding its own
+ * duration the way the rest of the app's one-off animations do.
+ */
+export const motionTokens = {
+  shimmerDuration: "1.8s", // skeleton shimmer sweep - within the 1.5-2s band that reads as "alive" without being distracting
+  blurUpDuration: "0.4s", // progressive image blur/opacity settle once the full-res asset lands
+  // Deceleration curve for the determinate progress bar's "climb toward 90%
+  // and wait" phase (see hooks/useTopProgress.tsx) - a long duration paired
+  // with an ease-out curve, so the CSS engine (not JS) does the decelerating
+  // climb and can visibly still be "moving" if it's inspected mid-flight.
+  progressEase: "cubic-bezier(0.11, 0.72, 0.29, 0.98)",
+  progressHoldPercent: 90,
+} as const;

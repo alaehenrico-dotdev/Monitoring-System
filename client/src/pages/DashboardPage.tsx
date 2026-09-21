@@ -7,10 +7,17 @@ import { listChangeLog } from "../api/changeLog";
 import type { ChangeLogEntry } from "../types";
 import { ACTION_COLOR, TABLE_LABELS } from "../config/changeLog";
 import { formatRelativeTime } from "../utils/dateFormat";
+import { RowsSkeleton, StatCardsSkeleton, TableSkeleton } from "../components/Skeleton";
+import { MonthlyMonitoring } from "../components/MonthlyMonitoring";
 import { colors } from "../theme";
 
 type Analytics = {
   activeProducts: number;
+  /// Online and Offline are separate stock pools (Section 2.1) - kept apart
+  /// here too, same as Total Stocks/Daily Report. totalRemaining is kept
+  /// alongside them only as an explicitly-labeled combined figure.
+  onlineRemaining: number;
+  offlineRemaining: number;
   totalRemaining: number;
   todayReceipts: number;
   varianceFlags: number;
@@ -97,6 +104,8 @@ export function DashboardPage() {
       .then(([products, stocks, receipts]) => {
         setAnalytics({
           activeProducts: products.filter((product) => product.isActive).length,
+          onlineRemaining: stocks.reduce((sum, row) => sum + Number(row.onlineRemainingStock || 0), 0),
+          offlineRemaining: stocks.reduce((sum, row) => sum + Number(row.offlineRemainingStock || 0), 0),
           totalRemaining: stocks.reduce((sum, row) => sum + Number(row.totalRemainingStock || 0), 0),
           todayReceipts: receipts.length,
           varianceFlags: stocks.filter((row) => Number(row.totalVariance || 0) !== 0).length,
@@ -120,12 +129,22 @@ export function DashboardPage() {
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 
-      <div className="ae-dash-stats">
-        <StatCard label="Active SKUs" value={analytics?.activeProducts} />
-        <StatCard label="Total remaining stock" value={analytics?.totalRemaining} />
-        <StatCard label="Receipts today" value={analytics?.todayReceipts} />
-        <StatCard label={hasVariance ? "Variance flags — needs review" : "Variance flags"} value={analytics?.varianceFlags} alert={hasVariance} />
+      <div className="ae-dash-stats" role={analytics ? undefined : "status"} aria-busy={analytics ? undefined : "true"}>
+        {analytics ? (
+          <>
+            <StatCard label="Active SKUs" value={analytics.activeProducts} />
+            <StatCard label="Online remaining stock" value={analytics.onlineRemaining} />
+            <StatCard label="Offline remaining stock" value={analytics.offlineRemaining} />
+            <StatCard label="Total remaining stock (combined)" value={analytics.totalRemaining} />
+            <StatCard label="Receipts today" value={analytics.todayReceipts} />
+            <StatCard label={hasVariance ? "Variance flags — needs review" : "Variance flags"} value={analytics.varianceFlags} alert={hasVariance} />
+          </>
+        ) : (
+          <StatCardsSkeleton count={6} />
+        )}
       </div>
+
+      <MonthlyMonitoring />
 
       {/* Today: what the numbers above mean you should do, not a menu. */}
       <section className="ae-dash-section">
@@ -156,7 +175,7 @@ export function DashboardPage() {
               {!hasVariance && <TodayRow to="/variance-report" headline="No variances flagged today" action="Open the variance report" muted />}
             </>
           ) : (
-            <CardMessage>Loading today's activity…</CardMessage>
+            <RowsSkeleton rows={3} height={38} label="Loading today's activity…" />
           )}
         </div>
       </section>
@@ -174,7 +193,13 @@ export function DashboardPage() {
         </h3>
         <div className="ae-dash-card">
           {recentActivity === null ? (
-            <CardMessage>Loading recent activity…</CardMessage>
+            <TableSkeleton
+              headers={["Action", "Record", "Changed by", "When"]}
+              minWidth={480}
+              rows={5}
+              cellPadding="8px 12px"
+              label="Loading recent activity…"
+            />
           ) : recentActivity.length === 0 ? (
             <CardMessage>No activity recorded yet.</CardMessage>
           ) : (

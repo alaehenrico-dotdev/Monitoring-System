@@ -1474,3 +1474,95 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     display: none;
   }
 }
+
+/* =========================================================================
+   Loading system - skeleton shimmer (components/Skeleton.tsx), progressive
+   image blur-up (components/ProgressiveImage.tsx), and the determinate
+   top-of-viewport progress bar (components/TopProgressBar.tsx,
+   hooks/useTopProgress.tsx). Every animated property here is `transform`,
+   `opacity`, or `background-position` on its own compositor layer - none of
+   it triggers layout, so it stays smooth even while a slow/unstable fetch
+   is busy on the network (not main-thread) thread.
+   ========================================================================= */
+.ae-skeleton {
+  display: block;
+  background-image: linear-gradient(100deg, var(--ae-bg-alt) 38%, var(--ae-border-soft) 50%, var(--ae-bg-alt) 62%);
+  background-size: 250% 100%;
+  background-position: 200% 0;
+  animation: ae-skeleton-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes ae-skeleton-shimmer {
+  to {
+    background-position: -50% 0;
+  }
+}
+
+.ae-progressive-img-wrap {
+  position: relative;
+  overflow: hidden;
+  display: block;
+}
+.ae-progressive-img-placeholder {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(18px);
+  transform: scale(1.08); /* hides the blurred edge halo the filter leaves along the border */
+  transition: opacity 0.4s ease;
+}
+.ae-progressive-img-full {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  filter: blur(14px);
+  transition: opacity 0.4s ease-out, filter 0.4s ease-out;
+}
+.ae-progressive-img-full.is-loaded {
+  opacity: 1;
+  filter: blur(0);
+}
+
+.ae-top-progress-track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 1100; /* above Sidebar (50) and TopBar's clock/toggle (1000) */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.ae-top-progress-track.is-visible {
+  opacity: 1;
+}
+.ae-top-progress-bar {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  box-shadow: 0 0 8px 1px color-mix(in srgb, currentColor 70%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ae-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--ae-bg-alt);
+  }
+  .ae-progressive-img-placeholder,
+  .ae-progressive-img-full {
+    transition: none;
+  }
+  .ae-top-progress-track {
+    transition: none;
+  }
+  .ae-top-progress-bar {
+    transition: none !important;
+  }
+}

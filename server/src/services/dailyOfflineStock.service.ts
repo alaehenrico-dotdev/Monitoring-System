@@ -4,7 +4,14 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
 import { HttpError } from "../utils/HttpError";
-import { calculateOfflineRemaining, calculateOfflineStock, calculateOnlineRemaining, calculateOnlineStock, toNum } from "../utils/stockMath";
+import {
+  calculateOfflineRemaining,
+  calculateOfflineStock,
+  calculateOnlineRemaining,
+  calculateOnlineStock,
+  isNegativeStock,
+  toNum,
+} from "../utils/stockMath";
 
 const TABLE = "daily_offline_stock";
 const ONLINE_TABLE = "daily_online_stock";
@@ -79,6 +86,14 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, shift
   };
   const { offlineStock, remainingStock } = calculate(openingStock, merged);
 
+  // Negative-stock guard - see the matching comment in
+  // dailyOnlineStock.service.ts's saveOnlineEntry.
+  if (isNegativeStock(remainingStock)) {
+    throw HttpError.badRequest(
+      `This would take ${product.name}'s Offline stock below zero (would end at ${remainingStock}). Reduce Delivery (Out) or the transfer out to Online, or add Production (In)/Backloads first.`
+    );
+  }
+
   const data = { productId, entryDate, shift, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOfflineStockRepository.upsert(existing?.id, data);
 
@@ -137,6 +152,18 @@ async function mirrorTransferToOnline(
   };
   const onlineStock = calculateOnlineStock(openingStock, merged.stockInOffToOl, merged.stockOutOlToOff);
   const remainingStock = calculateOnlineRemaining(onlineStock, merged.productionIn, merged.fulfillmentOut, merged.rts);
+
+  // Same guard as the reverse direction in dailyOnlineStock.service.ts's
+  // mirrorTransferToOffline - pulling stock INTO Offline FROM Online
+  // mirrors as Online's stockOutOlToOff, a real Stock Out for Online that
+  // can't exceed what Online actually has, even though the transfer was
+  // entered on the Offline grid.
+  if (isNegativeStock(remainingStock)) {
+    const product = await productRepository.findActiveById(productId);
+    throw HttpError.badRequest(
+      `This transfer would take ${product?.name ?? `product #${productId}`}'s Online stock below zero (would end at ${remainingStock}).`
+    );
+  }
 
   const data = {
     productId,

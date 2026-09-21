@@ -17,6 +17,7 @@ import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { downloadTablePdf } from "../utils/tablePdf";
+import { useTopProgress } from "../hooks/useTopProgress";
 import {
   filterNotes,
   flatSection,
@@ -59,6 +60,7 @@ function daysAgo(n: number): string {
 /// product/category/location, to spot recurring problem SKUs (Section 4.4
 /// calls out Toyo Mansi and Oyster Sauce A as historically the largest).
 export function VarianceReportPage() {
+  const progress = useTopProgress();
   const [searchParams] = useSearchParams();
   const [startDate, setStartDate] = useState(
     searchParams.get("startDate") ?? daysAgo(30),
@@ -86,7 +88,7 @@ export function VarianceReportPage() {
   useEffect(() => {
     if (!rows || !printAfterLoad.current) return;
     printAfterLoad.current = false;
-    handlePdf();
+    void handlePdf();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
@@ -130,39 +132,41 @@ export function VarianceReportPage() {
 
   // Built from the rows by utils/tablePdf.ts (fixed page format, columns
   // fitted to the page) instead of window.print().
-  function handlePdf() {
+  async function handlePdf() {
     if (!rows) return;
     try {
-      downloadTablePdf({
-        filename: pdfFileName("variance-report", startDate, endDate, category),
-        title: "Variance Report",
-        subtitle: `${startDate} to ${endDate}`,
-        notes: [
-          ...filterNotes({ category }),
-          `${rows.length} flagged variance(s) found.`,
-        ],
-        sections: [
-          flatSection(
-            VARIANCE_PDF_COLUMNS,
-            rows.map((r): PdfCell[] => [
-              r.entryDate.slice(0, 10),
-              r.location,
-              r.product.category,
-              r.product.sku ?? "\u2014",
-              r.product.name,
-              r.systemRemainingStock,
-              r.manualCount,
-              {
-                text: r.variance,
-                bold: true,
-                tone: Number(r.variance) < 0 ? "danger" : "warning",
-              },
-              r.countedBy?.name ?? "\u2014",
-            ]),
-            { emptyMessage: "No flagged variances in this date range." },
-          ),
-        ],
-      });
+      await progress.track(() =>
+        downloadTablePdf({
+          filename: pdfFileName("variance-report", startDate, endDate, category),
+          title: "Variance Report",
+          subtitle: `${startDate} to ${endDate}`,
+          notes: [
+            ...filterNotes({ category }),
+            `${rows.length} flagged variance(s) found.`,
+          ],
+          sections: [
+            flatSection(
+              VARIANCE_PDF_COLUMNS,
+              rows.map((r): PdfCell[] => [
+                r.entryDate.slice(0, 10),
+                r.location,
+                r.product.category,
+                r.product.sku ?? "\u2014",
+                r.product.name,
+                r.systemRemainingStock,
+                r.manualCount,
+                {
+                  text: r.variance,
+                  bold: true,
+                  tone: Number(r.variance) < 0 ? "danger" : "warning",
+                },
+                r.countedBy?.name ?? "\u2014",
+              ]),
+              { emptyMessage: "No flagged variances in this date range." },
+            ),
+          ],
+        }),
+      );
     } catch (err) {
       setError(
         err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed",
@@ -264,7 +268,7 @@ export function VarianceReportPage() {
                       style={{
                         textAlign: "left",
                         whiteSpace: "nowrap",
-                        color: colors.subtleInk,
+                        color: colors.yellow,
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >

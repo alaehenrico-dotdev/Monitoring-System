@@ -22,8 +22,15 @@
  * Dependencies (jsPDF is already installed for receipts):
  *   npm install jspdf-autotable
  */
-import jsPDF from "jspdf";
-import { autoTable, type RowInput, type UserOptions } from "jspdf-autotable";
+// Type-only imports (erased at compile time, zero runtime cost) - the actual
+// jspdf/jspdf-autotable modules are ~230KB combined and only needed at the
+// moment someone actually clicks a "PDF" button, not on every route's
+// initial load (every helper below only ever touches a `jsPDF` *instance*
+// passed in as a parameter; the constructor and `autoTable()` itself are
+// only called once, inside buildTablePdf, where they're dynamically
+// imported instead - see the `import("jspdf")` call there).
+import type jsPDF from "jspdf";
+import type { RowInput, UserOptions } from "jspdf-autotable";
 import type { PdfCell, PdfCellObject, PdfDocumentSpec, PdfSection, PdfTone } from "./pdfTables";
 
 // ---- Page geometry (mm) ----
@@ -297,12 +304,14 @@ function drawPageChrome(doc: jsPDF, spec: PdfDocumentSpec, pageWidth: number, pa
 // ---------------------------------------------------------------------------
 
 /** Builds the PDF without saving it (handy for previewing or tests). */
-export function buildTablePdf(spec: PdfDocumentSpec): jsPDF {
+export async function buildTablePdf(spec: PdfDocumentSpec): Promise<jsPDF> {
+  const [{ default: JsPDF }, { autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+
   // Portrait by default, however many columns there are - wide tables get a
   // smaller font and wrapped text (see fitFontSize) instead of a landscape page.
   const orientation = spec.orientation === "landscape" ? "landscape" : "portrait";
 
-  const doc = new jsPDF({ orientation, unit: "mm", format: PAGE_FORMAT, compress: true });
+  const doc = new JsPDF({ orientation, unit: "mm", format: PAGE_FORMAT, compress: true });
   doc.setProperties({
     title: toPdfText(spec.subtitle ? `${spec.title} - ${spec.subtitle}` : spec.title),
     creator: "Ala Eh! Stocks Monitoring System",
@@ -373,6 +382,6 @@ export function buildTablePdf(spec: PdfDocumentSpec): jsPDF {
 }
 
 /** Builds the PDF and triggers the browser's normal "Save File" download. */
-export function downloadTablePdf(spec: PdfDocumentSpec): void {
-  buildTablePdf(spec).save(spec.filename);
+export async function downloadTablePdf(spec: PdfDocumentSpec): Promise<void> {
+  (await buildTablePdf(spec)).save(spec.filename);
 }

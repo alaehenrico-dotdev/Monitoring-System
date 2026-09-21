@@ -17,6 +17,7 @@ import { recordReportHistory } from "../utils/reportHistory";
 import { PrinterIcon } from "../components/icons";
 import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
+import { useTopProgress } from "../hooks/useTopProgress";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -72,6 +73,7 @@ async function noop() {}
  * category grouping/subtotals and proper number formatting for free.
  */
 export function DailyReportPage() {
+  const progress = useTopProgress();
   const [searchParams] = useSearchParams();
   const [date, setDate] = useState(searchParams.get("date") ?? today());
   const [report, setReport] = useState<DailyReport | null>(null);
@@ -108,7 +110,7 @@ export function DailyReportPage() {
   useEffect(() => {
     if (!report || !printAfterLoad.current) return;
     printAfterLoad.current = false;
-    handlePdf();
+    void handlePdf();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report]);
 
@@ -175,7 +177,7 @@ export function DailyReportPage() {
   // One PDF for whichever section(s) are selected, with the category filter
   // applied - the same rows Export Excel uses, laid out by utils/tablePdf.ts
   // (fixed page format, columns fitted to the page) instead of window.print().
-  function handlePdf() {
+  async function handlePdf() {
     if (!report) return;
     const sections: PdfSection[] = [];
     if (reportSection === "all" || reportSection === "online") {
@@ -188,13 +190,15 @@ export function DailyReportPage() {
       sections.push(totalStocksSection(byCategory(report.total), { title: `TOTAL STOCKS - ${report.date}` }));
     }
     try {
-      downloadTablePdf({
-        filename: pdfFileName("daily-report", reportSection === "all" ? undefined : reportSection, report.date),
-        title: "Daily Report",
-        subtitle: formatDateDisplay(report.date),
-        notes: [...(reportSection === "all" ? [] : [SECTION_LABELS[reportSection]]), ...filterNotes({ category: categoryFilter })],
-        sections,
-      });
+      await progress.track(() =>
+        downloadTablePdf({
+          filename: pdfFileName("daily-report", reportSection === "all" ? undefined : reportSection, report.date),
+          title: "Daily Report",
+          subtitle: formatDateDisplay(report.date),
+          notes: [...(reportSection === "all" ? [] : [SECTION_LABELS[reportSection]]), ...filterNotes({ category: categoryFilter })],
+          sections,
+        }),
+      );
     } catch (e) {
       setError(e instanceof Error ? `PDF failed: ${e.message}` : "PDF failed");
     }

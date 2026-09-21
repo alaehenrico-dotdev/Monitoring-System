@@ -5,6 +5,7 @@ import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { colors } from "../theme";
 import { clearReportHistory } from "../utils/reportHistory";
+import { InlineLoading, Spinner } from "../components/Spinner";
 
 const COUNTDOWN_SECONDS = 10;
 
@@ -118,7 +119,6 @@ export function DataResetPage() {
   if (lockStatus !== "unlocked") {
     return (
       <div>
-        <h2 style={{ margin: "-8px 0 0px" }}>Data Reset</h2>
         <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 20px", maxWidth: 620 }}>
           This section is restricted. Enter the reset passcode to continue.
         </p>
@@ -174,7 +174,13 @@ export function DataResetPage() {
               <p style={{ margin: "0 0 14px", fontSize: 12.5, color: PANEL_RED }}>{lockError}</p>
             )}
 
-            <Button type="submit" variant="danger" disabled={lockStatus === "verifying" || !passcode} style={{ width: "100%" }}>
+            <Button
+              type="submit"
+              variant="danger"
+              disabled={lockStatus === "verifying" || !passcode}
+              style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+            >
+              {lockStatus === "verifying" && <Spinner size="sm" color={PANEL_RED} />}
               {lockStatus === "verifying" ? "Verifying…" : "Unlock"}
             </Button>
           </form>
@@ -185,7 +191,6 @@ export function DataResetPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Data Reset</h2>
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 20px", maxWidth: 760 }}>
         Use this to give the system a completely fresh start. This is meant for wiping test data or
         starting a brand-new inventory period, and it cannot be undone once it runs.
@@ -318,7 +323,7 @@ export function DataResetPage() {
               </div>
             </>
           ) : (
-            <p style={{ margin: 0, fontSize: 13.5 }}>Resetting data…</p>
+            <InlineLoading label="Resetting data…" />
           )}
         </Modal>
       )}

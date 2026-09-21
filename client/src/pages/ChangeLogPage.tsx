@@ -8,6 +8,7 @@ import { matchesSearch } from "../utils/search";
 import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
+import { TableSkeleton } from "../components/Skeleton";
 
 const TABLE_FILTERS = ["", ...Object.keys(TABLE_LABELS)];
 
@@ -73,7 +74,11 @@ export function ChangeLogPage() {
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!entries ? (
-        <p>Loading…</p>
+        <TableSkeleton
+          headers={["When", "Table", "Record", "Action", "Changed By", ""]}
+          minWidth={720}
+          label="Loading change log…"
+        />
       ) : filtered && filtered.length === 0 ? (
         <p style={{ color: colors.subtleInk }}>No matching entries.</p>
       ) : (

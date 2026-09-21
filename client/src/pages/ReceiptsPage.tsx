@@ -27,6 +27,8 @@ import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { generateReceiptPdf } from "../utils/receiptPdf";
 import { PrinterIcon } from "../components/icons";
+import { TableSkeleton } from "../components/Skeleton";
+import { useTopProgress } from "../hooks/useTopProgress";
 /*
  * ============================================================
  * THERMAL RECEIPT PRINT SETTINGS
@@ -49,9 +51,6 @@ const THERMAL_PAPER_SIZES = {
 type ThermalPaperSize = keyof typeof THERMAL_PAPER_SIZES;
 
 const DEFAULT_THERMAL_PAPER_SIZE: ThermalPaperSize = "58mm";
-
-// CSS pixels per millimeter at the browser's standard 96 DPI.
-const PX_PER_MM = 96 / 25.4;
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -77,6 +76,7 @@ interface LineItem {
  */
 export function ReceiptsPage() {
   const { user } = useAuth();
+  const progress = useTopProgress();
 
   const [receipts, setReceipts] = useState<Receipt[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -193,156 +193,6 @@ export function ReceiptsPage() {
   }
 
   /*
-   * ============================================================
-   * PRINT THERMAL RECEIPT
-   * ============================================================
-   *
-   * Printed from an isolated <iframe> containing ONLY a clone of the
-   * receipt paper - nothing else exists in that document, so there is
-   * nothing else for the browser to paginate around. That guarantees a
-   * single page, sized to exactly the selected thermal paper width and
-   * to the receipt's own rendered height (so a 3-item and a 30-item
-   * receipt each get a page sized to fit them, not a fixed page with
-   * blank space or clipped overflow).
-   *
-   * The receipt card itself (`ReceiptCard`/`ReceiptPaper`) is built at a
-   * fixed pixel design width/padding/font-size. Rather than forcing a
-   * narrow physical width onto that fixed layout (which would wrap or
-   * clip text), we apply a `zoom` factor - computed from the selected
-   * thermal paper size - to the CLONED copy inside the print-only
-   * document. This shrinks the whole box uniformly (padding, text, the
-   * zigzag clip-path) without affecting the full-size version shown on
-   * screen, and the physical page size falls out of that already-correct
-   * rendered size.
-   */
-  function handlePrintReceipt() {
-    const paperEl = document.querySelector<HTMLElement>(
-      ".ae-modal-panel .ae-receipt-paper"
-    );
-
-    if (!paperEl) {
-      window.print();
-      return;
-    }
-
-    const { paperMM: paperWidthMM } = THERMAL_PAPER_SIZES[paperSize];
-
-    const styleHtml = Array.from(
-      document.querySelectorAll('style, link[rel="stylesheet"]')
-    )
-      .map((el) => el.outerHTML)
-      .join("\n");
-
-    const receiptHtml = paperEl.outerHTML;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
-    iframe.style.border = "0";
-    iframe.setAttribute("aria-hidden", "true");
-
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentDocument;
-    if (!iframeDoc) {
-      iframe.remove();
-      window.print();
-      return;
-    }
-
-    // Re-bind to a variable TS knows is non-null for the lifetime of this
-    // closure - `iframeDoc`'s null-check above doesn't automatically
-    // narrow inside the nested `printOnce` function below.
-    const doc: Document = iframeDoc;
-
-    doc.open();
-    doc.write(`<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    ${styleHtml}
-    <style>
-      html, body {
-        margin: 0;
-        padding: 0;
-        background: #fff;
-      }
-      /* The receipt's rendered (post-zoom) width is narrower than the
-         physical paper roll (printable vs. full roll width) - center it
-         rather than stretching it to fill the roll. */
-      body {
-        display: flex;
-        justify-content: center;
-      }
-      .ae-receipt-paper {
-        margin: 0 !important;
-        border: 0 !important;
-        box-shadow: none !important;
-        transform: none !important;
-        zoom: ${thermalScale} !important;
-      }
-    </style>
-  </head>
-  <body>
-    ${receiptHtml}
-  </body>
-</html>`);
-    doc.close();
-
-    let printed = false;
-
-    function printOnce() {
-      if (printed) return;
-      printed = true;
-
-      const win = iframe.contentWindow;
-      if (!win) {
-        iframe.remove();
-        return;
-      }
-
-      // Measure the ACTUAL rendered (post-zoom) height so the page is
-      // sized to exactly one receipt, whatever its line-item count.
-      const printedPaper = doc.querySelector<HTMLElement>(".ae-receipt-paper");
-      const heightMM = Math.max(
-        30,
-        (printedPaper?.getBoundingClientRect().height ?? 0) / PX_PER_MM
-      );
-
-      const pageStyle = doc.createElement("style");
-      pageStyle.textContent = `
-        @page {
-          size: ${paperWidthMM}mm ${heightMM.toFixed(2)}mm;
-          margin: 0;
-        }
-      `;
-      doc.head.appendChild(pageStyle);
-
-      win.focus();
-      win.print();
-
-      let removed = false;
-      function cleanup() {
-        if (removed) return;
-        removed = true;
-        iframe.remove();
-      }
-
-      win.addEventListener("afterprint", cleanup);
-      // Fallback in case `afterprint` doesn't fire in some browsers.
-      setTimeout(cleanup, 5000);
-    }
-
-    // document.write'd content doesn't always fire `onload` reliably, so
-    // a short timeout backs it up.
-    iframe.onload = printOnce;
-    setTimeout(printOnce, 150);
-  }
-
-  /*
    * Build the live receipt preview from the current form.
    */
   const previewReceipt: Receipt = useMemo(() => {
@@ -376,6 +226,10 @@ export function ReceiptsPage() {
         : null,
       createdAt: new Date().toISOString(),
       items: previewItems,
+      // Never actually rendered - ReceiptCard skips the QR code entirely
+      // for `isPreview` receipts (there's nothing stable to encode until
+      // the receipt has a real, server-issued id/token).
+      qrToken: "",
     };
   }, [orderDate, customer, location, items, products, user, salesRepName]);
 
@@ -398,15 +252,6 @@ export function ReceiptsPage() {
     .sort((a, b) =>
       a.orderDate < b.orderDate ? 1 : a.orderDate > b.orderDate ? -1 : b.id - a.id
     );
-
-  // Scale factor applied ONLY to the print output (built inside
-  // handlePrintReceipt) to shrink the fixed-width receipt card down to
-  // the selected thermal paper's printable width. The on-screen form,
-  // live preview, and review modal above always render at full size -
-  // this scale never touches them.
-  const { printableMM } = THERMAL_PAPER_SIZES[paperSize];
-  const thermalPrintWidthPx = printableMM * PX_PER_MM;
-  const thermalScale = thermalPrintWidthPx / RECEIPT_CARD_WIDTH;
 
   return (
     <div>
@@ -598,7 +443,12 @@ export function ReceiptsPage() {
           <h3 style={{ margin: "0 0 12px" }}>Recent Receipts</h3>
 
           {!receipts ? (
-            <p>Loading…</p>
+            <TableSkeleton
+              headers={["Receipt #", "Date", "Customer", "Location", "Sales Rep", "Items", "Total Qty"]}
+              minWidth={720}
+              rows={6}
+              label="Loading receipts…"
+            />
           ) : visibleReceipts?.length === 0 ? (
             <p style={{ color: colors.subtleInk }}>
               {receipts.length === 0
@@ -667,10 +517,10 @@ export function ReceiptsPage() {
         >
           {/*
            * Shown at full/normal size, same as the entry form and live
-           * preview - this is for the encoder to review comfortably.
-           * Shrinking to actual thermal-paper size only happens in the
-           * isolated print document built by handlePrintReceipt below,
-           * so it never affects what's shown on screen here.
+           * preview - this is for the encoder to review comfortably. The
+           * thermal-paper-sized version only exists in the downloaded PDF
+           * (see utils/receiptPdf.ts's "PDF" button below), so it never
+           * affects what's shown on screen here.
            */}
           <div style={{ display: "flex", justifyContent: "center", overflowX: "auto" }}>
             <ReceiptCard receipt={selectedReceipt} />
@@ -714,7 +564,7 @@ export function ReceiptsPage() {
             <Button
               type="button"
               size="sm"
-                 onClick={() => selectedReceipt && generateReceiptPdf(selectedReceipt, paperSize)}
+              onClick={() => selectedReceipt && void progress.track(() => generateReceiptPdf(selectedReceipt, paperSize))}
               title="Print or save as PDF"
             >
               <PrinterIcon /> PDF

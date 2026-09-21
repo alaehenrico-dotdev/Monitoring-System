@@ -107,6 +107,10 @@ export interface Receipt {
   createdBy: AuthUser | null;
   createdAt: string;
   items: ReceiptItem[];
+  /// Server-encrypted (AES-256-GCM) receipt id, for the printed QR code -
+  /// see server/src/utils/receiptQrToken.ts. Opaque on this side; the
+  /// client never has the key to decode or produce one itself.
+  qrToken: string;
 }
 
 export interface ChangeLogEntry {

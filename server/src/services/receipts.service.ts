@@ -5,8 +5,17 @@ import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
 import { productRepository } from "../repositories/productRepository";
 import { getCurrentShiftAndDate } from "../utils/shift";
+import { encryptReceiptId } from "../utils/receiptQrToken";
 
 const TABLE = "receipts";
+
+// Adds the encrypted QR token every returned receipt needs (see
+// utils/receiptQrToken.ts) - one place, so every path a Receipt can leave
+// this service through (create/list/getById) carries it, rather than each
+// caller having to remember to compute it.
+function withQrToken<T extends { id: number }>(receipt: T): T & { qrToken: string } {
+  return { ...receipt, qrToken: encryptReceiptId(receipt.id) };
+}
 
 export interface ReceiptItemInput {
   productId: number;
@@ -60,15 +69,16 @@ export async function createReceipt(input: CreateReceiptInput, createdById?: num
     }
   }
 
-  return receipt;
+  return withQrToken(receipt);
 }
 
 export async function listReceipts(filters: { date?: Date; customer?: string; location?: string; salesRepId?: number }) {
-  return receiptRepository.findMany(filters);
+  const receipts = await receiptRepository.findMany(filters);
+  return receipts.map(withQrToken);
 }
 
 export async function getReceiptById(id: number) {
   const receipt = await receiptRepository.findById(id);
   if (!receipt) throw HttpError.notFound("Receipt not found");
-  return receipt;
+  return withQrToken(receipt);
 }

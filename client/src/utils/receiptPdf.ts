@@ -16,8 +16,10 @@
  *   npm install jspdf qrcode
  *   npm install -D @types/qrcode   (jsPDF ships its own types)
  */
-import jsPDF from "jspdf";
-import QRCode from "qrcode";
+// Type-only import (see the matching note in utils/tablePdf.ts) - jspdf and
+// qrcode are only actually loaded, via dynamic import(), inside
+// generateReceiptPdf below, at the moment someone clicks "PDF" on a receipt.
+import type jsPDF from "jspdf";
 import type { Receipt } from "../types";
 
 // ---- Palette (from theme.ts's `colors`) ----
@@ -40,10 +42,12 @@ function pad(id: number): string {
   return String(id).padStart(6, "0");
 }
 
-// Same value scheme as ReceiptCard.tsx's receiptQrValue() — keep these two
-// in sync if that ever changes.
+// Same value as ReceiptCard.tsx's receiptQrValue(): the server-issued
+// encrypted token (receipt.qrToken), not the plain id - see
+// server/src/utils/receiptQrToken.ts for why this is the one id in the app
+// that's actually encrypted rather than a plain integer.
 function receiptQrValue(receipt: Receipt): string {
-  return `RECEIPT#${pad(receipt.id)}`;
+  return receipt.qrToken;
 }
 
 /**
@@ -249,10 +253,12 @@ export async function generateReceiptPdf(
   const { paperMM, printableMM } = THERMAL_PAPER_SIZES[paperSize];
   const marginMM = (paperMM - printableMM) / 2;
 
-  const [logoDataUrl, qrDataUrl] = await Promise.all([
+  const [{ default: JsPDF }, { default: QRCode }, logoDataUrl] = await Promise.all([
+    import("jspdf"),
+    import("qrcode"),
     svgToPngDataUrl(logoSvgMarkup(200), 200),
-    QRCode.toDataURL(receiptQrValue(receipt), { margin: 0, width: 300, color: { dark: INK } }),
   ]);
+  const qrDataUrl = await QRCode.toDataURL(receiptQrValue(receipt), { margin: 0, width: 300, color: { dark: INK } });
   const assets: Assets = { logoDataUrl, qrDataUrl };
 
   // Pass 1 (dry): measure only.
@@ -263,7 +269,7 @@ export async function generateReceiptPdf(
   });
 
   // Pass 2 (real): draw onto a page sized to fit exactly what pass 1 measured.
-  const doc = new jsPDF({ unit: "mm", format: [paperMM, contentHeight] });
+  const doc = new JsPDF({ unit: "mm", format: [paperMM, contentHeight] });
   doc.setProperties({ title: `Receipt #${pad(receipt.id)}` });
   renderReceipt(doc, receipt, assets, { contentWidthMM: printableMM, marginMM, topY: 0 });
 
