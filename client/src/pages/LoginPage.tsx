@@ -7,7 +7,7 @@ import { Button, Field, TextInput } from "../components/ui";
 import { colors, fonts } from "../theme";
 
 export function LoginPage() {
-  const { user, login } = useAuth();
+  const { user, login, sessionError } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -68,7 +68,13 @@ export function LoginPage() {
           <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%" }} />
         </Field>
 
-        {error && <p style={{ color: colors.danger, fontSize: 13, marginTop: -8, marginBottom: 12 }}>{error}</p>}
+        {/* A submit error takes precedence once the user has actually tried
+            signing in; sessionError (the initial session check failing for a
+            reason other than "not logged in") is what explains why they
+            landed here in the first place, if that's what happened. */}
+        {(error ?? sessionError) && (
+          <p style={{ color: colors.danger, fontSize: 13, marginTop: -8, marginBottom: 12 }}>{error ?? sessionError}</p>
+        )}
 
         <Button type="submit" disabled={submitting} style={{ width: "100%", padding: 10 }}>
           {submitting ? "Signing in…" : "Sign in"}

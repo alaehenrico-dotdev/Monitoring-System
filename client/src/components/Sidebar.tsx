@@ -48,6 +48,7 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
   {
     heading: "Reports",
     links: [
+      { to: "/consolidated-receipts", label: "Consolidated Receipt", abbr: "CR", roles: ["ONLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/variance-report", label: "Variance Report", abbr: "VR", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/daily-report", label: "Daily Report", abbr: "DR", roles: ["SUPERVISOR_ADMIN"] },
     ],
@@ -57,6 +58,7 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
     links: [
       { to: "/change-log", label: "Change Log", abbr: "CL", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/products", label: "SKUs", abbr: "SK", roles: ["SUPERVISOR_ADMIN"] },
+      { to: "/delivery-destinations", label: "Delivery Destinations", abbr: "DD", roles: ["SUPERVISOR_ADMIN"] },
     ],
   },
   {

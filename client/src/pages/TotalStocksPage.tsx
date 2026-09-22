@@ -79,7 +79,7 @@ export function TotalStocksPage() {
         <ToolbarControls>
           {csvRows && (
             <>
-              <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} canImport={false}
+              <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} getPendingValue={() => undefined} canImport={false}
                 exportFormat="excel"
                 pdf={{
                   title: "Total Stocks (Online + Offline)",

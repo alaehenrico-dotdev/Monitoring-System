@@ -14,7 +14,7 @@ import type { UnsavedWorkItem } from "../utils/unsavedWork";
  */
 export function AlertDialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   return (
-    <Modal title={title} onClose={onClose} width={440} bordered>
+    <Modal title={title} onClose={onClose} width={440}>
       <div role="alert" style={{ fontSize: 13.5, lineHeight: 1.55 }}>
         {children}
       </div>

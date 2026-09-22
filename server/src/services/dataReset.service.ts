@@ -59,6 +59,12 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
 
   return prisma.$transaction(async (tx) => {
     const onlineStock = await tx.dailyOnlineStock.deleteMany();
+    // OfflineEntryDelivery has an ON DELETE RESTRICT FK onto
+    // daily_offline_stock (schema.prisma), so its rows have to go first or
+    // the offlineStock delete below would fail on any entry with a
+    // destination breakdown. DeliveryDestination itself is untouched - it's
+    // admin-managed master data, same as Product.
+    const offlineEntryDeliveries = await tx.offlineEntryDelivery.deleteMany();
     const offlineStock = await tx.dailyOfflineStock.deleteMany();
     const manualCounts = await tx.manualCount.deleteMany();
     // Deleting a receipt cascades to its items (schema.prisma ReceiptItem
@@ -69,6 +75,7 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     const deleted = {
       onlineStock: onlineStock.count,
       offlineStock: offlineStock.count,
+      offlineEntryDeliveries: offlineEntryDeliveries.count,
       manualCounts: manualCounts.count,
       receipts: receipts.count,
       changeLog: changeLog.count,

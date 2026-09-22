@@ -1,6 +1,7 @@
 import { receiptRepository } from "../repositories/receiptRepository";
 import { recordChange } from "./changeLog.service";
 import { addFulfillmentFromReceipt } from "./dailyOnlineStock.service";
+import { addDeliveryFromReceipt } from "./dailyOfflineStock.service";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
 import { productRepository } from "../repositories/productRepository";
@@ -30,6 +31,12 @@ export interface CreateReceiptInput {
   salesRepName?: string;
   items: ReceiptItemInput[];
   postToFulfillment?: boolean;
+  /// Mirrors postToFulfillment but posts onto the Offline pool's Delivery
+  /// (Out) instead of Online's Fulfillment (Out). The two are mutually
+  /// exclusive from the client (a receipt belongs to one pool or the
+  /// other), but handled independently here - nothing stops both, or
+  /// neither, from being true.
+  postToOfflineDelivery?: boolean;
 }
 
 /**
@@ -57,15 +64,22 @@ export async function createReceipt(input: CreateReceiptInput, createdById?: num
 
   await recordChange({ tableName: TABLE, recordId: receipt.id, action: "CREATE", changedById: createdById, newValue: receipt });
 
-  const shouldPost = input.postToFulfillment ?? env.receiptsAutoPostDefault;
-  if (shouldPost) {
+  const shouldPostFulfillment = input.postToFulfillment ?? env.receiptsAutoPostDefault;
+  const shouldPostOfflineDelivery = input.postToOfflineDelivery ?? false;
+  if (shouldPostFulfillment || shouldPostOfflineDelivery) {
     // Receipts don't carry a shift of their own (orderDate has no time
-    // component, and can be backdated) - fulfillment always posts into
-    // whichever shift is actually open right now, the same real-time
-    // default Online/Offline Entry itself uses when an encoder opens it.
+    // component, and can be backdated) - posting always targets whichever
+    // shift is actually open right now, the same real-time default
+    // Online/Offline Entry itself uses when an encoder opens it - not a
+    // shift derived from orderDate.
     const { shift } = getCurrentShiftAndDate();
     for (const item of input.items) {
-      await addFulfillmentFromReceipt(item.productId, input.orderDate, shift, item.quantity, createdById);
+      if (shouldPostFulfillment) {
+        await addFulfillmentFromReceipt(item.productId, input.orderDate, shift, item.quantity, createdById);
+      }
+      if (shouldPostOfflineDelivery) {
+        await addDeliveryFromReceipt(item.productId, input.orderDate, shift, item.quantity, createdById);
+      }
     }
   }
 

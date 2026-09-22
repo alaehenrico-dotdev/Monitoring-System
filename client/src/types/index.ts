@@ -42,6 +42,21 @@ export interface OnlineGridRow {
   isSaved: boolean;
 }
 
+/// A named Offline delivery route/destination (e.g. "Western", "Cavite") -
+/// Section 4.3. Admin-managed (see DeliveryDestinationsAdminPage), the same
+/// way Products are, so the set of destinations can change over time
+/// without a code change: the monthly report this app re-imports (Section
+/// 8.1) has used a different destination lineup from one period to the
+/// next, each getting its own column ("SLOT 1", "SLOT 2", ... in the
+/// sheet's own generic sub-header, with the real name - "WESTERN UPSELL",
+/// "CAVITE" - as that column's actual header).
+export interface DeliveryDestination {
+  id: number;
+  name: string;
+  isActive: boolean;
+  sortOrder: number;
+}
+
 export interface OfflineEntry {
   productId: number;
   entryDate: string;
@@ -51,7 +66,27 @@ export interface OfflineEntry {
   stockOutOffToOl: number;
   offlineStock: number;
   productionIn: number;
+  /// Delivery (Out) broken down by destination - keyed by DeliveryDestination
+  /// id, one entry per active destination that's ever had a value here.
+  /// This is what an encoder actually fills in; deliveryOut below is
+  /// computed as its sum, the same way offlineStock/remainingStock are
+  /// computed rather than typed directly - the live grid shows one locked
+  /// "Delivery (Out)" column, not this map, plus one editable column per
+  /// destination (see buildOfflineStockColumns in config/stockColumns.ts).
+  deliveryByDestination: Record<number, number>;
   deliveryOut: number;
+  /// A distinct Out figure from Delivery (Out) - e.g. free/upsell samples
+  /// handed out rather than delivered against a route. Its own column on
+  /// the monthly report ("UPSELL (OUT)"), usually 0.
+  upsellOut: number;
+  /// Stock a delivery route brought back undelivered - Section 4.3. This
+  /// ADDS BACK onto Remaining Stock rather than subtracting: cross-checked
+  /// against the monthly report's own totals (Section 8.1), e.g. Class A
+  /// (Gallon) - Offline Stocks 3554 + Production 804 - Delivery 752 +
+  /// Backload 29 = Remaining 3635, which only balances with backloads
+  /// added. Confirmed correct server-side (calculateOfflineRemaining in
+  /// server/src/utils/stockMath.ts adds backloads) - see that file's own
+  /// test for this exact pinned example.
   backloads: number;
   remainingStock: number;
 }
@@ -104,6 +139,14 @@ export interface Receipt {
   salesRepName: string | null;
   salesRepId: number | null;
   salesRep: AuthUser | null;
+  /// Which stock pool this receipt tallies against - mirrors
+  /// CreateReceiptInput (see api/receipts.ts), mutually exclusive. Optional
+  /// here (rather than required like the create input) since older receipts
+  /// predate the flags and a not-yet-updated server response may omit them -
+  /// treat missing/undefined the same as `false` (Consolidated Receipt does,
+  /// via receiptPool() in utils/consolidatedReceipts.ts).
+  postToFulfillment?: boolean;
+  postToOfflineDelivery?: boolean;
   createdBy: AuthUser | null;
   createdAt: string;
   items: ReceiptItem[];

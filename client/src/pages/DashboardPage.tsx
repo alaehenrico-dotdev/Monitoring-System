@@ -96,6 +96,10 @@ function localISODate(now: Date = new Date()): string {
 export function DashboardPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [recentActivity, setRecentActivity] = useState<ChangeLogEntry[] | null>(null);
+  // Distinct from recentActivity being a real empty array - without this, a
+  // failed fetch and "the log is genuinely empty" both render the exact same
+  // "No activity recorded yet." message, silently hiding an actual outage.
+  const [recentActivityError, setRecentActivityError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const today = localISODate();
 
@@ -115,9 +119,13 @@ export function DashboardPage() {
 
     // The endpoint already comes back newest-first (Section 5.8) - just
     // take the first few for a glanceable feed instead of the full log.
+    setRecentActivityError(false);
     listChangeLog()
       .then((entries) => setRecentActivity(entries.slice(0, RECENT_ACTIVITY_LIMIT)))
-      .catch(() => setRecentActivity([]));
+      .catch(() => {
+        setRecentActivityError(true);
+        setRecentActivity([]);
+      });
   }, [today]);
 
   const hasVariance = !!analytics && analytics.varianceFlags > 0;
@@ -200,6 +208,8 @@ export function DashboardPage() {
               cellPadding="8px 12px"
               label="Loading recent activity…"
             />
+          ) : recentActivityError ? (
+            <CardMessage>Couldn't load recent activity - try refreshing the page.</CardMessage>
           ) : recentActivity.length === 0 ? (
             <CardMessage>No activity recorded yet.</CardMessage>
           ) : (

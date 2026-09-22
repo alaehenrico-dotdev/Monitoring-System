@@ -13,6 +13,7 @@ export interface OfflineStockData {
   productionIn: number;
   deliveryOut: number;
   backloads: number;
+  upsellOut: number;
   remainingStock: number;
   encodedById?: number;
 }

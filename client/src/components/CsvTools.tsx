@@ -1,6 +1,16 @@
-import { useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
+import {
+  categoryKey,
+  findHeaderRowIndex,
+  findMatchingProduct,
+  findProductColumnIndex,
+  matchColumnIndexes,
+  normalizeForMatch,
+  unmatchedColumns,
+  type ImportableColumn,
+} from "../utils/importMatch";
 import { downloadExcel, toExcelTable } from "../utils/excel";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
@@ -10,47 +20,129 @@ import { toolbarLayoutTransition } from "../motion";
 import { DownloadIcon, PrinterIcon, UploadIcon } from "./icons";
 import { Toast, type ToastVariant } from "./Toast";
 import { useTopProgress } from "../hooks/useTopProgress";
+import { Modal } from "./Modal";
+import { PendingChangesPreview } from "./PendingChangesPreview";
+import type { PendingChangeDetail } from "../hooks/usePendingEntryChanges";
+import { Button } from "./ui";
+import { colors } from "../theme";
 
-export interface CsvColumn {
-  key: string;
-  label: string;
-  editable?: boolean;
-  /// Extra header spellings this column should also be recognized under on
-  /// import (see stockColumns.ts) - the real-world monthly reports this
-  /// gets re-imported from use their own shorthand/typo'd header names
-  /// ("STOCKS IN", "FULLFILMENT (OUT)") rather than the app's own export
-  /// labels, and there's no reasonable way to derive one from the other.
-  aliases?: string[];
-  /// Recognized on import even when editable is false - see GridColumn's
-  /// own doc comment (StockGrid.tsx) for why Opening Stock needs this.
-  importable?: boolean;
+// Same shape as importMatch.ts's ImportableColumn (which is what actually
+// drives the header matching now - see handleImportFile below); kept as its
+// own named type since callers (stockColumns.ts, GridColumn in
+// StockGrid.tsx) already import CsvColumn by this name.
+export type CsvColumn = ImportableColumn;
+
+/// One row of the Review modal's matched list - a row that resolved to a
+/// product AND had at least one value that actually differs from what's
+/// currently on the grid (same "only include changed values" rule the old
+/// inline import used).
+interface MatchedImportRow {
+  productId: number;
+  productName: string;
+  category: string;
+  changes: Record<string, number>;
+  /// From validateImport, if the caller supplied one - an advisory "this
+  /// will likely be rejected at Save" reason, surfaced in the Review modal
+  /// before the user ever clicks Save. Never blocks staging or Save itself
+  /// (see validateImport's own doc comment on CsvToolsProps) - purely a
+  /// heads-up so the eventual save failure isn't a surprise.
+  warning?: string;
 }
 
-/// Loosens a product/category name for comparison during import: lowercased
-/// with all punctuation and whitespace stripped, so "CLASS A -(LITER)" and
-/// "Class A (Liter)" (or "SWEET A" and "Sweet A") are recognized as the same
-/// thing despite the case and punctuation differences a manually-maintained
-/// spreadsheet tends to accumulate.
-function normalizeForMatch(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, "");
+/// One row of the Review modal's unmatched list - every row that failed to
+/// resolve to a product, not just a truncated handful of examples, since
+/// this is now a scrollable list a user can act on rather than a one-line
+/// toast.
+interface UnmatchedImportRow {
+  productName: string;
+  category?: string;
+  rawLineIndex: number;
 }
 
-// A couple of category names the monthly report (Section 8.1) spells out
-// differently enough that stripping punctuation alone doesn't bridge the
-// gap - unlike everything else, this is a genuine wording difference
-// ("3.785 Liters" vs the app's abbreviated "3.785L"), not just formatting.
-// Keyed and valued by normalizeForMatch's own output.
-const CATEGORY_ALIASES: Record<string, string> = {
-  premium3785literspet: "premium3785lpet",
-};
+interface ImportReview {
+  matchedRows: MatchedImportRow[];
+  unmatchedRows: UnmatchedImportRow[];
+  /// Labels of columns this grid reads on import that weren't found
+  /// anywhere in this file's header row at all (see unmatchedColumns) -
+  /// distinct from a column that matched but had a blank cell for one row.
+  missingColumns: string[];
+}
 
-/// Like normalizeForMatch, but also resolves a category name through
-/// CATEGORY_ALIASES first - used for every category comparison so a report
-/// category and the app's own category are recognized as the same thing
-/// regardless of which side (if either) needed the alias.
-function categoryKey(s: string): string {
-  const normalized = normalizeForMatch(s);
-  return CATEGORY_ALIASES[normalized] ?? normalized;
+/// Everything handleConfirmImport/acceptSuggestion need to re-derive a diff
+/// after parsing has already finished and control has moved to the Review
+/// modal - kept out of ImportReview's own state (whose shape is just what
+/// the modal displays) and out of React state entirely, since it never
+/// drives a render itself.
+interface ImportParseContext {
+  lines: string[][];
+  columnIndexes: { key: string; idx: number }[];
+  unchangedCount: number;
+  fileName: string;
+}
+
+/// What the review modal's own Save actually staged, kept around just long
+/// enough for a one-shot "Undo Import" (Section 3.1) - same lifetime as
+/// `busy`/`message` (component state, not sessionStorage): fine to lose on
+/// navigation/reload, same as the rest of an in-progress import would be.
+interface ImportBatch {
+  fileName: string;
+  importedAt: number;
+  /// productId -> key -> what Save changed it from/to, exactly as staged -
+  /// used both to revert (oldValue) and to check nothing's touched the cell
+  /// since (newValue, compared against getPendingValue).
+  entries: Record<number, Record<string, { oldValue: number; newValue: number }>>;
+}
+
+/// Imperative handle so a page's own whole-grid Save (handleSaveAll, not
+/// this component's review-modal Save) can tell CsvTools its last import
+/// batch has actually been committed to the server and is no longer
+/// "pending" - see notifyCommitted's own doc comment below for why this
+/// can't just be inferred locally.
+export interface CsvToolsHandle {
+  notifyCommitted: () => void;
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const prevRow = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prevRow[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let prevDiag = prevRow[0];
+    prevRow[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const temp = prevRow[j];
+      prevRow[j] = a[i - 1] === b[j - 1] ? prevDiag : 1 + Math.min(prevDiag, prevRow[j], prevRow[j - 1]);
+      prevDiag = temp;
+    }
+  }
+  return prevRow[b.length];
+}
+
+/// A minimum similarity below which a "did you mean" suggestion does more
+/// harm than good (attaching a receipt-style edit to an unrelated SKU).
+const FUZZY_MATCH_THRESHOLD = 0.6;
+
+/// Tolerant similarity used only for the Review modal's suggestion on an
+/// unmatched row - normalizeForMatch's exact equality (the real match used
+/// during parsing) is deliberately strict so a row is never silently
+/// attached to the wrong SKU; this is purely to help a human decide, never
+/// applied automatically.
+function fuzzyScore(a: string, b: string): number {
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  return 1 - levenshtein(na, nb) / Math.max(na.length, nb.length);
+}
+
+function bestFuzzyMatch(name: string, candidates: Product[]): { product: Product; score: number } | null {
+  let best: { product: Product; score: number } | null = null;
+  for (const product of candidates) {
+    const score = fuzzyScore(name, product.name);
+    if (!best || score > best.score) best = { product, score };
+  }
+  return best && best.score >= FUZZY_MATCH_THRESHOLD ? best : null;
 }
 
 interface CsvToolsProps {
@@ -60,8 +152,26 @@ interface CsvToolsProps {
   columns: CsvColumn[];
   /// Applies one imported row's editable values (already resolved to a
   /// productId) - the caller owns saving it and merging the result into
-  /// local state, exactly like a manual cell edit would.
+  /// local state, exactly like a manual cell edit would. "Undo Import"
+  /// reuses this same callback (see handleUndoImport) - reverting a cell is
+  /// just staging its old value back through the normal path.
   onImportRow: (productId: number, values: Record<string, number>) => Promise<void>;
+  /// Whatever the caller's own pending-changes state currently has staged
+  /// for this exact cell, or undefined if nothing is - CsvTools has no
+  /// direct access to that state itself. Used only by "Undo Import" to
+  /// check a cell hasn't been touched by something else (a manual edit, a
+  /// second import) since this one staged it, before reverting it.
+  getPendingValue: (productId: number, key: string) => number | undefined;
+  /// Optional advisory pre-check, run once per matched row while building
+  /// the Review modal (and again when a fuzzy suggestion is accepted) -
+  /// returns a warning string if this row's changes would likely be
+  /// rejected server-side (e.g. the negative-stock guard), or undefined if
+  /// it looks fine. Purely informational: this can't see everything the
+  /// real save considers (a concurrent edit, the exact instant it runs), so
+  /// it can under- or over-warn - it never blocks staging or Save, only
+  /// surfaces the reason before Save is clicked instead of only after it
+  /// fails. Omit entirely on a page with no such risk to check for.
+  validateImport?: (productId: number, changes: Record<string, number>) => string | undefined;
   /// Writers only - readers can still Export but shouldn't see Import.
   canImport: boolean;
   /// Hide the Export segment - e.g. a page that already has its own Export
@@ -107,6 +217,41 @@ interface CsvToolsProps {
   };
 }
 
+/// One row of the Review modal's unmatched list - the raw name/category the
+/// file had, plus a fuzzy "did you mean" suggestion computed fresh on every
+/// render (so it always reflects the current product list) that the user
+/// can accept to fold this row into the matched list above.
+function UnmatchedImportRowView({
+  row,
+  candidates,
+  onAccept,
+}: {
+  row: UnmatchedImportRow;
+  candidates: Product[];
+  onAccept: (rawLineIndex: number, product: Product) => void;
+}) {
+  const suggestion = bestFuzzyMatch(row.productName, candidates);
+  return (
+    <div style={{ padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+      <div style={{ fontSize: 13, color: colors.ink }}>
+        “{row.productName}”{row.category ? <span style={{ color: colors.subtleInk }}> in “{row.category}”</span> : null}
+      </div>
+      {suggestion ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 12.5, color: colors.subtleInk }}>
+          <span>
+            Use “{suggestion.product.name}” instead?
+          </span>
+          <Button type="button" variant="secondary" size="sm" onClick={() => onAccept(row.rawLineIndex, suggestion.product)}>
+            Accept
+          </Button>
+        </div>
+      ) : (
+        <div style={{ marginTop: 4, fontSize: 12.5, color: colors.subtleInk }}>No match found.</div>
+      )}
+    </div>
+  );
+}
+
 /**
  * Section 3.1 - "Copy/paste of a block of numbers from an external
  * spreadsheet into the grid is supported for bulk correction." Implemented
@@ -115,12 +260,14 @@ interface CsvToolsProps {
  * re-import, which is the more common real-world bulk-correction workflow
  * than pasting a raw block of cells.
  */
-export function CsvTools({
+export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTools({
   filenamePrefix,
   date,
   rows,
   columns,
   onImportRow,
+  getPendingValue,
+  validateImport,
   canImport,
   showExport = true,
   showPdf = true,
@@ -129,13 +276,43 @@ export function CsvTools({
   onBeforePrint,
   exportFormat = "csv",
   pdf,
-}: CsvToolsProps) {
+}, ref) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const progress = useTopProgress();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [messageVariant, setMessageVariant] = useState<ToastVariant>("info");
+  // Parsing (busy) and Save (savingImport) are two separate, sequential
+  // steps now - see handleImportFile/handleConfirmImport - so each gets its
+  // own in-flight flag rather than one covering both.
+  const [importReview, setImportReview] = useState<ImportReview | null>(null);
+  const [savingImport, setSavingImport] = useState(false);
+  const importContextRef = useRef<ImportParseContext | null>(null);
+  // The most recent review-modal Save, revertible via "Undo Import" until
+  // either a second import overwrites it (one level only, same rule as the
+  // page's own per-save Undo) or notifyCommitted says it's been superseded
+  // by a real, already-saved edit (see CsvToolsHandle above).
+  const [lastImportBatch, setLastImportBatch] = useState<ImportBatch | null>(null);
+  // Whether the *current* toast message is the one "Undo Import" belongs to
+  // - kept separate from lastImportBatch itself (which can outlive its own
+  // toast) so the action doesn't show up again next to some later, unrelated
+  // message while a stale-but-not-yet-superseded batch still exists.
+  const [showUndoImport, setShowUndoImport] = useState(false);
+  const undoInFlightRef = useRef(false);
   const asExcel = exportFormat === "excel" && !canImport;
+
+  useImperativeHandle(ref, () => ({
+    // Called by the page's own whole-grid Save (handleSaveAll), never by
+    // anything in this file - once that Save actually commits an imported
+    // cell to the server, lastImportBatch's "oldValue -> newValue" is no
+    // longer describing a pending edit at all, so re-staging oldValue via
+    // Undo Import at that point would create a brand-new, real change
+    // instead of just dropping a still-pending one back to baseline.
+    notifyCommitted: () => {
+      setLastImportBatch(null);
+      setShowUndoImport(false);
+    },
+  }));
 
   function handleExport() {
     if (asExcel) {
@@ -178,54 +355,44 @@ export function CsvTools({
     } catch (err) {
       setMessage(err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed");
       setMessageVariant("error");
+      setShowUndoImport(false);
     }
   }
 
   async function handleImportFile(file: File) {
     setBusy(true);
     setMessage(null);
-    progress.start();
+    setShowUndoImport(false);
     try {
       const text = await file.text();
       const table = parseCsv(text);
       if (table.length < 2) throw new Error("File has no data rows");
 
-      // The header is normally row 0, but a file that's been round-tripped
-      // through Excel (or had a title/blank row pasted above it) can push
-      // the real column headers down a row or two - scan down for whichever
-      // row actually has a product-name cell in it instead of assuming row
-      // 0, so those files still import instead of failing outright. Some
-      // real-world exports (see Section 8.1) header this column "Products"
-      // (plural) rather than "Product" - both spellings (and this app's own
-      // "SKU"/"SKUs", per the Section 4.1 renaming) are accepted so neither
-      // an old export nor the current business file re-imports.
-      const headerRowIdx = table.findIndex((row) =>
-        row.some((cell) => ["product", "products", "sku", "skus"].includes(cell.trim().toLowerCase())),
-      );
+      // See findHeaderRowIndex's own doc comment: a file that's been
+      // round-tripped through Excel (or had a title/blank row pasted above
+      // it - exactly what the monthly report's own layout looks like) can
+      // push the real column headers down a row or two. Some real-world
+      // exports (Section 8.1) header this column "Products" (plural) rather
+      // than "Product" - both spellings (and this app's own "SKU"/"SKUs",
+      // per the Section 4.1 renaming) are accepted so neither an old export
+      // nor the current business file fails to import.
+      const headerRowIdx = findHeaderRowIndex(table);
       if (headerRowIdx === -1) throw new Error('Expected a "SKU" (or "Product") column - re-export the grid and edit that file');
 
       const header = table[headerRowIdx].map((h) => h.trim().toLowerCase());
-      const productIdx = header.findIndex((h) => ["product", "products", "sku", "skus"].includes(h));
+      const productIdx = findProductColumnIndex(header);
       const categoryIdx = header.indexOf("category");
 
-      const editableColumns = columns.filter((c) => c.editable || c.importable);
-      const columnIndexes = editableColumns
-        .map((col) => {
-          const names = [col.label, ...(col.aliases ?? [])].map((n) => n.toLowerCase());
-          const idx = header.findIndex((h) => names.includes(h));
-          return { key: col.key, idx };
-        })
-        .filter((c) => c.idx !== -1);
+      const columnIndexes = matchColumnIndexes(columns, header);
+      // Every column this grid reads on import that this particular file
+      // doesn't have a header for at all - worth a heads-up, since those
+      // rows will otherwise just look "unchanged" for that column with no
+      // indication why (see the toast message below).
+      const missingColumns = unmatchedColumns(columns, header);
 
-      let updated = 0;
-      let skipped = 0;
+      const matchedRows: MatchedImportRow[] = [];
+      const unmatchedRows: UnmatchedImportRow[] = [];
       let unchanged = 0;
-      // A few concrete examples of what failed to match, surfaced in the
-      // result message below - "67 unmatched" alone gives no way to tell a
-      // handful of genuinely-unrecognized rows (a discontinued product,
-      // a totals line) apart from every row failing because the file's
-      // naming doesn't line up with the product list at all.
-      const unmatchedExamples: string[] = [];
       // Some monthly reports (see Section 8.1) have no Category column at
       // all - instead a category shows up as its own row (e.g.
       // "PREMIUM (350 ML)") with every stat column left blank, followed by
@@ -244,13 +411,7 @@ export function CsvTools({
       // product named "Class A (Gallon)".
       const knownCategoryNames = new Set(rows.map((r) => categoryKey(r.product.category)));
       const importLines = table.slice(headerRowIdx + 1);
-      let linesSeen = 0;
-      for (const line of importLines) {
-        // Every line advances the bar, including the skip/continue paths
-        // below - it's a real "how far through the file are we" progress
-        // signal (Section: Loading system), not a synthetic timer.
-        linesSeen++;
-        progress.set(Math.round((linesSeen / (importLines.length || 1)) * 100));
+      for (const [rawLineIndex, line] of importLines.entries()) {
         const productName = line[productIdx]?.trim();
         if (!productName) continue;
 
@@ -266,25 +427,12 @@ export function CsvTools({
         }
 
         const category = categoryIdx !== -1 ? line[categoryIdx]?.trim() : currentCategory;
-        // Normalized (lowercased, punctuation/whitespace stripped) on both
-        // sides - the monthly report this also needs to import (Section
-        // 8.1) is written entirely in ALL CAPS ("SWEET A", "CLASS A
-        // (GALLON)") and isn't even internally consistent about punctuation
-        // ("CLASS A -(LITER)" vs "CLASS A (GALLON)", no dash), while the
-        // app's own product/category names are plain title case - an exact
-        // === here would fail to match a single row from that file.
-        // Product names repeat across categories (e.g. "Sweet A" exists in
-        // both Class A (Liter) and Class A (Gallon)) - matching on category
-        // too, when it's known (an explicit column, or an inferred section
-        // header above), avoids silently updating the wrong SKU.
-        const match = rows.find(
-          (r) =>
-            normalizeForMatch(r.product.name) === normalizeForMatch(productName) &&
-            (category === undefined || categoryKey(r.product.category) === categoryKey(category)),
-        );
+        // See findMatchingProduct's own doc comment (utils/importMatch.ts)
+        // for why this normalizes both sides and matches on category too,
+        // when known.
+        const match = findMatchingProduct(rows, productName, category);
         if (!match) {
-          skipped++;
-          if (unmatchedExamples.length < 3) unmatchedExamples.push(category ? `"${productName}" in "${category}"` : `"${productName}"`);
+          unmatchedRows.push({ productName, category, rawLineIndex });
           continue;
         }
 
@@ -293,54 +441,187 @@ export function CsvTools({
         // re-import) otherwise resubmits every unchanged "0" as a real edit -
         // 60+ redundant writes (and change-log entries) for what's really a
         // one-cell correction.
-        const values: Record<string, number> = {};
+        const changes: Record<string, number> = {};
         for (const { key, idx } of columnIndexes) {
           const raw = line[idx];
           if (raw === undefined || raw.trim() === "") continue;
           const parsed = Number(raw);
           if (Number.isNaN(parsed)) continue;
           const current = Number(match.entry[key] ?? 0);
-          if (parsed !== current) values[key] = parsed;
+          if (parsed !== current) changes[key] = parsed;
         }
-        if (Object.keys(values).length === 0) {
+        if (Object.keys(changes).length === 0) {
           unchanged++;
           continue;
         }
 
-        await onImportRow(match.product.id, values);
-        updated++;
+        matchedRows.push({
+          productId: match.product.id,
+          productName: match.product.name,
+          category: match.product.category,
+          changes,
+          warning: validateImport?.(match.product.id, changes),
+        });
       }
 
-      const parts = [`Imported ${updated} row${updated === 1 ? "" : "s"}`];
-      if (unchanged) parts.push(`${unchanged} unchanged`);
-      if (skipped) parts.push(`${skipped} unmatched`);
-      let summary = `${parts.join(", ")}.`;
-      if (unmatchedExamples.length) {
-        summary += ` Unrecognized, e.g. ${unmatchedExamples.join(", ")}.`;
-        // Show what's actually loaded side-by-side with what the file
-        // said, rather than sending the user off to the SKUs admin page to
-        // check by hand - if this list is empty, or its own names don't
-        // resemble the "Unrecognized" examples above, that's the mismatch.
-        summary +=
-          rows.length === 0
-            ? " No SKUs are currently loaded for this date/page, so nothing could match."
-            : ` For comparison, ${rows.length} SKUs are loaded here, e.g. ${rows
-                .slice(0, 3)
-                .map((r) => `"${r.product.name}" in "${r.product.category}"`)
-                .join(", ")}.`;
-      }
-      setMessage(summary);
-      // Worth reading in full, not glancing past - stays up until
-      // dismissed rather than auto-clearing while there's something
-      // unresolved (rows that didn't match anything).
-      setMessageVariant(unmatchedExamples.length ? "error" : "info");
-      progress.done();
+      // Everything past this point (accepting a suggestion, Save) needs the
+      // raw lines/column layout again to re-derive a diff - stashed here
+      // rather than re-parsed, since the file itself isn't kept around.
+      importContextRef.current = { lines: importLines, columnIndexes, unchangedCount: unchanged, fileName: file.name };
+      setImportReview({ matchedRows, unmatchedRows, missingColumns: missingColumns.map((c) => c.label) });
     } catch (err) {
       setMessage(err instanceof Error ? `Import failed: ${err.message}` : "Import failed");
       setMessageVariant("error");
-      progress.fail();
+      setShowUndoImport(false);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /// Moves one unmatched row onto the matched list using the destination the
+  /// user picked from its fuzzy suggestion - re-running the same "only
+  /// include changed values" diff against THAT product's current row (not
+  /// the one the file's own text implied), same as a normal match. A row
+  /// that turns out identical to the suggested product's current values is
+  /// still removed from the unmatched list (the user resolved it) but never
+  /// added to matched - same "nothing to change" treatment as any other
+  /// unchanged row.
+  function acceptSuggestion(rawLineIndex: number, product: Product) {
+    const context = importContextRef.current;
+    const line = context?.lines[rawLineIndex];
+    if (!context || !line) return;
+
+    const currentRow = rows.find((r) => r.product.id === product.id);
+    const changes: Record<string, number> = {};
+    for (const { key, idx } of context.columnIndexes) {
+      const raw = line[idx];
+      if (raw === undefined || raw.trim() === "") continue;
+      const parsed = Number(raw);
+      if (Number.isNaN(parsed)) continue;
+      const current = Number(currentRow?.entry[key] ?? 0);
+      if (parsed !== current) changes[key] = parsed;
+    }
+
+    setImportReview((prev) => {
+      if (!prev) return prev;
+      const unmatchedRows = prev.unmatchedRows.filter((u) => u.rawLineIndex !== rawLineIndex);
+      const matchedRows = Object.keys(changes).length
+        ? [
+            ...prev.matchedRows,
+            {
+              productId: product.id,
+              productName: product.name,
+              category: product.category,
+              changes,
+              warning: validateImport?.(product.id, changes),
+            },
+          ]
+        : prev.matchedRows;
+      return { ...prev, matchedRows, unmatchedRows };
+    });
+  }
+
+  /// The Review modal's own Save - this is the point the old inline import
+  /// actually mutated anything, so it's also where the network progress bar
+  /// now starts/advances/finishes (see handleImportFile, which no longer
+  /// touches it at all - parsing is purely local and instant). Also the
+  /// point that captures lastImportBatch: the old value for each changed
+  /// cell, resolved from `rows` the exact same way the review modal's own
+  /// diff already does, since that's the only "what did this actually
+  /// change from" this component ever has - a fresh recompute here, not a
+  /// carry-over from MatchedImportRow (which only ever needed the new
+  /// values) or the modal's own render (which never persists what it drew).
+  async function handleConfirmImport() {
+    if (!importReview || importReview.matchedRows.length === 0) return;
+    setSavingImport(true);
+    progress.start();
+    try {
+      const total = importReview.matchedRows.length;
+      const batchEntries: ImportBatch["entries"] = {};
+      for (let i = 0; i < importReview.matchedRows.length; i++) {
+        const row = importReview.matchedRows[i];
+        await onImportRow(row.productId, row.changes);
+
+        const priorRow = rows.find((r) => r.product.id === row.productId);
+        const fields: Record<string, { oldValue: number; newValue: number }> = {};
+        for (const [key, newValue] of Object.entries(row.changes)) {
+          fields[key] = { oldValue: Number(priorRow?.entry[key] ?? 0), newValue };
+        }
+        batchEntries[row.productId] = fields;
+
+        progress.set(Math.round(((i + 1) / total) * 100));
+      }
+
+      setLastImportBatch({ fileName: importContextRef.current?.fileName ?? "import", importedAt: Date.now(), entries: batchEntries });
+      setShowUndoImport(true);
+
+      const updated = importReview.matchedRows.length;
+      const unchanged = importContextRef.current?.unchangedCount ?? 0;
+      const stillUnmatched = importReview.unmatchedRows.length;
+      const parts = [`Imported ${updated} row${updated === 1 ? "" : "s"}`];
+      if (unchanged) parts.push(`${unchanged} unchanged`);
+      if (stillUnmatched) parts.push(`${stillUnmatched} still unmatched after review`);
+      setMessage(`${parts.join(", ")}.`);
+      // Worth reading in full, not glancing past - stays up until dismissed
+      // rather than auto-clearing while there's something unresolved (rows
+      // that still didn't match anything even after the review modal).
+      setMessageVariant(stillUnmatched ? "error" : "info");
+      progress.done();
+      setImportReview(null);
+    } catch (err) {
+      setMessage(err instanceof Error ? `Import failed: ${err.message}` : "Import failed");
+      setMessageVariant("error");
+      setShowUndoImport(false);
+      progress.fail();
+    } finally {
+      setSavingImport(false);
+    }
+  }
+
+  /// One-shot "Undo Import" (see lastImportBatch's own doc comment) - only
+  /// reverts a cell that's still exactly what this import last staged for
+  /// it (checked via getPendingValue), so a manual edit - or a second
+  /// import - made to that cell afterward is left alone rather than
+  /// silently overwritten. Reuses onImportRow one cell at a time, same as
+  /// the import itself used, so a revert is indistinguishable from staging
+  /// that old value by hand.
+  async function handleUndoImport() {
+    if (undoInFlightRef.current) return;
+    const batch = lastImportBatch;
+    if (!batch) return;
+    undoInFlightRef.current = true;
+    setShowUndoImport(false);
+    progress.start();
+    try {
+      const cells = Object.entries(batch.entries).flatMap(([productIdStr, fields]) =>
+        Object.entries(fields).map(([key, values]) => ({ productId: Number(productIdStr), key, ...values })),
+      );
+
+      let reverted = 0;
+      let skipped = 0;
+      for (let i = 0; i < cells.length; i++) {
+        const cell = cells[i];
+        if (getPendingValue(cell.productId, cell.key) === cell.newValue) {
+          await onImportRow(cell.productId, { [cell.key]: cell.oldValue });
+          reverted++;
+        } else {
+          skipped++;
+        }
+        progress.set(Math.round(((i + 1) / cells.length) * 100));
+      }
+
+      setLastImportBatch(null);
+      const parts = [`Reverted ${reverted} cell${reverted === 1 ? "" : "s"} from ${batch.fileName}`];
+      if (skipped) parts.push(`${skipped} cell${skipped === 1 ? "" : "s"} skipped, already changed since`);
+      setMessage(`${parts.join(", ")}.`);
+      setMessageVariant(skipped ? "error" : "info");
+      progress.done();
+    } catch (err) {
+      setMessage(err instanceof Error ? `Undo failed: ${err.message}` : "Undo failed");
+      setMessageVariant("error");
+      progress.fail();
+    } finally {
+      undoInFlightRef.current = false;
     }
   }
 
@@ -425,10 +706,88 @@ export function CsvTools({
       </motion.div>
       <Toast
         message={message}
-        onDismiss={() => setMessage(null)}
+        onDismiss={() => {
+          setMessage(null);
+          setShowUndoImport(false);
+        }}
         variant={messageVariant}
         duration={messageVariant === "error" ? null : 6000}
+        action={showUndoImport && lastImportBatch ? { label: "Undo Import", onClick: () => void handleUndoImport() } : undefined}
       />
+      {importReview && (
+        <Modal title="Review Import" onClose={() => setImportReview(null)} width={760}>
+          <PendingChangesPreview
+            items={importReview.matchedRows.flatMap((row): PendingChangeDetail[] =>
+              Object.entries(row.changes).map(([key, newValue]) => ({
+                productId: row.productId,
+                name: row.productName,
+                category: row.category,
+                label: columns.find((c) => c.key === key)?.label ?? key,
+                // Resolved the same way describePendingChanges resolves an
+                // old value - against the last-saved `rows`, never the
+                // (already-changed) values sitting in this review.
+                oldValue: Number(rows.find((r) => r.product.id === row.productId)?.entry[key] ?? 0),
+                newValue,
+              })),
+            )}
+          />
+          {importReview.matchedRows.some((r) => r.warning) && (
+            <div style={{ marginTop: 14 }}>
+              <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.danger }}>
+                ⚠ May fail to save
+              </h4>
+              {/* Advisory only (see validateImport's own doc comment) -
+                  these rows are still staged and still counted in
+                  "Save (N)" below; this is a heads-up before Save is
+                  clicked, not a second gate. */}
+              <ul style={{ margin: 0, padding: "0 0 0 18px", fontSize: 12.5, color: colors.subtleInk }}>
+                {importReview.matchedRows
+                  .filter((r) => r.warning)
+                  .map((r) => (
+                    <li key={r.productId}>
+                      <strong style={{ color: colors.ink }}>{r.productName}</strong>: {r.warning}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
+          {importReview.missingColumns.length > 0 && (
+            <p style={{ margin: "12px 0 0", fontSize: 12.5, color: colors.subtleInk }}>
+              Not found in this file, left unchanged: {importReview.missingColumns.join(", ")}.
+            </p>
+          )}
+          {importReview.unmatchedRows.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.ink }}>
+                Unmatched ({importReview.unmatchedRows.length})
+              </h4>
+              <div style={{ maxHeight: 240, overflowY: "auto" }}>
+                {importReview.unmatchedRows.map((row) => (
+                  <UnmatchedImportRowView
+                    key={row.rawLineIndex}
+                    row={row}
+                    candidates={rows.map((r) => r.product)}
+                    onAccept={acceptSuggestion}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setImportReview(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => void handleConfirmImport()}
+              disabled={importReview.matchedRows.length === 0 || savingImport}
+            >
+              {savingImport ? "Saving…" : `Save (${importReview.matchedRows.length})`}
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
-}
+});

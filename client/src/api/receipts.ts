@@ -8,6 +8,13 @@ export interface CreateReceiptInput {
   /// Free text - not necessarily a system user (Section 4.7).
   salesRepName?: string;
   postToFulfillment?: boolean;
+  /// Mirrors postToFulfillment (Section 4.7) but for the Offline pool -
+  /// tallies this receipt's item quantities onto the current shift's
+  /// Offline entry Delivery (Out) column instead of Online's Fulfillment
+  /// (Out). Online and Offline are separate stock pools that aren't
+  /// expected to tally with each other (see MonthlyMonitoring), so the
+  /// two flags are mutually exclusive - the form never sends both true.
+  postToOfflineDelivery?: boolean;
   items: { productId: number; quantity: number }[];
 }
 

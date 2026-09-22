@@ -15,8 +15,12 @@
  *   ala-eh-manual-count-pending:<date>:<shift>:<location>
  */
 
-const ENTRY_PREFIX = "ala-eh-pending:";
-const MANUAL_COUNT_PREFIX = "ala-eh-manual-count-pending:";
+// Exported so hooks/usePendingEntryChanges.ts's clearAllPendingEntryState
+// (Data Reset's client-side cleanup) can wipe exactly these same prefixes
+// rather than duplicating them as a second set of magic strings that could
+// silently drift out of sync with the ones actually written here.
+export const ENTRY_PREFIX = "ala-eh-pending:";
+export const MANUAL_COUNT_PREFIX = "ala-eh-manual-count-pending:";
 
 export type UnsavedWorkPage = "Online Entry" | "Offline Entry" | "Manual Count";
 

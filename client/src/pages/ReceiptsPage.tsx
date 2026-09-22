@@ -6,6 +6,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
+import { Link } from "react-router-dom";
 import { createReceipt, listReceipts } from "../api/receipts";
 import { listProducts } from "../api/products";
 import type { Product, Receipt } from "../types";
@@ -97,7 +98,24 @@ export function ReceiptsPage() {
   const [customer, setCustomer] = useState("");
   const [location, setLocation] = useState("");
   const [salesRepName, setSalesRepName] = useState("");
+  // Which stock pool (if any) this receipt tallies against. Online and
+  // Offline are separate pools that aren't expected to tally with each
+  // other (Section 2.1), so at most one of these is ever true - checking
+  // one clears the other rather than letting both post at once. Defaults
+  // to the pre-existing Online behavior so nothing changes for anyone who
+  // never touches the new control.
   const [postToFulfillment, setPostToFulfillment] = useState(true);
+  const [postToOfflineDelivery, setPostToOfflineDelivery] = useState(false);
+
+  function toggleFulfillment(checked: boolean) {
+    setPostToFulfillment(checked);
+    if (checked) setPostToOfflineDelivery(false);
+  }
+
+  function toggleOfflineDelivery(checked: boolean) {
+    setPostToOfflineDelivery(checked);
+    if (checked) setPostToFulfillment(false);
+  }
 
   const [items, setItems] = useState<LineItem[]>([
     { productId: 0, quantity: "" },
@@ -173,6 +191,7 @@ export function ReceiptsPage() {
         location,
         salesRepName: salesRepName.trim() || undefined,
         postToFulfillment,
+        postToOfflineDelivery,
         items: validItems.map((it) => ({
           productId: it.productId,
           quantity: Number(it.quantity),
@@ -271,6 +290,9 @@ export function ReceiptsPage() {
 
         <ToolbarControls>
           <ZoomControl zoom={zoom} onChange={setZoom} />
+          <Link to="/consolidated-receipts" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
+            Consolidated Receipt
+          </Link>
         </ToolbarControls>
       </Toolbar>
 
@@ -408,16 +430,46 @@ export function ReceiptsPage() {
                   gap: 6,
                   fontSize: 10.5,
                   color: colors.subtleInk,
-                  marginBottom: 10,
+                  marginBottom: 4,
                 }}
               >
                 <input
                   type="checkbox"
                   checked={postToFulfillment}
-                  onChange={(e) => setPostToFulfillment(e.target.checked)}
+                  onChange={(e) => toggleFulfillment(e.target.checked)}
                 />
                 Post to Online Fulfillment (Out)
               </label>
+
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 10.5,
+                  color: colors.subtleInk,
+                  marginBottom: 10,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={postToOfflineDelivery}
+                  onChange={(e) => toggleOfflineDelivery(e.target.checked)}
+                />
+                Post to Offline Delivery (Out)
+              </label>
+
+              {/*
+               * Online and Offline are separate stock pools (Section 2.1) -
+               * this receipt tallies against exactly one of them (or
+               * neither), never both, so the note makes that explicit
+               * instead of leaving it implicit in the two checkboxes.
+               */}
+              {!postToFulfillment && !postToOfflineDelivery && (
+                <p style={{ fontSize: 10, color: colors.subtleInk, margin: "-6px 0 10px" }}>
+                  Not posted to Online or Offline - this receipt won't tally against either entry.
+                </p>
+              )}
 
               {error && (
                 <p style={{ color: colors.danger, fontSize: 11, marginBottom: 8 }}>

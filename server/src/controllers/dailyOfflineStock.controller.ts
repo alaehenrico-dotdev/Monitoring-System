@@ -9,8 +9,13 @@ const entrySchema = z.object({
   stockInOlToOff: z.number().min(0).optional(),
   stockOutOffToOl: z.number().min(0).optional(),
   productionIn: z.number().min(0).optional(),
+  // Flat total (CSV-import backward compat) - ignored when
+  // deliveryByDestination is also given. See resolveDeliveryOut.
   deliveryOut: z.number().min(0).optional(),
+  // Partial: only the destination(s) actually being changed on this save.
+  deliveryByDestination: z.record(z.string().regex(/^\d+$/, "must be a destination id"), z.number().min(0)).optional(),
   backloads: z.number().min(0).optional(),
+  upsellOut: z.number().min(0).optional(),
   // See dailyOnlineStock.controller.ts's entrySchema - same reasoning.
   openingStock: z.number().optional(),
 });

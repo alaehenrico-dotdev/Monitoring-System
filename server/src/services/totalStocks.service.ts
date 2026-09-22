@@ -3,7 +3,7 @@ import { productRepository } from "../repositories/productRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { manualCountRepository } from "../repositories/manualCountRepository";
-import { toNum } from "../utils/stockMath";
+import { calculateVariance, toNum } from "../utils/stockMath";
 
 /// Online/Offline/Manual Count entries are now per-shift (Morning, Night),
 /// but Total Stocks is still a single per-date snapshot rather than
@@ -66,7 +66,10 @@ export async function getTotalStocksGrid(entryDate: Date) {
       : locationCount.length
         ? locationCount.reduce((sum, c) => sum + toNum(c.manualCount), 0)
         : null;
-    const totalVariance = totalManualCount === null ? null : totalRemainingStock - totalManualCount;
+    // Same formula as Manual Count's own variance (manualCounts.service.ts) -
+    // shared via calculateVariance rather than re-derived here, so the two
+    // can never drift onto different sign conventions.
+    const totalVariance = totalManualCount === null ? null : calculateVariance(totalRemainingStock, totalManualCount);
 
     return {
       product,

@@ -11,7 +11,11 @@
  * .xlsx zip format, which would need an actual library to produce safely.
  */
 
-function escapeHtml(value: string | number): string {
+/// Exported so other builders that need HTML-table cells Excel opens
+/// correctly (e.g. consolidatedReceipts.ts's multi-row grouped header,
+/// which toExcelTable's flat headers/rows signature can't express) don't
+/// have to duplicate this.
+export function escapeHtml(value: string | number): string {
   return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

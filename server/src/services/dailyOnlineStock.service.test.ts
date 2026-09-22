@@ -81,10 +81,12 @@ describe("saveOnlineEntry - Stock In/Out per channel", () => {
     expect(dailyOfflineStockRepository.upsert).not.toHaveBeenCalled();
   });
 
-  it("rejects a transfer that would drain the OTHER channel below zero, even though Online's own balance is fine", async () => {
+  it("still saves a transfer that drains the OTHER channel below zero, so the shortfall reflects in variance reports", async () => {
     // Online is only receiving stock here, so its own Remaining Stock is
-    // trivially non-negative - the real constraint is on Offline, which is
-    // what's actually giving up the 50 units being pulled in.
+    // trivially non-negative - the real constraint would be on Offline,
+    // which is what's actually giving up the 50 units being pulled in. That
+    // no longer blocks the save: the mirrored Offline row is persisted with
+    // its negative Remaining Stock as-is instead of rejecting the write.
     vi.mocked(dailyOnlineStockRepository.getOpeningStock).mockResolvedValue(0);
     vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue({
       id: 50,
@@ -97,6 +99,11 @@ describe("saveOnlineEntry - Stock In/Out per channel", () => {
       encodedById: null,
     } as never);
 
-    await expect(saveOnlineEntry(PRODUCT_ID, DATE, SHIFT, { stockInOffToOl: 50 })).rejects.toThrow(/Offline stock below zero/);
+    await saveOnlineEntry(PRODUCT_ID, DATE, SHIFT, { stockInOffToOl: 50 });
+
+    expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
+      50,
+      expect.objectContaining({ remainingStock: -30 }),
+    );
   });
 });

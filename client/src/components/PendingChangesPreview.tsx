@@ -27,7 +27,7 @@ export function PendingChangesPreview({ items }: { items: PendingChangeDetail[] 
             <td style={{ textAlign: "left", color: colors.ink }}>{item.category}</td>
             <td style={{ textAlign: "left", color: colors.ink }}>{item.label}</td>
             <td>{item.oldValue.toLocaleString()}</td>
-            <td style={{ fontWeight: 700, color: colors.red }}>{item.newValue.toLocaleString()}</td>
+            <td style={{ fontWeight: 700, color: colors.yellow }}>{item.newValue.toLocaleString()}</td>
           </tr>
         ))}
       </tbody>

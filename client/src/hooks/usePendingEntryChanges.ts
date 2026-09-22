@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { GridRow } from "../components/StockGrid";
+import { ENTRY_PREFIX, MANUAL_COUNT_PREFIX } from "../utils/unsavedWork";
 
 /// productId -> { columnKey -> staged value }
 export type PendingByProduct = Record<number, Record<string, number>>;
@@ -113,6 +114,29 @@ export function usePendingEntryChanges(rows: GridRow[] | null, storageKey?: stri
   }
 
   return { pending, displayRows, stage, clear, clearAll, pendingCount: Object.keys(pending).length };
+}
+
+/// Called by Data Reset (DataResetPage.tsx) right after the server-side wipe
+/// succeeds - session storage is a client-side cache the reset has no way to
+/// reach, and a staged-but-unsaved edit left over from before the reset
+/// would otherwise get submitted against data that no longer has the same
+/// baseline (or doesn't exist at all) once the reset finishes. Covers every
+/// page that stages edits this way: this hook's own pending-value keys
+/// (Online/Offline Entry) and every page's focus-position key, plus Manual
+/// Count's separate pending-value prefix (utils/unsavedWork.ts, which this
+/// must stay in sync with - hence importing its prefixes rather than
+/// re-typing them here).
+export function clearAllPendingEntryState() {
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && (k.startsWith(ENTRY_PREFIX) || k.startsWith(MANUAL_COUNT_PREFIX) || k.startsWith("ala-eh-focus:"))) keys.push(k);
+    }
+    keys.forEach((k) => sessionStorage.removeItem(k));
+  } catch {
+    // best-effort, same as the rest of this file
+  }
 }
 
 export interface PendingChangeDetail {
