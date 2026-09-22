@@ -15,20 +15,16 @@ import { colors } from "../theme";
  * this dialog on the page if it isn't itself a descendant of `.app-shell`
  * to begin with.
  */
-/// `bordered` adds a thin, square-cornered outline around the panel - opt-in
-/// (used by AlertDialog) so every other dialog keeps its existing look.
 export function Modal({
   title,
   onClose,
   children,
   width = 640,
-  bordered = false,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   width?: number;
-  bordered?: boolean;
 }) {
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -61,10 +57,10 @@ export function Modal({
         onClick={(e) => e.stopPropagation()}
         className="ae-modal-panel"
         style={{
+          position: "relative",
           background: colors.paper,
           color: colors.ink,
           borderRadius: 0,
-          border: bordered ? `1px solid ${colors.ink}` : undefined,
           boxShadow: "0 12px 40px rgba(20, 17, 13, 0.3)",
           width: "100%",
           maxWidth: width,
@@ -73,6 +69,7 @@ export function Modal({
           flexDirection: "column",
         }}
       >
+        <div aria-hidden className="ae-modal-border-sweep" />
         <div
           className="ae-modal-header no-print"
           style={{

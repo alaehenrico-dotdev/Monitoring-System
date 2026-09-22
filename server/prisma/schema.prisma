@@ -118,14 +118,43 @@ model DailyOfflineStock {
   productionIn      Decimal  @default(0) @db.Decimal(14, 2)
   deliveryOut       Decimal  @default(0) @db.Decimal(14, 2)
   backloads         Decimal  @default(0) @db.Decimal(14, 2)
+  upsellOut         Int      @default(0)
   remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
   encodedById       Int?
   encodedBy         User?    @relation("OfflineEncodedBy", fields: [encodedById], references: [id])
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  deliveries        OfflineEntryDelivery[]
+
   @@unique([productId, entryDate, shift])
   @@map("daily_offline_stock")
+}
+
+/// Per-destination breakdown of an offline entry's deliveries.
+model DeliveryDestination {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries OfflineEntryDelivery[]
+
+  @@map("delivery_destinations")
+}
+
+model OfflineEntryDelivery {
+  id              Int              @id @default(autoincrement())
+  offlineEntryId  Int
+  offlineEntry    DailyOfflineStock    @relation(fields: [offlineEntryId], references: [id])
+  destinationId   Int
+  destination     DeliveryDestination @relation(fields: [destinationId], references: [id])
+  quantity        Int                  @default(0)
+
+  @@unique([offlineEntryId, destinationId])
+  @@map("offline_entry_deliveries")
 }
 
 /// 5.4 manual_counts - physical count capture; variance is always derived

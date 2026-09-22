@@ -51,8 +51,19 @@ describe("calculateOfflineStock (Section 4.3)", () => {
 });
 
 describe("calculateOfflineRemaining (Section 4.3)", () => {
-  it("is offlineStock + production - delivery + backloads", () => {
-    expect(calculateOfflineRemaining(45, 8, 12, 3)).toBe(44);
+  it("is offlineStock + production - delivery - upsell + backloads", () => {
+    expect(calculateOfflineRemaining(45, 8, 12, 3, 0)).toBe(44);
+  });
+
+  it("subtracts Upsell (Out) the same way as Delivery (Out)", () => {
+    expect(calculateOfflineRemaining(45, 8, 12, 3, 5)).toBe(39);
+  });
+
+  it("ADDS Backloads back onto Remaining Stock - it's a return, not an outflow (real monthly report figures)", () => {
+    // offlineStock=3554, productionIn=804, deliveryOut=752, backloads=29 ->
+    // 3635, not 3577 - flipping this sign would silently understate every
+    // month's Remaining Stock by 2x the backloaded amount.
+    expect(calculateOfflineRemaining(3554, 804, 752, 29, 0)).toBe(3635);
   });
 });
 

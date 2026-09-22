@@ -1,9 +1,9 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Select } from "./ui";
 
-const MIN = 25;
+const MIN = 50;
 const MAX = 200;
-const PRESETS = [25, 50, 75, 100, 125, 150, 175, 200];
+const PRESETS = [50, 75, 100, 125, 150, 175, 200];
 
 function clamp(value: number): number {
   return Math.min(MAX, Math.max(MIN, value));
@@ -36,7 +36,10 @@ export function useZoom(key: string) {
 }
 
 /**
- * Excel-style zoom level, 25%-200% in 25% steps.
+ * Excel-style zoom level, 50%-200% in 25% steps. Floored at 50% (rather
+ * than the 25% Excel itself allows) - the hover ring/spotlight and cursor
+ * effects in RowGlowScroll.tsx are keyed to the table's on-screen row
+ * geometry, which gets too small to track reliably below half size.
  *
  * This is intentionally a single native select so it behaves like the other
  * toolbar filter controls.

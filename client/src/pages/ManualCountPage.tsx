@@ -1,10 +1,10 @@
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
 import { Button, NumberCellInput, Select } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
-import { CsvTools } from "../components/CsvTools";
+import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
 import {
   Toolbar,
   ToolbarControls,
@@ -26,8 +26,16 @@ import type { Shift } from "../types";
 const LOCATIONS: StockLocation[] = ["ONLINE", "OFFLINE", "TOTAL"];
 
 const csvColumns = [
+  // System-computed - never imported (see this page's own doc comment: "...
+  // is always system-calculated, never typed directly").
   { key: "systemRemainingStock", label: "System Remaining" },
-  { key: "manualCount", label: "Manual Count" },
+  // The real monthly report (Section 8.1) headers this column "MANUAL
+  // COUNTING", not "Manual Count" - a genuine wording difference (not just
+  // case/punctuation), same reasoning as stockColumns.ts's other aliases.
+  { key: "manualCount", label: "Manual Count", editable: true, aliases: ["Manual Counting"] },
+  // Also system-computed (calculateVariance, server-side) - a file's own
+  // "VARIANCE" column is never imported, so it can't disagree with what the
+  // server derives from System Remaining - Manual Count.
   { key: "variance", label: "Variance" },
 ];
 
@@ -85,6 +93,10 @@ export function ManualCountPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  // So handleSaveAll (below) can tell CsvTools its own last import batch is
+  // no longer just "pending" once a real Save has committed it - see
+  // CsvTools' notifyCommitted doc comment.
+  const csvToolsRef = useRef<CsvToolsHandle>(null);
 
   function load() {
     setRows(null);
@@ -173,7 +185,10 @@ export function ManualCountPage() {
         const name =
           rows?.find((r) => r.product.id === productId)?.product.name ??
           `#${productId}`;
-        failed.push(name);
+        // The server's own message is the actual reason - without it, every
+        // failure looks identical no matter what actually went wrong.
+        const reason = e instanceof Error ? e.message : "unknown error";
+        failed.push(`${name} (${reason})`);
       }
     }
     setDrafts((d) => {
@@ -183,10 +198,31 @@ export function ManualCountPage() {
     });
     setSaving(false);
     setShowConfirm(false);
-    if (failed.length)
-      setError(
-        `Failed to save: ${failed.join(", ")} - still unsaved, try Save again.`,
-      );
+    if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
+    // Whatever CsvTools' own "Undo Import" batch might still reference is no
+    // longer just staged - some or all of it just got committed for real by
+    // this Save (see CsvTools' notifyCommitted doc comment). Safe to call
+    // even when nothing was actually imported - it's a no-op then.
+    csvToolsRef.current?.notifyCommitted();
+  }
+
+  // CSV import (Section 3.1) stages the imported Manual Count exactly like
+  // typing into the cell does (setDrafts) - Save is the same explicit,
+  // reviewable step for an import as it already is for a typed count, and
+  // the existing "Confirm manual counts" modal doubles as its review.
+  async function handleImportRow(productId: number, values: Record<string, number>) {
+    if (!("manualCount" in values)) return;
+    setDrafts((d) => ({ ...d, [productId]: String(values.manualCount) }));
+  }
+
+  // CsvTools' own "Undo Import" needs to know whether a cell it staged has
+  // since been changed by something else (a manual edit, a second import) -
+  // this page only has one importable column, so `key` is always
+  // "manualCount" in practice.
+  function getPendingValue(productId: number, key: string): number | undefined {
+    if (key !== "manualCount") return undefined;
+    const draft = drafts[productId];
+    return draft === undefined || draft === "" ? undefined : Number(draft);
   }
 
   const pendingCount = Object.keys(drafts).length;
@@ -317,10 +353,12 @@ export function ManualCountPage() {
               <CsvTools
                 filenamePrefix={`manual-count-${location.toLowerCase()}-${shift.toLowerCase()}`}
                 date={date}
+                ref={csvToolsRef}
                 rows={csvRows}
                 columns={csvColumns}
-                onImportRow={async () => {}}
-                canImport={false}
+                onImportRow={handleImportRow}
+                getPendingValue={getPendingValue}
+                canImport
                 pdfDisabled={pendingCount > 0}
                 exportFormat="excel"
                 pdf={{
@@ -533,7 +571,7 @@ export function ManualCountPage() {
                       {c.name}
                     </td>
                     <td>{c.oldValue}</td>
-                    <td style={{ fontWeight: 700, color: colors.red }}>
+                    <td style={{ fontWeight: 700, color: colors.yellow }}>
                       {c.newValue}
                     </td>
                   </tr>

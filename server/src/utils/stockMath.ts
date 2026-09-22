@@ -24,9 +24,19 @@ export function calculateOfflineStock(opening: number, stockIn: number, stockOut
   return opening + stockIn - stockOut;
 }
 
-/// Section 4.3 - Remaining Stocks = Offline Stocks + Production (In) - Delivery (Out) + Backloads.
-export function calculateOfflineRemaining(offlineStock: number, productionIn: number, deliveryOut: number, backloads: number): number {
-  return offlineStock + productionIn - deliveryOut + backloads;
+/// Section 4.3 - Remaining Stocks = Offline Stocks + Production (In) - Delivery
+/// (Out) - Upsell (Out) + Backloads. Backloads ADDS onto Remaining Stock - a
+/// backload is a delivery route returning undelivered stock, so it's a
+/// return back into inventory, not an outflow like Delivery (Out)/Upsell
+/// (Out).
+export function calculateOfflineRemaining(
+  offlineStock: number,
+  productionIn: number,
+  deliveryOut: number,
+  backloads: number,
+  upsellOut: number
+): number {
+  return offlineStock + productionIn - deliveryOut - upsellOut + backloads;
 }
 
 /// Section 4.4 - Variance = System Remaining Stock - Manual Count.

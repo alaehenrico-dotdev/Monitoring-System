@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOnlineGrid, saveOnlineEntry } from "../api/onlineStock";
+import { getOfflineGrid } from "../api/offlineStock";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
-import { CsvTools } from "../components/CsvTools";
+import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
 import { PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
@@ -22,6 +23,7 @@ import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { filterNotes, pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { getCurrentShiftAndDate, otherShift, SHIFT_LABELS, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { calculateOfflineRemaining, calculateOfflineStock, calculateOnlineRemaining, calculateOnlineStock, isNegativeStock } from "../utils/stockMath";
 import { colors } from "../theme";
 import type { Shift } from "../types";
 
@@ -51,6 +53,10 @@ export function OnlineEntryPage() {
   const [lastSavedBatch, setLastSavedBatch] = useState<PendingByProduct | null>(null);
   const [undoing, setUndoing] = useState(false);
   const canEdit = user?.role === "ONLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
+  // So handleSaveAll (below) can tell CsvTools its own last import batch is
+  // no longer just "pending" once a real Save has committed it - see
+  // CsvTools' notifyCommitted doc comment.
+  const csvToolsRef = useRef<CsvToolsHandle>(null);
 
   // Cell edits are staged here instead of hitting the save endpoint
   // immediately - Save (below) flushes them all at once, and Preview shows
@@ -93,6 +99,19 @@ export function OnlineEntryPage() {
     getOnlineGrid(date, otherShift(shift))
       .then((data) => setOtherShiftCount((data as unknown as GridRow[]).filter((r) => r.isSaved).length))
       .catch(() => setOtherShiftCount(null));
+  }, [date, shift]);
+
+  // Best-effort - CSV import's advisory negative-stock pre-check
+  // (validateImportRow, below) needs the CURRENT shift's Offline rows to
+  // predict whether a Stocks In/Out (Off<->Ol) change would push a
+  // mirrored transfer negative on the Offline side. If this fails to load,
+  // the pre-check just skips that one case rather than blocking anything.
+  const [offlineRowsForImportCheck, setOfflineRowsForImportCheck] = useState<GridRow[] | null>(null);
+  useEffect(() => {
+    setOfflineRowsForImportCheck(null);
+    getOfflineGrid(date, shift)
+      .then((data) => setOfflineRowsForImportCheck(data as unknown as GridRow[]))
+      .catch(() => setOfflineRowsForImportCheck(null));
   }, [date, shift]);
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
@@ -154,13 +173,23 @@ export function OnlineEntryPage() {
         revertTo[productId] = oldValues;
       } catch (e) {
         const name = priorRow?.product.name ?? `#${productId}`;
-        failed.push(name);
+        // The server's own message (e.g. the negative-stock guard's "would
+        // end at -5") is the actual reason - without it, every failure looks
+        // identical ("still shown as unsaved, try Save again.") no matter
+        // what actually went wrong, leaving nothing to act on.
+        const reason = e instanceof Error ? e.message : "unknown error";
+        failed.push(`${name} (${reason})`);
       }
     }
     setSaving(false);
     setShowPreview(false);
     if (Object.keys(revertTo).length > 0) setLastSavedBatch(revertTo);
-    if (failed.length) setError(`Failed to save: ${failed.join(", ")} - still shown as unsaved, try Save again.`);
+    if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
+    // Whatever CsvTools' own "Undo Import" batch might still reference is no
+    // longer just staged - some or all of it just got committed for real by
+    // this Save (see CsvTools' notifyCommitted doc comment). Safe to call
+    // even when nothing was actually imported - it's a no-op then.
+    csvToolsRef.current?.notifyCommitted();
     return failed.length === 0;
   }
 
@@ -179,6 +208,57 @@ export function OnlineEntryPage() {
     }
   }
 
+  // Advisory-only pre-check for CsvTools' Review modal (Option 1 from the
+  // "flagged import" discussion): mirrors the server's own negative-stock
+  // guard and its Online->Offline transfer mirror, using client-side copies
+  // of the same pure formulas (utils/stockMath.ts) - purely to warn before
+  // Save, never to block it. The server remains the only real enforcement;
+  // this can be wrong (stale data, a concurrent edit) without any real risk,
+  // since Save always re-checks for real.
+  function validateImportRow(productId: number, changes: Record<string, number>): string | undefined {
+    const row = rows?.find((r) => r.product.id === productId);
+    if (!row) return undefined;
+    const entry = row.entry as unknown as Record<string, unknown>;
+
+    const openingStock = changes.openingStock ?? Number(entry.openingStock ?? 0);
+    const stockInOffToOl = changes.stockInOffToOl ?? Number(entry.stockInOffToOl ?? 0);
+    const stockOutOlToOff = changes.stockOutOlToOff ?? Number(entry.stockOutOlToOff ?? 0);
+    const productionIn = changes.productionIn ?? Number(entry.productionIn ?? 0);
+    const fulfillmentOut = changes.fulfillmentOut ?? Number(entry.fulfillmentOut ?? 0);
+    const rts = changes.rts ?? Number(entry.rts ?? 0);
+
+    const onlineStock = calculateOnlineStock(openingStock, stockInOffToOl, stockOutOlToOff);
+    const remainingStock = calculateOnlineRemaining(onlineStock, productionIn, fulfillmentOut, rts);
+    if (isNegativeStock(remainingStock)) {
+      return `This would take ${row.product.name}'s Online stock below zero (would end at ${remainingStock}).`;
+    }
+
+    // Only relevant when the transfer fields themselves changed - an edit
+    // to, say, Fulfillment (Out) alone never touches the Offline side.
+    if (changes.stockInOffToOl !== undefined || changes.stockOutOlToOff !== undefined) {
+      const offlineRow = offlineRowsForImportCheck?.find((r) => r.product.id === productId);
+      if (offlineRow) {
+        const offlineEntry = offlineRow.entry as unknown as Record<string, unknown>;
+        // Same mapping as mirrorTransferToOffline (dailyOnlineStock.service.ts):
+        // Online's stockInOffToOl becomes Offline's stockOutOffToOl, and
+        // Online's stockOutOlToOff becomes Offline's stockInOlToOff.
+        const offlineStock = calculateOfflineStock(Number(offlineEntry.openingStock ?? 0), stockOutOlToOff, stockInOffToOl);
+        const offlineRemaining = calculateOfflineRemaining(
+          offlineStock,
+          Number(offlineEntry.productionIn ?? 0),
+          Number(offlineEntry.deliveryOut ?? 0),
+          Number(offlineEntry.backloads ?? 0),
+          Number(offlineEntry.upsellOut ?? 0),
+        );
+        if (isNegativeStock(offlineRemaining)) {
+          return `This transfer would take ${row.product.name}'s Offline stock below zero (would end at ${offlineRemaining}).`;
+        }
+      }
+    }
+
+    return undefined;
+  }
+
   // Re-submits the pre-save values captured above through the same save
   // endpoint - an undo is its own tracked edit (shows up in the Change Log
   // like any other save), not a silent rewrite of history. One level only:
@@ -195,12 +275,13 @@ export function OnlineEntryPage() {
         mergeEntry(productId, saved);
       } catch (e) {
         const name = rows?.find((r) => r.product.id === productId)?.product.name ?? `#${productId}`;
-        failed.push(name);
+        const reason = e instanceof Error ? e.message : "unknown error";
+        failed.push(`${name} (${reason})`);
       }
     }
     setUndoing(false);
     setLastSavedBatch(null);
-    if (failed.length) setError(`Failed to undo: ${failed.join(", ")}.`);
+    if (failed.length) setError(`Failed to undo: ${failed.join("; ")}`);
   }
 
   // PDF of the grid as currently filtered (search / category), with every
@@ -274,11 +355,14 @@ export function OnlineEntryPage() {
           </Button>
           {canEdit && rows && (
             <CsvTools
+              ref={csvToolsRef}
               filenamePrefix="online-entry"
               date={date}
               rows={rows}
               columns={columns}
               onImportRow={handleImportRow}
+              getPendingValue={(productId, key) => pending[productId]?.[key]}
+              validateImport={validateImportRow}
               canImport
               showExport={false}
               showPdf={false}

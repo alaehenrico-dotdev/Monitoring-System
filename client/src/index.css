@@ -25,6 +25,7 @@
   --ae-header-bg: #e7dfc9;
   --ae-header-rule: #14110d;
   --ae-num-text: var(--ae-text);
+  --ae-danger-text: #c1272d;
 
   /* Toolbar tokens - brand colors, identical in light and dark mode so the
      toolbar border and its action buttons are always visible. */
@@ -50,6 +51,11 @@
   --ae-header-bg: #2a2318;
   --ae-header-rule: #c99a2e;
   --ae-num-text: #fff;
+  /* The brand red (#c1272d) is a dark, low-luminance red - readable on the
+     light paper background but too close to the near-black dark-mode
+     background (#14110d) to read as error text. Same pattern as
+     --ae-warning-text above: a lighter tint of the same hue for dark mode. */
+  --ae-danger-text: #e5626a;
 }
 
 body {
@@ -124,6 +130,31 @@ table input[type="number"] {
   );
   background-size: 400% 100%;
   animation: ae-row-ring-sweep 13s linear infinite;
+}
+
+/* Full-box version of .ae-row-ring's sweep, for the shared Modal panel
+   (Modal.tsx) - same gradient, same 13s sweep, same 1.5px thickness, just
+   traced around all four edges instead of top/bottom bars only. Always
+   animating (a modal has no per-row "hover" state to key off), so every
+   dialog built on Modal - AlertDialog, ConfirmDialog, and page-level
+   Preview dialogs alike - gets the same thin animated border. */
+.ae-modal-border-sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1.5px;
+  background-image: linear-gradient(
+    100deg,
+    #14110d, #ffd400, #14110d, #c99a2e, #14110d,
+    #f1e9d0, #14110d, #c99a2e, #14110d, #ffd400, #14110d
+  );
+  background-size: 400% 100%;
+  animation: ae-row-ring-sweep 13s linear infinite;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
 }
 
 .ae-row-spotlight {
@@ -1441,37 +1472,18 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
 /* =========================================================================
    Logo seal animation (components/LogoMark.tsx, hover wiring in Sidebar.tsx)
    =========================================================================
-   The border lettering turns one full revolution per hover (its `rotate()`
-   is set from LogoMark's `spin` prop), and a soft light streak crosses the
-   seal. Keep the 1.1s / 1100ms in step with LOGO_SPIN_MS in Sidebar.tsx. */
+   The seal turns one full revolution per hover (its `rotate()` is set from
+   LogoMark's `spin` prop). Keep the 1.1s / 1100ms in step with
+   LOGO_SPIN_MS in Sidebar.tsx. (Previously also crossed the seal with a
+   light-streak glint - that depended on an SVG gradient/clip-path only the
+   old hand-drawn recreation had; dropped along with it now that LogoMark
+   renders the real logo photo instead.) */
 .ae-logo-ring {
   transition: transform 1.1s cubic-bezier(0.65, 0, 0.35, 1);
-}
-@keyframes ae-logo-glint {
-  from {
-    transform: translateX(0);
-    opacity: 0;
-  }
-  15% {
-    opacity: 1;
-  }
-  85% {
-    opacity: 1;
-  }
-  to {
-    transform: translateX(340px);
-    opacity: 0;
-  }
-}
-.ae-logo-glint {
-  animation: ae-logo-glint 0.9s ease-in-out both;
 }
 @media (prefers-reduced-motion: reduce) {
   .ae-logo-ring {
     transition: none;
-  }
-  .ae-logo-glint {
-    display: none;
   }
 }
 

@@ -25,9 +25,13 @@ const OfflineEntryPage = lazy(() => import("./pages/OfflineEntryPage").then((m) 
 const TotalStocksPage = lazy(() => import("./pages/TotalStocksPage").then((m) => ({ default: m.TotalStocksPage })));
 const ManualCountPage = lazy(() => import("./pages/ManualCountPage").then((m) => ({ default: m.ManualCountPage })));
 const ReceiptsPage = lazy(() => import("./pages/ReceiptsPage").then((m) => ({ default: m.ReceiptsPage })));
+const ConsolidatedReceiptPage = lazy(() => import("./pages/ConsolidatedReceiptPage").then((m) => ({ default: m.ConsolidatedReceiptPage })));
 const VarianceReportPage = lazy(() => import("./pages/VarianceReportPage").then((m) => ({ default: m.VarianceReportPage })));
 const DailyReportPage = lazy(() => import("./pages/DailyReportPage").then((m) => ({ default: m.DailyReportPage })));
 const ProductsAdminPage = lazy(() => import("./pages/ProductsAdminPage").then((m) => ({ default: m.ProductsAdminPage })));
+const DeliveryDestinationsAdminPage = lazy(() =>
+  import("./pages/DeliveryDestinationsAdminPage").then((m) => ({ default: m.DeliveryDestinationsAdminPage })),
+);
 const ChangeLogPage = lazy(() => import("./pages/ChangeLogPage").then((m) => ({ default: m.ChangeLogPage })));
 const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
 const DailyReportHistoryPage = lazy(() => import("./pages/DailyReportHistoryPage").then((m) => ({ default: m.DailyReportHistoryPage })));
@@ -53,6 +57,7 @@ export default function App() {
                   <Route path="/total-stocks" element={<TotalStocksPage />} />
                   <Route path="/manual-count" element={<ManualCountPage />} />
                   <Route path="/receipts" element={<ReceiptsPage />} />
+                  <Route path="/consolidated-receipts" element={<ConsolidatedReceiptPage />} />
 
                   <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
                     <Route path="/dashboard" element={<DashboardPage />} />
@@ -62,6 +67,7 @@ export default function App() {
                     <Route path="/daily-report" element={<DailyReportPage />} />
                     <Route path="/change-log" element={<ChangeLogPage />} />
                     <Route path="/products" element={<ProductsAdminPage />} />
+                    <Route path="/delivery-destinations" element={<DeliveryDestinationsAdminPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                   </Route>
                 </Route>

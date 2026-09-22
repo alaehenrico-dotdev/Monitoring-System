@@ -10,6 +10,7 @@ const createSchema = z.object({
   location: z.string().min(1),
   salesRepName: z.string().optional(),
   postToFulfillment: z.boolean().optional(),
+  postToOfflineDelivery: z.boolean().optional(),
   items: z
     .array(z.object({ productId: z.number().int().positive(), quantity: z.number().finite().positive() }))
     .min(1),

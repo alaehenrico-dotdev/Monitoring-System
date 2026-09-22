@@ -83,11 +83,23 @@ export function RowGlowScroll({
     if (!scrollEl || !row) return null;
     const scrollRect = scrollEl.getBoundingClientRect();
     const rowRect = row.getBoundingClientRect();
+    // ZoomControl.tsx applies CSS `zoom` to an ancestor of this container
+    // (.ae-grid-fill), not to this container itself. getBoundingClientRect()
+    // reports real on-screen pixels, already multiplied by that ancestor
+    // zoom - but scrollEl.scrollTop/scrollLeft, and any inline top/left/width
+    // we set below, stay in scrollEl's own zoom-unaware local pixel space
+    // (they get multiplied by the zoom again once rendered). Mixing the two
+    // unconverted is what let the ring/spotlight drift off the hovered row
+    // at any zoom other than 100%. offsetWidth stays in that same local
+    // space regardless of ancestor zoom, so comparing it against the
+    // on-screen width gives the effective cumulative zoom factor to divide
+    // the screen-pixel deltas by before they're used as local values.
+    const zoomFactor = scrollEl.offsetWidth ? scrollRect.width / scrollEl.offsetWidth : 1;
     return {
-      top: rowRect.top - scrollRect.top + scrollEl.scrollTop,
-      left: rowRect.left - scrollRect.left + scrollEl.scrollLeft,
-      width: rowRect.width,
-      height: rowRect.height,
+      top: (rowRect.top - scrollRect.top) / zoomFactor + scrollEl.scrollTop,
+      left: (rowRect.left - scrollRect.left) / zoomFactor + scrollEl.scrollLeft,
+      width: rowRect.width / zoomFactor,
+      height: rowRect.height / zoomFactor,
     };
   }, []);
 

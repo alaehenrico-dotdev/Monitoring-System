@@ -16,7 +16,7 @@ export const colors = {
   gold: "#C99A2E", // seal ring + accents
   goldLight: "#E4B94D", // hover / highlight state for gold elements
   goldDark: "#8B6A1E", // borders, pressed state
-  red: "#C1272D", // banner red - primary action color
+  red: "#C1272D", // banner red - fixed brand color for decorative accents (borders, the receipt wordmark); not for error/status text - use `danger` for that so it stays visible in dark mode
   redDark: "#9E1F24", // hover/pressed red
   yellow: "#FFD400", // "Ala Eh!" lettering
   cream: "#F1E9D0", // "FOOD PRODUCTS" text, light text on dark surfaces
@@ -26,7 +26,7 @@ export const colors = {
   ink: "var(--ae-text)", // primary body text
   subtleInk: "var(--ae-text-muted)", // secondary/muted text
   border: "var(--ae-border)", // hairline borders
-  danger: "#C1272D", // reuse brand red for error/variance text
+  danger: "var(--ae-danger-text)", // error/variance text - flips to a lighter tint in dark mode (unlike `red` below) so it stays readable on the dark surface
   warningBg: "var(--ae-warning-bg)", // flagged-row tint
   warningText: "var(--ae-warning-text)",
   // Fixed light-surface text colors, for content that always renders on a

@@ -32,8 +32,17 @@ copy the server's env file:
 ```bash
 cd server
 cp .env.example .env
-# edit .env - set DATABASE_URL and a random JWT_SECRET
+# edit .env - set DATABASE_URL, JWT_SECRET, DATA_RESET_PASSCODE, and
+# RECEIPT_QR_SECRET (see below) - the server refuses to start if any of
+# these are missing, with no insecure fallback.
 # XAMPP default: mysql://root:@localhost:3306/ala_eh_stocks (no password)
+```
+
+`JWT_SECRET`, `DATA_RESET_PASSCODE`, and `RECEIPT_QR_SECRET` all need a real
+random value — generate one for each with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ### 2. Install, migrate, seed
@@ -66,6 +75,13 @@ npm run dev
 (`npm run dev:server` / `npm run dev:client` from the root, or `npm run dev` from inside `server/`
 or `client/` directly, still work individually if you want them in separate terminals.)
 
+### 4. Tests & linting
+
+```bash
+npm run test    # runs both workspaces' Vitest suites
+npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server + client
+```
+
 ### Default logins (seeded — change before real use)
 
 | Username | Password | Role |
@@ -82,15 +98,27 @@ or `client/` directly, still work individually if you want them in separate term
 - Daily Online / Offline stock entry grids with auto carry-forward of opening stock (Section 4.6),
   category grouping, and subtotal/grand-total rows — an Excel-like editable grid (Section 3.1).
 - Auto-mirrored Online↔Offline transfer figures (Section 4.3), written once and reflected on both
-  sides without duplicate typing.
+  sides without duplicate typing. A Stock Out (Fulfillment/Delivery, or a transfer to the other
+  channel) that would take a channel's Remaining Stock below zero is rejected server-side, on
+  either side of the transfer, rather than silently persisted as a negative balance.
 - Server-calculated subtotal / Remaining Stock columns — never client-editable.
 - Manual Counting & system-calculated Variance (Section 4.4), flagged rows for non-zero variance.
-- Live Total Stocks view (Online + Offline, Section 4.5), always in sync by construction.
+- Live Total Stocks view (Section 4.5). Online and Offline are separate stock pools that aren't
+  expected to tally with each other — every report (Total Stocks, Daily Report, Dashboard, Monthly
+  Monitoring) shows both channels separately, with a combined "Total" kept alongside them only as
+  an explicitly-labeled figure, never the only number shown.
 - Receipt / Sales Order entry (Section 4.7): the entry form itself is styled as an editable
   physical receipt, with a live preview beside it showing exactly what Save will produce, and can
-  post straight into that date's Fulfillment (Out).
+  post straight into that date's Fulfillment (Out). The printed receipt's QR code encodes an
+  AES-256-GCM-encrypted token, not the plain receipt id — the one id in the app that actually
+  leaves the authenticated app, onto paper anyone can scan.
 - Daily Report, Variance Report, and a Change Log page (Section 4.8) — every create/update/delete
   across the app, attributed and timestamped, with an expandable before/after diff per entry.
+- Dashboard with a today-at-a-glance stat row and a Monthly Monitoring section: a year-at-a-glance
+  Online/Offline trend chart plus receipts and variance-flag counts per month.
+- Settings page (Supervisor-Admin): a full `mysqldump` database backup, streamed straight to a
+  browser download with a live byte counter, and the passcode-gated Data Reset panel for wiping
+  transactional data between test runs or a new rollout period.
 - Role-based access: Online Encoder / Offline Encoder / Supervisor-Admin (Section 3.2).
 
 **Data entry & reporting tools**
@@ -101,9 +129,21 @@ or `client/` directly, still work individually if you want them in separate term
   changed, so a round-tripped export doesn't resubmit 60 unchanged rows as edits.
 - One-file, multi-section CSV export on the Daily Report (Online + Offline + Total in a single
   download).
-- Export as PDF via the browser's print dialog on every grid page (choose "Save as PDF").
+- Export as a real generated PDF (not the browser's print dialog) on every grid page and the
+  receipt review modal — one fixed page format, the same brand chrome (masthead, category bars,
+  page-X-of-Y footer) every time, built from the same row data the CSV/Excel export uses.
 - Smart multi-term search on every toolbar (product/category, or customer/location/product for
   Receipts).
+
+**Security**
+- `helmet` security headers on every API response; a strict Content-Security-Policy is injected
+  into the client's production build only (never the dev server/HMR).
+- Rate limiting: a generous backstop across the whole API, plus a tight brute-force limit on login
+  and the Data Reset passcode check specifically.
+- `JWT_SECRET` / `DATA_RESET_PASSCODE` / `RECEIPT_QR_SECRET` are all required env vars with no
+  insecure fallback — the server refuses to boot rather than running on a guessable default.
+- zod request validation on every controller that takes user input; a top-level React error
+  boundary so an uncaught render error never white-screens the whole app.
 
 **Under the hood**
 - Batched opening-stock and system-remaining-stock lookups (2 queries instead of one per product)
@@ -111,5 +151,13 @@ or `client/` directly, still work individually if you want them in separate term
 - In-memory, write-invalidated caching for the product master list.
 - Independently-scrolling sidebar and content pane, so a long grid never drags the sidebar (and
   its Log out button) down with it.
+- Skeleton screens (not spinners) on every data-dependent page, and a determinate top-of-viewport
+  progress bar for exports/imports and the database backup download — bound to real progress
+  (rows imported, bytes downloaded) where that data exists, an eased "still working" fallback
+  where it doesn't.
+- Route-level code-splitting plus dynamically-imported PDF/QR libraries (only fetched when a PDF
+  is actually generated) — cut the client's main bundle from ~918KB to ~333KB.
+- `eslint.config.mjs` (one shared flat config for both workspaces) + Vitest unit tests on the
+  highest logic-density modules (stock math, shift/date boundary logic, the receipt QR cipher).
 
 Phase 5 (encoder training / parallel run / cutover) is a rollout activity outside the codebase.

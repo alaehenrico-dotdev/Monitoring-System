@@ -14,6 +14,12 @@ interface ToastProps {
   /// reading in full rather than glancing past, e.g. an import that failed
   /// or turned up unmatched rows.
   duration?: number | null;
+  /// A single inline action alongside the dismiss ✕ (e.g. "Undo Import") -
+  /// scoped to whatever `message` currently is. The caller owns clearing
+  /// this itself (alongside `message`, or sooner) so it doesn't outlive the
+  /// specific toast it belongs to - this component doesn't try to guess
+  /// that on its own.
+  action?: { label: string; onClick: () => void };
 }
 
 const ACCENT: Record<ToastVariant, string> = {
@@ -28,7 +34,7 @@ const ACCENT: Record<ToastVariant, string> = {
  * page instead of competing for space in an already-crowded toolbar row
  * (its original home, as an inline <span> next to CsvTools' Import button).
  */
-export function Toast({ message, onDismiss, variant = "info", duration = 6000 }: ToastProps) {
+export function Toast({ message, onDismiss, variant = "info", duration = 6000, action }: ToastProps) {
   useEffect(() => {
     if (!message || duration === null) return;
     const timer = setTimeout(onDismiss, duration);
@@ -78,6 +84,25 @@ export function Toast({ message, onDismiss, variant = "info", duration = 6000 }:
             }}
           >
             <span style={{ flex: 1, wordBreak: "break-word" }}>{message}</span>
+            {action && (
+              <button
+                type="button"
+                onClick={action.onClick}
+                style={{
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  lineHeight: 1,
+                  color: colors.subtleInk,
+                  padding: 2,
+                  flexShrink: 0,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {action.label}
+              </button>
+            )}
             <button
               type="button"
               onClick={onDismiss}

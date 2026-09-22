@@ -5,6 +5,7 @@ import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { colors } from "../theme";
 import { clearReportHistory } from "../utils/reportHistory";
+import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 import { InlineLoading, Spinner } from "../components/Spinner";
 
 const COUNTDOWN_SECONDS = 10;
@@ -26,7 +27,7 @@ const PANEL_GOLD = "#c99a2e";
 const PANEL_RED = "#e2555c";
 
 const WIPED_ITEMS = ["Online & offline stock entries", "Manual counts", "Receipts / sales orders", "Daily & variance reports", "Change log"];
-const PRESERVED_ITEMS = ["Products & categories", "User accounts & roles", "System settings"];
+const PRESERVED_ITEMS = ["Products & categories", "Delivery destinations", "User accounts & roles", "System settings"];
 
 /// Section: Admin - lets a supervisor wipe all transactional data (entries,
 /// counts, receipts, reports, change log) to hand the system a clean slate
@@ -102,6 +103,18 @@ export function DataResetPage() {
       // above can't touch it, but leaving old entries around after a reset
       // would let an admin reopen a "history" report that's now empty.
       clearReportHistory();
+      // Same reasoning, for the Online/Offline Entry and Manual Count
+      // pages' own staged-but-unsaved edits (sessionStorage, see
+      // hooks/usePendingEntryChanges.ts) - without this, a pending edit from
+      // before the reset could still get saved afterward against a baseline
+      // that's now completely different (or gone).
+      //
+      // The CSV import Review modal (CsvTools.tsx) needs no equivalent
+      // handling here: its parsed-but-unstaged rows live only in that
+      // component's own React state, never sessionStorage, so they're
+      // already gone on any remount/navigation - there's nothing left for a
+      // reset to clean up.
+      clearAllPendingEntryState();
       setStatus("done");
     } catch (err) {
       // The reset token is single-use-window (~5 min) - if it's expired or

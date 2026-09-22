@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { Button, Select } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
@@ -6,7 +6,9 @@ import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { CategoryFilter } from "../components/CategoryFilter";
-import { onlineStockColumns, offlineStockColumns } from "../config/stockColumns";
+import { onlineStockColumns, buildOfflineStockColumns } from "../config/stockColumns";
+import { listDeliveryDestinations } from "../api/deliveryDestinations";
+import type { DeliveryDestination } from "../types";
 import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
@@ -98,6 +100,16 @@ export function DailyReportPage() {
   // this date, or a date with nothing saved to report on.
   const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(null);
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
+  // Same best-effort, load-once-reuse-always fetch as OfflineEntryPage's own
+  // destinations state - see its comment for why this starts empty rather
+  // than null.
+  const [destinations, setDestinations] = useState<DeliveryDestination[]>([]);
+  const offlineStockColumns = useMemo(() => buildOfflineStockColumns(destinations), [destinations]);
+  useEffect(() => {
+    listDeliveryDestinations()
+      .then(setDestinations)
+      .catch(() => setDestinations([]));
+  }, []);
 
   useEffect(() => {
     if (searchParams.get("history") === "1") load();

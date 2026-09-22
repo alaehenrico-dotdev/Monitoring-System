@@ -51,68 +51,31 @@ function receiptQrValue(receipt: Receipt): string {
 }
 
 /**
- * Static (non-JSX) recreation of LogoMark.tsx's seal artwork, with the
- * theme's hex values inlined directly, so it can be rasterized to a PNG
- * for embedding — jsPDF can only place raster/vector images it's given,
- * it can't render a React component.
+ * Loads a static public asset (client/public/logo.jpg, the real Ala Eh!
+ * seal - see components/LogoMark.tsx) as a base64 data URL, for embedding
+ * via jsPDF's addImage - it needs actual image data, not a URL it fetches
+ * itself and it can't render a React component either way.
  */
-function logoSvgMarkup(px: number): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${px}" height="${px}" viewBox="0 0 200 200">
-    <defs>
-      <path id="ala-eh-top-arc" d="M 20 72 A 85 85 0 0 1 180 72" />
-      <path id="ala-eh-bottom-arc" d="M 35.5 154 A 85 85 0 0 0 164.5 154" />
-    </defs>
-    <circle cx="100" cy="100" r="97" fill="#14110D" stroke="#C99A2E" stroke-width="6" />
-    <circle cx="100" cy="100" r="85" fill="none" stroke="#C99A2E" stroke-width="1.5" opacity="0.6" />
-    <text font-family="Georgia, serif" font-size="11.5" font-weight="700" letter-spacing="2.2" fill="#F1E9D0">
-      <textPath href="#ala-eh-top-arc" startOffset="50%" text-anchor="middle">SPECIALLY MADE RECIPE</textPath>
-    </text>
-    <text font-family="Georgia, serif" font-size="10.5" font-weight="700" letter-spacing="1.1" fill="#F1E9D0">
-      <textPath href="#ala-eh-bottom-arc" startOffset="50%" text-anchor="middle">SA PANLASANG PINOY</textPath>
-    </text>
-    <path d="M55 85 Q100 40 145 85 Z" fill="#C99A2E" />
-    <ellipse cx="100" cy="85" rx="45" ry="6.5" fill="#8B6A1E" />
-    <ellipse cx="74" cy="68" rx="9" ry="3.5" fill="#fff" opacity="0.85" transform="rotate(-25 74 68)" />
-    <ellipse cx="123" cy="64" rx="6.5" ry="2.5" fill="#fff" opacity="0.7" transform="rotate(-15 123 64)" />
-    <rect x="30" y="93" width="140" height="40" rx="20" fill="#C1272D" />
-    <text x="100" y="121" text-anchor="middle" font-family="Arial, sans-serif" font-weight="800"
-          font-style="italic" font-size="27" fill="#FFD400" stroke="#14110D" stroke-width="1.3" paint-order="stroke">
-      Ala Eh!
-    </text>
-    <text x="100" y="141" text-anchor="middle" font-family="Georgia, serif" font-weight="700"
-          letter-spacing="1.3" font-size="9.5" fill="#F1E9D0">
-      FOOD PRODUCTS
-    </text>
-  </svg>`;
+function loadImageAsDataUrl(url: string): Promise<string> {
+  return fetch(url)
+    .then((res) => res.blob())
+    .then(
+      (blob) =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error(`Failed to load ${url}`));
+          reader.readAsDataURL(blob);
+        }),
+    );
 }
 
-/** Rasterize an SVG markup string to a PNG data URL, at 2x for crisp embedding. */
-function svgToPngDataUrl(svgMarkup: string, px: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const blob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      const scale = 2;
-      const canvas = document.createElement("canvas");
-      canvas.width = px * scale;
-      canvas.height = px * scale;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        URL.revokeObjectURL(url);
-        reject(new Error("Canvas 2D context unavailable"));
-        return;
-      }
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Failed to rasterize logo SVG"));
-    };
-    img.src = url;
-  });
+/// jsPDF's addImage needs to be told the format explicitly - read it off
+/// the data URL's mime prefix rather than hardcoding one, since the logo
+/// (JPEG, see loadImageAsDataUrl) and the QR code (PNG, from the `qrcode`
+/// package's own toDataURL) go through the same image() helper below.
+function addImageFormat(dataUrl: string): "JPEG" | "PNG" {
+  return dataUrl.startsWith("data:image/jpeg") ? "JPEG" : "PNG";
 }
 
 interface Assets {
@@ -197,7 +160,7 @@ function renderReceipt(doc: jsPDF | null, receipt: Receipt, assets: Assets, opts
   }
 
   function image(dataUrl: string, sizeMM: number, gap: number) {
-    if (!dry) doc!.addImage(dataUrl, "PNG", xCenter - sizeMM / 2, y, sizeMM, sizeMM);
+    if (!dry) doc!.addImage(dataUrl, addImageFormat(dataUrl), xCenter - sizeMM / 2, y, sizeMM, sizeMM);
     y += sizeMM + gap;
   }
 
@@ -256,7 +219,7 @@ export async function generateReceiptPdf(
   const [{ default: JsPDF }, { default: QRCode }, logoDataUrl] = await Promise.all([
     import("jspdf"),
     import("qrcode"),
-    svgToPngDataUrl(logoSvgMarkup(200), 200),
+    loadImageAsDataUrl("/logo.jpg"),
   ]);
   const qrDataUrl = await QRCode.toDataURL(receiptQrValue(receipt), { margin: 0, width: 300, color: { dark: INK } });
   const assets: Assets = { logoDataUrl, qrDataUrl };
