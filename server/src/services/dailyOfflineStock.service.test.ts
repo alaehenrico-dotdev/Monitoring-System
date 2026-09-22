@@ -91,10 +91,7 @@ describe("saveOfflineEntry - Stock In/Out per channel", () => {
     expect(dailyOnlineStockRepository.upsert).not.toHaveBeenCalled();
   });
 
-  it("still saves a transfer that drains Online below zero, so the shortfall reflects in variance reports", async () => {
-    // Same relaxation as the reverse direction in
-    // dailyOnlineStock.service.test.ts: the mirrored Online row is persisted
-    // with its negative Remaining Stock as-is instead of rejecting the save.
+  it("rejects a transfer that would drain Online below zero, even though Offline's own balance is fine", async () => {
     vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(0);
     vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({
       id: 50,
@@ -107,12 +104,7 @@ describe("saveOfflineEntry - Stock In/Out per channel", () => {
       encodedById: null,
     } as never);
 
-    await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { stockInOlToOff: 50 });
-
-    expect(dailyOnlineStockRepository.upsert).toHaveBeenCalledWith(
-      50,
-      expect.objectContaining({ remainingStock: -30 }),
-    );
+    await expect(saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { stockInOlToOff: 50 })).rejects.toThrow(/Online stock below zero/);
   });
 });
 

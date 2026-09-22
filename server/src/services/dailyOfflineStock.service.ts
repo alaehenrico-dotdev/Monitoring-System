@@ -269,14 +269,18 @@ async function mirrorTransferToOnline(
   const onlineStock = calculateOnlineStock(openingStock, merged.stockInOffToOl, merged.stockOutOlToOff);
   const remainingStock = calculateOnlineRemaining(onlineStock, merged.productionIn, merged.fulfillmentOut, merged.rts);
 
-  // Same reasoning as the reverse direction in dailyOnlineStock.service.ts's
-  // mirrorTransferToOffline: pulling stock INTO Offline FROM Online mirrors
-  // as Online's stockOutOlToOff here. That's a side effect of a transfer
-  // entered on the OTHER grid (Offline), so a negative result on it is
-  // persisted rather than rejected - blocking it would silently fail an
-  // Offline save (or an Offline CSV import) over a balance the encoder isn't
-  // even looking at, and the negative Remaining Stock needs to actually land
-  // on the Online grid/variance reports to be useful.
+  // Same guard as the reverse direction in dailyOnlineStock.service.ts's
+  // mirrorTransferToOffline - pulling stock INTO Offline FROM Online
+  // mirrors as Online's stockOutOlToOff, a real Stock Out for Online that
+  // can't exceed what Online actually has, even though the transfer was
+  // entered on the Offline grid.
+  if (isNegativeStock(remainingStock)) {
+    const product = await productRepository.findActiveById(productId);
+    throw HttpError.badRequest(
+      `This transfer would take ${product?.name ?? `product #${productId}`}'s Online stock below zero (would end at ${remainingStock}).`
+    );
+  }
+
   const data = {
     productId,
     entryDate,

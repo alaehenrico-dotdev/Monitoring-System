@@ -10,9 +10,22 @@ import { motion } from "motion/react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { LogoMark } from "./LogoMark";
-import { PinIcon } from "./icons";
+import { PinIcon, ChevronIcon } from "./icons";
 import { colors, fonts } from "../theme";
 import { sidebarSpring } from "../motion";
+
+// Below this width the sidebar drops its hover-driven rail/expanded states
+// entirely and behaves as a single icon-only button that opens a dropdown
+// menu on tap - hover has no reliable equivalent on touch, so trying to
+// reuse the desktop rail there just leaves the menu stuck either fully
+// closed or fully (256px) open with no useful middle state.
+const MOBILE_BREAKPOINT = 768;
+const MOBILE_MENU_QUERY = `(max-width: ${MOBILE_BREAKPOINT}px)`;
+
+function readInitialIsMobile(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.matchMedia(MOBILE_MENU_QUERY).matches;
+}
 
 const RAIL_WIDTH = 56;
 const EXPANDED_WIDTH = 256;
@@ -142,6 +155,27 @@ const NAV_STYLE = `
     opacity: var(--spotlight-opacity, 0);
     transition: opacity 220ms ease;
   }
+  /* Mobile-only affordance: a small down arrow under the minimized icon,
+     pulsing so it reads as "tap for more" rather than a static decoration. */
+  @keyframes ae-sidebar-mobile-arrow-glow {
+    0%, 100% {
+      opacity: 0.55;
+      filter: drop-shadow(0 0 0px ${colors.yellow});
+    }
+    50% {
+      opacity: 1;
+      filter: drop-shadow(0 0 6px ${colors.yellow});
+    }
+  }
+  .ae-sidebar-mobile-arrow {
+    animation: ae-sidebar-mobile-arrow-glow 1.8s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ae-sidebar-mobile-arrow {
+      animation: none;
+      opacity: 0.9;
+    }
+  }
 `;
 
 export function Sidebar() {
@@ -152,6 +186,12 @@ export function Sidebar() {
   const [pinned, setPinned] = useState(readInitialPinned);
   const [isMouseOver, setIsMouseOver] = useState(false);
   const [isFocusWithin, setIsFocusWithin] = useState(false);
+  // On mobile the sidebar is always minimized to just the icon until the
+  // person taps it open - there's no hover state to fall back on, so this
+  // is tracked separately from the desktop `collapsed`/`pinned` prefs
+  // instead of trying to reuse them.
+  const [isMobile, setIsMobile] = useState(readInitialIsMobile);
+  const [mobileOpen, setMobileOpen] = useState(false);
   // How many times the logo's ring has been sent round (LogoMark's `spin`);
   // bumped when the pointer enters the logo row, at most once per turn.
   const [logoSpin, setLogoSpin] = useState(0);
@@ -185,9 +225,23 @@ export function Sidebar() {
   }, []);
 
   useEffect(() => {
-    document.body.classList.toggle("ae-sidebar-collapsed-icon", collapsed);
+    const mql = window.matchMedia(MOBILE_MENU_QUERY);
+    function onChange(e: MediaQueryListEvent) {
+      setIsMobile(e.matches);
+      // Leaving mobile (rotating a tablet, resizing a browser window) with
+      // the dropdown open shouldn't carry that "open" flag back into the
+      // desktop rail/expanded logic below.
+      if (!e.matches) setMobileOpen(false);
+    }
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  useEffect(() => {
+    const iconOnly = isMobile ? !mobileOpen : collapsed;
+    document.body.classList.toggle("ae-sidebar-collapsed-icon", iconOnly);
     return () => document.body.classList.remove("ae-sidebar-collapsed-icon");
-  }, [collapsed]);
+  }, [collapsed, isMobile, mobileOpen]);
 
   useEffect(() => {
     let frame = 0;
@@ -208,11 +262,18 @@ export function Sidebar() {
   // same effect as isMouseOver/isFocusWithin, just sourced from a click
   // instead of the pointer, and remembered across reloads.
   const hovered = !collapsed && (isMouseOver || isFocusWithin || pinned);
-  const state: "rail" | "expanded" | "collapsed" = collapsed
-    ? "collapsed"
-    : hovered
+  // Mobile never uses the hover-only "rail" (icon strip, no labels) state -
+  // there's nothing to hover, so it would be a dead end. Mobile is only
+  // ever the minimized icon or the fully-labeled dropdown.
+  const state: "rail" | "expanded" | "collapsed" = isMobile
+    ? mobileOpen
       ? "expanded"
-      : "rail";
+      : "collapsed"
+    : collapsed
+      ? "collapsed"
+      : hovered
+        ? "expanded"
+        : "rail";
 
   function handleBlur(e: FocusEvent<HTMLDivElement>) {
     if (!containerRef.current?.contains(e.relatedTarget as Node | null)) {
@@ -245,7 +306,18 @@ export function Sidebar() {
   }
 
   function toggleCollapsed() {
+    if (isMobile) {
+      setMobileOpen((prev) => !prev);
+      return;
+    }
     setCollapsed((prev) => !prev);
+  }
+
+  // Closes the mobile dropdown after a nav link is tapped (desktop leaves
+  // the sidebar's own state alone on click - only mobile needs this, since
+  // there the menu is a transient overlay rather than persistent chrome).
+  function closeMobileMenu() {
+    if (isMobile) setMobileOpen(false);
   }
 
   function togglePinned() {
@@ -270,6 +342,22 @@ export function Sidebar() {
 
   return (
     <>
+      {/* Mobile-only scrim behind the dropdown - tapping anywhere outside
+          the menu closes it, same as a standard mobile nav drawer. Doesn't
+          exist on desktop, where the rail/expanded states are driven by
+          hover instead of an explicit open/closed toggle. */}
+      {isMobile && mobileOpen && (
+        <div
+          className="no-print"
+          onClick={() => setMobileOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 49,
+            background: "rgba(20, 17, 13, 0.35)",
+          }}
+        />
+      )}
       {/* Real `animate={{ width: ... }}`, not `layout` - `layout` FLIPs a
           resize via a transform (scale) trick, which visually squishes
           whatever's actually rendered inside the box while it's mid-
@@ -437,7 +525,7 @@ export function Sidebar() {
                 </p>
               </div>
             )}
-            {state === "expanded" && (
+            {state === "expanded" && !isMobile && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -453,6 +541,7 @@ export function Sidebar() {
                 title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
                 aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
                 aria-pressed={pinned}
+                className="ae-tap-target"
                 style={{
                   marginLeft: "auto",
                   flexShrink: 0,
@@ -530,7 +619,10 @@ export function Sidebar() {
                           to={l.to}
                           title={l.label}
                           tabIndex={collapsed ? -1 : undefined}
-                          onClick={blurAfterClick}
+                          onClick={(e) => {
+                            blurAfterClick(e);
+                            closeMobileMenu();
+                          }}
                           onMouseMove={handleTabPointerMove}
                           onMouseLeave={handleTabPointerLeave}
                           className="ae-sidebar-tab"
@@ -670,6 +762,38 @@ export function Sidebar() {
           </motion.div>
         </div>
       </motion.div>
+
+      {/* Glowing "tap for menu" affordance - only when mobile is showing
+          just the bare icon. It disappears the instant the dropdown opens
+          (the open menu is its own, much less ambiguous, affordance). */}
+      {isMobile && state === "collapsed" && (
+        <button
+          type="button"
+          className="no-print ae-sidebar-mobile-arrow"
+          onClick={() => setMobileOpen(true)}
+          title="Open menu"
+          aria-label="Open menu"
+          style={{
+            position: "fixed",
+            top: ICON_INSET + ICON_SIZE + 4,
+            left: ICON_INSET + ICON_SIZE / 2 - 11,
+            zIndex: 50,
+            width: 22,
+            height: 22,
+            padding: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: "50%",
+            border: "none",
+            background: "transparent",
+            color: colors.yellow,
+            cursor: "pointer",
+          }}
+        >
+          <ChevronIcon />
+        </button>
+      )}
     </>
   );
 }

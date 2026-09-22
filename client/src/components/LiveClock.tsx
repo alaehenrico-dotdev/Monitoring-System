@@ -25,7 +25,7 @@ export function LiveClock() {
       ref={hostRef}
       onMouseMove={handlePointerMove}
       onMouseLeave={handlePointerLeave}
-      className="no-print"
+      className="no-print ae-live-clock"
       style={{
         position: "relative",
         fontFamily: '"JetBrains Mono", "SF Mono", "Roboto Mono", ui-monospace, monospace',
