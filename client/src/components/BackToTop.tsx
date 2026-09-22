@@ -51,7 +51,7 @@ export function BackToTop({ containerRef }: { containerRef: RefObject<HTMLElemen
     <button
       ref={hostRef}
       type="button"
-      className="no-print"
+      className="no-print ae-tap-target"
       onClick={() => scrolledElRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
       onMouseMove={handlePointerMove}
       onMouseLeave={(e) => {

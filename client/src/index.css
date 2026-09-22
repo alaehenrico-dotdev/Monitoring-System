@@ -69,6 +69,13 @@ table input[type="number"] {
   font-family: inherit;
 }
 
+@media (pointer: coarse) {
+  .ae-tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 ::selection {
   background: #ffd400;
   color: #14110d;
@@ -1213,6 +1220,53 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   }
 }
 
+/* ------------------------------------------------------------------------
+   Mobile tier (matches the Sidebar's own MOBILE_BREAKPOINT in Sidebar.tsx -
+   below this width the sidebar is JS-driven into an icon-only button with
+   a tap-to-open dropdown instead of the desktop hover rail; everything
+   below is the layout-only half of that same "mobile" treatment).
+   ------------------------------------------------------------------------ */
+@media (max-width: 768px) {
+  /* The live clock is a nice-to-have on a desk monitor, not on a phone
+     screen already short on width - the theme toggle alone is enough
+     persistent chrome there. */
+  .ae-live-clock {
+    display: none;
+  }
+
+  /* Page titles and subtitles: every page follows the same <h2>/<p> intro
+     pattern (see DashboardPage, ReceiptsPage, etc.), so sizing them down
+     here covers all of them at once rather than per-page. */
+  .ae-main h2 {
+    font-size: 19px;
+    line-height: 1.25;
+  }
+  .ae-main p {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  /* Dashboard stat tiles: the desktop auto-fit grid still happily fits 2
+     narrow tiles per row down to ~420px, which on a phone reads as cramped
+     half-width cards with truncated labels - one full-width column reads
+     far better at this size. */
+  .ae-dash-stats {
+    grid-template-columns: 1fr;
+  }
+  .ae-dash-stat-value {
+    font-size: 26px;
+  }
+
+  /* Receipts entry form + live preview: side-by-side on desktop, but at
+     phone widths there isn't room for both without shrinking either past
+     the point of being usable - stack them in one column instead, form
+     first so it's what a phone user reaches first. */
+  .ae-receipt-columns {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
 /* A collapsed category (StockGrid, TotalStocksTable) hides its product rows
    on screen but should still print/PDF in full - a printed grid missing
    whatever happened to be collapsed at the time would be a silent data gap,
@@ -1350,7 +1404,7 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
 .ae-dash-stat-value {
   position: relative;
   margin-bottom: 8px;
-  font-size: 30px;
+  font-size: clamp(22px, 5vw, 30px);
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;

@@ -304,6 +304,7 @@ export function ReceiptsPage() {
          * Entry form + live preview.
          */}
         <div
+          className="ae-receipt-columns"
           style={{
             display: "flex",
             justifyContent: "center",
@@ -404,6 +405,7 @@ export function ReceiptsPage() {
                     onClick={() => removeItemRow(i)}
                     disabled={items.length === 1}
                     aria-label="Remove item"
+                    className="ae-tap-target"
                     style={removeButtonStyle}
                   >
                     ×

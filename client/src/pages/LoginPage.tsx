@@ -38,6 +38,8 @@ export function LoginPage() {
         alignItems: "center",
         justifyContent: "center",
         minHeight: "100vh",
+        padding: "24px 16px",
+        boxSizing: "border-box",
         fontFamily: fonts.body,
         background: colors.black,
         backgroundImage: `radial-gradient(circle at 50% -10%, ${colors.blackSoft}, ${colors.black} 70%)`,
@@ -52,7 +54,9 @@ export function LoginPage() {
       <form
         onSubmit={handleSubmit}
         style={{
-          width: 320,
+          width: "100%",
+          maxWidth: 320,
+          boxSizing: "border-box",
           background: colors.paper,
           borderRadius: 10,
           padding: 24,

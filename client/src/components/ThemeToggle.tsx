@@ -30,6 +30,7 @@ export function ThemeToggle() {
       }}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      className="ae-tap-target"
       style={{
         position: "relative",
         width: 36,

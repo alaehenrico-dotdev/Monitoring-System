@@ -324,6 +324,7 @@ export function OnlineEntryPage() {
               disabled={!lastSavedBatch || undoing}
               aria-label="Undo last save"
               title="Undo last save"
+              className="ae-tap-target"
               style={{ width: 30, height: 30, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
             >
               <UndoIcon />
