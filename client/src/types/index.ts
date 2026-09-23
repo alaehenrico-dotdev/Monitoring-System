@@ -128,6 +128,11 @@ export interface ReceiptItem {
   productId: number;
   product: Product;
   quantity: number;
+  /// Peso price for this line, fixed at the time the receipt was created
+  /// (Section 4.7) - null only for receipts logged before this field
+  /// existed, since there's no Product-level default price to backfill
+  /// from. Every new receipt's create form requires it per line.
+  unitPrice: number | null;
 }
 
 export interface Receipt {
@@ -139,14 +144,11 @@ export interface Receipt {
   salesRepName: string | null;
   salesRepId: number | null;
   salesRep: AuthUser | null;
-  /// Which stock pool this receipt tallies against - mirrors
-  /// CreateReceiptInput (see api/receipts.ts), mutually exclusive. Optional
-  /// here (rather than required like the create input) since older receipts
-  /// predate the flags and a not-yet-updated server response may omit them -
-  /// treat missing/undefined the same as `false` (Consolidated Receipt does,
-  /// via receiptPool() in utils/consolidatedReceipts.ts).
-  postToFulfillment?: boolean;
-  postToOfflineDelivery?: boolean;
+  /// Which stock pool this receipt posted into at creation (Section 4.7) -
+  /// set once server-side from the postToFulfillment/postToOfflineDelivery
+  /// flags on CreateReceiptInput (see api/receipts.ts) and never changed
+  /// after. See receiptPool() in utils/consolidatedReceipts.ts.
+  postedPool: "NONE" | "FULFILLMENT" | "OFFLINE_DELIVERY";
   createdBy: AuthUser | null;
   createdAt: string;
   items: ReceiptItem[];

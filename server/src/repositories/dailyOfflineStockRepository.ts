@@ -1,5 +1,5 @@
 import { Shift } from "@prisma/client";
-import { prisma } from "../lib/prisma";
+import { prisma, type Db } from "../lib/prisma";
 import { toNum } from "../utils/stockMath";
 
 export interface OfflineStockData {
@@ -20,8 +20,8 @@ export interface OfflineStockData {
 
 /// Section 5.3 - daily_offline_stock: one row per product, per date, per shift.
 export const dailyOfflineStockRepository = {
-  findByProductAndDate(productId: number, entryDate: Date, shift: Shift) {
-    return prisma.dailyOfflineStock.findUnique({ where: { productId_entryDate_shift: { productId, entryDate, shift } } });
+  findByProductAndDate(productId: number, entryDate: Date, shift: Shift, db: Db = prisma) {
+    return db.dailyOfflineStock.findUnique({ where: { productId_entryDate_shift: { productId, entryDate, shift } } });
   },
 
   findAllForDate(entryDate: Date, shift: Shift) {
@@ -32,8 +32,8 @@ export const dailyOfflineStockRepository = {
   /// table; see dailyOnlineStockRepository.getOpeningStock for the full
   /// reasoning on why the "immediately preceding shift" is always
   /// deterministic rather than a search across arbitrary shift values.
-  async getOpeningStock(productId: number, entryDate: Date, shift: Shift): Promise<number> {
-    const prior = await prisma.dailyOfflineStock.findFirst({
+  async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+    const prior = await db.dailyOfflineStock.findFirst({
       where: {
         productId,
         OR:
@@ -87,9 +87,9 @@ export const dailyOfflineStockRepository = {
     return result;
   },
 
-  upsert(id: number | undefined, data: OfflineStockData) {
+  upsert(id: number | undefined, data: OfflineStockData, db: Db = prisma) {
     return id
-      ? prisma.dailyOfflineStock.update({ where: { id }, data })
-      : prisma.dailyOfflineStock.create({ data });
+      ? db.dailyOfflineStock.update({ where: { id }, data })
+      : db.dailyOfflineStock.create({ data });
   },
 };

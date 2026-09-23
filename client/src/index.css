@@ -2,6 +2,23 @@
   box-sizing: border-box;
 }
 
+/* Dark-mode toggle (ThemeToggle.tsx): replaces the browser's default
+   cross-fade View Transition with nothing, so the only visible animation is
+   the expanding circle it drives itself via `.animate()` on
+   ::view-transition-new(root) - clipped from a point at the toggle button,
+   growing to cover the screen. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root) {
+  z-index: 0;
+}
+::view-transition-new(root) {
+  z-index: 1;
+}
+
 /* Light/dark theme tokens (see ThemeContext.tsx, which toggles the
    data-theme attribute on <html>, and theme.ts's `colors` object, whose
    paper/ink/subtleInk/border/warningBg/warningText re-export these same
@@ -26,6 +43,25 @@
   --ae-header-rule: #14110d;
   --ae-num-text: var(--ae-text);
   --ae-danger-text: #c1272d;
+  /* Category group-header bar inside data tables (StockGrid,
+     TotalStocksTable, ManualCountPage, ConsolidatedReceiptTable) - a
+     lighter gray in light mode instead of the brand-black used everywhere
+     else, since a pure-black bar reads too heavy against the paper-white
+     table around it. */
+  --ae-category-bg: #5c574c;
+  /* Editable grid-cell number inputs (.ae-input-cell) - lighter in light
+     mode to match the airier table; dark mode keeps the original
+     near-black fill since it already suits that surface. */
+  --ae-input-cell-bg: #fff8e0;
+  --ae-input-cell-text: #241d14;
+  --ae-input-cell-text-muted: #6b6255;
+  --ae-input-cell-border: #c99a2e;
+  --ae-input-cell-focus-ring: rgba(201, 154, 46, 0.35);
+  /* The up/down stepper triangles on grid number inputs - darker gold reads
+     against the new light cream fill; dark mode keeps the original bright
+     yellow, which needs the near-black fill to stay legible. */
+  --ae-input-cell-spin: #c99a2e;
+  --ae-input-cell-spin-hover-bg: rgba(201, 154, 46, 0.18);
 
   /* Toolbar tokens - brand colors, identical in light and dark mode so the
      toolbar border and its action buttons are always visible. */
@@ -56,6 +92,17 @@
      background (#14110d) to read as error text. Same pattern as
      --ae-warning-text above: a lighter tint of the same hue for dark mode. */
   --ae-danger-text: #e5626a;
+  /* Unchanged from the original fixed values - dark mode already suits a
+     near-black category bar and near-black input-cell fill, so only light
+     mode (above) gets the new lighter/grayer treatment. */
+  --ae-category-bg: #14110d;
+  --ae-input-cell-bg: #14110d;
+  --ae-input-cell-text: #fff;
+  --ae-input-cell-text-muted: rgba(255, 255, 255, 0.55);
+  --ae-input-cell-border: #ffd400;
+  --ae-input-cell-focus-ring: rgba(255, 255, 255, 0.45);
+  --ae-input-cell-spin: #ffd400;
+  --ae-input-cell-spin-hover-bg: rgba(255, 212, 0, 0.18);
 }
 
 body {
@@ -100,7 +147,7 @@ table input[type="number"] {
   border-bottom: 2px solid var(--ae-header-rule);
 }
 .ae-table td {
-  text-align: right;
+  text-align: center;
   padding: 4px 8px;
   border-bottom: 0.5px solid var(--ae-border);
   transition: background-color 120ms ease;
@@ -113,6 +160,12 @@ table input[type="number"] {
 }
 .ae-table--left td {
   text-align: left;
+}
+/* Manual Count and Total Stocks grids: header labels centered over their
+   column instead of stuck flush-left, regardless of how that column's own
+   cells are aligned (left for SKU/Product, right for numeric columns). */
+.ae-table--center-head th {
+  text-align: center;
 }
 
 @keyframes ae-row-ring-sweep {
@@ -284,21 +337,21 @@ table input[type="number"] {
 }
 .ae-input-cell {
   padding: 3px 6px;
-  background: #14110d;
-  color: #fff;
+  background: var(--ae-input-cell-bg);
+  color: var(--ae-input-cell-text);
   border-width: 1px;
-  border-color: #ffd400;
+  border-color: var(--ae-input-cell-border);
 }
 .ae-input-cell:hover:not(:disabled):not(:focus) {
-  border-color: #ffd400;
+  border-color: var(--ae-input-cell-border);
 }
 .ae-input-cell:focus {
-  border-color: #ffd400;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.45);
+  border-color: var(--ae-input-cell-border);
+  box-shadow: 0 0 0 2px var(--ae-input-cell-focus-ring);
 }
 .ae-input-cell:disabled {
-  background: #14110d;
-  color: rgba(255, 255, 255, 0.55);
+  background: var(--ae-input-cell-bg);
+  color: var(--ae-input-cell-text-muted);
 }
 
 .ae-number-cell {
@@ -349,7 +402,7 @@ table input[type="number"] {
   cursor: pointer;
 }
 .ae-number-cell-spin button:hover {
-  background: rgba(255, 212, 0, 0.18);
+  background: var(--ae-input-cell-spin-hover-bg);
 }
 .ae-number-cell-spin button::before {
   content: "";
@@ -357,10 +410,10 @@ table input[type="number"] {
   border-right: 4px solid transparent;
 }
 .ae-number-cell-spin-up::before {
-  border-bottom: 5px solid #ffd400;
+  border-bottom: 5px solid var(--ae-input-cell-spin);
 }
 .ae-number-cell-spin-down::before {
-  border-top: 5px solid #ffd400;
+  border-top: 5px solid var(--ae-input-cell-spin);
 }
 
 .ae-receipt-paper .ae-input,
@@ -620,6 +673,122 @@ table input[type="number"] {
   }
 }
 
+/* ---- Dropdown (components/Dropdown.tsx) ---------------------------------
+   Themed replacement for a bare <select>, used by every toolbar dropdown
+   (CategoryFilter, ShiftFilter, ZoomControl, and the page-level filter
+   selects). Same trigger-plus-portaled-panel shape as the date picker
+   above, and deliberately styled to match it: same .ae-input trigger, same
+   square (border-radius: 0), dark-shadowed panel, same brand-yellow
+   selected state. */
+.ae-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 96px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ae-select-trigger[aria-expanded="true"] {
+  border-color: #c99a2e;
+  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.18);
+}
+.ae-select-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ae-select-trigger-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: #8b6a1e;
+  transition:
+    color 120ms ease,
+    transform 120ms ease;
+}
+.ae-select-trigger:hover:not(:disabled) .ae-select-trigger-icon,
+.ae-select-trigger[aria-expanded="true"] .ae-select-trigger-icon {
+  color: #c99a2e;
+}
+.ae-select-trigger[aria-expanded="true"] .ae-select-trigger-icon {
+  transform: rotate(180deg);
+}
+:root[data-theme="dark"] .ae-select-trigger-icon {
+  color: #ffd400;
+}
+:root[data-theme="dark"] .ae-receipt-paper .ae-select-trigger-icon {
+  color: #8b6a1e; /* matches .ae-date-trigger-icon's same override */
+}
+.ae-select-trigger:disabled {
+  cursor: not-allowed;
+}
+
+.ae-dropdown {
+  position: fixed;
+  z-index: 300; /* above Modal (200), same as .ae-datepicker */
+  overflow: hidden;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 0;
+  box-shadow: 0 16px 48px rgba(20, 17, 13, 0.35);
+  font-size: 13px;
+  outline: none;
+}
+.ae-dropdown-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px 0;
+  /* Scroll is still fully usable (wheel/touch/keyboard) - the bar itself is
+     just hidden, matching the plainer look asked for here (unlike the
+     table/main-pane scrollbars, which stay visible - see .ae-table-scroll
+     above). */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ae-dropdown-list::-webkit-scrollbar {
+  display: none;
+}
+.ae-dropdown button {
+  font-family: inherit;
+}
+.ae-dropdown-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.ae-dropdown-option:hover {
+  background: var(--ae-surface-hover);
+}
+.ae-dropdown-option--selected,
+.ae-dropdown-option--selected:hover {
+  background: #ffd400;
+  color: #14110d;
+  font-weight: 800;
+}
+.ae-dropdown-option:focus-visible {
+  outline: 2px solid #c99a2e;
+  outline-offset: -2px;
+}
+@media print {
+  .ae-dropdown {
+    display: none !important;
+  }
+}
+
 .ae-select {
   appearance: none;
   -webkit-appearance: none;
@@ -832,7 +1001,8 @@ table input[type="number"] {
 
 /* ---- Filters: borders always visible, no hover-only border ------------- */
 .ae-toolbar .ae-input,
-.ae-toolbar .ae-select {
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
@@ -847,6 +1017,7 @@ table input[type="number"] {
   min-width: 72px;
 }
 .ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger,
 .ae-toolbar .ae-date-trigger {
   flex: 0 1 auto;
 }
@@ -861,7 +1032,8 @@ table input[type="number"] {
   width: 110px !important;
   min-width: 72px;
 }
-.ae-toolbar--compact .ae-select {
+.ae-toolbar--compact .ae-select,
+.ae-toolbar--compact .ae-select-trigger {
   flex: 1 1 88px !important;
   width: 88px !important;
   min-width: 64px !important;
@@ -883,11 +1055,15 @@ table input[type="number"] {
   width: 72px !important;
   min-width: 56px;
 }
-.ae-toolbar--circle .ae-select {
+.ae-toolbar--circle .ae-select,
+.ae-toolbar--circle .ae-select-trigger {
   flex: 1 1 64px !important;
   width: 64px !important;
   min-width: 48px !important;
   max-width: 120px !important;
+}
+.ae-toolbar--circle .ae-select-trigger-icon {
+  display: none;
 }
 .ae-toolbar--circle .ae-date-trigger {
   flex: 1 1 84px !important;

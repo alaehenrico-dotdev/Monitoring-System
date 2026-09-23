@@ -55,13 +55,15 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
       { to: "/offline", label: "Offline Entry", abbr: "OF", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/manual-count", label: "Manual Count", abbr: "MC", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/total-stocks", label: "Total Stocks", abbr: "TS", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/receipts", label: "Receipts", abbr: "RC", roles: ["ONLINE_ENCODER", "SUPERVISOR_ADMIN"] },
+      // Bulk entry lives inside this page too now (its own "Bulk Entry" mode,
+      // shown to Offline Encoders/Supervisors only) - no separate nav entry.
+      { to: "/receipts", label: "Receipts", abbr: "RC", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
     ],
   },
   {
     heading: "Reports",
     links: [
-      { to: "/consolidated-receipts", label: "Consolidated Receipt", abbr: "CR", roles: ["ONLINE_ENCODER", "SUPERVISOR_ADMIN"] },
+      { to: "/consolidated-receipts", label: "Consolidated Receipt", abbr: "CR", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/variance-report", label: "Variance Report", abbr: "VR", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/daily-report", label: "Daily Report", abbr: "DR", roles: ["SUPERVISOR_ADMIN"] },
     ],

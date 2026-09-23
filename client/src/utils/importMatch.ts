@@ -35,7 +35,7 @@ export function findHeaderRowIndex(table: string[][]): number {
 
 /// Index of the product-name column within an already-located header row.
 export function findProductColumnIndex(header: string[]): number {
-  return header.findIndex((h) => PRODUCT_HEADER_NAMES.includes(h));
+  return header.findIndex((h) => PRODUCT_HEADER_NAMES.includes(h.trim().toLowerCase()));
 }
 
 /// For every column that's read on import (editable, or explicitly marked

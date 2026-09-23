@@ -7,9 +7,10 @@ import {
   type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
-import { createReceipt, listReceipts } from "../api/receipts";
+import { createReceipt, createReceiptsBatch, listLastCustomers, listReceipts, type CreateReceiptBatchInput } from "../api/receipts";
 import { listProducts } from "../api/products";
-import type { Product, Receipt } from "../types";
+import { listDeliveryDestinations } from "../api/deliveryDestinations";
+import type { DeliveryDestination, Product, Receipt } from "../types";
 import { colors } from "../theme";
 import {
   Divider,
@@ -17,6 +18,7 @@ import {
   ReceiptPaper,
   RECEIPT_CARD_WIDTH,
 } from "../components/ReceiptCard";
+import { ConsolidatedReceiptEntryGrid, type EntryCustomerColumn } from "../components/ConsolidatedReceiptEntryGrid";
 import { Button, Select } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useAuth } from "../context/AuthContext";
@@ -53,8 +55,24 @@ type ThermalPaperSize = keyof typeof THERMAL_PAPER_SIZES;
 
 const DEFAULT_THERMAL_PAPER_SIZE: ThermalPaperSize = "58mm";
 
+/// Which entry surface is showing - one receipt at a time (any pool, any
+/// encoder role) or a whole sheet of customers at once for one delivery
+/// date/location (Offline-only, see EntryMode's own gating below). Both
+/// write into the same `receipts` table through the same recent-receipts
+/// list at the bottom of this page - there was never a need for two
+/// separate pages, just two different ways of filling the same form.
+type EntryMode = "single" | "bulk";
+
 function today(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function newCustomerId(): string {
+  return `c${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function bulkCellKey(productId: number, customerId: string): string {
+  return `${productId}:${customerId}`;
 }
 
 // Small top nudge for the receipt entry columns.
@@ -67,20 +85,37 @@ const RECEIPT_LIST_MAX_HEIGHT = 29 + RECEIPT_LIST_VISIBLE_ROWS * 23;
 interface LineItem {
   productId: number;
   quantity: string;
+  unitPrice: string;
 }
 
 /**
  * Section 4.7 - Receipt / Sales Order Entry.
  *
- * The entry form is displayed as an editable receipt on the left,
- * with a live receipt preview on the right.
+ * Two entry modes share this one page:
+ * - Single: the editable receipt form on the left, with a live preview card
+ *   on the right - any pool, any encoder role.
+ * - Bulk: one delivery date/location for a whole sheet, customers as
+ *   editable columns, products as rows - Offline Delivery only, so only
+ *   visible to Offline Encoders/Supervisors.
+ *
+ * Both modes feed the same "Recent Receipts" list below, since they create
+ * the exact same kind of record either way.
  */
 export function ReceiptsPage() {
   const { user } = useAuth();
   const progress = useTopProgress();
+  const canBulk = user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
+
+  const [mode, setModeState] = useState<EntryMode>("single");
+  function setMode(next: EntryMode) {
+    setModeState(next);
+    setError(null);
+    setBulkSaved(null);
+  }
 
   const [receipts, setReceipts] = useState<Receipt[] | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  const [destinations, setDestinations] = useState<DeliveryDestination[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [zoom, setZoom] = useZoom("receipts");
@@ -118,11 +153,22 @@ export function ReceiptsPage() {
   }
 
   const [items, setItems] = useState<LineItem[]>([
-    { productId: 0, quantity: "" },
+    { productId: 0, quantity: "", unitPrice: "" },
   ]);
 
+  // ---------------------------------------------------------------------
+  // Bulk entry state (Section 4.7's Consolidated Receipt bulk entry).
+  // ---------------------------------------------------------------------
+  const [bulkDate, setBulkDate] = useState(today());
+  const [bulkLocation, setBulkLocation] = useState("");
+  const [bulkCustomers, setBulkCustomers] = useState<EntryCustomerColumn[]>([]);
+  const [bulkUnitPrices, setBulkUnitPrices] = useState<Record<number, string>>({});
+  const [bulkQuantities, setBulkQuantities] = useState<Record<string, string>>({});
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkSaved, setBulkSaved] = useState<{ count: number; date: string } | null>(null);
+
   /*
-   * Load receipts and products.
+   * Load receipts, products, and delivery destinations.
    */
   useEffect(() => {
     listReceipts()
@@ -137,7 +183,35 @@ export function ReceiptsPage() {
       .catch((e) =>
         setError(e instanceof Error ? e.message : "Failed to load SKUs")
       );
+
+    listDeliveryDestinations()
+      .then(setDestinations)
+      .catch(() => setDestinations([])); // best-effort, same as OfflineEntryPage
   }, []);
+
+  // Pre-fill the bulk sheet's customer columns from this location's last
+  // prior sheet instead of starting blank, whenever its date or location
+  // changes - but only while the sheet is still untouched (no quantities
+  // entered yet), so switching dates mid-entry can never silently wipe
+  // someone's in-progress work. bulkQuantities is intentionally left out of
+  // the dependency list: this should fire on date/location changes only,
+  // using the current quantities purely as a guard at the moment it runs.
+  useEffect(() => {
+    if (!bulkLocation) return;
+    if (Object.keys(bulkQuantities).length > 0) return;
+
+    let cancelled = false;
+    listLastCustomers(bulkLocation, bulkDate)
+      .then((names) => {
+        if (cancelled || names.length === 0) return;
+        setBulkCustomers(names.map((name) => ({ id: newCustomerId(), customer: name, salesRepName: "" })));
+      })
+      .catch(() => {}); // best-effort - never blocks manually adding customers
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bulkLocation, bulkDate]);
 
   /*
    * Update one order item.
@@ -152,7 +226,7 @@ export function ReceiptsPage() {
    * Add another product row.
    */
   function addItemRow() {
-    setItems((prev) => [...prev, { productId: 0, quantity: "" }]);
+    setItems((prev) => [...prev, { productId: 0, quantity: "", unitPrice: "" }]);
   }
 
   /*
@@ -172,12 +246,12 @@ export function ReceiptsPage() {
     setError(null);
 
     const validItems = items.filter(
-      (it) => it.productId && Number(it.quantity) > 0
+      (it) => it.productId && Number(it.quantity) > 0 && Number(it.unitPrice) > 0
     );
 
     if (!customer || !location || !validItems.length) {
       setError(
-        "Customer, location, and at least one order item are required."
+        "Customer, location, and at least one order item (with a unit price) are required."
       );
       return;
     }
@@ -195,6 +269,7 @@ export function ReceiptsPage() {
         items: validItems.map((it) => ({
           productId: it.productId,
           quantity: Number(it.quantity),
+          unitPrice: Number(it.unitPrice),
         })),
       });
 
@@ -203,7 +278,7 @@ export function ReceiptsPage() {
       setCustomer("");
       setLocation("");
       setSalesRepName("");
-      setItems([{ productId: 0, quantity: "" }]);
+      setItems([{ productId: 0, quantity: "", unitPrice: "" }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save receipt");
     } finally {
@@ -228,6 +303,7 @@ export function ReceiptsPage() {
           productId: it.productId,
           product,
           quantity: Number(it.quantity),
+          unitPrice: it.unitPrice !== "" ? Number(it.unitPrice) : null,
         };
       })
       .filter((it): it is NonNullable<typeof it> => it !== null);
@@ -245,12 +321,107 @@ export function ReceiptsPage() {
         : null,
       createdAt: new Date().toISOString(),
       items: previewItems,
+      postedPool: postToFulfillment ? "FULFILLMENT" : postToOfflineDelivery ? "OFFLINE_DELIVERY" : "NONE",
       // Never actually rendered - ReceiptCard skips the QR code entirely
       // for `isPreview` receipts (there's nothing stable to encode until
       // the receipt has a real, server-issued id/token).
       qrToken: "",
     };
-  }, [orderDate, customer, location, items, products, user, salesRepName]);
+  }, [orderDate, customer, location, items, products, user, salesRepName, postToFulfillment, postToOfflineDelivery]);
+
+  // ---------------------------------------------------------------------
+  // Bulk entry handlers.
+  // ---------------------------------------------------------------------
+
+  function addBulkCustomer() {
+    setBulkCustomers((prev) => [...prev, { id: newCustomerId(), customer: "", salesRepName: "" }]);
+  }
+
+  function renameBulkCustomer(id: string, patch: Partial<Omit<EntryCustomerColumn, "id">>) {
+    setBulkCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  }
+
+  function removeBulkCustomer(id: string) {
+    setBulkCustomers((prev) => prev.filter((c) => c.id !== id));
+    setBulkQuantities((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (key.endsWith(`:${id}`)) delete next[key];
+      }
+      return next;
+    });
+  }
+
+  function setBulkUnitPrice(productId: number, value: string) {
+    setBulkUnitPrices((prev) => ({ ...prev, [productId]: value }));
+  }
+
+  function setBulkQuantity(productId: number, customerId: string, value: string) {
+    setBulkQuantities((prev) => ({ ...prev, [bulkCellKey(productId, customerId)]: value }));
+  }
+
+  function resetBulkForm() {
+    setBulkCustomers([]);
+    setBulkQuantities({});
+    setBulkUnitPrices({});
+  }
+
+  async function handleBulkSave() {
+    setError(null);
+    setBulkSaved(null);
+
+    if (!bulkLocation) {
+      setError("Pick a delivery location first.");
+      return;
+    }
+
+    const productsWithQty = products.filter((p) => bulkCustomers.some((c) => Number(bulkQuantities[bulkCellKey(p.id, c.id)]) > 0));
+    const missingPrice = productsWithQty.filter((p) => !(Number(bulkUnitPrices[p.id]) > 0));
+    if (missingPrice.length > 0) {
+      setError(`Set a unit price for: ${missingPrice.map((p) => p.name).join(", ")}`);
+      return;
+    }
+
+    const batch: CreateReceiptBatchInput[] = [];
+    for (const c of bulkCustomers) {
+      if (!c.customer.trim()) continue;
+      const batchItems = products
+        .map((p) => {
+          const qty = Number(bulkQuantities[bulkCellKey(p.id, c.id)]);
+          if (!(qty > 0)) return null;
+          return { productId: p.id, quantity: qty, unitPrice: Number(bulkUnitPrices[p.id]) };
+        })
+        .filter((it): it is NonNullable<typeof it> => it !== null);
+      if (batchItems.length === 0) continue;
+
+      batch.push({
+        orderDate: bulkDate,
+        customer: c.customer.trim(),
+        location: bulkLocation,
+        salesRepName: c.salesRepName.trim() || undefined,
+        postToFulfillment: false,
+        postToOfflineDelivery: true,
+        items: batchItems,
+      });
+    }
+
+    if (batch.length === 0) {
+      setError("Add a customer name and at least one quantity before saving.");
+      return;
+    }
+
+    setBulkSaving(true);
+    try {
+      const created = await createReceiptsBatch(batch);
+      setReceipts((prev) => [...created, ...(prev ?? [])]);
+      setBulkSaved({ count: created.length, date: bulkDate });
+      resetBulkForm();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save the batch");
+    } finally {
+      setBulkSaving(false);
+    }
+  }
 
   /*
    * Search and sort recent receipts.
@@ -277,8 +448,9 @@ export function ReceiptsPage() {
       <h2 style={{ margin: "-8px 0 0px" }}>Receipts / Sales Orders</h2>
 
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Fill in the receipt on the left - the card on the right always shows
-        exactly what will be saved.
+        {mode === "single"
+          ? "Fill in the receipt on the left - the card on the right always shows exactly what will be saved."
+          : "One delivery date and location for the whole sheet - add a customer column per order, fill in quantities, and Save creates every customer's receipt together, posted to Offline Delivery."}
       </p>
 
       <Toolbar>
@@ -289,273 +461,387 @@ export function ReceiptsPage() {
         />
 
         <ToolbarControls>
-          <ZoomControl zoom={zoom} onChange={setZoom} />
+          {canBulk && (
+            <div style={modeToggleStyle} role="tablist" aria-label="Entry mode">
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "single" ? "primary" : "secondary"}
+                role="tab"
+                aria-selected={mode === "single"}
+                onClick={() => setMode("single")}
+              >
+                Single Receipt
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={mode === "bulk" ? "primary" : "secondary"}
+                role="tab"
+                aria-selected={mode === "bulk"}
+                onClick={() => setMode("bulk")}
+              >
+                Bulk Entry
+              </Button>
+            </div>
+          )}
+          {mode === "single" && <ZoomControl zoom={zoom} onChange={setZoom} />}
           <Link to="/consolidated-receipts" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
             Consolidated Receipt
           </Link>
         </ToolbarControls>
       </Toolbar>
 
+      {mode === "bulk" && (
+        <Toolbar className="no-print">
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
+            <DatePicker aria-label="Delivery date" value={bulkDate} onChange={setBulkDate} />
+            <Select aria-label="Delivery location" value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)} required>
+              <option value="" disabled>
+                Select destination…
+              </option>
+              {destinations.map((d) => (
+                <option key={d.id} value={d.name}>
+                  {d.name}
+                </option>
+              ))}
+            </Select>
+            <Button type="button" variant="secondary" onClick={addBulkCustomer}>
+              + Add Customer
+            </Button>
+          </div>
+          <ToolbarControls>
+            <Button onClick={handleBulkSave} disabled={bulkSaving}>
+              {bulkSaving ? "Saving…" : "Save All"}
+            </Button>
+          </ToolbarControls>
+        </Toolbar>
+      )}
+
+      {mode === "bulk" && error && <p style={{ color: colors.danger }}>{error}</p>}
+      {mode === "bulk" && bulkSaved && (
+        <p style={{ color: colors.ink, fontWeight: 600 }}>
+          Saved {bulkSaved.count} receipt{bulkSaved.count === 1 ? "" : "s"} for {formatDateDisplay(bulkSaved.date)} -{" "}
+          <Link to="/consolidated-receipts">view in Consolidated Receipt</Link>.
+        </p>
+      )}
+
+      {mode === "bulk" && (
+        <div style={{ marginBottom: 20 }}>
+          <ConsolidatedReceiptEntryGrid
+            products={products}
+            customers={bulkCustomers}
+            onRenameCustomer={renameBulkCustomer}
+            onRemoveCustomer={removeBulkCustomer}
+            unitPrices={bulkUnitPrices}
+            onUnitPriceChange={setBulkUnitPrice}
+            quantities={bulkQuantities}
+            onQuantityChange={setBulkQuantity}
+          />
+        </div>
+      )}
+
       {/*
-       * Everything below the toolbar zooms together.
+       * Everything below zooms together - single-mode entry form only
+       * (the bulk grid above isn't part of this zoomable section).
        */}
-      <div style={zoomStyle(zoom)}>
-        {/*
-         * Entry form + live preview.
-         */}
-        <div
-          className="ae-receipt-columns"
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            flexWrap: "nowrap",
-            gap: 28,
-            overflow: "auto",
-            padding: "0 4px 20px",
-          }}
-        >
-          <form
-            onSubmit={handleSubmit}
-            style={{ marginTop: RECEIPT_COLUMN_TOP, flexShrink: 0 }}
+      {mode === "single" && (
+        <div style={zoomStyle(zoom)}>
+          {/*
+           * Entry form + live preview.
+           */}
+          <div
+            className="ae-receipt-columns"
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              flexWrap: "nowrap",
+              gap: 28,
+              overflow: "auto",
+              padding: "0 4px 20px",
+            }}
           >
-            <ReceiptPaper>
-              <Divider />
+            <form
+              onSubmit={handleSubmit}
+              style={{ marginTop: RECEIPT_COLUMN_TOP, flexShrink: 0 }}
+            >
+              <ReceiptPaper>
+                <Divider />
 
-              <FormRow label="Date">
-                <DatePicker aria-label="Order date" style={receiptInputStyle} value={orderDate} onChange={setOrderDate} />
-              </FormRow>
+                <FormRow label="Date">
+                  <DatePicker aria-label="Order date" style={receiptInputStyle} value={orderDate} onChange={setOrderDate} />
+                </FormRow>
 
-              <FormRow label="Customer">
-                <input
-                  className="ae-input"
-                  style={receiptInputStyle}
-                  value={customer}
-                  onChange={(e) => setCustomer(e.target.value)}
-                  placeholder="Name"
-                />
-              </FormRow>
+                <FormRow label="Customer">
+                  <input
+                    className="ae-input"
+                    style={receiptInputStyle}
+                    value={customer}
+                    onChange={(e) => setCustomer(e.target.value)}
+                    placeholder="Name"
+                  />
+                </FormRow>
 
-              <FormRow label="Location">
-                <input
-                  className="ae-input"
-                  style={receiptInputStyle}
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Delivery address"
-                />
-              </FormRow>
-
-              <FormRow label="Sales Rep">
-                <input
-                  className="ae-input"
-                  style={receiptInputStyle}
-                  value={salesRepName}
-                  onChange={(e) => setSalesRepName(e.target.value)}
-                  placeholder="Name"
-                />
-              </FormRow>
-
-              <Divider />
-
-              {items.map((item, i) => (
-                <div
-                  key={i}
-                  style={{
-                    display: "flex",
-                    gap: 4,
-                    alignItems: "center",
-                    marginBottom: 6,
-                  }}
-                >
+                <FormRow label="Location">
                   <Select
-                    value={item.productId}
-                    onChange={(e) =>
-                      updateItem(i, { productId: Number(e.target.value) })
-                    }
-                    style={{ flex: 1, minWidth: 0, fontSize: 11, padding: "4px 4px" }}
+                    style={receiptInputStyle}
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    required
                   >
-                    <option value={0}>Select SKU…</option>
+                    <option value="" disabled>
+                      Select destination…
+                    </option>
 
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.category} — {p.name}
+                    {/* A location that no longer matches any active destination
+                        (retired since, or renamed) still needs to render as a
+                        valid selected option - otherwise an old receipt would
+                        silently fall back to the blank placeholder and look
+                        like its location was lost. */}
+                    {location && !destinations.some((d) => d.name === location) && (
+                      <option value={location}>{location}</option>
+                    )}
+
+                    {destinations.map((d) => (
+                      <option key={d.id} value={d.name}>
+                        {d.name}
                       </option>
                     ))}
                   </Select>
+                </FormRow>
 
+                <FormRow label="Sales Rep">
                   <input
-                    type="number"
                     className="ae-input"
-                    placeholder="Qty"
-                    value={item.quantity}
-                    onChange={(e) =>
-                      updateItem(i, { quantity: e.target.value })
-                    }
-                    style={{
-                      width: 46,
-                      flexShrink: 0,
-                      fontSize: 11,
-                      padding: "4px 4px",
-                      textAlign: "right",
-                    }}
+                    style={receiptInputStyle}
+                    value={salesRepName}
+                    onChange={(e) => setSalesRepName(e.target.value)}
+                    placeholder="Name"
                   />
+                </FormRow>
 
-                  <button
-                    type="button"
-                    onClick={() => removeItemRow(i)}
-                    disabled={items.length === 1}
-                    aria-label="Remove item"
-                    className="ae-tap-target"
-                    style={removeButtonStyle}
+                <Divider />
+
+                {items.map((item, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      gap: 4,
+                      alignItems: "center",
+                      marginBottom: 6,
+                    }}
                   >
-                    ×
-                  </button>
-                </div>
-              ))}
+                    <Select
+                      value={item.productId}
+                      onChange={(e) =>
+                        updateItem(i, { productId: Number(e.target.value) })
+                      }
+                      style={{ flex: 1, minWidth: 0, fontSize: 11, padding: "4px 4px" }}
+                    >
+                      <option value={0}>Select SKU…</option>
 
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={addItemRow}
-                style={{ width: "100%", marginBottom: 4 }}
-              >
-                + Add item
-              </Button>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.category} — {p.name}
+                        </option>
+                      ))}
+                    </Select>
 
-              <Divider dashed />
+                    <input
+                      type="number"
+                      className="ae-input"
+                      placeholder="Qty"
+                      value={item.quantity}
+                      onChange={(e) =>
+                        updateItem(i, { quantity: e.target.value })
+                      }
+                      style={{
+                        width: 46,
+                        flexShrink: 0,
+                        fontSize: 11,
+                        padding: "4px 4px",
+                        textAlign: "right",
+                      }}
+                    />
 
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 10.5,
-                  color: colors.subtleInk,
-                  marginBottom: 4,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={postToFulfillment}
-                  onChange={(e) => toggleFulfillment(e.target.checked)}
-                />
-                Post to Online Fulfillment (Out)
-              </label>
+                    <input
+                      type="number"
+                      className="ae-input"
+                      placeholder="₱/unit"
+                      value={item.unitPrice}
+                      min={0}
+                      step="0.01"
+                      onChange={(e) =>
+                        updateItem(i, { unitPrice: e.target.value })
+                      }
+                      style={{
+                        width: 58,
+                        flexShrink: 0,
+                        fontSize: 11,
+                        padding: "4px 4px",
+                        textAlign: "right",
+                      }}
+                    />
 
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  fontSize: 10.5,
-                  color: colors.subtleInk,
-                  marginBottom: 10,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={postToOfflineDelivery}
-                  onChange={(e) => toggleOfflineDelivery(e.target.checked)}
-                />
-                Post to Offline Delivery (Out)
-              </label>
+                    <button
+                      type="button"
+                      onClick={() => removeItemRow(i)}
+                      disabled={items.length === 1}
+                      aria-label="Remove item"
+                      className="ae-tap-target"
+                      style={removeButtonStyle}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
 
-              {/*
-               * Online and Offline are separate stock pools (Section 2.1) -
-               * this receipt tallies against exactly one of them (or
-               * neither), never both, so the note makes that explicit
-               * instead of leaving it implicit in the two checkboxes.
-               */}
-              {!postToFulfillment && !postToOfflineDelivery && (
-                <p style={{ fontSize: 10, color: colors.subtleInk, margin: "-6px 0 10px" }}>
-                  Not posted to Online or Offline - this receipt won't tally against either entry.
-                </p>
-              )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={addItemRow}
+                  style={{ width: "100%", marginBottom: 4 }}
+                >
+                  + Add item
+                </Button>
 
-              {error && (
-                <p style={{ color: colors.danger, fontSize: 11, marginBottom: 8 }}>
-                  {error}
-                </p>
-              )}
+                <Divider dashed />
 
-              <Button type="submit" disabled={submitting} style={{ width: "100%" }}>
-                {submitting ? "Saving…" : "Save Receipt"}
-              </Button>
-            </ReceiptPaper>
-          </form>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 10.5,
+                    color: colors.subtleInk,
+                    marginBottom: 4,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={postToFulfillment}
+                    onChange={(e) => toggleFulfillment(e.target.checked)}
+                  />
+                  Post to Online Fulfillment (Out)
+                </label>
 
-          <div style={{ marginTop: RECEIPT_COLUMN_TOP, flexShrink: 0 }}>
-            <ReceiptCard receipt={previewReceipt} isPreview />
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    fontSize: 10.5,
+                    color: colors.subtleInk,
+                    marginBottom: 10,
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={postToOfflineDelivery}
+                    onChange={(e) => toggleOfflineDelivery(e.target.checked)}
+                  />
+                  Post to Offline Delivery (Out)
+                </label>
+
+                {/*
+                 * Online and Offline are separate stock pools (Section 2.1) -
+                 * this receipt tallies against exactly one of them (or
+                 * neither), never both, so the note makes that explicit
+                 * instead of leaving it implicit in the two checkboxes.
+                 */}
+                {!postToFulfillment && !postToOfflineDelivery && (
+                  <p style={{ fontSize: 10, color: colors.subtleInk, margin: "-6px 0 10px" }}>
+                    Not posted to Online or Offline - this receipt won't tally against either entry.
+                  </p>
+                )}
+
+                {error && (
+                  <p style={{ color: colors.danger, fontSize: 11, marginBottom: 8 }}>
+                    {error}
+                  </p>
+                )}
+
+                <Button type="submit" disabled={submitting} style={{ width: "100%", color: colors.yellow }}>
+                  {submitting ? "Saving…" : "Save Receipt"}
+                </Button>
+              </ReceiptPaper>
+            </form>
+
+            <div style={{ marginTop: RECEIPT_COLUMN_TOP, flexShrink: 0 }}>
+              <ReceiptCard receipt={previewReceipt} isPreview />
+            </div>
           </div>
         </div>
+      )}
 
-        {/*
-         * Recent receipts.
-         */}
-        <div style={{ marginTop: 4 }}>
-          <h3 style={{ margin: "0 0 12px" }}>Recent Receipts</h3>
+      {/*
+       * Recent receipts - shared between both entry modes, since either one
+       * creates the exact same kind of record.
+       */}
+      <div style={{ marginTop: 4 }}>
+        <h3 style={{ margin: "0 0 12px" }}>Recent Receipts</h3>
 
-          {!receipts ? (
-            <TableSkeleton
-              headers={["Receipt #", "Date", "Customer", "Location", "Sales Rep", "Items", "Total Qty"]}
-              minWidth={720}
-              rows={6}
-              label="Loading receipts…"
-            />
-          ) : visibleReceipts?.length === 0 ? (
-            <p style={{ color: colors.subtleInk }}>
-              {receipts.length === 0
-                ? "No receipts logged yet."
-                : "No receipts match your search."}
-            </p>
-          ) : (
-            <div
-              className="table-scroll"
-              style={{
-                maxHeight: RECEIPT_LIST_MAX_HEIGHT,
-                overflow: "auto",
-                border: `1px solid ${colors.border}`,
-                borderRadius: 0,
-              }}
-            >
-              <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
-                <thead>
-                  <tr>
-                    <th>Receipt #</th>
-                    <th>Date</th>
-                    <th>Customer</th>
-                    <th>Location</th>
-                    <th>Sales Rep</th>
-                    <th style={{ textAlign: "right" }}>Items</th>
-                    <th style={{ textAlign: "right" }}>Total Qty</th>
+        {!receipts ? (
+          <TableSkeleton
+            headers={["Receipt #", "Date", "Customer", "Location", "Sales Rep", "Items", "Total Qty"]}
+            minWidth={720}
+            rows={6}
+            label="Loading receipts…"
+          />
+        ) : visibleReceipts?.length === 0 ? (
+          <p style={{ color: colors.subtleInk }}>
+            {receipts.length === 0
+              ? "No receipts logged yet."
+              : "No receipts match your search."}
+          </p>
+        ) : (
+          <div
+            className="table-scroll"
+            style={{
+              maxHeight: RECEIPT_LIST_MAX_HEIGHT,
+              overflow: "auto",
+              border: `1px solid ${colors.border}`,
+              borderRadius: 0,
+            }}
+          >
+            <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
+              <thead>
+                <tr>
+                  <th>Receipt #</th>
+                  <th>Date</th>
+                  <th>Customer</th>
+                  <th>Location</th>
+                  <th>Sales Rep</th>
+                  <th style={{ textAlign: "center" }}>Items</th>
+                  <th style={{ textAlign: "center" }}>Total Qty</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {visibleReceipts?.map((r) => (
+                  <tr
+                    key={r.id}
+                    onClick={() => setSelectedReceipt(r)}
+                    style={{ cursor: "pointer" }}
+                    title="Click to preview and print"
+                  >
+                    <td>#{String(r.id).padStart(6, "0")}</td>
+                    <td>{formatDateDisplay(r.orderDate.slice(0, 10))}</td>
+                    <td>{r.customer || "—"}</td>
+                    <td>{r.location || "—"}</td>
+                    <td>{r.salesRepName || "—"}</td>
+                    <td style={{ textAlign: "center", color: "var(--ae-num-text)" }}>{r.items.length}</td>
+                    <td style={{ textAlign: "center", color: "var(--ae-num-text)" }}>
+                      {r.items.reduce((sum, it) => sum + Number(it.quantity), 0)}
+                    </td>
                   </tr>
-                </thead>
-
-                <tbody>
-                  {visibleReceipts?.map((r) => (
-                    <tr
-                      key={r.id}
-                      onClick={() => setSelectedReceipt(r)}
-                      style={{ cursor: "pointer" }}
-                      title="Click to preview and print"
-                    >
-                      <td>#{String(r.id).padStart(6, "0")}</td>
-                      <td>{formatDateDisplay(r.orderDate.slice(0, 10))}</td>
-                      <td>{r.customer || "—"}</td>
-                      <td>{r.location || "—"}</td>
-                      <td>{r.salesRepName || "—"}</td>
-                      <td style={{ textAlign: "right", color: "var(--ae-num-text)" }}>{r.items.length}</td>
-                      <td style={{ textAlign: "right", color: "var(--ae-num-text)" }}>
-                        {r.items.reduce((sum, it) => sum + Number(it.quantity), 0)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/*
@@ -680,4 +966,12 @@ const removeButtonStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   padding: 0,
+};
+
+/*
+ * Single/Bulk mode toggle styling.
+ */
+const modeToggleStyle: CSSProperties = {
+  display: "flex",
+  gap: 4,
 };

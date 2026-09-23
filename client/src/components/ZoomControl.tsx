@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { Select } from "./ui";
+import { Dropdown } from "./Dropdown";
 
 const MIN = 50;
 const MAX = 200;
@@ -41,8 +41,8 @@ export function useZoom(key: string) {
  * effects in RowGlowScroll.tsx are keyed to the table's on-screen row
  * geometry, which gets too small to track reliably below half size.
  *
- * This is intentionally a single native select so it behaves like the other
- * toolbar filter controls.
+ * This is intentionally a single Dropdown so it behaves - and now looks -
+ * like the other toolbar filter controls.
  *
  * Its SIZE is owned entirely by the `.ae-zoom-control` rules in index.css
  * (a fixed width per toolbar tier). Do not set width / minWidth / maxWidth /
@@ -60,25 +60,15 @@ export function ZoomControl({
   onChange: (zoom: number) => void;
 }) {
   return (
-    <Select
+    <Dropdown
       className="ae-zoom-control"
       aria-label="Zoom level"
       title="Zoom"
-      value={zoom}
-      onChange={(e) => onChange(Number(e.target.value))}
-      style={{
-        boxSizing: "border-box",
-        paddingLeft: 8,
-        paddingRight: 26,
-        textAlign: "right",
-      }}
-    >
-      {PRESETS.map((p) => (
-        <option key={p} value={p}>
-          {p}%
-        </option>
-      ))}
-    </Select>
+      value={String(zoom)}
+      onChange={(v) => onChange(Number(v))}
+      options={PRESETS.map((p) => ({ value: String(p), label: `${p}%` }))}
+      style={{ boxSizing: "border-box" }}
+    />
   );
 }
 

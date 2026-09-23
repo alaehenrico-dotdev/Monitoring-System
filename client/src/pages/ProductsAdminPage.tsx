@@ -105,7 +105,7 @@ export function ProductsAdminPage() {
         <Field label="Unit">
           <TextInput value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. Gallon" />
         </Field>
-        <Button type="submit">Add SKU</Button>
+        <Button type="submit" style={{ color: colors.yellow }}>Add SKU</Button>
       </form>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 
@@ -149,7 +149,7 @@ export function ProductsAdminPage() {
                   <td>{p.unit}</td>
                   <td>
                     {p.isActive ? (
-                      <Button variant="danger" size="sm" disabled={busyId === p.id} onClick={() => setPendingDeactivate(p)}>
+                      <Button variant="danger" size="sm" disabled={busyId === p.id} onClick={() => setPendingDeactivate(p)} style={{ color: colors.yellow }}>
                         Deactivate
                       </Button>
                     ) : (

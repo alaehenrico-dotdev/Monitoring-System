@@ -30,7 +30,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
 
   return (
     <RowGlowScroll>
-      <table className="ae-table" style={{ minWidth: 640 }}>
+      <table className="ae-table ae-table--center-head" style={{ minWidth: 640 }}>
         <thead>
           <tr>
             {["SKU", "Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"].map((h) => (
@@ -113,7 +113,7 @@ const categoryToggleStyle: CSSProperties = {
   padding: "6px 8px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
-  background: colors.black,
+  background: "var(--ae-category-bg)",
   color: colors.yellow,
   cursor: "pointer",
 };

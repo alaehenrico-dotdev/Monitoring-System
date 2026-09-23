@@ -3,7 +3,7 @@ import { listChangeLog } from "../api/changeLog";
 import type { ChangeLogEntry } from "../types";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
-import { Select } from "../components/ui";
+import { Dropdown } from "../components/Dropdown";
 import { matchesSearch } from "../utils/search";
 import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
@@ -60,13 +60,13 @@ export function ChangeLogPage() {
       </p>
 
       <Toolbar>
-        <Select value={tableFilter} onChange={(e) => setTableFilter(e.target.value)} style={{ minWidth: 160 }}>
-          {TABLE_FILTERS.map((t) => (
-            <option key={t} value={t}>
-              {t ? (TABLE_LABELS[t] ?? t) : "All tables"}
-            </option>
-          ))}
-        </Select>
+        <Dropdown
+          aria-label="Table"
+          value={tableFilter}
+          onChange={setTableFilter}
+          options={TABLE_FILTERS.map((t) => ({ value: t, label: t ? (TABLE_LABELS[t] ?? t) : "All tables" }))}
+          style={{ minWidth: 160 }}
+        />
         <ToolbarControls>
           <SearchInput value={query} onChange={setQuery} placeholder="Search by table, action, or user…" />
         </ToolbarControls>

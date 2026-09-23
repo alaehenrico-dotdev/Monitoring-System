@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
-import { Button, NumberCellInput, Select } from "../components/ui";
+import { Button, NumberCellInput } from "../components/ui";
+import { Dropdown } from "../components/Dropdown";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
@@ -294,17 +295,12 @@ export function ManualCountPage() {
         >
           <DatePicker aria-label="Date" value={date} onChange={setDate} todayValue={getCurrentShiftAndDate().date} />
           <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-          <Select
+          <Dropdown
             aria-label="Location"
             value={location}
-            onChange={(e) => setLocation(e.target.value as StockLocation)}
-          >
-            {LOCATIONS.map((l) => (
-              <option key={l} value={l}>
-                {l}
-              </option>
-            ))}
-          </Select>
+            onChange={(v) => setLocation(v as StockLocation)}
+            options={LOCATIONS.map((l) => ({ value: l, label: l }))}
+          />
           <SearchInput
             value={query}
             onChange={setQuery}
@@ -389,7 +385,7 @@ export function ManualCountPage() {
           <RowGlowScroll
             focusStorageKey={`ala-eh-focus:manual-count:${date}:${shift}:${location}`}
           >
-            <table className="ae-table" style={{ minWidth: 640 }}>
+            <table className="ae-table ae-table--center-head" style={{ minWidth: 640 }}>
               <thead>
                 <tr>
                   {[
@@ -481,7 +477,7 @@ export function ManualCountPage() {
                                 e.key === "Enter" &&
                                 (e.currentTarget as HTMLInputElement).blur()
                               }
-                              style={{ width: 64, textAlign: "right" }}
+                              style={{ width: 64, textAlign: "center" }}
                             />
                           </td>
                           <td style={{ fontWeight: r.isFlagged ? 700 : 400 }}>
@@ -634,7 +630,7 @@ const categoryToggleStyle: CSSProperties = {
   padding: "6px 8px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
-  background: colors.black,
+  background: "var(--ae-category-bg)",
   color: colors.yellow,
   cursor: "pointer",
 };

@@ -1,5 +1,5 @@
 import { ChangeAction } from "@prisma/client";
-import { prisma } from "../lib/prisma";
+import { prisma, type Db } from "../lib/prisma";
 
 export interface ChangeLogCreateData {
   tableName: string;
@@ -17,8 +17,8 @@ export interface ChangeLogFilters {
 
 /// Section 5.8 - change_log: accountability and variance tracing.
 export const changeLogRepository = {
-  create(data: ChangeLogCreateData) {
-    return prisma.changeLog.create({
+  create(data: ChangeLogCreateData, db: Db = prisma) {
+    return db.changeLog.create({
       data: {
         tableName: data.tableName,
         recordId: data.recordId,

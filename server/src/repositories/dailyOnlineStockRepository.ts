@@ -1,5 +1,5 @@
 import { Shift } from "@prisma/client";
-import { prisma } from "../lib/prisma";
+import { prisma, type Db } from "../lib/prisma";
 import { toNum } from "../utils/stockMath";
 
 export interface OnlineStockData {
@@ -19,8 +19,8 @@ export interface OnlineStockData {
 
 /// Section 5.2 - daily_online_stock: one row per product, per date, per shift.
 export const dailyOnlineStockRepository = {
-  findByProductAndDate(productId: number, entryDate: Date, shift: Shift) {
-    return prisma.dailyOnlineStock.findUnique({ where: { productId_entryDate_shift: { productId, entryDate, shift } } });
+  findByProductAndDate(productId: number, entryDate: Date, shift: Shift, db: Db = prisma) {
+    return db.dailyOnlineStock.findUnique({ where: { productId_entryDate_shift: { productId, entryDate, shift } } });
   },
 
   findAllForDate(entryDate: Date, shift: Shift) {
@@ -36,8 +36,8 @@ export const dailyOnlineStockRepository = {
   /// If that immediate predecessor was never actually saved (e.g. an
   /// encoder skipped a shift), this falls back to the most recent
   /// still-earlier row instead of resetting to a misleading 0.
-  async getOpeningStock(productId: number, entryDate: Date, shift: Shift): Promise<number> {
-    const prior = await prisma.dailyOnlineStock.findFirst({
+  async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+    const prior = await db.dailyOnlineStock.findFirst({
       where: {
         productId,
         OR:
@@ -96,9 +96,9 @@ export const dailyOnlineStockRepository = {
     return result;
   },
 
-  upsert(id: number | undefined, data: OnlineStockData) {
+  upsert(id: number | undefined, data: OnlineStockData, db: Db = prisma) {
     return id
-      ? prisma.dailyOnlineStock.update({ where: { id }, data })
-      : prisma.dailyOnlineStock.create({ data });
+      ? db.dailyOnlineStock.update({ where: { id }, data })
+      : db.dailyOnlineStock.create({ data });
   },
 };

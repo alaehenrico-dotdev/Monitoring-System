@@ -64,8 +64,7 @@ describe("findHeaderRowIndex / findProductColumnIndex", () => {
   });
 
   it("locates PRODUCTS case-insensitively within the header row", () => {
-    const header = OFFLINE_REPORT_HEADER.map((h) => h.toLowerCase());
-    expect(findProductColumnIndex(header)).toBe(0);
+    expect(findProductColumnIndex(OFFLINE_REPORT_HEADER)).toBe(0);
   });
 });
 
