@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
+import { AnimatePresence, motion } from "motion/react";
 import { createReceipt, createReceiptsBatch, listLastCustomers, listReceipts, type CreateReceiptBatchInput } from "../api/receipts";
 import { listProducts } from "../api/products";
 import { listDeliveryDestinations } from "../api/deliveryDestinations";
@@ -492,31 +493,45 @@ export function ReceiptsPage() {
         </ToolbarControls>
       </Toolbar>
 
-      {mode === "bulk" && (
-        <Toolbar className="no-print">
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-            <DatePicker aria-label="Delivery date" value={bulkDate} onChange={setBulkDate} />
-            <Select aria-label="Delivery location" value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)} required>
-              <option value="" disabled>
-                Select destination…
-              </option>
-              {destinations.map((d) => (
-                <option key={d.id} value={d.name}>
-                  {d.name}
+      {/*
+       * Bulk Entry's own date/location/+Add Customer/Save controls - a
+       * yellow panel attached directly under the main toolbar (no gap,
+       * squared top corners) instead of a second identical black bar with
+       * its own margin, so switching into Bulk Entry reads as this panel
+       * unfolding out of the main toolbar's bottom edge.
+       */}
+      <AnimatePresence initial={false}>
+        {mode === "bulk" && (
+          <motion.div
+            key="bulk-flyout"
+            className="ae-bulk-flyout no-print"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.18, ease: "easeOut" }}
+          >
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
+              <DatePicker aria-label="Delivery date" value={bulkDate} onChange={setBulkDate} />
+              <Select aria-label="Delivery location" value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)} required>
+                <option value="" disabled>
+                  Select destination…
                 </option>
-              ))}
-            </Select>
-            <Button type="button" variant="secondary" onClick={addBulkCustomer}>
-              + Add Customer
-            </Button>
-          </div>
-          <ToolbarControls>
+                {destinations.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
+              </Select>
+              <Button type="button" variant="secondary" onClick={addBulkCustomer}>
+                + Add Customer
+              </Button>
+            </div>
             <Button onClick={handleBulkSave} disabled={bulkSaving}>
               {bulkSaving ? "Saving…" : "Save All"}
             </Button>
-          </ToolbarControls>
-        </Toolbar>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {mode === "bulk" && error && <p style={{ color: colors.danger }}>{error}</p>}
       {mode === "bulk" && bulkSaved && (
