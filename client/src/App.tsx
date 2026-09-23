@@ -58,6 +58,8 @@ export default function App() {
                   <Route path="/manual-count" element={<ManualCountPage />} />
                   <Route path="/receipts" element={<ReceiptsPage />} />
                   <Route path="/consolidated-receipts" element={<ConsolidatedReceiptPage />} />
+                  {/* Bulk entry merged into ReceiptsPage's "Bulk Entry" mode - redirect any old link/bookmark. */}
+                  <Route path="/consolidated-receipts/entry" element={<Navigate to="/receipts" replace />} />
 
                   <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
                     <Route path="/dashboard" element={<DashboardPage />} />

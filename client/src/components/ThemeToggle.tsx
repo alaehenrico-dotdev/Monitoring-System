@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import { useTheme } from "../context/ThemeContext";
 import { MoonIcon, SunIcon } from "./icons";
 import { useCursorGlow, CursorGlowOverlay } from "./CursorGlow";
@@ -18,11 +19,62 @@ export function ThemeToggle() {
   const { hostRef, gradientRef, spotlightRef, handlePointerMove, handlePointerLeave } =
     useCursorGlow<HTMLButtonElement>();
 
+  /**
+   * Dark-mode switch as a circle that expands outward from this button
+   * (not the click point - so it looks the same whether toggled by mouse,
+   * touch, or keyboard) via the View Transition API. `toggleTheme` still
+   * runs unconditionally on unsupported browsers or with reduced motion
+   * requested - only the animation around it is skipped.
+   */
+  function handleToggle() {
+    const prefersReducedMotion = window.matchMedia?.(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+
+    // Chrome/Edge only as of this writing - Safari/Firefox fall through to
+    // the plain instant toggle, same as the reduced-motion guard above.
+    if (!document.startViewTransition || prefersReducedMotion) {
+      toggleTheme();
+      return;
+    }
+
+    const rect = hostRef.current?.getBoundingClientRect();
+    const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
+    const y = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y),
+    );
+
+    const transition = document.startViewTransition(() => {
+      // Forces the theme's state + DOM update to land synchronously inside
+      // this callback, so the browser's "after" snapshot is the new theme
+      // rather than the old one (see ThemeContext's useLayoutEffect).
+      flushSync(() => toggleTheme());
+    });
+
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${endRadius}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 550,
+          easing: "ease-in-out",
+          pseudoElement: "::view-transition-new(root)",
+        },
+      );
+    });
+  }
+
   return (
     <button
       ref={hostRef}
       type="button"
-      onClick={toggleTheme}
+      onClick={handleToggle}
       onMouseMove={handlePointerMove}
       onMouseLeave={(e) => {
         handlePointerLeave();

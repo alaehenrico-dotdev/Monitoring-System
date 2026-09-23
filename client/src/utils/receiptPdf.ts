@@ -50,6 +50,25 @@ function receiptQrValue(receipt: Receipt): string {
   return receipt.qrToken;
 }
 
+// Same peso formatting as ReceiptCard.tsx's formatPeso, kept local since
+// this file is intentionally standalone (see the header comment).
+const pesoFormat = new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" });
+function formatPeso(value: number): string {
+  return pesoFormat.format(value);
+}
+
+/// Same null-when-unpriced rule as ReceiptCard.tsx's lineTotal - a receipt
+/// logged before unitPrice existed has nothing to compute a line total from.
+function lineTotal(item: { quantity: number; unitPrice: number | null }): number | null {
+  return item.unitPrice == null ? null : Number(item.unitPrice) * Number(item.quantity);
+}
+
+function receiptTotal(receipt: Receipt): number | null {
+  const priced = receipt.items.map(lineTotal).filter((t): t is number => t !== null);
+  if (!priced.length) return null;
+  return priced.reduce((sum, t) => sum + t, 0);
+}
+
 /**
  * Loads a static public asset (client/public/logo.jpg, the real Ala Eh!
  * seal - see components/LogoMark.tsx) as a base64 data URL, for embedding
@@ -139,7 +158,7 @@ function renderReceipt(doc: jsPDF | null, receipt: Receipt, assets: Assets, opts
     y += opts2.gap ?? size * 0.5;
   }
 
-  function itemRow(name: string, qty: number, gap = 4.4) {
+  function itemRow(name: string, qty: number, total: number | null, gap = 4.4) {
     const size = 9;
     if (!dry) {
       doc!.setFont("courier", "normal");
@@ -157,6 +176,20 @@ function renderReceipt(doc: jsPDF | null, receipt: Receipt, assets: Assets, opts
       doc!.text(qtyText, xRight, y, { align: "right" });
     }
     y += gap;
+
+    // Second, smaller line for that line's peso total - omitted
+    // entirely (not even blank space) for a receipt logged before
+    // unitPrice existed, same as ReceiptCard.tsx.
+    if (total !== null) {
+      const priceSize = 7;
+      if (!dry) {
+        doc!.setFont("courier", "normal");
+        doc!.setFontSize(priceSize);
+        doc!.setTextColor(SUBTLE_INK);
+        doc!.text(formatPeso(total), xRight, y, { align: "right" });
+      }
+      y += priceSize * 0.5;
+    }
   }
 
   function image(dataUrl: string, sizeMM: number, gap: number) {
@@ -184,14 +217,18 @@ function renderReceipt(doc: jsPDF | null, receipt: Receipt, assets: Assets, opts
     center("No items", 9, { color: SUBTLE_INK, gap: 5 });
   } else {
     for (const it of receipt.items) {
-      itemRow(it.product.name, Number(it.quantity));
+      itemRow(it.product.name, Number(it.quantity), lineTotal(it));
     }
   }
   divider(false, 4.5);
 
   // ---- Total ----
   const totalItems = receipt.items.reduce((sum, it) => sum + Number(it.quantity), 0);
-  row("TOTAL ITEMS", String(totalItems), { bold: true, size: 10, gap: 6 });
+  const totalAmount = receiptTotal(receipt);
+  row("TOTAL ITEMS", String(totalItems), { bold: true, size: 10, gap: totalAmount !== null ? 5 : 6 });
+  if (totalAmount !== null) {
+    row("TOTAL AMOUNT", formatPeso(totalAmount), { bold: true, size: 10, gap: 6 });
+  }
   divider(true, 5.5);
 
   // ---- QR + footer ----

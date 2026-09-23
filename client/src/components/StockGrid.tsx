@@ -222,7 +222,7 @@ const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", c
 const lockedStyle: CSSProperties = { background: colors.paperAlt, color: "var(--ae-num-text)" };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
-const inputStyle: CSSProperties = { width: 64, textAlign: "right" };
+const inputStyle: CSSProperties = { width: 64, textAlign: "center" };
 // A real <button>, not just a styled <td> (the old categoryRowStyle) - the
 // whole category bar needs to be a single clickable/keyboard-focusable
 // target for the expand/collapse arrow, spanning every column exactly like
@@ -238,7 +238,7 @@ const categoryToggleStyle: CSSProperties = {
   padding: "6px 8px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
-  background: colors.black,
+  background: "var(--ae-category-bg)",
   color: colors.yellow,
   cursor: "pointer",
 };

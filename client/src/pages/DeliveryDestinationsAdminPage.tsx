@@ -96,7 +96,7 @@ export function DeliveryDestinationsAdminPage() {
         <Field label="Destination name">
           <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Cavite" />
         </Field>
-        <Button type="submit">Add Destination</Button>
+        <Button type="submit" style={{ color: colors.yellow }}>Add Destination</Button>
       </form>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 
@@ -137,7 +137,7 @@ export function DeliveryDestinationsAdminPage() {
                   </td>
                   <td>
                     {d.isActive ? (
-                      <Button variant="danger" size="sm" disabled={busyId === d.id} onClick={() => setPendingDeactivate(d)}>
+                      <Button variant="danger" size="sm" disabled={busyId === d.id} onClick={() => setPendingDeactivate(d)} style={{ color: colors.yellow }}>
                         Deactivate
                       </Button>
                     ) : (

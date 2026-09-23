@@ -1,4 +1,5 @@
 import { ChangeAction } from "@prisma/client";
+import { prisma, type Db } from "../lib/prisma";
 import { changeLogRepository } from "../repositories/changeLogRepository";
 
 /**
@@ -7,15 +8,18 @@ import { changeLogRepository } from "../repositories/changeLogRepository";
  * disputed number can be traced back to its source instead of disappearing
  * into an overwritten cell (Section 2.1).
  */
-export async function recordChange(params: {
-  tableName: string;
-  recordId: number;
-  action: ChangeAction;
-  changedById?: number | null;
-  oldValue?: unknown;
-  newValue?: unknown;
-}) {
-  await changeLogRepository.create(params);
+export async function recordChange(
+  params: {
+    tableName: string;
+    recordId: number;
+    action: ChangeAction;
+    changedById?: number | null;
+    oldValue?: unknown;
+    newValue?: unknown;
+  },
+  db: Db = prisma,
+) {
+  await changeLogRepository.create(params, db);
 }
 
 export async function listChangeLog(filters: { tableName?: string; recordId?: number }) {

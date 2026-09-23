@@ -73,6 +73,7 @@ describe("saveOfflineEntry - Stock In/Out per channel", () => {
     expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
       undefined,
       expect.objectContaining({ remainingStock: 6 }),
+      expect.anything(),
     );
   });
 
@@ -126,7 +127,11 @@ describe("saveOfflineEntry - per-destination Delivery (Out) breakdown", () => {
     await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryByDestination: { "2": 8 } });
 
     // 20 (untouched West) + 8 (new East) = 28, not 999 and not just 8.
-    expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(7, expect.objectContaining({ deliveryOut: 28, remainingStock: 72 }));
+    expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ deliveryOut: 28, remainingStock: 72 }),
+      expect.anything(),
+    );
     expect(offlineEntryDeliveryRepository.upsert).toHaveBeenCalledWith(7, 2, 8);
     expect(offlineEntryDeliveryRepository.upsert).toHaveBeenCalledTimes(1);
   });
@@ -144,6 +149,7 @@ describe("saveOfflineEntry - per-destination Delivery (Out) breakdown", () => {
         oldValue: expect.objectContaining({ "deliveryOut:East": 5 }),
         newValue: expect.objectContaining({ "deliveryOut:East": 8 }),
       }),
+      expect.anything(),
     );
   });
 
@@ -163,7 +169,11 @@ describe("saveOfflineEntry - per-destination Delivery (Out) breakdown", () => {
 
     await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryOut: 15 });
 
-    expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ deliveryOut: 15 }));
+    expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ deliveryOut: 15 }),
+      expect.anything(),
+    );
     expect(offlineEntryDeliveryRepository.upsert).not.toHaveBeenCalled();
     expect(deliveryDestinationRepository.findByIds).not.toHaveBeenCalled();
   });

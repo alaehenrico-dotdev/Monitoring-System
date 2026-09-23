@@ -42,6 +42,35 @@ function receiptQrValue(receipt: Receipt): string {
   return receipt.qrToken;
 }
 
+/// Peso formatting for receipt totals - pinned to en-PH so it always reads
+/// "₱1,234.50" regardless of the viewer's own locale.
+const pesoFormat = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+});
+
+function formatPeso(value: number): string {
+  return pesoFormat.format(value);
+}
+
+/// A line's total (unitPrice × quantity), or null when this line predates
+/// unitPrice (Section 4.7) and so has nothing to compute from.
+function lineTotal(item: { quantity: number; unitPrice: number | null }): number | null {
+  return item.unitPrice == null ? null : Number(item.unitPrice) * Number(item.quantity);
+}
+
+/// The receipt's total, or null if not one of its lines has a price -
+/// e.g. every item on a receipt logged before unitPrice existed. A receipt
+/// with a mix (only possible if some lines predate this field and the
+/// receipt itself is somehow older but has newer lines, which never
+/// actually happens) still totals just its priced lines rather than
+/// silently dropping them.
+function receiptTotal(receipt: Receipt): number | null {
+  const priced = receipt.items.map(lineTotal).filter((t): t is number => t !== null);
+  if (!priced.length) return null;
+  return priced.reduce((sum, t) => sum + t, 0);
+}
+
 /**
  * The shared "paper" shell - background, border, torn zigzag edge, and the
  * centered logo header - factored out so the read-only output card and the
@@ -119,6 +148,7 @@ export function ReceiptCard({
   paperStyle?: CSSProperties;
 }) {
   const totalItems = receipt.items.reduce((sum, it) => sum + Number(it.quantity), 0);
+  const totalAmount = receiptTotal(receipt);
 
   return (
     <ReceiptPaper testId="receipt-card" style={paperStyle}>
@@ -133,12 +163,23 @@ export function ReceiptCard({
       {receipt.items.length === 0 ? (
         <div style={{ fontSize: 13, color: colors.staticSubtleInk, textAlign: "center", padding: "8px 0" }}>No items yet</div>
       ) : (
-        receipt.items.map((it) => (
-          <div key={it.id} style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13.5, marginBottom: 4 }}>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.product.name}</span>
-            <span style={{ flexShrink: 0 }}>x{Number(it.quantity)}</span>
-          </div>
-        ))
+        receipt.items.map((it) => {
+          const total = lineTotal(it);
+          return (
+            <div key={it.id} style={{ marginBottom: 4 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 13.5 }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.product.name}</span>
+                <span style={{ flexShrink: 0 }}>x{Number(it.quantity)}</span>
+              </div>
+              {total !== null && (
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8, fontSize: 11, color: colors.staticSubtleInk }}>
+                  <span>@ {formatPeso(Number(it.unitPrice))}</span>
+                  <span>{formatPeso(total)}</span>
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
 
       <Divider />
@@ -146,6 +187,12 @@ export function ReceiptCard({
         <span>TOTAL ITEMS</span>
         <span>{totalItems}</span>
       </div>
+      {totalAmount !== null && (
+        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: 14 }}>
+          <span>TOTAL AMOUNT</span>
+          <span>{formatPeso(totalAmount)}</span>
+        </div>
+      )}
       <Divider dashed />
 
       {!isPreview && (

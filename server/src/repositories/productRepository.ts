@@ -1,4 +1,4 @@
-import { prisma } from "../lib/prisma";
+import { prisma, type Db } from "../lib/prisma";
 import { getOrSet, invalidatePrefix } from "../lib/cache";
 
 export interface ProductCreateData {
@@ -49,8 +49,8 @@ export const productRepository = {
     return prisma.product.findUnique({ where: { id } });
   },
 
-  findActiveById(id: number) {
-    return prisma.product.findFirst({ where: { id, isActive: true } });
+  findActiveById(id: number, db: Db = prisma) {
+    return db.product.findFirst({ where: { id, isActive: true } });
   },
 
   findByNameAndCategory(name: string, category: string) {

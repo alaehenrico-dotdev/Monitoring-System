@@ -32,6 +32,8 @@ export interface ConsolidatedColumn {
   /** "#018766" - matches the Receipt # shown on ReceiptsPage / the printed receipt. */
   receiptLabel: string;
   salesRepName: string | null;
+  /** This receipt's peso total (Section 4.7) - null when none of its lines are priced (logged before unitPrice existed). */
+  totalAmount: number | null;
 }
 
 export interface ConsolidatedProductRow {
@@ -39,6 +41,8 @@ export interface ConsolidatedProductRow {
   /** Quantity for this product on each receipt, keyed by receiptId. Omitted (not 0) when there's no line item at all. */
   valuesByReceiptId: Record<number, number>;
   total: number;
+  /** This product's peso total across every receipt in view, counting only priced lines. */
+  totalAmount: number;
 }
 
 export interface ConsolidatedCategoryGroup {
@@ -46,6 +50,7 @@ export interface ConsolidatedCategoryGroup {
   rows: ConsolidatedProductRow[];
   subtotalByReceiptId: Record<number, number>;
   subtotalTotal: number;
+  subtotalAmount: number;
 }
 
 export interface ConsolidatedLocationGroup {
@@ -60,10 +65,22 @@ export interface ConsolidatedReceiptData {
   /** Grand total (every category) per receipt - the "Total Order" figure the hand-built sheet keeps in its customer/legend table. */
   grandTotalByReceiptId: Record<number, number>;
   grandTotal: number;
+  /** Peso equivalent of grandTotal, counting only priced lines. */
+  grandTotalAmount: number;
 }
 
 function receiptLabel(id: number): string {
   return `#${String(id).padStart(6, "0")}`;
+}
+
+/// Same null-when-unpriced rule as ReceiptCard.tsx's lineTotal/receiptTotal
+/// (duplicated here rather than imported, same as receiptQrValue is
+/// duplicated between ReceiptCard.tsx and receiptPdf.ts - this file stays
+/// standalone from the receipt-display components).
+function receiptAmountTotal(r: Receipt): number | null {
+  const priced = r.items.filter((it) => it.unitPrice != null);
+  if (!priced.length) return null;
+  return priced.reduce((sum, it) => sum + Number(it.unitPrice) * Number(it.quantity), 0);
 }
 
 /**
@@ -97,6 +114,7 @@ export function buildConsolidatedReceiptData(receipts: Receipt[], products: Prod
         location: r.location,
         receiptLabel: receiptLabel(r.id),
         salesRepName: r.salesRepName,
+        totalAmount: receiptAmountTotal(r),
       })),
     };
   });
@@ -107,11 +125,20 @@ export function buildConsolidatedReceiptData(receipts: Receipt[], products: Prod
   // (a product normally appears at most once per receipt, but this sums
   // defensively rather than assuming that).
   const quantities = new Map<number, Map<number, number>>();
+  // productId -> peso total across every receipt in view, counting only
+  // priced lines - unlike quantities, not broken down per receipt, since
+  // this only feeds a single "Total ₱" column (see ConsolidatedProductRow).
+  const amountsByProduct = new Map<number, number>();
   for (const r of receipts) {
     for (const item of r.items) {
       const byReceipt = quantities.get(item.productId) ?? new Map<number, number>();
       byReceipt.set(r.id, (byReceipt.get(r.id) ?? 0) + item.quantity);
       quantities.set(item.productId, byReceipt);
+
+      if (item.unitPrice != null) {
+        const amount = Number(item.unitPrice) * Number(item.quantity);
+        amountsByProduct.set(item.productId, (amountsByProduct.get(item.productId) ?? 0) + amount);
+      }
     }
   }
 
@@ -136,7 +163,8 @@ export function buildConsolidatedReceiptData(receipts: Receipt[], products: Prod
         if (qty !== 0) valuesByReceiptId[col.receiptId] = qty;
         total += qty;
       }
-      return { product, valuesByReceiptId, total };
+      const totalAmount = amountsByProduct.get(product.id) ?? 0;
+      return { product, valuesByReceiptId, total, totalAmount };
     });
 
     const subtotalByReceiptId: Record<number, number> = {};
@@ -146,8 +174,9 @@ export function buildConsolidatedReceiptData(receipts: Receipt[], products: Prod
       subtotalByReceiptId[col.receiptId] = sum;
       subtotalTotal += sum;
     }
+    const subtotalAmount = rows.reduce((s, r) => s + r.totalAmount, 0);
 
-    return { category, rows, subtotalByReceiptId, subtotalTotal };
+    return { category, rows, subtotalByReceiptId, subtotalTotal, subtotalAmount };
   });
 
   const grandTotalByReceiptId: Record<number, number> = {};
@@ -157,8 +186,9 @@ export function buildConsolidatedReceiptData(receipts: Receipt[], products: Prod
     grandTotalByReceiptId[col.receiptId] = sum;
     grandTotal += sum;
   }
+  const grandTotalAmount = categoryGroups.reduce((s, g) => s + g.subtotalAmount, 0);
 
-  return { columns, locationGroups, categoryGroups, grandTotalByReceiptId, grandTotal };
+  return { columns, locationGroups, categoryGroups, grandTotalByReceiptId, grandTotal, grandTotalAmount };
 }
 
 /// Blank (not "0") for a zero cell - matches the hand-built sheet, where an
@@ -168,18 +198,24 @@ export function formatQty(value: number | undefined): string {
   return value.toLocaleString("en-US");
 }
 
+/// Same blank-on-zero/null convention as formatQty, for the peso columns.
+export function formatPeso(value: number | null | undefined): string {
+  if (!value) return "";
+  return `₱${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 /**
- * Which stock pool a receipt tallies against (Section 4.7's mutually
- * exclusive postToFulfillment / postToOfflineDelivery pair), for filtering
- * the consolidated view down to exactly the receipts that fed a given day's
- * Fulfillment (Out) or Delivery (Out) figure - so the grand total here can
- * be checked against that entry directly.
+ * Which stock pool a receipt tallies against (Section 4.7's postedPool,
+ * recorded once at creation), for filtering the consolidated view down to
+ * exactly the receipts that fed a given day's Fulfillment (Out) or Delivery
+ * (Out) figure - so the grand total here can be checked against that entry
+ * directly.
  */
 export type ReceiptPool = "ALL" | "FULFILLMENT" | "OFFLINE_DELIVERY" | "NOT_POSTED";
 
 export function receiptPool(r: Receipt): Exclude<ReceiptPool, "ALL"> {
-  if (r.postToFulfillment) return "FULFILLMENT";
-  if (r.postToOfflineDelivery) return "OFFLINE_DELIVERY";
+  if (r.postedPool === "FULFILLMENT") return "FULFILLMENT";
+  if (r.postedPool === "OFFLINE_DELIVERY") return "OFFLINE_DELIVERY";
   return "NOT_POSTED";
 }
 
@@ -204,35 +240,39 @@ export function filterReceiptsByPool(receipts: Receipt[], pool: ReceiptPool): Re
  */
 export function toConsolidatedExcelTable(data: ConsolidatedReceiptData, title: string): string {
   const leadCols = 2; // Category/SKU, Product name
-  const totalCols = leadCols + data.columns.length + 1; // + Total Order
+  const totalCols = leadCols + data.columns.length + 2; // + Total Order, Total ₱
 
   const titleRow = `<tr><th colspan="${totalCols}" style="text-align:left">${escapeHtml(title)}</th></tr>`;
 
   const locationRow = `<tr><th colspan="${leadCols}"></th>${data.locationGroups
     .map((g) => `<th colspan="${g.columns.length}">${escapeHtml(g.location)}</th>`)
-    .join("")}<th></th></tr>`;
+    .join("")}<th></th><th></th></tr>`;
 
   const customerRow = `<tr><th>SKU</th><th>Product</th>${data.columns
     .map((c) => `<th>${escapeHtml(c.customer)}</th>`)
-    .join("")}<th>Total Order</th></tr>`;
+    .join("")}<th>Total Order</th><th>Total ₱</th></tr>`;
 
   const receiptRow = `<tr><th></th><th></th>${data.columns
     .map((c) => `<th>${escapeHtml(c.receiptLabel)}</th>`)
-    .join("")}<th></th></tr>`;
+    .join("")}<th></th><th></th></tr>`;
 
   const bodyRows: string[] = [];
   for (const group of data.categoryGroups) {
     bodyRows.push(`<tr><td colspan="${totalCols}"><b>${escapeHtml(group.category)}</b></td></tr>`);
     for (const row of group.rows) {
       const cells = data.columns.map((c) => `<td>${escapeHtml(formatQty(row.valuesByReceiptId[c.receiptId]))}</td>`).join("");
-      bodyRows.push(`<tr><td>${escapeHtml(row.product.sku ?? "")}</td><td>${escapeHtml(row.product.name)}</td>${cells}<td>${escapeHtml(formatQty(row.total))}</td></tr>`);
+      bodyRows.push(
+        `<tr><td>${escapeHtml(row.product.sku ?? "")}</td><td>${escapeHtml(row.product.name)}</td>${cells}<td>${escapeHtml(formatQty(row.total))}</td><td>${escapeHtml(formatPeso(row.totalAmount))}</td></tr>`,
+      );
     }
     const subtotalCells = data.columns.map((c) => `<td><b>${escapeHtml(formatQty(group.subtotalByReceiptId[c.receiptId]))}</b></td>`).join("");
-    bodyRows.push(`<tr><td colspan="2"><b>TOTAL - ${escapeHtml(group.category)}</b></td>${subtotalCells}<td><b>${escapeHtml(formatQty(group.subtotalTotal))}</b></td></tr>`);
+    bodyRows.push(
+      `<tr><td colspan="2"><b>TOTAL - ${escapeHtml(group.category)}</b></td>${subtotalCells}<td><b>${escapeHtml(formatQty(group.subtotalTotal))}</b></td><td><b>${escapeHtml(formatPeso(group.subtotalAmount))}</b></td></tr>`,
+    );
   }
 
   const grandTotalCells = data.columns.map((c) => `<td><b>${escapeHtml(formatQty(data.grandTotalByReceiptId[c.receiptId]))}</b></td>`).join("");
-  const grandTotalRow = `<tr><td colspan="2"><b>TOTAL ORDER</b></td>${grandTotalCells}<td><b>${escapeHtml(data.grandTotal)}</b></td></tr>`;
+  const grandTotalRow = `<tr><td colspan="2"><b>TOTAL ORDER</b></td>${grandTotalCells}<td><b>${escapeHtml(formatQty(data.grandTotal))}</b></td><td><b>${escapeHtml(formatPeso(data.grandTotalAmount))}</b></td></tr>`;
 
   return `<table border="1">${titleRow}${locationRow}${customerRow}${receiptRow}${bodyRows.join("")}${grandTotalRow}</table>`;
 }
@@ -245,12 +285,12 @@ export function toConsolidatedExcelTable(data: ConsolidatedReceiptData, title: s
  * receipts.
  */
 export function toConsolidatedLegendExcelTable(data: ConsolidatedReceiptData, title: string): string {
-  const headers = ["#", "Customer", "Location", "Receipt #", "Sales Rep", "Total Order"];
+  const headers = ["#", "Customer", "Location", "Receipt #", "Sales Rep", "Total Order", "Total ₱"];
   const headRow = `<tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>`;
   const rows = data.columns
     .map(
       (c, i) =>
-        `<tr><td>${i + 1}</td><td>${escapeHtml(c.customer)}</td><td>${escapeHtml(c.location)}</td><td>${escapeHtml(c.receiptLabel)}</td><td>${escapeHtml(c.salesRepName ?? "")}</td><td>${escapeHtml(data.grandTotalByReceiptId[c.receiptId] ?? 0)}</td></tr>`,
+        `<tr><td>${i + 1}</td><td>${escapeHtml(c.customer)}</td><td>${escapeHtml(c.location)}</td><td>${escapeHtml(c.receiptLabel)}</td><td>${escapeHtml(c.salesRepName ?? "")}</td><td>${escapeHtml(formatQty(data.grandTotalByReceiptId[c.receiptId]))}</td><td>${escapeHtml(formatPeso(c.totalAmount))}</td></tr>`,
     )
     .join("");
   return `<table border="1"><tr><th colspan="${headers.length}" style="text-align:left">${escapeHtml(title)}</th></tr>${headRow}${rows}</table>`;
@@ -274,6 +314,7 @@ export function consolidatedMatrixSection(data: ConsolidatedReceiptData, options
     { header: "Product" },
     ...data.columns.map((c) => ({ header: c.receiptLabel, align: "right" as const })),
     { header: "Total", align: "right" as const },
+    { header: "Total \u20B1", align: "right" as const },
   ];
 
   const rows: PdfRow[] = [];
@@ -285,6 +326,7 @@ export function consolidatedMatrixSection(data: ConsolidatedReceiptData, options
         r.product.name,
         ...data.columns.map((c) => formatQty(r.valuesByReceiptId[c.receiptId]) || "\u00B7"),
         { text: formatCount(r.total), bold: true },
+        { text: formatPeso(r.totalAmount) || "\u00B7", bold: true },
       ];
       rows.push({ kind: "data", cells });
     }
@@ -294,6 +336,7 @@ export function consolidatedMatrixSection(data: ConsolidatedReceiptData, options
         { text: `Subtotal - ${group.category}`, colSpan: 2 },
         ...data.columns.map((c) => formatQty(group.subtotalByReceiptId[c.receiptId]) || "\u00B7"),
         formatCount(group.subtotalTotal),
+        formatPeso(group.subtotalAmount) || "\u00B7",
       ],
     });
   }
@@ -305,6 +348,7 @@ export function consolidatedMatrixSection(data: ConsolidatedReceiptData, options
         { text: "GRAND TOTAL", colSpan: 2 },
         ...data.columns.map((c) => formatCount(data.grandTotalByReceiptId[c.receiptId])),
         formatCount(data.grandTotal),
+        formatPeso(data.grandTotalAmount) || "\u2014",
       ],
     });
   }
@@ -323,10 +367,19 @@ export function consolidatedLegendSection(data: ConsolidatedReceiptData, options
       { header: "Receipt #" },
       { header: "Sales Rep" },
       { header: "Total Order", align: "right" },
+      { header: "Total \u20B1", align: "right" },
     ],
     rows: data.columns.map((c, i) => ({
       kind: "data",
-      cells: [String(i + 1), c.customer, c.location, c.receiptLabel, c.salesRepName ?? "\u2014", formatCount(data.grandTotalByReceiptId[c.receiptId])],
+      cells: [
+        String(i + 1),
+        c.customer,
+        c.location,
+        c.receiptLabel,
+        c.salesRepName ?? "\u2014",
+        formatCount(data.grandTotalByReceiptId[c.receiptId]),
+        formatPeso(c.totalAmount) || "\u2014",
+      ],
     })),
     emptyMessage: "No receipts for this date.",
   };

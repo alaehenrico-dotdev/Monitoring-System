@@ -63,7 +63,7 @@ export function ConsolidatedReceiptTable({
             ))}
             <th
               rowSpan={3}
-              style={{ top: 0, textAlign: "right", verticalAlign: "bottom" }}
+              style={{ top: 0, textAlign: "center", verticalAlign: "bottom" }}
             >
               Total Order
             </th>
@@ -76,7 +76,7 @@ export function ConsolidatedReceiptTable({
                 key={c.receiptId}
                 style={{
                   top: HEADER_ROW_HEIGHT,
-                  textAlign: "right",
+                  textAlign: "center",
                   whiteSpace: "normal",
                   maxWidth: 90,
                 }}
@@ -96,7 +96,7 @@ export function ConsolidatedReceiptTable({
                 key={c.receiptId}
                 style={{
                   top: HEADER_ROW_HEIGHT * 2,
-                  textAlign: "right",
+                  textAlign: "center",
                   fontWeight: 400,
                   color: colors.subtleInk,
                 }}
@@ -152,11 +152,11 @@ export function ConsolidatedReceiptTable({
                     <td style={skuCellStyle}>{row.product.sku ?? "\u2014"}</td>
                     <td style={nameCellStyle}>{row.product.name}</td>
                     {data.columns.map((c) => (
-                      <td key={c.receiptId}>
+                      <td key={c.receiptId} style={numCellStyle}>
                         {formatQty(row.valuesByReceiptId[c.receiptId])}
                       </td>
                     ))}
-                    <td style={{ fontWeight: 600 }}>{formatQty(row.total)}</td>
+                    <td style={{ ...numCellStyle, fontWeight: 600 }}>{formatQty(row.total)}</td>
                   </tr>
                 ))}
 
@@ -165,11 +165,11 @@ export function ConsolidatedReceiptTable({
                     Subtotal - {group.category}
                   </td>
                   {data.columns.map((c) => (
-                    <td key={c.receiptId}>
+                    <td key={c.receiptId} style={numCellStyle}>
                       {formatQty(group.subtotalByReceiptId[c.receiptId])}
                     </td>
                   ))}
-                  <td>{formatQty(group.subtotalTotal)}</td>
+                  <td style={numCellStyle}>{formatQty(group.subtotalTotal)}</td>
                 </tr>
               </Fragment>
             );
@@ -180,11 +180,11 @@ export function ConsolidatedReceiptTable({
               GRAND TOTAL
             </td>
             {data.columns.map((c) => (
-              <td key={c.receiptId}>
+              <td key={c.receiptId} style={numCellStyle}>
                 {formatQty(data.grandTotalByReceiptId[c.receiptId])}
               </td>
             ))}
-            <td>{formatQty(data.grandTotal)}</td>
+            <td style={numCellStyle}>{formatQty(data.grandTotal)}</td>
           </tr>
         </tbody>
       </table>
@@ -203,6 +203,10 @@ const skuCellStyle: CSSProperties = {
   color: colors.yellow,
   fontVariantNumeric: "tabular-nums",
 };
+// This table uses ae-table--left (so its td default is left, for the
+// SKU/Product text columns) - the numeric quantity columns need their own
+// explicit centering since they don't inherit the base .ae-table td rule.
+const numCellStyle: CSSProperties = { textAlign: "center" };
 // Same treatment as StockGrid/TotalStocksTable's identical style - a real
 // <button> spanning every column so the expand/collapse arrow has one
 // clickable/keyboard-focusable target instead of a styled, inert <td>.
@@ -217,7 +221,7 @@ const categoryToggleStyle: CSSProperties = {
   padding: "6px 8px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
-  background: colors.black,
+  background: "var(--ae-category-bg)",
   color: colors.yellow,
   cursor: "pointer",
 };

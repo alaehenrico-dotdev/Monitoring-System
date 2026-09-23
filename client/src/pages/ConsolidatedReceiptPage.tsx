@@ -2,7 +2,8 @@ import { useState } from "react";
 import { listReceipts } from "../api/receipts";
 import { listProducts } from "../api/products";
 import type { Receipt } from "../types";
-import { Button, Select } from "../components/ui";
+import { Button } from "../components/ui";
+import { Dropdown } from "../components/Dropdown";
 import { DatePicker } from "../components/DatePicker";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { ConsolidatedReceiptTable } from "../components/ConsolidatedReceiptTable";
@@ -44,9 +45,9 @@ const POOL_LABELS: Record<ReceiptPool, string> = {
  * Offline Receipts Audit workbook.
  *
  * The Pool filter narrows this to exactly the receipts behind a given day's
- * Fulfillment (Out) or Delivery (Out) figure (see Receipt.postToFulfillment /
- * postToOfflineDelivery, Section 4.7), so the grand total at the bottom of
- * the matrix can be checked against that entry on the Online/Offline grid.
+ * Fulfillment (Out) or Delivery (Out) figure (see Receipt.postedPool,
+ * Section 4.7), so the grand total at the bottom of the matrix can be
+ * checked against that entry on the Online/Offline grid.
  */
 export function ConsolidatedReceiptPage() {
   const progress = useTopProgress();
@@ -124,13 +125,13 @@ export function ConsolidatedReceiptPage() {
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <DatePicker aria-label="Delivery date" value={date} onChange={setDate} />
-          <Select aria-label="Pool" value={pool} onChange={(e) => setPool(e.target.value as ReceiptPool)} title="Narrow to receipts posted to a given stock pool">
-            {(Object.keys(POOL_LABELS) as ReceiptPool[]).map((p) => (
-              <option key={p} value={p}>
-                {POOL_LABELS[p]}
-              </option>
-            ))}
-          </Select>
+          <Dropdown
+            aria-label="Pool"
+            value={pool}
+            onChange={(v) => setPool(v as ReceiptPool)}
+            title="Narrow to receipts posted to a given stock pool"
+            options={(Object.keys(POOL_LABELS) as ReceiptPool[]).map((p) => ({ value: p, label: POOL_LABELS[p] }))}
+          />
           <Button onClick={generate} disabled={loading}>
             {loading ? "Loading…" : "Generate"}
           </Button>

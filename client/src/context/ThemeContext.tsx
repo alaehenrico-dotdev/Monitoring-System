@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
 
 export type Theme = "light" | "dark";
 
@@ -20,7 +20,12 @@ function getInitialTheme(): Theme {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so this commits synchronously in the
+  // same tick as the state update - ThemeToggle wraps its toggle in
+  // flushSync() specifically so this attribute is already on <html> before
+  // the View Transition API takes its "after" snapshot; with the async
+  // useEffect that snapshot would still show the old theme.
+  useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);

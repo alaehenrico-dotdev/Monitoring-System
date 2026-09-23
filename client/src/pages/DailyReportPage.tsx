@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
-import { Button, Select } from "../components/ui";
+import { Button } from "../components/ui";
+import { Dropdown } from "../components/Dropdown";
 import { DatePicker } from "../components/DatePicker";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
@@ -225,13 +226,13 @@ export function DailyReportPage() {
       <Toolbar className="no-print">
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           <DatePicker aria-label="Date" value={date} onChange={setDate} />
-          <Select aria-label="Report section" value={reportSection} onChange={(e) => setReportSection(e.target.value as ReportSection)} title="Which section to view/export">
-            {(Object.keys(SECTION_LABELS) as ReportSection[]).map((s) => (
-              <option key={s} value={s}>
-                {SECTION_LABELS[s]}
-              </option>
-            ))}
-          </Select>
+          <Dropdown
+            aria-label="Report section"
+            value={reportSection}
+            onChange={(v) => setReportSection(v as ReportSection)}
+            title="Which section to view/export"
+            options={(Object.keys(SECTION_LABELS) as ReportSection[]).map((s) => ({ value: s, label: SECTION_LABELS[s] }))}
+          />
           {report && <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />}
           <Button onClick={load}>Generate</Button>
         </div>

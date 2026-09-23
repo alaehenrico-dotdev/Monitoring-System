@@ -75,7 +75,7 @@ export function DatabaseBackupPage() {
           variant="primary"
           onClick={handleDownload}
           disabled={downloading}
-          style={{ padding: "10px 22px", display: "inline-flex", alignItems: "center", gap: 8 }}
+          style={{ padding: "10px 22px", display: "inline-flex", alignItems: "center", gap: 8, color: colors.yellow }}
         >
           {downloading && <Spinner size="sm" color={colors.cream} />}
           {downloading ? "Downloading…" : "Download Backup"}

@@ -1,4 +1,5 @@
 import { Shift } from "@prisma/client";
+import { prisma, type Db } from "../lib/prisma";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { deliveryDestinationRepository } from "../repositories/deliveryDestinationRepository";
@@ -45,8 +46,8 @@ interface DestinationChange {
 }
 
 /// Section 4.6 - same shift-aware carry-forward principle as the Online table.
-export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift): Promise<number> {
-  return dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift);
+export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+  return dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 }
 
 function calculate(opening: number, input: Required<Omit<OfflineEntryInput, "openingStock" | "deliveryByDestination">>) {
@@ -150,13 +151,20 @@ async function resolveDeliveryOut(
 }
 
 /// Encoder-facing upsert for one product/date/shift cell row (Section 4.3).
-export async function saveOfflineEntry(productId: number, entryDate: Date, shift: Shift, input: OfflineEntryInput, userId?: number) {
-  const product = await productRepository.findActiveById(productId);
+export async function saveOfflineEntry(
+  productId: number,
+  entryDate: Date,
+  shift: Shift,
+  input: OfflineEntryInput,
+  userId?: number,
+  db: Db = prisma,
+) {
+  const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
-  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift);
+  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
 
   const openingStock =
-    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift));
+    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift, db));
   const { deliveryOut, destinationChanges } = await resolveDeliveryOut(existing, input);
   const merged: Required<Omit<OfflineEntryInput, "openingStock" | "deliveryByDestination">> = {
     stockInOlToOff: input.stockInOlToOff ?? toNum(existing?.stockInOlToOff),
@@ -177,7 +185,7 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, shift
   }
 
   const data = { productId, entryDate, shift, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
-  const saved = await dailyOfflineStockRepository.upsert(existing?.id, data);
+  const saved = await dailyOfflineStockRepository.upsert(existing?.id, data, db);
 
   // Only now that the entry definitely has an id do we persist the
   // breakdown rows themselves - resolveDeliveryOut only computed the totals.
@@ -201,14 +209,17 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, shift
     newValue[key] = change.newQuantity;
   }
 
-  await recordChange({
-    tableName: TABLE,
-    recordId: saved.id,
-    action: existing ? "UPDATE" : "CREATE",
-    changedById: userId,
-    oldValue,
-    newValue,
-  });
+  await recordChange(
+    {
+      tableName: TABLE,
+      recordId: saved.id,
+      action: existing ? "UPDATE" : "CREATE",
+      changedById: userId,
+      oldValue,
+      newValue,
+    },
+    db,
+  );
 
   // Section 4.3 - mirror this transfer back onto the Online table via its
   // repository directly, keeping the two stock services independent of
@@ -219,7 +230,8 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, shift
     entryDate,
     shift,
     { stockInOffToOl: merged.stockOutOffToOl, stockOutOlToOff: merged.stockInOlToOff },
-    userId
+    userId,
+    db,
   );
 
   return saved;
@@ -231,10 +243,17 @@ export async function saveOfflineEntry(productId: number, entryDate: Date, shift
 /// split across destinations, regardless of whatever OfflineEntryDelivery
 /// breakdown rows the entry already has (see resolveDeliveryOut: a plain
 /// `deliveryOut` in the input takes the flat, no-breakdown path).
-export async function addDeliveryFromReceipt(productId: number, entryDate: Date, shift: Shift, additionalQty: number, userId?: number) {
-  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift);
+export async function addDeliveryFromReceipt(
+  productId: number,
+  entryDate: Date,
+  shift: Shift,
+  additionalQty: number,
+  userId?: number,
+  db: Db = prisma,
+) {
+  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
   const currentDeliveryOut = toNum(existing?.deliveryOut);
-  await saveOfflineEntry(productId, entryDate, shift, { deliveryOut: currentDeliveryOut + additionalQty }, userId);
+  await saveOfflineEntry(productId, entryDate, shift, { deliveryOut: currentDeliveryOut + additionalQty }, userId, db);
 }
 
 async function mirrorTransferToOnline(
@@ -242,9 +261,10 @@ async function mirrorTransferToOnline(
   entryDate: Date,
   shift: Shift,
   mirrored: { stockInOffToOl: number; stockOutOlToOff: number },
-  userId?: number
+  userId?: number,
+  db: Db = prisma,
 ) {
-  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
+  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
 
   // Same guard as the reverse direction in dailyOnlineStock.service.ts -
   // saveOfflineEntry mirrors unconditionally after every save, so without
@@ -257,7 +277,7 @@ async function mirrorTransferToOnline(
     return; // nothing has actually transferred yet - don't create a blank row just to mirror zeros
   }
 
-  const openingStock = existing ? toNum(existing.openingStock) : await dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift);
+  const openingStock = existing ? toNum(existing.openingStock) : await dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 
   const merged = {
     stockInOffToOl: mirrored.stockInOffToOl,
@@ -275,7 +295,7 @@ async function mirrorTransferToOnline(
   // can't exceed what Online actually has, even though the transfer was
   // entered on the Offline grid.
   if (isNegativeStock(remainingStock)) {
-    const product = await productRepository.findActiveById(productId);
+    const product = await productRepository.findActiveById(productId, db);
     throw HttpError.badRequest(
       `This transfer would take ${product?.name ?? `product #${productId}`}'s Online stock below zero (would end at ${remainingStock}).`
     );
@@ -291,14 +311,17 @@ async function mirrorTransferToOnline(
     remainingStock,
     encodedById: existing?.encodedById ?? userId,
   };
-  const saved = await dailyOnlineStockRepository.upsert(existing?.id, data);
+  const saved = await dailyOnlineStockRepository.upsert(existing?.id, data, db);
 
-  await recordChange({
-    tableName: ONLINE_TABLE,
-    recordId: saved.id,
-    action: existing ? "UPDATE" : "CREATE",
-    changedById: userId,
-    oldValue: existing,
-    newValue: saved,
-  });
+  await recordChange(
+    {
+      tableName: ONLINE_TABLE,
+      recordId: saved.id,
+      action: existing ? "UPDATE" : "CREATE",
+      changedById: userId,
+      oldValue: existing,
+      newValue: saved,
+    },
+    db,
+  );
 }
