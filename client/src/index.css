@@ -1310,6 +1310,52 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
+/* ---- Bulk Entry flyout (ReceiptsPage) ---------------------------------
+   Bulk Entry mode's own date/location/+Add Customer/Save controls, styled
+   to look like they unfold directly out of the main toolbar's bottom edge:
+   flush against it (no gap, squared top corners, rounded bottom), and a
+   different fixed color - the brand yellow, not the light/dark surface
+   token - so it always reads as its own distinct panel regardless of
+   theme, the same reasoning ReceiptCard.tsx's staticInk/staticSubtleInk use
+   for a surface that must look the same in both themes. Its own controls
+   invert to dark pills on that yellow, mirroring how the main toolbar's
+   buttons are yellow pills on a dark bar. */
+.ae-bulk-flyout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -10px 32px 14px;
+  padding: 8px 14px;
+  background: #ffd400;
+  border: 1px solid #c99a2e;
+  border-top: none;
+  border-radius: 0 0 22px 22px;
+  box-shadow: 0 6px 10px rgba(20, 17, 13, 0.12);
+}
+.ae-bulk-flyout .ae-input,
+.ae-bulk-flyout .ae-select,
+.ae-bulk-flyout .ae-select-trigger,
+.ae-bulk-flyout .ae-date-trigger {
+  background: #14110d;
+  color: #f1e9d0;
+  border-color: transparent;
+  border-radius: 999px;
+}
+.ae-bulk-flyout .ae-btn:not(.ae-btn-danger) {
+  background: #14110d;
+  color: #f1e9d0;
+  border-color: transparent;
+  border-radius: 999px;
+}
+.ae-bulk-flyout .ae-btn:not(.ae-btn-danger):hover:not(:disabled) {
+  background: #241d14;
+}
+.ae-bulk-flyout .ae-btn:not(.ae-btn-danger):active:not(:disabled) {
+  background: #000000;
+}
+
 .ae-main {
   min-width: 0;
   padding: 24px;
