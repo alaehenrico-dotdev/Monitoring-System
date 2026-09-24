@@ -101,6 +101,40 @@ describe("CsvTools - export/import round trip", () => {
   });
 });
 
+describe("CsvTools - saving state", () => {
+  it("disables Save and shows a loading label while the save is in flight", async () => {
+    let resolveImport!: () => void;
+    const onImportRow = vi.fn(() => new Promise<void>((resolve) => (resolveImport = resolve)));
+    render(
+      <TopProgressProvider>
+        <CsvTools
+          filenamePrefix="offline-entry"
+          date="2026-06-01"
+          rows={rows}
+          columns={columns}
+          onImportRow={onImportRow}
+          getPendingValue={() => undefined}
+          canImport
+        />
+      </TopProgressProvider>,
+    );
+
+    const csv = ["CATEGORY,SKU,STOCKS IN (OL→OFF),PRODUCTION (IN),DELIVERY (OUT)", "Class A (Liter),Sweet A,7,10,3"].join("\r\n");
+    const file = new File([csv], "edit.csv", { type: "text/csv" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Save (1)" }));
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled());
+    expect(onImportRow).toHaveBeenCalledTimes(1);
+
+    resolveImport();
+    await waitFor(() => expect(screen.queryByText("Review Import")).not.toBeInTheDocument());
+  });
+});
+
 /**
  * Option 1 from the "flagged import" discussion: an advisory pre-check that
  * surfaces a likely save failure (e.g. the negative-stock guard) IN the
