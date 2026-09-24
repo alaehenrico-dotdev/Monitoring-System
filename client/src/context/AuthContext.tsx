@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { getMe, login as loginRequest } from "../api/auth";
-import { ApiError, getToken, setToken } from "../api/http";
+import { ApiError, getToken, setToken, setUnauthorizedHandler } from "../api/http";
 import type { AuthUser } from "../types";
 
 interface AuthContextValue {
@@ -43,7 +43,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setSessionError(e instanceof Error ? e.message : "Couldn't reach the server - check your connection and try again.");
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        // Registered only now (not above) so this same 401/403 - already
+        // handled, silently, just above - can't also trip the global
+        // handler and overwrite that with an "expired" message. From here
+        // on, a 401 on any other request means a session that WAS valid
+        // just stopped being valid (revoked, deactivated, expired mid-use).
+        setUnauthorizedHandler(() => {
+          setUser(null);
+          setSessionError("Your session expired - please log in again.");
+        });
+      });
+
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   async function login(username: string, password: string) {

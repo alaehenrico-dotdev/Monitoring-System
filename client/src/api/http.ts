@@ -17,6 +17,20 @@ export function setToken(token: string | null) {
   else localStorage.removeItem("ala-eh-token");
 }
 
+// http.ts sits outside React (AuthContext imports from here, not the other
+// way around), so a global 401 - "the session that was here a moment ago is
+// no longer valid" - can't call AuthContext's state setters directly. It
+// calls this instead, which AuthContext wires up to its own sessionError
+// machinery. AuthContext only registers it once its own initial session
+// check has finished (see AuthContext.tsx) so that check's own 401/403
+// handling - which is deliberately silent, see its comment - stays the only
+// thing that runs for it; this only fires for requests after that.
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  onUnauthorized = fn;
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -29,6 +43,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
+    if (res.status === 401) {
+      setToken(null);
+      onUnauthorized?.();
+    }
     throw new ApiError(res.status, body.error ?? "Request failed");
   }
   if (res.status === 204) return undefined as T;
