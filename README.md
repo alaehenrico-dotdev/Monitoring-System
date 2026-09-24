@@ -45,6 +45,25 @@ random value — generate one for each with:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
+Placeholder values (e.g. leaving `JWT_SECRET` as the literal string from
+`.env.example`, or reusing an old hardcoded default like `127001`) are
+rejected at boot too, with the same "no insecure fallback" reasoning —
+see `server/src/config/env.ts`.
+
+#### Environment variables
+
+| Variable | Where | Required? | Purpose |
+|---|---|---|---|
+| `DATABASE_URL` | server | required | MySQL connection string |
+| `JWT_SECRET` | server | required, no placeholder | Signs/verifies login JWTs |
+| `DATA_RESET_PASSCODE` | server | required, no placeholder | Gates the Data Reset admin panel |
+| `RECEIPT_QR_SECRET` | server | required, no placeholder | Encrypts the id in a printed receipt's QR code |
+| `PORT` | server | optional (default `4000`) | API listen port |
+| `JWT_EXPIRES_IN` | server | optional (default `8h`) | Login session lifetime |
+| `CLIENT_ORIGIN` | server | optional (default `http://localhost:5173`) | Allowed CORS origin |
+| `RECEIPTS_AUTO_POST_DEFAULT` | server | optional (default `true`) | Whether saving a Receipt auto-posts into Online Fulfillment (Out) |
+| `VITE_API_URL` | client | optional (default `http://localhost:4000/api`) | API base URL the client calls directly, in both dev and production (see the dev proxy note below) |
+
 ### 2. Install, migrate, seed
 
 ```bash
@@ -74,6 +93,15 @@ npm run dev
 
 (`npm run dev:server` / `npm run dev:client` from the root, or `npm run dev` from inside `server/`
 or `client/` directly, still work individually if you want them in separate terminals.)
+
+**Dev proxy:** by default (`VITE_API_URL` unset or left at its `.env.example` value), the client
+calls the API's absolute URL directly (`http://localhost:4000/api`) — the server's `CLIENT_ORIGIN`
+CORS setting is what allows that cross-port call from `:5173`. `client/vite.config.ts` also
+configures Vite's dev server to proxy `/api/*` to `http://localhost:4000` (`server.proxy` in that
+file); that path is only actually used if `VITE_API_URL` is set to a relative `/api` instead of the
+absolute URL, which the default setup above doesn't do — it's there for setups (e.g. behind an
+ngrok tunnel, see `allowedHosts` in the same config block) where hitting the API through the same
+origin as the client is preferable to a direct cross-origin call.
 
 ### 4. Tests & linting
 
