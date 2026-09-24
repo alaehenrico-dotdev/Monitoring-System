@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      # Placeholder values for CI only - no real database or secrets are
+      # needed here. `prisma generate` only parses this connection string
+      # (it doesn't connect), and every test mocks the repositories it
+      # touches rather than hitting a real DB. The secrets below deliberately
+      # avoid config/env.ts's own placeholder denylist (see that file) - a
+      # value like "changeme" here would fail the exact guard item 2 added.
+      DATABASE_URL: "mysql://root:root@localhost:3306/ala_eh_stocks_ci"
+      JWT_SECRET: "ci-only-jwt-secret-not-used-anywhere-real"
+      DATA_RESET_PASSCODE: "ci-only-passcode-not-used-anywhere-real"
+      RECEIPT_QR_SECRET: "ci-only-receipt-qr-secret-not-used-anywhere-real"
+      CLIENT_ORIGIN: "http://localhost:5173"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies (both workspaces)
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (both workspaces)
+        run: npm test
+
+      - name: Build (both workspaces)
+        run: npm run build
