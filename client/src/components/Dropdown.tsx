@@ -186,7 +186,7 @@ export function Dropdown({
       closeMenu(false);
       return;
     }
-    let next = activeIndex;
+    let next: number;
     switch (e.key) {
       case "ArrowDown":
         next = Math.min(options.length - 1, activeIndex + 1);
