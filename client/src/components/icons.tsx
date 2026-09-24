@@ -127,3 +127,16 @@ export function ChevronRightIcon() {
     </svg>
   );
 }
+
+/// A blank sheet with a "+" corner - the trailing "Add Customer" page in
+/// ConsolidatedReceiptEntryGrid's stacked-pages shell (a fresh, not-yet-
+/// filled sheet sitting at the front of the stack).
+export function FileAddIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 1.5h5.5L13 5v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11a1 1 0 0 1 1-1Z" />
+      <path d="M9.5 1.5V5H13" />
+      <path d="M8 8v4M6 10h4" />
+    </svg>
+  );
+}

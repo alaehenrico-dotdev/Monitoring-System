@@ -1,13 +1,13 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type CSSProperties,
   type FormEvent,
   type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
-import { AnimatePresence, motion } from "motion/react";
 import { createReceipt, createReceiptsBatch, listLastCustomers, listReceipts, type CreateReceiptBatchInput } from "../api/receipts";
 import { listProducts } from "../api/products";
 import { listDeliveryDestinations } from "../api/deliveryDestinations";
@@ -23,14 +23,20 @@ import { ConsolidatedReceiptEntryGrid, type EntryCustomerColumn } from "../compo
 import { Button, Select } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useAuth } from "../context/AuthContext";
-import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
 import { SearchInput } from "../components/SearchInput";
+import { CategoryFilter } from "../components/CategoryFilter";
+import { SkuCombobox } from "../components/SkuCombobox";
+import { formatPeso } from "../utils/consolidatedReceipts";
+import { AddDestinationModal, ADD_DESTINATION_VALUE } from "../components/AddDestinationModal";
+import { useSessionState } from "../hooks/useSessionState";
+import { RECEIPT_DRAFT_PREFIX } from "../utils/unsavedWork";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { generateReceiptPdf } from "../utils/receiptPdf";
-import { PrinterIcon } from "../components/icons";
+import { PrinterIcon, SaveIcon } from "../components/icons";
 import { TableSkeleton } from "../components/Skeleton";
 import { useTopProgress } from "../hooks/useTopProgress";
 /*
@@ -107,7 +113,14 @@ export function ReceiptsPage() {
   const progress = useTopProgress();
   const canBulk = user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
 
-  const [mode, setModeState] = useState<EntryMode>("single");
+  // Everything typed on this page (both modes) is kept in sessionStorage
+  // under RECEIPT_DRAFT_PREFIX, so switching to another tab and back doesn't
+  // wipe an in-progress receipt or bulk sheet - same idea as the Online/
+  // Offline Entry pages' staged edits. Cleared by a successful save, by
+  // Data Reset, or by closing the browser tab.
+  const [modeState, setModeState] = useSessionState<EntryMode>(`${RECEIPT_DRAFT_PREFIX}mode`, "single");
+  // A restored "bulk" is ignored for roles that can't use it.
+  const mode: EntryMode = canBulk ? modeState : "single";
   function setMode(next: EntryMode) {
     setModeState(next);
     setError(null);
@@ -130,18 +143,18 @@ export function ReceiptsPage() {
     DEFAULT_THERMAL_PAPER_SIZE
   );
 
-  const [orderDate, setOrderDate] = useState(today());
-  const [customer, setCustomer] = useState("");
-  const [location, setLocation] = useState("");
-  const [salesRepName, setSalesRepName] = useState("");
+  const [orderDate, setOrderDate] = useSessionState(`${RECEIPT_DRAFT_PREFIX}order-date`, today);
+  const [customer, setCustomer] = useSessionState(`${RECEIPT_DRAFT_PREFIX}customer`, "");
+  const [location, setLocation] = useSessionState(`${RECEIPT_DRAFT_PREFIX}location`, "");
+  const [salesRepName, setSalesRepName] = useSessionState(`${RECEIPT_DRAFT_PREFIX}sales-rep`, "");
   // Which stock pool (if any) this receipt tallies against. Online and
   // Offline are separate pools that aren't expected to tally with each
   // other (Section 2.1), so at most one of these is ever true - checking
   // one clears the other rather than letting both post at once. Defaults
   // to the pre-existing Online behavior so nothing changes for anyone who
   // never touches the new control.
-  const [postToFulfillment, setPostToFulfillment] = useState(true);
-  const [postToOfflineDelivery, setPostToOfflineDelivery] = useState(false);
+  const [postToFulfillment, setPostToFulfillment] = useSessionState(`${RECEIPT_DRAFT_PREFIX}post-fulfillment`, true);
+  const [postToOfflineDelivery, setPostToOfflineDelivery] = useSessionState(`${RECEIPT_DRAFT_PREFIX}post-offline`, false);
 
   function toggleFulfillment(checked: boolean) {
     setPostToFulfillment(checked);
@@ -153,18 +166,23 @@ export function ReceiptsPage() {
     if (checked) setPostToFulfillment(false);
   }
 
-  const [items, setItems] = useState<LineItem[]>([
+  const [items, setItems] = useSessionState<LineItem[]>(`${RECEIPT_DRAFT_PREFIX}items`, [
     { productId: 0, quantity: "", unitPrice: "" },
   ]);
 
   // ---------------------------------------------------------------------
   // Bulk entry state (Section 4.7's Consolidated Receipt bulk entry).
   // ---------------------------------------------------------------------
-  const [bulkDate, setBulkDate] = useState(today());
-  const [bulkLocation, setBulkLocation] = useState("");
-  const [bulkCustomers, setBulkCustomers] = useState<EntryCustomerColumn[]>([]);
-  const [bulkUnitPrices, setBulkUnitPrices] = useState<Record<number, string>>({});
-  const [bulkQuantities, setBulkQuantities] = useState<Record<string, string>>({});
+  const [bulkDate, setBulkDate] = useSessionState(`${RECEIPT_DRAFT_PREFIX}bulk-date`, today);
+  const [bulkLocation, setBulkLocation] = useSessionState(`${RECEIPT_DRAFT_PREFIX}bulk-location`, "");
+  const [bulkCustomers, setBulkCustomers] = useSessionState<EntryCustomerColumn[]>(`${RECEIPT_DRAFT_PREFIX}bulk-customers`, []);
+  // Keyed by `${productId}:${customerId}` - price is entered per customer, per product.
+  const [bulkUnitPrices, setBulkUnitPrices] = useSessionState<Record<string, string>>(`${RECEIPT_DRAFT_PREFIX}bulk-prices`, {});
+  const [bulkQuantities, setBulkQuantities] = useSessionState<Record<string, string>>(`${RECEIPT_DRAFT_PREFIX}bulk-quantities`, {});
+  // View-only filter for the bulk grid's rows - not part of the draft.
+  const [bulkCategory, setBulkCategory] = useState("");
+  // Which destination <select> asked for "+ Add new destination…" (null = modal closed).
+  const [addDestinationFor, setAddDestinationFor] = useState<"single" | "bulk" | null>(null);
   const [bulkSaving, setBulkSaving] = useState(false);
   const [bulkSaved, setBulkSaved] = useState<{ count: number; date: string } | null>(null);
 
@@ -197,9 +215,19 @@ export function ReceiptsPage() {
   // someone's in-progress work. bulkQuantities is intentionally left out of
   // the dependency list: this should fire on date/location changes only,
   // using the current quantities purely as a guard at the moment it runs.
+  // A sheet restored from sessionStorage (customer columns already there)
+  // must not be replaced by the prefill on the very render it comes back on -
+  // that would silently swap the customers the person had just set up for
+  // the location's previous ones. Only skips the restored date/location
+  // pair; changing either one afterwards behaves as before.
+  const skipPrefillKey = useRef<string | null>(bulkCustomers.length > 0 ? `${bulkLocation}|${bulkDate}` : null);
+
   useEffect(() => {
     if (!bulkLocation) return;
     if (Object.keys(bulkQuantities).length > 0) return;
+    const prefillKey = `${bulkLocation}|${bulkDate}`;
+    if (skipPrefillKey.current === prefillKey) return;
+    skipPrefillKey.current = null;
 
     let cancelled = false;
     listLastCustomers(bulkLocation, bulkDate)
@@ -331,6 +359,28 @@ export function ReceiptsPage() {
   }, [orderDate, customer, location, items, products, user, salesRepName, postToFulfillment, postToOfflineDelivery]);
 
   // ---------------------------------------------------------------------
+  // Destination dropdowns' "+ Add new destination…" option.
+  // ---------------------------------------------------------------------
+
+  function handleDestinationChange(value: string, target: "single" | "bulk") {
+    if (value === ADD_DESTINATION_VALUE) {
+      setAddDestinationFor(target);
+      return;
+    }
+    if (target === "bulk") setBulkLocation(value);
+    else setLocation(value);
+  }
+
+  function handleDestinationCreated(destination: DeliveryDestination) {
+    setDestinations((prev) => (prev.some((d) => d.id === destination.id) ? prev : [...prev, destination]));
+    if (addDestinationFor === "bulk") setBulkLocation(destination.name);
+    else setLocation(destination.name);
+    setAddDestinationFor(null);
+  }
+
+  const bulkCategories = useMemo(() => Array.from(new Set(products.map((p) => p.category))).sort(), [products]);
+
+  // ---------------------------------------------------------------------
   // Bulk entry handlers.
   // ---------------------------------------------------------------------
 
@@ -351,10 +401,17 @@ export function ReceiptsPage() {
       }
       return next;
     });
+    setBulkUnitPrices((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (key.endsWith(`:${id}`)) delete next[key];
+      }
+      return next;
+    });
   }
 
-  function setBulkUnitPrice(productId: number, value: string) {
-    setBulkUnitPrices((prev) => ({ ...prev, [productId]: value }));
+  function setBulkUnitPrice(productId: number, customerId: string, value: string) {
+    setBulkUnitPrices((prev) => ({ ...prev, [bulkCellKey(productId, customerId)]: value }));
   }
 
   function setBulkQuantity(productId: number, customerId: string, value: string) {
@@ -376,10 +433,17 @@ export function ReceiptsPage() {
       return;
     }
 
-    const productsWithQty = products.filter((p) => bulkCustomers.some((c) => Number(bulkQuantities[bulkCellKey(p.id, c.id)]) > 0));
-    const missingPrice = productsWithQty.filter((p) => !(Number(bulkUnitPrices[p.id]) > 0));
-    if (missingPrice.length > 0) {
-      setError(`Set a unit price for: ${missingPrice.map((p) => p.name).join(", ")}`);
+    const missingPriceNames = new Set<string>();
+    for (const c of bulkCustomers) {
+      for (const p of products) {
+        const qty = Number(bulkQuantities[bulkCellKey(p.id, c.id)]);
+        if (qty > 0 && !(Number(bulkUnitPrices[bulkCellKey(p.id, c.id)]) > 0)) {
+          missingPriceNames.add(p.name);
+        }
+      }
+    }
+    if (missingPriceNames.size > 0) {
+      setError(`Set a unit price for: ${[...missingPriceNames].join(", ")}`);
       return;
     }
 
@@ -390,7 +454,7 @@ export function ReceiptsPage() {
         .map((p) => {
           const qty = Number(bulkQuantities[bulkCellKey(p.id, c.id)]);
           if (!(qty > 0)) return null;
-          return { productId: p.id, quantity: qty, unitPrice: Number(bulkUnitPrices[p.id]) };
+          return { productId: p.id, quantity: qty, unitPrice: Number(bulkUnitPrices[bulkCellKey(p.id, c.id)]) };
         })
         .filter((it): it is NonNullable<typeof it> => it !== null);
       if (batchItems.length === 0) continue;
@@ -455,83 +519,73 @@ export function ReceiptsPage() {
       </p>
 
       <Toolbar>
-        <SearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder="Search customer, location, sales rep, or SKU…"
-        />
+        <div>
+          <div style={{ display: "flex", flex: mode === "bulk" ? "0 0 auto" : "1 1 auto", minWidth: 0 }}>
+            <SearchInput
+              className={mode === "bulk" ? "ae-search-fixed" : undefined}
+              value={query}
+              onChange={setQuery}
+              placeholder="Search customer, location, sales rep, or SKU…"
+            />
+          </div>
 
-        <ToolbarControls>
-          {canBulk && (
-            <div style={modeToggleStyle} role="tablist" aria-label="Entry mode">
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === "single" ? "primary" : "secondary"}
-                role="tab"
-                aria-selected={mode === "single"}
-                onClick={() => setMode("single")}
-              >
-                Single Receipt
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={mode === "bulk" ? "primary" : "secondary"}
-                role="tab"
-                aria-selected={mode === "bulk"}
-                onClick={() => setMode("bulk")}
-              >
-                Bulk Entry
-              </Button>
-            </div>
-          )}
-          {mode === "single" && <ZoomControl zoom={zoom} onChange={setZoom} />}
-          <Link to="/consolidated-receipts" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
-            Consolidated Receipt
-          </Link>
-        </ToolbarControls>
-      </Toolbar>
-
-      {/*
-       * Bulk Entry's own date/location/+Add Customer/Save controls - a
-       * yellow panel attached directly under the main toolbar (no gap,
-       * squared top corners) instead of a second identical black bar with
-       * its own margin, so switching into Bulk Entry reads as this panel
-       * unfolding out of the main toolbar's bottom edge.
-       */}
-      <AnimatePresence initial={false}>
-        {mode === "bulk" && (
-          <motion.div
-            key="bulk-flyout"
-            className="ae-bulk-flyout no-print"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ duration: 0.18, ease: "easeOut" }}
-          >
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", minWidth: 0 }}>
+          {mode === "bulk" && (
+            <>
               <DatePicker aria-label="Delivery date" value={bulkDate} onChange={setBulkDate} />
-              <Select aria-label="Delivery location" value={bulkLocation} onChange={(e) => setBulkLocation(e.target.value)} required>
+              <Select aria-label="Delivery location" value={bulkLocation} onChange={(e) => handleDestinationChange(e.target.value, "bulk")} required>
                 <option value="" disabled>
                   Select destination…
                 </option>
+                {/* Same as the single form: a saved-in-draft destination that
+                    isn't in the active list any more still renders as selected. */}
+                {bulkLocation && !destinations.some((d) => d.name === bulkLocation) && <option value={bulkLocation}>{bulkLocation}</option>}
                 {destinations.map((d) => (
                   <option key={d.id} value={d.name}>
                     {d.name}
                   </option>
                 ))}
+                <option value={ADD_DESTINATION_VALUE}>+ Add new destination…</option>
               </Select>
-              <Button type="button" variant="secondary" onClick={addBulkCustomer}>
-                + Add Customer
-              </Button>
-            </div>
-            <Button onClick={handleBulkSave} disabled={bulkSaving}>
-              {bulkSaving ? "Saving…" : "Save All"}
+              <CategoryFilter categories={bulkCategories} value={bulkCategory} onChange={setBulkCategory} />
+            </>
+          )}
+
+          {canBulk && (
+            <Button type="button" variant="secondary" onClick={() => setMode(mode === "single" ? "bulk" : "single")}>
+              {mode === "single" ? "Bulk Entry" : "Single Receipt"}
             </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </div>
+
+        <ToolbarControls>
+          {mode === "bulk" && (
+            <>
+              {/* Icon + .ae-toolbar-btn-label, same as Save on the entry pages.
+                  --keep-label (index.css) makes it show "Save All" in the
+                  full AND compact tiers and only shrink to a round icon in
+                  the circle tier, when the toolbar genuinely has no room. */}
+              <Button
+                className="ae-toolbar-save ae-toolbar-save--keep-label"
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleBulkSave}
+                disabled={bulkSaving}
+                aria-label="Save all receipts"
+                title="Save every customer's receipt"
+              >
+                <SaveIcon />
+                <span className="ae-toolbar-btn-label">{bulkSaving ? "Saving…" : "Save All"}</span>
+              </Button>
+              <ToolbarDivider />
+            </>
+          )}
+          <ZoomControl zoom={zoom} onChange={setZoom} />
+          <Link to="/consolidated-receipts" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
+            Consolidated Receipt
+          </Link>
+        </ToolbarControls>
+      </Toolbar>
 
       {mode === "bulk" && error && <p style={{ color: colors.danger }}>{error}</p>}
       {mode === "bulk" && bulkSaved && (
@@ -542,16 +596,18 @@ export function ReceiptsPage() {
       )}
 
       {mode === "bulk" && (
-        <div style={{ marginBottom: 20 }}>
+        <div style={{ marginBottom: 8 }}>
           <ConsolidatedReceiptEntryGrid
             products={products}
             customers={bulkCustomers}
             onRenameCustomer={renameBulkCustomer}
             onRemoveCustomer={removeBulkCustomer}
+            onAddCustomer={addBulkCustomer}
             unitPrices={bulkUnitPrices}
             onUnitPriceChange={setBulkUnitPrice}
             quantities={bulkQuantities}
             onQuantityChange={setBulkQuantity}
+            categoryFilter={bulkCategory}
           />
         </div>
       )}
@@ -570,7 +626,7 @@ export function ReceiptsPage() {
             style={{
               display: "flex",
               justifyContent: "center",
-              flexWrap: "nowrap",
+              flexWrap: "wrap",
               gap: 28,
               overflow: "auto",
               padding: "0 4px 20px",
@@ -589,7 +645,7 @@ export function ReceiptsPage() {
 
                 <FormRow label="Customer">
                   <input
-                    className="ae-input"
+                    className="ae-input ae-input-emphasis"
                     style={receiptInputStyle}
                     value={customer}
                     onChange={(e) => setCustomer(e.target.value)}
@@ -601,7 +657,7 @@ export function ReceiptsPage() {
                   <Select
                     style={receiptInputStyle}
                     value={location}
-                    onChange={(e) => setLocation(e.target.value)}
+                    onChange={(e) => handleDestinationChange(e.target.value, "single")}
                     required
                   >
                     <option value="" disabled>
@@ -622,12 +678,14 @@ export function ReceiptsPage() {
                         {d.name}
                       </option>
                     ))}
+
+                    <option value={ADD_DESTINATION_VALUE}>+ Add new destination…</option>
                   </Select>
                 </FormRow>
 
                 <FormRow label="Sales Rep">
                   <input
-                    className="ae-input"
+                    className="ae-input ae-input-emphasis"
                     style={receiptInputStyle}
                     value={salesRepName}
                     onChange={(e) => setSalesRepName(e.target.value)}
@@ -638,77 +696,54 @@ export function ReceiptsPage() {
                 <Divider />
 
                 {items.map((item, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      gap: 4,
-                      alignItems: "center",
-                      marginBottom: 6,
-                    }}
-                  >
-                    <Select
+                  <div key={i} style={{ marginBottom: 8 }}>
+                    {/* Smart SKU input: type to search by SKU, name or category. */}
+                    <SkuCombobox
+                      aria-label={`Item ${i + 1} SKU`}
+                      products={products}
                       value={item.productId}
-                      onChange={(e) =>
-                        updateItem(i, { productId: Number(e.target.value) })
-                      }
-                      style={{ flex: 1, minWidth: 0, fontSize: 11, padding: "4px 4px" }}
-                    >
-                      <option value={0}>Select SKU…</option>
-
-                      {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.category} — {p.name}
-                        </option>
-                      ))}
-                    </Select>
-
-                    <input
-                      type="number"
-                      className="ae-input"
-                      placeholder="Qty"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        updateItem(i, { quantity: e.target.value })
-                      }
-                      style={{
-                        width: 46,
-                        flexShrink: 0,
-                        fontSize: 11,
-                        padding: "4px 4px",
-                        textAlign: "right",
-                      }}
+                      onChange={(productId) => updateItem(i, { productId })}
+                      style={{ width: "100%", boxSizing: "border-box", fontSize: 11, padding: "4px 8px", marginBottom: 4 }}
                     />
 
-                    <input
-                      type="number"
-                      className="ae-input"
-                      placeholder="₱/unit"
-                      value={item.unitPrice}
-                      min={0}
-                      step="0.01"
-                      onChange={(e) =>
-                        updateItem(i, { unitPrice: e.target.value })
-                      }
-                      style={{
-                        width: 58,
-                        flexShrink: 0,
-                        fontSize: 11,
-                        padding: "4px 4px",
-                        textAlign: "right",
-                      }}
-                    />
+                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                      <input
+                        type="number"
+                        className="ae-input"
+                        placeholder="Qty"
+                        aria-label="Quantity"
+                        value={item.quantity}
+                        onChange={(e) => updateItem(i, { quantity: e.target.value })}
+                        style={{ width: 56, flexShrink: 0, fontSize: 11, padding: "4px 4px", textAlign: "right" }}
+                      />
 
-                    <button
-                      type="button"
-                      onClick={() => removeItemRow(i)}
-                      disabled={items.length === 1}
-                      aria-label="Remove item"
-                      className="ae-tap-target"
-                      style={removeButtonStyle}
-                    >
-                      ×
-                    </button>
+                      <input
+                        type="number"
+                        className="ae-input"
+                        placeholder="₱/unit"
+                        aria-label="Unit price"
+                        value={item.unitPrice}
+                        min={0}
+                        step="0.01"
+                        onChange={(e) => updateItem(i, { unitPrice: e.target.value })}
+                        style={{ width: 70, flexShrink: 0, fontSize: 11, padding: "4px 4px", textAlign: "right" }}
+                      />
+
+                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", fontSize: 11, color: colors.subtleInk, whiteSpace: "nowrap" }}>
+                        {formatPeso((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)) || "—"}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => removeItemRow(i)}
+                        disabled={items.length === 1}
+                        aria-label="Remove item"
+                        className="ae-tap-target"
+                        style={removeButtonStyle}
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
                 ))}
 
@@ -859,6 +894,10 @@ export function ReceiptsPage() {
         )}
       </div>
 
+      {addDestinationFor && (
+        <AddDestinationModal existing={destinations} onClose={() => setAddDestinationFor(null)} onCreated={handleDestinationCreated} />
+      )}
+
       {/*
        * ========================================================
        * RECEIPT PREVIEW / PRINT MODAL
@@ -981,12 +1020,4 @@ const removeButtonStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "center",
   padding: 0,
-};
-
-/*
- * Single/Bulk mode toggle styling.
- */
-const modeToggleStyle: CSSProperties = {
-  display: "flex",
-  gap: 4,
 };

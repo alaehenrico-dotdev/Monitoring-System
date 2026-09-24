@@ -265,6 +265,119 @@ table input[type="number"] {
   border-bottom: 0;
 }
 
+/* Bulk Entry grid (ConsolidatedReceiptEntryGrid) - a batch of receipts,
+   one per customer column, dressed as a stack of paper sheets fanned open
+   to the right (see the reference mockup) rather than the usual
+   edge-to-edge page grid: each customer's own Quantity/Price/Total
+   columns are tinted and edge-shadowed a little differently (sheetStyle in
+   the component) so they read as sheets peeking out from under one
+   another, and a genuinely blank "next page" sheet - Add Customer - sits
+   at the very front. Sized to its own content (not full page width) so a
+   single-customer sheet reads as one page in a stack instead of a lonely
+   row stretched across the screen. */
+.ae-bulk-stack {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 4px 6px 0;
+  vertical-align: top;
+}
+.ae-bulk-fan {
+  display: flex;
+  align-items: stretch;
+  max-width: 100%;
+}
+.ae-bulk-stack-scroll.ae-table-scroll {
+  margin: 0;
+  border-radius: 0;
+  border: 0.5px solid var(--ae-border);
+  box-shadow: 0 10px 24px rgba(20, 17, 13, 0.16);
+  z-index: 1;
+}
+/* The near-black shadow above all but disappears against the dark-mode
+   background, so the sheets stop reading as stacked. Swap it for a
+   brand-yellow glow, which stays visible on the dark surface. */
+:root[data-theme="dark"] .ae-bulk-stack-scroll.ae-table-scroll {
+  box-shadow: 0 10px 24px rgba(255, 212, 0, 0.16);
+}
+/* The blank "next page" sheet, tucked behind the table rather than on top
+   of it - lowest z-index of the stack, sitting mostly underneath the last
+   customer sheet with only a strip peeking out to the right (and a
+   correspondingly quieter shadow, since it's not the sheet closest to the
+   viewer anymore). Still fully clickable on the strip that peeks out. */
+.ae-bulk-add-page {
+  flex: 0 0 96px;
+  margin-left: -28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 8px 16px 24px;
+  border: 0.5px solid var(--ae-border);
+  border-radius: 0;
+  background: var(--ae-surface);
+  color: var(--ae-text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 3px 4px 12px rgba(20, 17, 13, 0.14);
+  z-index: 0;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
+}
+.ae-bulk-add-page:hover {
+  color: #c99a2e;
+  box-shadow: 3px 6px 16px rgba(20, 17, 13, 0.18);
+}
+:root[data-theme="dark"] .ae-bulk-add-page {
+  box-shadow: 3px 4px 12px rgba(255, 212, 0, 0.14);
+}
+:root[data-theme="dark"] .ae-bulk-add-page:hover {
+  box-shadow: 3px 6px 16px rgba(255, 212, 0, 0.18);
+}
+
+/* Bulk Entry's frozen SKU/Products column (ConsolidatedReceiptEntryGrid) -
+   position: sticky rather than a genuinely separate table, so it stays put
+   as the customer cards page through the stack (see the pager below) or
+   scroll horizontally: the SKU and Product-name cells pin to the left edge
+   of .ae-bulk-stack-scroll instead of travelling with the rest of the row.
+   Needs its own opaque background (the default transparent cell would let
+   whichever customer cell now sits underneath show through once scrolled)
+   - --ae-surface here, overridden inline per row on the subtotal/grand-total
+   rows, which use their own tinted row background instead. */
+.ae-bulk-fixed-col {
+  position: sticky;
+  z-index: 2;
+  background: var(--ae-surface);
+}
+/* The right-hand edge of the frozen block (Product name, and the spanning
+   header/subtotal/total-label cells) - a plain border rather than a shadow,
+   since --ae-border already flips to a legible tint in dark mode on its own
+   (unlike a fixed dark rgba shadow, which vanishes there - see the stack's
+   own box-shadow rules above). */
+.ae-bulk-fixed-col--edge {
+  border-right: 1px solid var(--ae-border);
+}
+
+/* Bulk Entry's page bar - shown once there's more than one page of customer
+   cards, so a long batch doesn't force the stack ever wider. Only the cards
+   themselves page; the frozen SKU/Products column above is unaffected. */
+.ae-bulk-pager {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+
 /* Themed scrollbars for table containers and the main content pane - a
    thin, pill-shaped thumb (same border-radius: 999px as .ae-input/.ae-select)
    that turns brand gold on hover, instead of the OS-default bar clashing
@@ -334,6 +447,13 @@ table input[type="number"] {
   background: var(--ae-surface-hover);
   color: var(--ae-text-muted);
   cursor: not-allowed;
+}
+
+/* Always-active border - for a field that should read as "focused" even
+   at rest (Customer / Sales Rep on the single-receipt form), rather than
+   only turning gold on hover/focus like every other .ae-input. */
+.ae-input.ae-input-emphasis {
+  border-color: #c99a2e;
 }
 .ae-input-cell {
   padding: 3px 6px;
@@ -893,8 +1013,20 @@ table input[type="number"] {
   justify-content: flex-start;
   flex-wrap: nowrap;
   gap: var(--ae-toolbar-gap);
-  padding: 5px 6px;
-  margin: 0 -20px 10px;
+  /* Horizontal padding must clear the pill's own end caps. border-radius:
+     9999px makes each end a true semicircle of radius = row-height/2 (~22px),
+     centered on the row's vertical middle - the cap curves back in toward
+     that center as you move up/down from mid-height, reaching all the way
+     in at the very top/bottom edge. A full-height circular control (the
+     compact/circle round Save button, a segment group) sitting flush
+     against a too-thin 6px padding poked past that curve at its own
+     top/bottom edge, and overflow-hidden clipped the sliver off - a small
+     crescent "bite" out of the button right where it met the toolbar's
+     rounded end. 10px keeps every tier's flush end control inside the cap. */
+  padding: 6px 6px;
+  /* Pulls the strip 8px past the page padding on each side at every screen
+     size (the small-screen rules below used to widen this to -12/-16px). */
+  margin: 0 -8px 10px;
   background: var(--ae-surface);
   border: 1px solid var(--ae-toolbar-border);
   border-radius: 9999px;
@@ -1012,9 +1144,19 @@ table input[type="number"] {
 /* ---- Filters: sizing per tier ------------------------------------------ */
 /* full */
 .ae-toolbar input[type="search"] {
-  flex: 1 1 180px;
-  width: 180px !important;
+  flex: 1 1 280px;
+  width: 280px !important;
   min-width: 72px;
+}
+/* Bulk Entry's search box (ReceiptsPage): pinned to just its placeholder's
+   width instead of growing, so the date/destination/mode-toggle controls
+   sitting beside it in the filter cluster get room instead of search
+   eating all the toolbar's leftover space. Scoped to the full tier only -
+   :not(.ae-toolbar--compact) drops out in compact/circle, where the
+   generic rules below still shrink it like any other toolbar search box. */
+.ae-toolbar:not(.ae-toolbar--compact) input.ae-search-fixed[type="search"] {
+  flex: 0 0 280px;
+  width: 280px !important;
 }
 .ae-toolbar .ae-select,
 .ae-toolbar .ae-select-trigger,
@@ -1198,6 +1340,23 @@ table input[type="number"] {
   padding: 0;
   border-radius: 50%;
 }
+/* Opt-in: a Save button that keeps its text through the compact tier and
+   only collapses to a round icon in the circle (floor) tier - e.g. Save All
+   on the Receipts bulk sheet, where the toolbar is crowded enough that it
+   sits in compact most of the time. The circle tier's own rules (28px, label
+   hidden) still win there because this only targets compact-but-not-circle.
+   The tier measurement sees this too (the sizers use the same CSS), so the
+   width it reserves for compact already includes the label. */
+.ae-toolbar--compact:not(.ae-toolbar--circle) .ae-toolbar-save.ae-toolbar-save--keep-label {
+  width: auto;
+  min-width: 32px;
+  padding: 0 0 0 10px;
+  border-radius: 9999px;
+}
+.ae-toolbar--compact:not(.ae-toolbar--circle) .ae-toolbar-save--keep-label .ae-toolbar-btn-label {
+  max-width: 160px;
+  opacity: 1;
+}
 /* The gap: 0 above exists so an icon whose label collapsed to nothing stays
    centered. A button whose text is NOT in a label span (e.g. "[icon] PDF")
    keeps its text, so it needs its normal icon/text spacing back. */
@@ -1310,52 +1469,6 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
-/* ---- Bulk Entry flyout (ReceiptsPage) ---------------------------------
-   Bulk Entry mode's own date/location/+Add Customer/Save controls, styled
-   to look like they unfold directly out of the main toolbar's bottom edge:
-   flush against it (no gap, squared top corners, rounded bottom), and a
-   different fixed color - the brand yellow, not the light/dark surface
-   token - so it always reads as its own distinct panel regardless of
-   theme, the same reasoning ReceiptCard.tsx's staticInk/staticSubtleInk use
-   for a surface that must look the same in both themes. Its own controls
-   invert to dark pills on that yellow, mirroring how the main toolbar's
-   buttons are yellow pills on a dark bar. */
-.ae-bulk-flyout {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: -10px 32px 14px;
-  padding: 8px 14px;
-  background: #ffd400;
-  border: 1px solid #c99a2e;
-  border-top: none;
-  border-radius: 0 0 22px 22px;
-  box-shadow: 0 6px 10px rgba(20, 17, 13, 0.12);
-}
-.ae-bulk-flyout .ae-input,
-.ae-bulk-flyout .ae-select,
-.ae-bulk-flyout .ae-select-trigger,
-.ae-bulk-flyout .ae-date-trigger {
-  background: #14110d;
-  color: #f1e9d0;
-  border-color: transparent;
-  border-radius: 999px;
-}
-.ae-bulk-flyout .ae-btn:not(.ae-btn-danger) {
-  background: #14110d;
-  color: #f1e9d0;
-  border-color: transparent;
-  border-radius: 999px;
-}
-.ae-bulk-flyout .ae-btn:not(.ae-btn-danger):hover:not(:disabled) {
-  background: #241d14;
-}
-.ae-bulk-flyout .ae-btn:not(.ae-btn-danger):active:not(:disabled) {
-  background: #000000;
-}
-
 .ae-main {
   min-width: 0;
   padding: 24px;
@@ -1412,10 +1525,6 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   .ae-main {
     padding: 16px;
   }
-  .ae-toolbar {
-    margin-left: -16px;
-    margin-right: -16px;
-  }
   .ae-main > div > h2:first-child,
   .ae-main > div > h2:first-child + p {
     left: -8px;
@@ -1428,10 +1537,6 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
 @media (max-width: 520px) {
   .ae-main {
     padding: 12px;
-  }
-  .ae-toolbar {
-    margin-left: -12px;
-    margin-right: -12px;
   }
   .ae-main > div > h2:first-child,
   .ae-main > div > h2:first-child + p {
@@ -1489,12 +1594,140 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   }
 }
 
+/* Receipts entry form + live preview. On desktop the two sit side by side;
+   the row wraps (see the inline flex-wrap on .ae-receipt-columns) so the
+   preview drops under the form when there isn't room for both, instead of
+   scrolling sideways. The paper is a fixed 460px wide (its zigzag edge is a
+   pixel-exact clip-path), so on phones it's scaled down to fit rather than
+   overflowing the screen. */
+.ae-receipt-columns > * {
+  max-width: 100%;
+}
+@media (max-width: 520px) {
+  .ae-receipt-columns > * {
+    zoom: 0.8;
+  }
+}
+@media (max-width: 420px) {
+  .ae-receipt-columns > * {
+    zoom: 0.7;
+  }
+}
+@media (max-width: 360px) {
+  .ae-receipt-columns > * {
+    zoom: 0.62;
+  }
+}
+
 /* A collapsed category (StockGrid, TotalStocksTable) hides its product rows
    on screen but should still print/PDF in full - a printed grid missing
    whatever happened to be collapsed at the time would be a silent data gap,
-   not just a display convenience. See the print override below. */
-.ae-row-collapsed {
-  display: none;
+   not just a display convenience. See the print override below.
+
+   Rows stay `display: table-row` at all times (screen and print alike) -
+   only `visibility` changes. `visibility: collapse` is the table-row-
+   specific value for this: a collapsed row renders nothing and takes up no
+   space, same end result as `display: none`, but - unlike `display` - it's
+   a property transitions can be delayed on, which is what lets the shrink
+   below finish before the row actually disappears, instead of the row's
+   cells snapping to zero size and vanishing in the same instant. */
+@media screen {
+  /*
+   * Category rows use real <tr>/<td> elements, so animating `display` or
+   * `visibility: collapse` makes the browser remove the row from the table
+   * layout immediately. That causes the old "snap shut" effect.
+   *
+   * Instead, keep the row in the table and animate the things that determine
+   * its intrinsic height: cell padding, line-height, font-size and the height
+   * of interactive children. This lets the table close continuously while
+   * keeping the layout stable and reversible if the user clicks again.
+   */
+  .ae-cat-row {
+    visibility: visible;
+  }
+
+  /*
+   * Product rows should feel like they are being revealed from directly
+   * underneath the category header.  The table row itself still participates
+   * in layout, but its cells/content slide upward into the category row while
+   * opening and reverse that motion while closing.
+   */
+  .ae-cat-row > td {
+    padding-top: 4px;
+    padding-bottom: 4px;
+    line-height: 1.35;
+    border-top-width: 1px;
+    border-bottom-width: 1px;
+    transform-origin: top center;
+    clip-path: inset(0 0 0 0);
+    transition:
+      padding 360ms cubic-bezier(0.22, 1, 0.36, 1),
+      line-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
+      font-size 260ms ease,
+      border-color 260ms ease,
+      background-color 180ms ease,
+      transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+      clip-path 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: calc(var(--ae-row-i, 0) * 18ms);
+  }
+
+  .ae-cat-row > td > * {
+    max-height: 100px;
+    opacity: 1;
+    transform: translateY(0);
+    transform-origin: top center;
+    overflow: hidden;
+    transition:
+      max-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 220ms ease,
+      transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: calc(var(--ae-row-i, 0) * 18ms);
+  }
+
+  /* Closed: contents tuck upward into the category row rather than simply
+     disappearing. */
+  .ae-cat-row.ae-row-collapsed > td {
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 0;
+    font-size: 0;
+    border-top-color: transparent;
+    border-bottom-color: transparent;
+    transform: translateY(-7px);
+    clip-path: inset(0 0 100% 0);
+  }
+
+  .ae-cat-row.ae-row-collapsed > td > * {
+    max-height: 0;
+    min-height: 0 !important;
+    height: 0 !important;
+    opacity: 0;
+    transform: translateY(-14px);
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+
+  /* Inputs/buttons can otherwise impose their own minimum height while the
+     row is sliding closed. */
+  .ae-cat-row.ae-row-collapsed input,
+  .ae-cat-row.ae-row-collapsed button,
+  .ae-cat-row.ae-row-collapsed select,
+  .ae-cat-row.ae-row-collapsed textarea {
+    min-height: 0 !important;
+    height: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    border-width: 0 !important;
+  }
+
+
+@media (prefers-reduced-motion: reduce) {
+  .ae-cat-row > td,
+  .ae-cat-row > td > *,
+  .ae-cat-row.ae-row-collapsed {
+    transition: none !important;
+    transform: none !important;
+  }
 }
 
 @media print {
@@ -1502,7 +1735,7 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     display: none !important;
   }
   .ae-row-collapsed {
-    display: table-row !important;
+    visibility: visible !important;
   }
 
   body,
@@ -1853,4 +2086,4 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   .ae-top-progress-bar {
     transition: none !important;
   }
-}
+}}

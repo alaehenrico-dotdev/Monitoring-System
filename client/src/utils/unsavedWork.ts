@@ -22,6 +22,11 @@
 export const ENTRY_PREFIX = "ala-eh-pending:";
 export const MANUAL_COUNT_PREFIX = "ala-eh-manual-count-pending:";
 
+// Receipts page drafts (single form + bulk sheet) - see pages/ReceiptsPage.tsx.
+// Not an "unsaved edit against a saved grid" like the two above, so
+// findUnsavedWork ignores it; it's only here so Data Reset can wipe it too.
+export const RECEIPT_DRAFT_PREFIX = "ala-eh-receipts-draft:";
+
 export type UnsavedWorkPage = "Online Entry" | "Offline Entry" | "Manual Count";
 
 export interface UnsavedWorkItem {

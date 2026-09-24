@@ -147,22 +147,25 @@ export function StockGrid({ rows, columns, onCommit, readOnly, pending, focusSto
                     type="button"
                     onClick={() => setExpandedOverride((e) => ({ ...e, [category]: !isExpanded }))}
                     aria-expanded={!isCollapsed}
+                    aria-controls={groupRows.map((row) => `ae-stockgrid-row-${row.product.id}`).join(" ")}
+                    aria-disabled={hasPending || undefined}
                     title={hasPending ? `${category} has unsaved edits, so it stays expanded` : isCollapsed ? `Expand ${category}` : `Collapse ${category}`}
                     style={categoryToggleStyle}
                   >
-                    <span style={{ display: "inline-flex", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 120ms ease" }}>
+                    <span style={{ display: "inline-flex", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
                       <ChevronIcon />
                     </span>
                     {category}
                   </button>
                 </td>
               </tr>
-              {groupRows.map((row) => (
+              {groupRows.map((row, i) => (
                 <tr
                   key={row.product.id}
+                  id={`ae-stockgrid-row-${row.product.id}`}
                   data-row-id={row.product.id}
-                  className={isCollapsed ? "ae-row-collapsed" : undefined}
-                  style={row.isFlagged ? { background: colors.warningBg } : undefined}
+                  className={isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"}
+                  style={{ "--ae-row-i": i, ...(row.isFlagged ? { background: colors.warningBg } : undefined) } as CSSProperties}
                 >
                   <td style={skuCellStyle}>{row.product.sku ?? "—"}</td>
                   <td style={nameCellStyle}>{row.product.name}</td>
