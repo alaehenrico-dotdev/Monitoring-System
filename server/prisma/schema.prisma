@@ -111,6 +111,12 @@ model DailyOnlineStock {
   updatedAt         DateTime @updatedAt
 
   @@unique([productId, entryDate, shift])
+  // Serves cross-product lookups (findAllForDate, dashboard monthly
+  // aggregates) that filter/range on entryDate without a productId - the
+  // unique key above can't help there since productId is its leftmost
+  // column. Confirmed via EXPLAIN against a seeded ~116k-row table: this
+  // turns a full table scan into a ref/range lookup.
+  @@index([entryDate, shift])
   @@map("daily_online_stock")
 }
 
@@ -138,6 +144,8 @@ model DailyOfflineStock {
   deliveries        OfflineEntryDelivery[]
 
   @@unique([productId, entryDate, shift])
+  // See the matching index on DailyOnlineStock above - same reasoning.
+  @@index([entryDate, shift])
   @@map("daily_offline_stock")
 }
 
@@ -184,6 +192,10 @@ model ManualCount {
   updatedAt            DateTime      @updatedAt
 
   @@unique([productId, entryDate, shift, location])
+  // Serves findAllForDateAndLocation/findForTotals/findForVarianceReport,
+  // all of which filter or range-scan entryDate across products (see the
+  // DailyOnlineStock index above for why the unique key doesn't help).
+  @@index([entryDate])
   @@map("manual_counts")
 }
 
