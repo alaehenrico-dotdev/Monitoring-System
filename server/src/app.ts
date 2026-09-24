@@ -4,6 +4,7 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiLimiter } from "./middleware/rateLimit";
+import { requestLogger } from "./middleware/requestLogger";
 import routes from "./routes";
 
 export function createApp() {
@@ -18,6 +19,7 @@ export function createApp() {
   app.use(helmet({ contentSecurityPolicy: false }));
   app.use(cors({ origin: env.clientOrigin, credentials: true }));
   app.use(express.json());
+  app.use(requestLogger);
 
   app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
