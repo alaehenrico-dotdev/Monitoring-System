@@ -30,8 +30,6 @@ function readInitialIsMobile(): boolean {
 const RAIL_WIDTH = 56;
 const EXPANDED_WIDTH = 256;
 const ICON_SIZE = 40;
-// Must match the transition / animation length of .ae-logo-ring and
-// .ae-logo-glint in index.css - a new spin is ignored until the last is done.
 const LOGO_SPIN_MS = 1100;
 const ICON_INSET = 16;
 const TAB_BADGE_SIZE = 36;
@@ -50,36 +48,123 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
   {
     heading: "Data Entry",
     links: [
-      { to: "/dashboard", label: "Dashboard", abbr: "DB", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/online", label: "Online Entry", abbr: "ON", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/offline", label: "Offline Entry", abbr: "OF", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/manual-count", label: "Manual Count", abbr: "MC", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/total-stocks", label: "Total Stocks", abbr: "TS", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      // Bulk entry lives inside this page too now (its own "Bulk Entry" mode,
-      // shown to Offline Encoders/Supervisors only) - no separate nav entry.
-      { to: "/receipts", label: "Receipts", abbr: "RC", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
+      {
+        to: "/dashboard",
+        label: "Dashboard",
+        abbr: "DB",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/online",
+        label: "Online Entry",
+        abbr: "ON",
+        roles: [
+          "ONLINE_ENCODER",
+          "OFFLINE_ENCODER",
+          "SUPERVISOR_ADMIN",
+        ],
+      },
+      {
+        to: "/offline",
+        label: "Offline Entry",
+        abbr: "OF",
+        roles: [
+          "ONLINE_ENCODER",
+          "OFFLINE_ENCODER",
+          "SUPERVISOR_ADMIN",
+        ],
+      },
+      {
+        to: "/manual-count",
+        label: "Manual Count",
+        abbr: "MC",
+        roles: [
+          "ONLINE_ENCODER",
+          "OFFLINE_ENCODER",
+          "SUPERVISOR_ADMIN",
+        ],
+      },
+      {
+        to: "/total-stocks",
+        label: "Total Stocks",
+        abbr: "TS",
+        roles: [
+          "ONLINE_ENCODER",
+          "OFFLINE_ENCODER",
+          "SUPERVISOR_ADMIN",
+        ],
+      },
+      {
+        to: "/receipts",
+        label: "Receipts",
+        abbr: "RC",
+        roles: [
+          "ONLINE_ENCODER",
+          "OFFLINE_ENCODER",
+          "SUPERVISOR_ADMIN",
+        ],
+      },
     ],
   },
   {
     heading: "Reports",
     links: [
-      { to: "/consolidated-receipts", label: "Consolidated Receipt", abbr: "CR", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/variance-report", label: "Variance Report", abbr: "VR", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/daily-report", label: "Daily Report", abbr: "DR", roles: ["SUPERVISOR_ADMIN"] },
+      {
+        to: "/consolidated-receipts",
+        label: "Consolidated Receipt",
+        abbr: "CR",
+        roles: [
+          "ONLINE_ENCODER",
+          "OFFLINE_ENCODER",
+          "SUPERVISOR_ADMIN",
+        ],
+      },
+      {
+        to: "/variance-report",
+        label: "Variance Report",
+        abbr: "VR",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/daily-report",
+        label: "Daily Report",
+        abbr: "DR",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
     ],
   },
   {
     heading: "Admin",
     links: [
-      { to: "/change-log", label: "Change Log", abbr: "CL", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/products", label: "SKUs", abbr: "SK", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/delivery-destinations", label: "Delivery Destinations", abbr: "DD", roles: ["SUPERVISOR_ADMIN"] },
+      {
+        to: "/change-log",
+        label: "Change Log",
+        abbr: "CL",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/products",
+        label: "SKUs",
+        abbr: "SK",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/delivery-destinations",
+        label: "Delivery Destinations",
+        abbr: "DD",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
     ],
   },
   {
     heading: "Settings",
     links: [
-      { to: "/settings", label: "Settings", abbr: "ST", roles: ["SUPERVISOR_ADMIN"] },
+      {
+        to: "/settings",
+        label: "Settings",
+        abbr: "ST",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
     ],
   },
 ];
@@ -101,77 +186,109 @@ function readInitialPinned(): boolean {
 }
 
 const NAV_STYLE_TAG_ID = "ae-sidebar-nav-style";
-// Hover rules live here (not inline) because they need `!important` to win
-// against the tabs' own inline `background`/`color`, which is set per-row
-// based on `isActive`. `:not([aria-current="page"])` keeps hover from ever
-// fighting the active tab's own solid highlight - React Router sets
-// aria-current="page" on the active NavLink automatically, so this needs
-// no extra prop threading.
+
 const NAV_STYLE = `
   .ae-sidebar-nav {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* old Edge / IE */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
+
   .ae-sidebar-nav::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, new Edge */
+    display: none;
     width: 0;
     height: 0;
   }
+
   .ae-sidebar-tab:hover:not([aria-current="page"]) {
-    background: color-mix(in srgb, ${colors.yellow} 16%, transparent) !important;
+    background: color-mix(
+      in srgb,
+      ${colors.yellow} 16%,
+      transparent
+    ) !important;
+
     color: ${colors.yellow} !important;
   }
-  .ae-sidebar-tab:hover:not([aria-current="page"]) .ae-sidebar-tab-badge {
-    background: color-mix(in srgb, ${colors.yellow} 22%, transparent);
+
+  .ae-sidebar-tab:hover:not([aria-current="page"])
+    .ae-sidebar-tab-badge {
+    background: color-mix(
+      in srgb,
+      ${colors.yellow} 22%,
+      transparent
+    );
+
     color: ${colors.yellow};
   }
-  /* Only the seal reacts - not the whole row. The row used to scale and
-     tilt as one piece, which wobbled the "Ala Eh!" text and the pin button
-     along with the logo. The border lettering also spins and a light streak
-     crosses the seal on hover (see LogoMark's spin prop and .ae-logo-*
-     in index.css). */
+
   .ae-sidebar-logo .ae-logo-mark {
     display: block;
     flex-shrink: 0;
     overflow: visible;
+
     transition:
       transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
       filter 0.25s ease;
   }
+
   .ae-sidebar-logo:hover .ae-logo-mark,
   .ae-sidebar-logo:focus-visible .ae-logo-mark {
     transform: scale(1.06);
-    filter: drop-shadow(0 0 6px color-mix(in srgb, ${colors.gold} 60%, transparent));
+
+    filter: drop-shadow(
+      0 0 6px
+      color-mix(in srgb, ${colors.gold} 60%, transparent)
+    );
   }
+
   .ae-sidebar-logo:active .ae-logo-mark {
     transform: scale(0.93);
   }
+
   @keyframes ae-sidebar-gradient-position {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
+    0%,
+    100% {
+      background-position: 0% 50%;
+    }
+
+    50% {
+      background-position: 100% 50%;
+    }
   }
+
   .ae-sidebar-gradient-sweep {
-    animation: ae-sidebar-gradient-position 13s linear infinite;
+    animation:
+      ae-sidebar-gradient-position
+      13s linear infinite;
   }
+
   .ae-sidebar-tab-spotlight {
     opacity: var(--spotlight-opacity, 0);
     transition: opacity 220ms ease;
   }
-  /* Mobile-only affordance: a small down arrow under the minimized icon,
-     pulsing so it reads as "tap for more" rather than a static decoration. */
+
   @keyframes ae-sidebar-mobile-arrow-glow {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 0.55;
-      filter: drop-shadow(0 0 0px ${colors.yellow});
+      filter: drop-shadow(
+        0 0 0px ${colors.yellow}
+      );
     }
+
     50% {
       opacity: 1;
-      filter: drop-shadow(0 0 6px ${colors.yellow});
+      filter: drop-shadow(
+        0 0 6px ${colors.yellow}
+      );
     }
   }
+
   .ae-sidebar-mobile-arrow {
-    animation: ae-sidebar-mobile-arrow-glow 1.8s ease-in-out infinite;
+    animation:
+      ae-sidebar-mobile-arrow-glow
+      1.8s ease-in-out infinite;
   }
+
   @media (prefers-reduced-motion: reduce) {
     .ae-sidebar-mobile-arrow {
       animation: none;
@@ -184,90 +301,164 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [collapsed, setCollapsed] = useState(readInitialCollapsed);
-  const [pinned, setPinned] = useState(readInitialPinned);
-  const [isMouseOver, setIsMouseOver] = useState(false);
-  const [isFocusWithin, setIsFocusWithin] = useState(false);
-  // On mobile the sidebar is always minimized to just the icon until the
-  // person taps it open - there's no hover state to fall back on, so this
-  // is tracked separately from the desktop `collapsed`/`pinned` prefs
-  // instead of trying to reuse them.
-  const [isMobile, setIsMobile] = useState(readInitialIsMobile);
-  const [mobileOpen, setMobileOpen] = useState(false);
-  // How many times the logo's ring has been sent round (LogoMark's `spin`);
-  // bumped when the pointer enters the logo row, at most once per turn.
-  const [logoSpin, setLogoSpin] = useState(0);
-  const lastSpinAtRef = useRef(0);
-  const [viewportHeight, setViewportHeight] = useState(() =>
-    typeof window !== "undefined" ? window.innerHeight : 900,
+  const [collapsed, setCollapsed] = useState(
+    readInitialCollapsed,
   );
+
+  const [pinned, setPinned] = useState(
+    readInitialPinned,
+  );
+
+  const [isMouseOver, setIsMouseOver] =
+    useState(false);
+
+  const [isFocusWithin, setIsFocusWithin] =
+    useState(false);
+
+  const [isMobile, setIsMobile] = useState(
+    readInitialIsMobile,
+  );
+
+  const [mobileOpen, setMobileOpen] =
+    useState(false);
+
+  const [logoSpin, setLogoSpin] = useState(0);
+
+  const lastSpinAtRef = useRef(0);
+
+  const [viewportHeight, setViewportHeight] =
+    useState(() =>
+      typeof window !== "undefined"
+        ? window.innerHeight
+        : 900,
+    );
 
   useEffect(() => {
     try {
-      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+      localStorage.setItem(
+        SIDEBAR_COLLAPSED_KEY,
+        collapsed ? "1" : "0",
+      );
     } catch {
-      // Ignore - still works for this session, just won't be remembered.
+      // Ignore storage errors.
     }
   }, [collapsed]);
 
   useEffect(() => {
     try {
-      localStorage.setItem(SIDEBAR_PINNED_KEY, pinned ? "1" : "0");
+      localStorage.setItem(
+        SIDEBAR_PINNED_KEY,
+        pinned ? "1" : "0",
+      );
     } catch {
-      // Ignore - still works for this session, just won't be remembered.
+      // Ignore storage errors.
     }
   }, [pinned]);
 
   useEffect(() => {
-    if (document.getElementById(NAV_STYLE_TAG_ID)) return;
-    const style = document.createElement("style");
+    if (
+      document.getElementById(
+        NAV_STYLE_TAG_ID,
+      )
+    ) {
+      return;
+    }
+
+    const style =
+      document.createElement("style");
+
     style.id = NAV_STYLE_TAG_ID;
     style.textContent = NAV_STYLE;
+
     document.head.appendChild(style);
   }, []);
 
   useEffect(() => {
-    const mql = window.matchMedia(MOBILE_MENU_QUERY);
-    function onChange(e: MediaQueryListEvent) {
+    const mql = window.matchMedia(
+      MOBILE_MENU_QUERY,
+    );
+
+    function onChange(
+      e: MediaQueryListEvent,
+    ) {
       setIsMobile(e.matches);
-      // Leaving mobile (rotating a tablet, resizing a browser window) with
-      // the dropdown open shouldn't carry that "open" flag back into the
-      // desktop rail/expanded logic below.
-      if (!e.matches) setMobileOpen(false);
+
+      if (!e.matches) {
+        setMobileOpen(false);
+      }
     }
-    mql.addEventListener("change", onChange);
-    return () => mql.removeEventListener("change", onChange);
+
+    mql.addEventListener(
+      "change",
+      onChange,
+    );
+
+    return () =>
+      mql.removeEventListener(
+        "change",
+        onChange,
+      );
   }, []);
 
   useEffect(() => {
-    const iconOnly = isMobile ? !mobileOpen : collapsed;
-    document.body.classList.toggle("ae-sidebar-collapsed-icon", iconOnly);
-    return () => document.body.classList.remove("ae-sidebar-collapsed-icon");
-  }, [collapsed, isMobile, mobileOpen]);
+    const iconOnly = isMobile
+      ? !mobileOpen
+      : collapsed;
+
+    document.body.classList.toggle(
+      "ae-sidebar-collapsed-icon",
+      iconOnly,
+    );
+
+    return () =>
+      document.body.classList.remove(
+        "ae-sidebar-collapsed-icon",
+      );
+  }, [
+    collapsed,
+    isMobile,
+    mobileOpen,
+  ]);
 
   useEffect(() => {
     let frame = 0;
+
     function onResize() {
       cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() =>
-        setViewportHeight(window.innerHeight),
+
+      frame = requestAnimationFrame(
+        () =>
+          setViewportHeight(
+            window.innerHeight,
+          ),
       );
     }
-    window.addEventListener("resize", onResize);
+
+    window.addEventListener(
+      "resize",
+      onResize,
+    );
+
     return () => {
-      window.removeEventListener("resize", onResize);
+      window.removeEventListener(
+        "resize",
+        onResize,
+      );
+
       cancelAnimationFrame(frame);
     };
   }, []);
 
-  // Pinned holds the sidebar in "expanded" permanently (no hover needed) -
-  // same effect as isMouseOver/isFocusWithin, just sourced from a click
-  // instead of the pointer, and remembered across reloads.
-  const hovered = !collapsed && (isMouseOver || isFocusWithin || pinned);
-  // Mobile never uses the hover-only "rail" (icon strip, no labels) state -
-  // there's nothing to hover, so it would be a dead end. Mobile is only
-  // ever the minimized icon or the fully-labeled dropdown.
-  const state: "rail" | "expanded" | "collapsed" = isMobile
+  const hovered =
+    !collapsed &&
+    (isMouseOver ||
+      isFocusWithin ||
+      pinned);
+
+  const state:
+    | "rail"
+    | "expanded"
+    | "collapsed" = isMobile
     ? mobileOpen
       ? "expanded"
       : "collapsed"
@@ -277,53 +468,96 @@ export function Sidebar() {
         ? "expanded"
         : "rail";
 
-  function handleBlur(e: FocusEvent<HTMLDivElement>) {
-    if (!containerRef.current?.contains(e.relatedTarget as Node | null)) {
+  function handleBlur(
+    e: FocusEvent<HTMLDivElement>,
+  ) {
+    if (
+      !containerRef.current?.contains(
+        e.relatedTarget as Node | null,
+      )
+    ) {
       setIsFocusWithin(false);
     }
   }
 
-  function blurAfterClick(e: MouseEvent<HTMLElement>) {
+  function blurAfterClick(
+    e: MouseEvent<HTMLElement>,
+  ) {
     e.currentTarget.blur();
   }
 
-  // Same cursor-follow trick as the toolbar (Toolbar.tsx): write `--mx`/
-  // `--my` straight onto the tab element via `style.setProperty` instead of
-  // through React state, so tracking the pointer across the nav never
-  // triggers a sidebar re-render. Each tab gets its own overlay, so the
-  // glow only ever appears under whichever tab is actually hovered.
-  function handleTabPointerMove(e: MouseEvent<HTMLAnchorElement>) {
+  function handleTabPointerMove(
+    e: MouseEvent<HTMLAnchorElement>,
+  ) {
     const el = e.currentTarget;
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-    el.style.setProperty("--mx", `${x}%`);
-    el.style.setProperty("--my", `${y}%`);
-    el.style.setProperty("--spotlight-opacity", "1");
+    const rect =
+      el.getBoundingClientRect();
+
+    if (
+      rect.width === 0 ||
+      rect.height === 0
+    ) {
+      return;
+    }
+
+    const x =
+      ((e.clientX - rect.left) /
+        rect.width) *
+      100;
+
+    const y =
+      ((e.clientY - rect.top) /
+        rect.height) *
+      100;
+
+    el.style.setProperty(
+      "--mx",
+      `${x}%`,
+    );
+
+    el.style.setProperty(
+      "--my",
+      `${y}%`,
+    );
+
+    el.style.setProperty(
+      "--spotlight-opacity",
+      "1",
+    );
   }
 
-  function handleTabPointerLeave(e: MouseEvent<HTMLAnchorElement>) {
-    e.currentTarget.style.setProperty("--spotlight-opacity", "0");
+  function handleTabPointerLeave(
+    e: MouseEvent<HTMLAnchorElement>,
+  ) {
+    e.currentTarget.style.setProperty(
+      "--spotlight-opacity",
+      "0",
+    );
   }
 
   function toggleCollapsed() {
     if (isMobile) {
-      setMobileOpen((prev) => !prev);
+      setMobileOpen(
+        (prev) => !prev,
+      );
       return;
     }
-    setCollapsed((prev) => !prev);
+
+    setCollapsed(
+      (prev) => !prev,
+    );
   }
 
-  // Closes the mobile dropdown after a nav link is tapped (desktop leaves
-  // the sidebar's own state alone on click - only mobile needs this, since
-  // there the menu is a transient overlay rather than persistent chrome).
   function closeMobileMenu() {
-    if (isMobile) setMobileOpen(false);
+    if (isMobile) {
+      setMobileOpen(false);
+    }
   }
 
   function togglePinned() {
-    setPinned((prev) => !prev);
+    setPinned(
+      (prev) => !prev,
+    );
   }
 
   const width =
@@ -332,58 +566,81 @@ export function Sidebar() {
       : state === "expanded"
         ? EXPANDED_WIDTH
         : RAIL_WIDTH;
-  const height = state === "collapsed" ? ICON_SIZE : viewportHeight;
-  const inset = state === "collapsed" ? ICON_INSET : 0;
+
+  const height =
+    state === "collapsed"
+      ? ICON_SIZE
+      : viewportHeight;
+
+  const inset =
+    state === "collapsed"
+      ? ICON_INSET
+      : 0;
+
   const borderRadius =
     state === "collapsed"
       ? "70px 70px 70px 70px"
       : state === "expanded"
         ? "0px 0px 0px 0px"
         : "0px 0px 0px 0px";
-  const spacerWidth = state === "collapsed" ? 0 : width;
+
+  const spacerWidth =
+    state === "collapsed"
+      ? 0
+      : width;
 
   return (
     <>
-      {/* Mobile-only scrim behind the dropdown - tapping anywhere outside
-          the menu closes it, same as a standard mobile nav drawer. Doesn't
-          exist on desktop, where the rail/expanded states are driven by
-          hover instead of an explicit open/closed toggle. */}
-      {isMobile && mobileOpen && (
-        <div
-          className="no-print"
-          onClick={() => setMobileOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 49,
-            background: "rgba(20, 17, 13, 0.35)",
-          }}
-        />
-      )}
-      {/* Real `animate={{ width: ... }}`, not `layout` - `layout` FLIPs a
-          resize via a transform (scale) trick, which visually squishes
-          whatever's actually rendered inside the box while it's mid-
-          transition. That's invisible on this plain-color spacer, but the
-          same trick on `<main>` (see Layout.tsx) visibly distorted real
-          page content (grid text) while resizing, which read as ugly rather
-          than smooth. Animating the real `width` instead costs an extra
-          reflow per frame, but is what makes both this spacer and main's
-          own resize (Layout.tsx) actually smooth rather than faked. */}
+      {isMobile &&
+        mobileOpen && (
+          <div
+            className="no-print"
+            onClick={() =>
+              setMobileOpen(false)
+            }
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 49,
+              background:
+                "rgba(20, 17, 13, 0.35)",
+            }}
+          />
+        )}
+
       <motion.div
         className="no-print"
         aria-hidden
-        animate={{ width: spacerWidth }}
+        animate={{
+          width: spacerWidth,
+        }}
         transition={sidebarSpring}
-        style={{ flexShrink: 0, height: "100%" }}
+        style={{
+          flexShrink: 0,
+          height: "100%",
+        }}
       />
+
       <motion.div
         ref={containerRef}
         className="no-print"
-        onMouseEnter={() => setIsMouseOver(true)}
-        onMouseLeave={() => setIsMouseOver(false)}
-        onFocus={() => setIsFocusWithin(true)}
+        onMouseEnter={() =>
+          setIsMouseOver(true)
+        }
+        onMouseLeave={() =>
+          setIsMouseOver(false)
+        }
+        onFocus={() =>
+          setIsFocusWithin(true)
+        }
         onBlur={handleBlur}
-        animate={{ width, height, x: inset, y: inset, borderRadius }}
+        animate={{
+          width,
+          height,
+          x: inset,
+          y: inset,
+          borderRadius,
+        }}
         transition={sidebarSpring}
         style={{
           position: "fixed",
@@ -391,39 +648,46 @@ export function Sidebar() {
           left: 0,
           zIndex: 50,
           overflow: "hidden",
-          background: `color-mix(in srgb, ${colors.black} 82%, transparent)`,
-          backdropFilter: "blur(20px) saturate(120%)",
-          WebkitBackdropFilter: "blur(20px) saturate(120%)",
-          // The static border is only drawn when NOT expanded. While
-          // expanded, the border is rendered by the animated overlay below
-          // so it can pulse without fighting this element's own width/height
-          // spring transition (animating two different `transition`
-          // configs on one element isn't possible with framer-motion).
+
+          background: `color-mix(
+            in srgb,
+            ${colors.black} 82%,
+            transparent
+          )`,
+
+          backdropFilter:
+            "blur(20px) saturate(120%)",
+
+          WebkitBackdropFilter:
+            "blur(20px) saturate(120%)",
+
+          /*
+           * Expanded:
+           * transparent base border because the animated
+           * gradient overlay creates the visible border.
+           *
+           * Rail/collapsed:
+           * no border. The minimized icon instead uses
+           * a soft yellow glow through boxShadow.
+           */
           border:
             state === "expanded"
               ? "0.5px solid transparent"
-              : `0.5px solid ${colors.yellow}`,
+              : "none",
+
           color: colors.cream,
+
           boxShadow:
             state === "collapsed"
-              ? "0 8px 24px rgba(0,0,0,0.55)"
+              ? `
+                  0 8px 24px rgba(0, 0, 0, 0.55),
+                  0 0 14px rgba(255, 212, 0, 0.28),
+                  0 0 28px rgba(255, 212, 0, 0.12)
+                `
               : "0 8px 32px rgba(0,0,0,0.4)",
         }}
       >
         {state === "expanded" && (
-          // Gradient-border trick: this element is padded by exactly the
-          // border width, filled with a moving gradient, then masked so
-          // only that padding ring (not the center) is visible - the
-          // `xor`/`exclude` composite punches the content-box out of the
-          // full box, leaving a ring the same shape as `borderRadius`.
-          //
-          // A plain CSS `animation` (see NAV_STYLE), not a Framer Motion
-          // `animate` loop - `background-position` never runs on the
-          // compositor, so a JS-driven `repeat: Infinity` was repainting
-          // this whole viewport-height layer forever, on the main thread,
-          // for as long as the sidebar stayed expanded (indefinitely, once
-          // pinned). The native CSS engine runs the identical keyframes
-          // without that per-frame JS/React overhead.
           <div
             aria-hidden
             className="ae-sidebar-gradient-sweep"
@@ -433,22 +697,44 @@ export function Sidebar() {
               borderRadius: "inherit",
               padding: 0.5,
               pointerEvents: "none",
-              // Black stops between each highlight color are what make the
-              // sweep read clearly - without them the yellow/gold/cream
-              // trio blends into one continuous warm glow with too little
-              // contrast against the dark sidebar background.
-              backgroundImage: `linear-gradient(115deg, ${colors.black}, ${colors.yellow}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.cream}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.yellow}, ${colors.black})`,
-              backgroundSize: "400% 400%",
+
+              backgroundImage: `linear-gradient(
+                115deg,
+                ${colors.black},
+                ${colors.yellow},
+                ${colors.black},
+                ${colors.gold},
+                ${colors.black},
+                ${colors.cream},
+                ${colors.black},
+                ${colors.gold},
+                ${colors.black},
+                ${colors.yellow},
+                ${colors.black}
+              )`,
+
+              backgroundSize:
+                "400% 400%",
+
               WebkitMask:
                 "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
-              WebkitMaskComposite: "xor",
-              maskComposite: "exclude",
+
+              WebkitMaskComposite:
+                "xor",
+
+              maskComposite:
+                "exclude",
             }}
           />
         )}
+
         <div
           style={{
-            padding: state === "collapsed" ? 0 : "20px 0",
+            padding:
+              state === "collapsed"
+                ? 0
+                : "20px 0",
+
             height: "100%",
             display: "flex",
             flexDirection: "column",
@@ -457,67 +743,136 @@ export function Sidebar() {
           <div
             className="ae-sidebar-logo"
             onMouseEnter={() => {
-              const now = performance.now();
-              if (now - lastSpinAtRef.current < LOGO_SPIN_MS) return;
-              lastSpinAtRef.current = now;
-              setLogoSpin((n) => n + 1);
+              const now =
+                performance.now();
+
+              if (
+                now -
+                  lastSpinAtRef.current <
+                LOGO_SPIN_MS
+              ) {
+                return;
+              }
+
+              lastSpinAtRef.current =
+                now;
+
+              setLogoSpin(
+                (n) => n + 1,
+              );
             }}
             onClick={(e) => {
               toggleCollapsed();
               blurAfterClick(e);
             }}
             onKeyDown={(e) => {
-              // Ignore key events bubbling up from the pin button below -
-              // it's its own focusable control, not part of this row's
-              // collapse/expand toggle.
-              if (e.target !== e.currentTarget) return;
-              if (e.key === "Enter" || e.key === " ") {
+              if (
+                e.target !==
+                e.currentTarget
+              ) {
+                return;
+              }
+
+              if (
+                e.key === "Enter" ||
+                e.key === " "
+              ) {
                 e.preventDefault();
                 toggleCollapsed();
               }
             }}
             role="button"
             tabIndex={0}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar into icon"}
+            title={
+              collapsed
+                ? "Expand sidebar"
+                : "Collapse sidebar into icon"
+            }
             aria-label={
-              collapsed ? "Expand sidebar" : "Collapse sidebar into icon"
+              collapsed
+                ? "Expand sidebar"
+                : "Collapse sidebar into icon"
             }
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "flex-start",
-              gap: state === "expanded" ? 10 : 0,
-              width: state === "collapsed" ? ICON_SIZE : "100%",
-              boxSizing: "border-box",
+              justifyContent:
+                "flex-start",
+              gap:
+                state === "expanded"
+                  ? 10
+                  : 0,
+
+              width:
+                state === "collapsed"
+                  ? ICON_SIZE
+                  : "100%",
+
+              boxSizing:
+                "border-box",
+
               paddingLeft:
-                state === "collapsed" ? 0 : state === "expanded" ? 14 : 8,
+                state === "collapsed"
+                  ? 0
+                  : state === "expanded"
+                    ? 14
+                    : 8,
+
               paddingRight:
-                state === "collapsed" ? 0 : state === "expanded" ? 14 : 8,
-              height: state === "collapsed" ? ICON_SIZE : "auto",
-              marginBottom: state === "collapsed" ? 0 : 20,
+                state === "collapsed"
+                  ? 0
+                  : state === "expanded"
+                    ? 14
+                    : 8,
+
+              height:
+                state === "collapsed"
+                  ? ICON_SIZE
+                  : "auto",
+
+              marginBottom:
+                state === "collapsed"
+                  ? 0
+                  : 20,
+
               cursor: "pointer",
               flexShrink: 0,
             }}
           >
-            <LogoMark size={ICON_SIZE} spin={logoSpin} />
-            {state === "expanded" && (
-              <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
+            <LogoMark
+              size={ICON_SIZE}
+              spin={logoSpin}
+            />
+
+            {state ===
+              "expanded" && (
+              <div
+                style={{
+                  overflow: "hidden",
+                  whiteSpace:
+                    "nowrap",
+                }}
+              >
                 <h1
                   style={{
-                    fontFamily: fonts.wordmark,
+                    fontFamily:
+                      fonts.wordmark,
                     fontSize: 16,
                     fontWeight: 800,
-                    color: colors.yellow,
+                    color:
+                      colors.yellow,
                     margin: 0,
                     lineHeight: 1.1,
                   }}
                 >
                   Ala Eh!
                 </h1>
+
                 <p
                   style={{
                     fontSize: 10.5,
-                    color: colors.cream,
+                    color:
+                      colors.cream,
                     opacity: 0.75,
                     margin: 0,
                     letterSpacing: 0.3,
@@ -527,57 +882,84 @@ export function Sidebar() {
                 </p>
               </div>
             )}
-            {state === "expanded" && !isMobile && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePinned();
-                  // Otherwise this button stays DOM-focused after the
-                  // click, and focus-within (see `hovered` above) would
-                  // keep the sidebar expanded regardless of `pinned` until
-                  // something else steals focus - same reason toggleCollapsed
-                  // blurs its own trigger.
-                  blurAfterClick(e);
-                }}
-                title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
-                aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
-                aria-pressed={pinned}
-                className="ae-tap-target"
-                style={{
-                  marginLeft: "auto",
-                  flexShrink: 0,
-                  width: 26,
-                  height: 26,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: "50%",
-                  border: "none",
-                  background: pinned ? colors.yellow : "transparent",
-                  color: pinned ? colors.black : colors.cream,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                  transition: "background-color 0.15s ease, color 0.15s ease",
-                }}
-              >
-                <PinIcon filled={pinned} />
-              </button>
-            )}
+
+            {state ===
+              "expanded" &&
+              !isMobile && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    togglePinned();
+                    blurAfterClick(e);
+                  }}
+                  title={
+                    pinned
+                      ? "Unpin sidebar"
+                      : "Pin sidebar open"
+                  }
+                  aria-label={
+                    pinned
+                      ? "Unpin sidebar"
+                      : "Pin sidebar open"
+                  }
+                  aria-pressed={pinned}
+                  className="ae-tap-target"
+                  style={{
+                    marginLeft: "auto",
+                    flexShrink: 0,
+                    width: 26,
+                    height: 26,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent:
+                      "center",
+                    borderRadius:
+                      "50%",
+                    border: "none",
+                    background:
+                      pinned
+                        ? colors.yellow
+                        : "transparent",
+                    color:
+                      pinned
+                        ? colors.black
+                        : colors.cream,
+                    cursor:
+                      "pointer",
+                    fontFamily:
+                      "inherit",
+                    transition:
+                      "background-color 0.15s ease, color 0.15s ease",
+                  }}
+                >
+                  <PinIcon
+                    filled={pinned}
+                  />
+                </button>
+              )}
           </div>
 
           <motion.div
             animate={{
-              opacity: collapsed ? 0 : 1,
-              scale: collapsed ? 0.6 : 1,
-              y: collapsed ? -20 : 0,
+              opacity:
+                collapsed ? 0 : 1,
+              scale:
+                collapsed ? 0.6 : 1,
+              y:
+                collapsed ? -20 : 0,
             }}
             transition={sidebarSpring}
             style={{
-              pointerEvents: collapsed ? "none" : "auto",
+              pointerEvents:
+                collapsed
+                  ? "none"
+                  : "auto",
+
               flex: 1,
               display: "flex",
-              flexDirection: "column",
+              flexDirection:
+                "column",
               overflow: "hidden",
             }}
           >
@@ -585,179 +967,369 @@ export function Sidebar() {
               className="ae-sidebar-nav"
               style={{
                 display: "flex",
-                flexDirection: "column",
+                flexDirection:
+                  "column",
                 gap: 14,
-                overflowY: "auto",
-                overflowX: "hidden",
+                overflowY:
+                  "auto",
+                overflowX:
+                  "hidden",
               }}
             >
-              {sections.map((section) => {
-                const visible = section.links.filter(
-                  (l) => !user || l.roles.includes(user.role),
-                );
-                if (visible.length === 0) return null;
-                return (
-                  <div key={section.heading}>
-                    {state === "expanded" && (
-                      <p
+              {sections.map(
+                (section) => {
+                  const visible =
+                    section.links.filter(
+                      (l) =>
+                        !user ||
+                        l.roles.includes(
+                          user.role,
+                        ),
+                    );
+
+                  if (
+                    visible.length ===
+                    0
+                  ) {
+                    return null;
+                  }
+
+                  return (
+                    <div
+                      key={
+                        section.heading
+                      }
+                    >
+                      {state ===
+                        "expanded" && (
+                        <p
+                          style={{
+                            margin:
+                              "0 0 4px",
+                            padding:
+                              "0 14px",
+                            fontSize:
+                              10.5,
+                            fontWeight:
+                              700,
+                            letterSpacing:
+                              0.6,
+                            textTransform:
+                              "uppercase",
+                            color:
+                              colors.gold,
+                            opacity:
+                              0.8,
+                          }}
+                        >
+                          {
+                            section.heading
+                          }
+                        </p>
+                      )}
+
+                      <div
                         style={{
-                          margin: "0 0 4px",
-                          padding: "0 14px",
-                          fontSize: 10.5,
-                          fontWeight: 700,
-                          letterSpacing: 0.6,
-                          textTransform: "uppercase",
-                          color: colors.gold,
-                          opacity: 0.8,
+                          display:
+                            "flex",
+                          flexDirection:
+                            "column",
                         }}
                       >
-                        {section.heading}
-                      </p>
-                    )}
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {visible.map((l) => (
-                        <NavLink
-                          key={l.to}
-                          to={l.to}
-                          title={l.label}
-                          tabIndex={collapsed ? -1 : undefined}
-                          onClick={(e) => {
-                            blurAfterClick(e);
-                            closeMobileMenu();
-                          }}
-                          onMouseMove={handleTabPointerMove}
-                          onMouseLeave={handleTabPointerLeave}
-                          className="ae-sidebar-tab"
-                          style={({ isActive }): CSSProperties => ({
-                            position: "relative",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent:
-                              state === "expanded" ? "flex-start" : "center",
-                            width: "100%",
-                            boxSizing: "border-box",
-                            margin: 0,
-                            padding:
-                              state === "expanded" ? "10px 14px" : "6px 0",
-                            borderRadius: 0,
-                            textDecoration: "none",
-                            color:
-                              state === "expanded"
-                                ? isActive
-                                  ? colors.black
-                                  : colors.cream
-                                : colors.cream,
-                            background:
-                              state === "expanded"
-                                ? isActive
-                                  ? colors.yellow
-                                  : "transparent"
-                                : "transparent",
-                            fontWeight:
-                              state === "expanded"
-                                ? isActive
-                                  ? 700
-                                  : 500
-                                : 500,
-                            fontSize: 13.5,
-                            fontFamily: "inherit",
-                            whiteSpace: "nowrap",
-                            transition: "background-color 0.15s ease, color 0.15s ease",
-                          })}
-                        >
-                          {({ isActive }: { isActive: boolean }) => (
-                            <>
-                              {/* Interior cursor-follow glow, same trick as
-                                  the toolbar's spotlight (Toolbar.tsx): a
-                                  soft white radial gradient centered on
-                                  `--mx`/`--my`, faded in/out purely via the
-                                  `--spotlight-opacity` custom property set
-                                  in handleTabPointerMove/Leave above - no
-                                  React re-render involved. */}
-                              <div
-                                aria-hidden
-                                className="ae-sidebar-tab-spotlight"
-                                style={{
-                                  position: "absolute",
-                                  inset: 0,
-                                  pointerEvents: "none",
-                                  mixBlendMode: "screen",
-                                  background:
-                                    "radial-gradient(circle 90px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.3), rgba(255,255,255,0.06) 55%, transparent 75%)",
-                                }}
-                              />
-                              {state === "expanded" ? (
+                        {visible.map(
+                          (l) => (
+                            <NavLink
+                              key={
+                                l.to
+                              }
+                              to={
+                                l.to
+                              }
+                              title={
                                 l.label
-                              ) : (
-                                <span
-                                  className="ae-sidebar-tab-badge"
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    width: TAB_BADGE_SIZE,
-                                    height: TAB_BADGE_SIZE,
-                                    borderRadius: "50%",
-                                    background: isActive
+                              }
+                              tabIndex={
+                                collapsed
+                                  ? -1
+                                  : undefined
+                              }
+                              onClick={(
+                                e,
+                              ) => {
+                                blurAfterClick(
+                                  e,
+                                );
+                                closeMobileMenu();
+                              }}
+                              onMouseMove={
+                                handleTabPointerMove
+                              }
+                              onMouseLeave={
+                                handleTabPointerLeave
+                              }
+                              className="ae-sidebar-tab"
+                              style={({
+                                isActive,
+                              }) => ({
+                                position:
+                                  "relative",
+
+                                display:
+                                  "flex",
+
+                                alignItems:
+                                  "center",
+
+                                justifyContent:
+                                  state ===
+                                  "expanded"
+                                    ? "flex-start"
+                                    : "center",
+
+                                width:
+                                  "100%",
+
+                                boxSizing:
+                                  "border-box",
+
+                                margin: 0,
+
+                                padding:
+                                  state ===
+                                  "expanded"
+                                    ? "10px 14px"
+                                    : "6px 0",
+
+                                borderRadius:
+                                  0,
+
+                                textDecoration:
+                                  "none",
+
+                                color:
+                                  state ===
+                                  "expanded"
+                                    ? isActive
+                                      ? colors.black
+                                      : colors.cream
+                                    : colors.cream,
+
+                                background:
+                                  state ===
+                                  "expanded"
+                                    ? isActive
                                       ? colors.yellow
-                                      : "transparent",
-                                    color: isActive ? colors.black : colors.cream,
-                                    fontWeight: isActive ? 700 : 500,
-                                    transition: "background-color 0.15s ease, color 0.15s ease",
-                                  }}
-                                >
-                                  {l.abbr}
-                                </span>
+                                      : "transparent"
+                                    : "transparent",
+
+                                fontWeight:
+                                  state ===
+                                  "expanded"
+                                    ? isActive
+                                      ? 700
+                                      : 500
+                                    : 500,
+
+                                fontSize:
+                                  13.5,
+
+                                fontFamily:
+                                  "inherit",
+
+                                whiteSpace:
+                                  "nowrap",
+
+                                transition:
+                                  "background-color 0.15s ease, color 0.15s ease",
+                              })}
+                            >
+                              {({
+                                isActive,
+                              }: {
+                                isActive: boolean;
+                              }) => (
+                                <>
+                                  <div
+                                    aria-hidden
+                                    className="ae-sidebar-tab-spotlight"
+                                    style={{
+                                      position:
+                                        "absolute",
+                                      inset: 0,
+                                      pointerEvents:
+                                        "none",
+                                      mixBlendMode:
+                                        "screen",
+                                      background:
+                                        "radial-gradient(circle 90px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.3), rgba(255,255,255,0.06) 55%, transparent 75%)",
+                                    }}
+                                  />
+
+                                  {state ===
+                                  "expanded" ? (
+                                    l.label
+                                  ) : (
+                                    <span
+                                      className="ae-sidebar-tab-badge"
+                                      style={{
+                                        display:
+                                          "flex",
+
+                                        alignItems:
+                                          "center",
+
+                                        justifyContent:
+                                          "center",
+
+                                        width:
+                                          TAB_BADGE_SIZE,
+
+                                        height:
+                                          TAB_BADGE_SIZE,
+
+                                        borderRadius:
+                                          "50%",
+
+                                        background:
+                                          isActive
+                                            ? colors.yellow
+                                            : "transparent",
+
+                                        color:
+                                          isActive
+                                            ? colors.black
+                                            : colors.cream,
+
+                                        fontWeight:
+                                          isActive
+                                            ? 700
+                                            : 500,
+
+                                        transition:
+                                          "background-color 0.15s ease, color 0.15s ease",
+                                      }}
+                                    >
+                                      {
+                                        l.abbr
+                                      }
+                                    </span>
+                                  )}
+                                </>
                               )}
-                            </>
-                          )}
-                        </NavLink>
-                      ))}
+                            </NavLink>
+                          ),
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </div>
 
-            <div style={{ flex: 1 }} />
+            <div
+              style={{
+                flex: 1,
+              }}
+            />
 
             {user && (
               <div
                 style={{
                   fontSize: 12,
-                  color: colors.cream,
+                  color:
+                    colors.cream,
                   opacity: 0.85,
+
                   padding:
-                    state === "expanded" ? "12px 14px 4px" : "12px 8px 4px",
-                  borderTop: `1px solid color-mix(in srgb, ${colors.cream} 18%, transparent)`,
+                    state ===
+                    "expanded"
+                      ? "12px 14px 4px"
+                      : "12px 8px 4px",
+
+                  borderTop:
+                    `1px solid color-mix(in srgb, ${colors.cream} 18%, transparent)`,
+
                   flexShrink: 0,
                 }}
               >
-                {state === "expanded" && (
-                  <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
-                    <div style={{ fontWeight: 600 }}>{user.name}</div>
-                    <div style={{ opacity: 0.75, marginBottom: 8 }}>
-                      {user.role.replace(/_/g, " ")}
+                {state ===
+                  "expanded" && (
+                  <div
+                    style={{
+                      overflow:
+                        "hidden",
+                      whiteSpace:
+                        "nowrap",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight:
+                          600,
+                      }}
+                    >
+                      {user.name}
+                    </div>
+
+                    <div
+                      style={{
+                        opacity:
+                          0.75,
+                        marginBottom:
+                          8,
+                      }}
+                    >
+                      {user.role.replace(
+                        /_/g,
+                        " ",
+                      )}
                     </div>
                   </div>
                 )}
+
                 <button
                   onClick={logout}
                   title="Log out"
-                  tabIndex={collapsed ? -1 : undefined}
+                  tabIndex={
+                    collapsed
+                      ? -1
+                      : undefined
+                  }
                   style={{
-                    width: state === "expanded" ? "auto" : "100%",
+                    width:
+                      state ===
+                      "expanded"
+                        ? "auto"
+                        : "100%",
+
                     fontSize: 12,
-                    fontFamily: "inherit",
-                    cursor: "pointer",
-                    background: "transparent",
-                    color: colors.gold,
-                    border: `1px solid color-mix(in srgb, ${colors.gold} 55%, transparent)`,
+                    fontFamily:
+                      "inherit",
+                    cursor:
+                      "pointer",
+
+                    background:
+                      "transparent",
+
+                    color:
+                      colors.gold,
+
+                    border:
+                      `1px solid color-mix(in srgb, ${colors.gold} 55%, transparent)`,
+
                     borderRadius: 0,
-                    padding: state === "expanded" ? "4px 10px" : "4px 0",
+
+                    padding:
+                      state ===
+                      "expanded"
+                        ? "4px 10px"
+                        : "4px 0",
                   }}
                 >
-                  {state === "expanded" ? "Log out" : "⏻"}
+                  {state ===
+                  "expanded"
+                    ? "Log out"
+                    : "⏻"}
                 </button>
               </div>
             )}
@@ -765,37 +1337,59 @@ export function Sidebar() {
         </div>
       </motion.div>
 
-      {/* Glowing "tap for menu" affordance - only when mobile is showing
-          just the bare icon. It disappears the instant the dropdown opens
-          (the open menu is its own, much less ambiguous, affordance). */}
-      {isMobile && state === "collapsed" && (
-        <button
-          type="button"
-          className="no-print ae-sidebar-mobile-arrow"
-          onClick={() => setMobileOpen(true)}
-          title="Open menu"
-          aria-label="Open menu"
-          style={{
-            position: "fixed",
-            top: ICON_INSET + ICON_SIZE + 4,
-            left: ICON_INSET + ICON_SIZE / 2 - 11,
-            zIndex: 50,
-            width: 22,
-            height: 22,
-            padding: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: "50%",
-            border: "none",
-            background: "transparent",
-            color: colors.yellow,
-            cursor: "pointer",
-          }}
-        >
-          <ChevronIcon />
-        </button>
-      )}
+      {isMobile &&
+        state ===
+          "collapsed" && (
+          <button
+            type="button"
+            className="no-print ae-sidebar-mobile-arrow"
+            onClick={() =>
+              setMobileOpen(true)
+            }
+            title="Open menu"
+            aria-label="Open menu"
+            style={{
+              position: "fixed",
+              top:
+                ICON_INSET +
+                ICON_SIZE +
+                4,
+
+              left:
+                ICON_INSET +
+                ICON_SIZE / 2 -
+                11,
+
+              zIndex: 50,
+
+              width: 22,
+              height: 22,
+              padding: 0,
+
+              display: "flex",
+              alignItems:
+                "center",
+              justifyContent:
+                "center",
+
+              borderRadius:
+                "50%",
+
+              border: "none",
+
+              background:
+                "transparent",
+
+              color:
+                colors.yellow,
+
+              cursor:
+                "pointer",
+            }}
+          >
+            <ChevronIcon />
+          </button>
+        )}
     </>
   );
 }

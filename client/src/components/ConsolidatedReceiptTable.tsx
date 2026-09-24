@@ -123,6 +123,7 @@ export function ConsolidatedReceiptTable({
                         }))
                       }
                       aria-expanded={!isCollapsed}
+                      aria-controls={group.rows.map((row) => `ae-receipttable-row-${row.product.id}`).join(" ")}
                       title={
                         isCollapsed
                           ? `Expand ${group.category}`
@@ -134,7 +135,7 @@ export function ConsolidatedReceiptTable({
                         style={{
                           display: "inline-flex",
                           transform: isCollapsed ? "rotate(-90deg)" : "none",
-                          transition: "transform 120ms ease",
+                          transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
                         }}
                       >
                         <ChevronIcon />
@@ -144,10 +145,12 @@ export function ConsolidatedReceiptTable({
                   </td>
                 </tr>
 
-                {group.rows.map((row) => (
+                {group.rows.map((row, i) => (
                   <tr
                     key={row.product.id}
-                    className={isCollapsed ? "ae-row-collapsed" : undefined}
+                    id={`ae-receipttable-row-${row.product.id}`}
+                    className={isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"}
+                    style={{ "--ae-row-i": i } as CSSProperties}
                   >
                     <td style={skuCellStyle}>{row.product.sku ?? "\u2014"}</td>
                     <td style={nameCellStyle}>{row.product.name}</td>

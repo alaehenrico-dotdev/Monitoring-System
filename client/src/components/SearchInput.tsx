@@ -7,10 +7,14 @@ export function SearchInput({
   value,
   onChange,
   placeholder = "Search…",
+  className,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /// Extra class on the <input> itself, e.g. "ae-search-fixed" to pin the
+  /// box to its placeholder width instead of growing to fill the toolbar.
+  className?: string;
 }) {
   return (
     <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
@@ -18,13 +22,13 @@ export function SearchInput({
         <SearchIcon />
       </span>
       <input
-        className="ae-input"
+        className={className ? `ae-input ${className}` : "ae-input"}
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="Search"
-        style={{ paddingLeft: 28, width: 280 }}
+        style={{ paddingLeft: 28 }}
       />
     </div>
   );

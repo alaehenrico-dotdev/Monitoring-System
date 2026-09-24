@@ -49,21 +49,23 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                     type="button"
                     onClick={() => setExpandedOverride((e) => ({ ...e, [category]: isCollapsed }))}
                     aria-expanded={!isCollapsed}
+                    aria-controls={groupRows.map((r) => `ae-totalstocks-row-${r.product.id}`).join(" ")}
                     title={isCollapsed ? `Expand ${category}` : `Collapse ${category}`}
                     style={categoryToggleStyle}
                   >
-                    <span style={{ display: "inline-flex", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 120ms ease" }}>
+                    <span style={{ display: "inline-flex", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
                       <ChevronIcon />
                     </span>
                     {category}
                   </button>
                 </td>
               </tr>
-              {groupRows.map((r) => (
+              {groupRows.map((r, i) => (
                 <tr
                   key={r.product.id}
-                  className={isCollapsed ? "ae-row-collapsed" : undefined}
-                  style={r.totalVariance ? { background: colors.warningBg } : undefined}
+                  id={`ae-totalstocks-row-${r.product.id}`}
+                  className={isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"}
+                  style={{ "--ae-row-i": i, ...(r.totalVariance ? { background: colors.warningBg } : undefined) } as CSSProperties}
                 >
                   <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
                   <td style={nameCellStyle}>{r.product.name}</td>

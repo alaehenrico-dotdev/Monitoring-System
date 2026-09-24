@@ -1,11 +1,11 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useState, type CSSProperties } from "react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
 import { Button, NumberCellInput } from "../components/ui";
 import { Dropdown } from "../components/Dropdown";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
-import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
+import { CsvTools } from "../components/CsvTools";
 import {
   Toolbar,
   ToolbarControls,
@@ -94,10 +94,6 @@ export function ManualCountPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  // So handleSaveAll (below) can tell CsvTools its own last import batch is
-  // no longer just "pending" once a real Save has committed it - see
-  // CsvTools' notifyCommitted doc comment.
-  const csvToolsRef = useRef<CsvToolsHandle>(null);
 
   function load() {
     setRows(null);
@@ -200,30 +196,6 @@ export function ManualCountPage() {
     setSaving(false);
     setShowConfirm(false);
     if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
-    // Whatever CsvTools' own "Undo Import" batch might still reference is no
-    // longer just staged - some or all of it just got committed for real by
-    // this Save (see CsvTools' notifyCommitted doc comment). Safe to call
-    // even when nothing was actually imported - it's a no-op then.
-    csvToolsRef.current?.notifyCommitted();
-  }
-
-  // CSV import (Section 3.1) stages the imported Manual Count exactly like
-  // typing into the cell does (setDrafts) - Save is the same explicit,
-  // reviewable step for an import as it already is for a typed count, and
-  // the existing "Confirm manual counts" modal doubles as its review.
-  async function handleImportRow(productId: number, values: Record<string, number>) {
-    if (!("manualCount" in values)) return;
-    setDrafts((d) => ({ ...d, [productId]: String(values.manualCount) }));
-  }
-
-  // CsvTools' own "Undo Import" needs to know whether a cell it staged has
-  // since been changed by something else (a manual edit, a second import) -
-  // this page only has one importable column, so `key` is always
-  // "manualCount" in practice.
-  function getPendingValue(productId: number, key: string): number | undefined {
-    if (key !== "manualCount") return undefined;
-    const draft = drafts[productId];
-    return draft === undefined || draft === "" ? undefined : Number(draft);
   }
 
   const pendingCount = Object.keys(drafts).length;
@@ -349,12 +321,13 @@ export function ManualCountPage() {
               <CsvTools
                 filenamePrefix={`manual-count-${location.toLowerCase()}-${shift.toLowerCase()}`}
                 date={date}
-                ref={csvToolsRef}
                 rows={csvRows}
                 columns={csvColumns}
-                onImportRow={handleImportRow}
-                getPendingValue={getPendingValue}
-                canImport
+                // Import lives on the Online/Offline Entry pages only - this
+                // page just exports (Excel/PDF), same as Total Stocks.
+                onImportRow={async () => {}}
+                getPendingValue={() => undefined}
+                canImport={false}
                 pdfDisabled={pendingCount > 0}
                 exportFormat="excel"
                 pdf={{
@@ -434,7 +407,7 @@ export function ManualCountPage() {
                                 transform: isCollapsed
                                   ? "rotate(-90deg)"
                                   : "none",
-                                transition: "transform 120ms ease",
+                                transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
                               }}
                             >
                               <ChevronIcon />
@@ -443,17 +416,20 @@ export function ManualCountPage() {
                           </button>
                         </td>
                       </tr>
-                      {groupRows.map((r) => (
+                      {groupRows.map((r, i) => (
                         <tr
                           key={r.product.id}
                           data-row-id={r.product.id}
                           className={
-                            isCollapsed ? "ae-row-collapsed" : undefined
+                            isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"
                           }
                           style={
-                            r.isFlagged
-                              ? { background: colors.warningBg }
-                              : undefined
+                            {
+                              "--ae-row-i": i,
+                              ...(r.isFlagged
+                                ? { background: colors.warningBg }
+                                : {}),
+                            } as CSSProperties
                           }
                         >
                           <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
