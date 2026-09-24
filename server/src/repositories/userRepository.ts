@@ -27,6 +27,13 @@ export const userRepository = {
     return prisma.user.findUnique({ where: { id } });
   },
 
+  /// Lean projection for the per-request revocation check in
+  /// middleware/auth.ts - runs on every cache-miss for an authenticated
+  /// request, so it skips passwordHash and everything else findById pulls.
+  findStatus(id: number) {
+    return prisma.user.findUnique({ where: { id }, select: { isActive: true, role: true } });
+  },
+
   findAllPublic() {
     return prisma.user.findMany({ select: PUBLIC_USER_SELECT, orderBy: { name: "asc" } });
   },
