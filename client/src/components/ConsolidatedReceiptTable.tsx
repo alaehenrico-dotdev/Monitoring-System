@@ -123,7 +123,9 @@ export function ConsolidatedReceiptTable({
                         }))
                       }
                       aria-expanded={!isCollapsed}
-                      aria-controls={group.rows.map((row) => `ae-receipttable-row-${row.product.id}`).join(" ")}
+                      aria-controls={group.rows
+                        .map((row) => `ae-receipttable-row-${row.product.id}`)
+                        .join(" ")}
                       title={
                         isCollapsed
                           ? `Expand ${group.category}`
@@ -135,7 +137,8 @@ export function ConsolidatedReceiptTable({
                         style={{
                           display: "inline-flex",
                           transform: isCollapsed ? "rotate(-90deg)" : "none",
-                          transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                          transition:
+                            "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
                         }}
                       >
                         <ChevronIcon />
@@ -145,21 +148,24 @@ export function ConsolidatedReceiptTable({
                   </td>
                 </tr>
 
-                {group.rows.map((row, i) => (
+                {group.rows.map((row) => (
                   <tr
                     key={row.product.id}
                     id={`ae-receipttable-row-${row.product.id}`}
-                    className={isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"}
-                    style={{ "--ae-row-i": i } as CSSProperties}
+                    className={
+                      isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"
+                    }
                   >
                     <td style={skuCellStyle}>{row.product.sku ?? "\u2014"}</td>
-                    <td style={nameCellStyle}>{row.product.name}</td>
+                    <td style={nameCellStyle} title={row.product.name}>{row.product.name}</td>
                     {data.columns.map((c) => (
                       <td key={c.receiptId} style={numCellStyle}>
                         {formatQty(row.valuesByReceiptId[c.receiptId])}
                       </td>
                     ))}
-                    <td style={{ ...numCellStyle, fontWeight: 600 }}>{formatQty(row.total)}</td>
+                    <td style={{ ...numCellStyle, fontWeight: 600 }}>
+                      {formatQty(row.total)}
+                    </td>
                   </tr>
                 ))}
 
@@ -198,6 +204,8 @@ export function ConsolidatedReceiptTable({
 const nameCellStyle: CSSProperties = {
   textAlign: "left",
   whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
   color: colors.ink,
 };
 const skuCellStyle: CSSProperties = {

@@ -107,7 +107,7 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--ae-text);
   background: var(--ae-bg);
 }
@@ -1023,10 +1023,10 @@ table input[type="number"] {
      top/bottom edge, and overflow-hidden clipped the sliver off - a small
      crescent "bite" out of the button right where it met the toolbar's
      rounded end. 10px keeps every tier's flush end control inside the cap. */
-  padding: 6px 6px;
+  padding: 4px 4px;
   /* Pulls the strip 8px past the page padding on each side at every screen
      size (the small-screen rules below used to widen this to -12/-16px). */
-  margin: 0 -8px 10px;
+  margin: 0 -8px 6px;
   background: var(--ae-surface);
   border: 1px solid var(--ae-toolbar-border);
   border-radius: 9999px;
@@ -1423,6 +1423,19 @@ table input[type="number"] {
 .ae-sidebar-nav::-webkit-scrollbar {
   display: none;
 }
+/* Nav drawer link hover + the cursor-follow spotlight inside each one -
+   moved here from Sidebar.tsx's own runtime-injected <style> tag (gone
+   now that the drawer is a single, static-width overlay - no more
+   per-tier/hover-state styling that needed recomputing against live
+   `colors.*` values). */
+.ae-sidebar-tab:hover:not([aria-current="page"]) {
+  background: color-mix(in srgb, #ffd400 16%, transparent) !important;
+  color: #ffd400 !important;
+}
+.ae-sidebar-tab-spotlight {
+  opacity: var(--spotlight-opacity, 0);
+  transition: opacity 220ms ease;
+}
 
 .ae-segment-group {
   display: flex;
@@ -1481,14 +1494,6 @@ table input[type="number"] {
 .ae-main p {
   margin: 0 0 8px;
 }
-.ae-main > div > h2:first-child,
-.ae-main > div > h2:first-child + p {
-  position: relative;
-  left: -12px;
-}
-.ae-main > div > h2:first-child {
-  margin-top: -16px !important;
-}
 .ae-main > div {
   display: flex;
   flex-direction: column;
@@ -1502,21 +1507,188 @@ table input[type="number"] {
   min-height: 0;
 }
 
-body.ae-sidebar-collapsed-icon .ae-main {
-  padding-top: 16px;
-}
-body.ae-sidebar-collapsed-icon .ae-main h2:first-child,
-body.ae-sidebar-collapsed-icon .ae-main h2:first-child + p {
-  left: 0;
-  padding-left: 48px;
-}
-body.ae-sidebar-collapsed-icon .ae-main h2:first-child {
-  margin-top: -8px !important;
-}
-body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
-  margin-top: 20px;
-}
+/* ------------------------------------------------------------------------
+   Page header card - bundles the h2/p intro and the Toolbar into one
+   fixed-black, gold-bordered card, matching the design mockup, instead of
+   plain page-background text sitting above a separately-bordered toolbar
+   strip. Fixed black rather than theme-following, same as the nav drawer -
+   see theme.ts's note on brand surfaces staying constant across the
+   light/dark toggle. Now also the app's main container for controls and
+   navigation - the sidebar itself is just this card's floating nav drawer
+   (Sidebar.tsx), opened via the logo button below.
 
+   Pulled close against .ae-main's own 24px padding (negative margin eating
+   most of it) on the top/left/right, down to a narrow 6px gap - just
+   enough that the border/rounded corners still read as a card instead of
+   sitting flush against the viewport edges. `position: relative` anchors
+   HeaderExtras (the clock/theme toggle), which every page now renders as
+   this card's own top-right corner ornament instead of a toolbar control.
+   ------------------------------------------------------------------------ */
+.ae-page-header {
+  position: relative;
+  background: #14110d;
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 8px;
+  padding: 12px 14px 10px;
+  margin: -18px -18px 8px;
+  /* Same all-around gold glow as the sidebar's own collapsed-icon state
+     (Sidebar.tsx's boxShadow) - a soft drop shadow plus two rings of the
+     brand yellow bleeding outward, so the card reads as the same kind of
+     glowing chrome instead of a flat bordered box. */
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.55),
+    0 0 14px rgba(255, 212, 0, 0.28),
+    0 0 28px rgba(255, 212, 0, 0.12);
+}
+/* Nothing sits below the title once collapsed - drop its own bottom
+   margin, since the toolbar row (still present for the collapse button
+   alone) already carries its own top spacing. */
+.ae-page-header--collapsed h2 {
+  margin-bottom: 0;
+}
+/* Simple grid-rows trick for animating to/from an unknown content height:
+   the wrapper's single track eases between 1fr (natural height) and 0fr,
+   and the inner element clips to whatever that track resolves to each
+   frame. Opacity fades alongside so the subtitle/toolbar don't just get
+   sheared off mid-collapse. */
+.ae-page-header-collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 220ms ease;
+}
+.ae-page-header--collapsed .ae-page-header-collapsible {
+  grid-template-rows: 0fr;
+}
+.ae-page-header-collapsible-inner {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 1;
+  transition: opacity 160ms ease;
+}
+.ae-page-header--collapsed .ae-page-header-collapsible-inner {
+  opacity: 0;
+}
+.ae-page-header-toolbar-slot {
+  min-width: 0;
+}
+/* Bottom-center collapse tab - a small nub straddling the card's own
+   bottom border (half in, half out, via the negative bottom offset) so it
+   reads as an edge affordance rather than a toolbar button. Hidden until
+   the header itself is hovered/focused-within, then fades and nudges
+   into view; stays reachable by keyboard (focus-within) even without a
+   pointer. Rendered as a direct child of .ae-page-header (not the toolbar
+   row) so it always has a fixed spot regardless of collapsed state - the
+   collapsed header (title row alone) can still be hovered to bring it
+   back, since there'd otherwise be no way to expand again. */
+.ae-page-header-collapse-btn {
+  position: absolute;
+  left: 50%;
+  bottom: -11px;
+  transform: translate(-50%, -4px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 50%;
+  background: #14110d;
+  color: #c99a2e;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 140ms ease, background-color 120ms ease,
+    box-shadow 120ms ease, color 120ms ease;
+}
+.ae-page-header:hover .ae-page-header-collapse-btn,
+.ae-page-header:focus-within .ae-page-header-collapse-btn,
+.ae-page-header-collapse-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+  z-index: 2;
+}
+/* Glowing yellow fill, arrow flips to black - same brand yellow as the
+   toolbar's own buttons. */
+.ae-page-header-collapse-btn:hover {
+  background: #ffd400;
+  color: #14110d;
+  box-shadow:
+    0 0 8px 2px rgba(255, 212, 0, 0.55),
+    0 0 18px 4px rgba(255, 212, 0, 0.25);
+}
+.ae-page-header-collapse-btn svg {
+  width: 9px;
+  height: 9px;
+  transform: rotate(180deg);
+  transition: transform 160ms ease;
+}
+.ae-page-header--collapsed .ae-page-header-collapse-btn svg {
+  transform: rotate(0deg);
+}
+/* Top row: the clickable brand logo (opens the floating nav drawer - see
+   PageHeader.tsx/NavDrawerContext) beside the title/subtitle column,
+   instead of the logo living in the sidebar itself - the header is the
+   main container for controls/navigation now, the sidebar is purely the
+   drawer's own content. `align-items: flex-start` keeps the logo pinned
+   to the title line rather than centered against the whole column when a
+   Toolbar underneath makes it tall. */
+.ae-page-header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ae-page-header-titles {
+  min-width: 0;
+  flex: 1;
+}
+.ae-page-header-logo {
+  flex-shrink: 0;
+  display: flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+/* Same hover scale + glow the logo had inside the sidebar itself. */
+.ae-page-header-logo .ae-logo-mark {
+  display: block;
+  overflow: visible;
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.25s ease;
+}
+.ae-page-header-logo:hover .ae-logo-mark,
+.ae-page-header-logo:focus-visible .ae-logo-mark {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 6px rgba(201, 154, 46, 0.6));
+}
+.ae-page-header-logo:active .ae-logo-mark {
+  transform: scale(0.93);
+}
+.ae-page-header h2 {
+  margin: 0 0 3px;
+  color: #f1e9d0;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.ae-page-header p {
+  margin: 0 0 8px;
+  color: #a89a7d;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+/* The toolbar's own pill background/border/shadow would double up on the
+   card's - strip them so its controls sit directly on the card instead.
+   Padding/gap trimmed further than the pill's own default so the row
+   reads as fitted to the card rather than floating with its usual
+   free-standing breathing room. */
+.ae-page-header .ae-toolbar {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  margin: 0;
+  padding: 2px 0;
+  --ae-toolbar-gap: 6px;
+}
 /* Small screens only adjust page padding / edge-to-edge margins. Toolbar
    gap, padding and control sizes are owned by the tier classes above - the
    old per-breakpoint overrides here (a fixed 72px search box, a 10px gap)
@@ -1525,12 +1697,15 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   .ae-main {
     padding: 16px;
   }
-  .ae-main > div > h2:first-child,
-  .ae-main > div > h2:first-child + p {
-    left: -8px;
-  }
   .ae-table-scroll {
     margin: 0 -16px -16px;
+  }
+  /* .ae-page-header's own -18px margin assumes .ae-main's default 24px
+     padding (see its own comment) - rescale to this breakpoint's 16px so
+     the card keeps the same narrow 6px gap instead of overshooting past
+     the viewport edge. */
+  .ae-page-header {
+    margin: -10px -10px 8px;
   }
 }
 
@@ -1538,20 +1713,17 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   .ae-main {
     padding: 12px;
   }
-  .ae-main > div > h2:first-child,
-  .ae-main > div > h2:first-child + p {
-    left: -12px;
-  }
   .ae-table-scroll {
     margin: 0 -12px -12px;
+  }
+  .ae-page-header {
+    margin: -6px -6px 8px;
   }
 }
 
 /* ------------------------------------------------------------------------
-   Mobile tier (matches the Sidebar's own MOBILE_BREAKPOINT in Sidebar.tsx -
-   below this width the sidebar is JS-driven into an icon-only button with
-   a tap-to-open dropdown instead of the desktop hover rail; everything
-   below is the layout-only half of that same "mobile" treatment).
+   Mobile tier - phone-width layout/sizing tweaks (the nav drawer itself
+   already behaves identically at every width, see Sidebar.tsx).
    ------------------------------------------------------------------------ */
 @media (max-width: 768px) {
   /* The live clock is a nice-to-have on a desk monitor, not on a phone
@@ -1573,10 +1745,10 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
     line-height: 1.4;
   }
 
-  /* Dashboard stat tiles: the desktop auto-fit grid still happily fits 2
-     narrow tiles per row down to ~420px, which on a phone reads as cramped
-     half-width cards with truncated labels - one full-width column reads
-     far better at this size. */
+  /* Dashboard stat tiles: the 2x2 grid still happily fits 2 narrow tiles
+     per row down to ~420px, which on a phone reads as cramped half-width
+     cards with truncated labels - one full-width column reads far better
+     at this size. */
   .ae-dash-stats {
     grid-template-columns: 1fr;
   }
@@ -1619,122 +1791,34 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   }
 }
 
-/* A collapsed category (StockGrid, TotalStocksTable) hides its product rows
-   on screen but should still print/PDF in full - a printed grid missing
+/* A collapsed category (StockGrid, TotalStocksTable, ConsolidatedReceiptTable,
+   ConsolidatedReceiptEntryGrid, ManualCountPage) hides its product rows on
+   screen but should still print/PDF in full - a printed grid missing
    whatever happened to be collapsed at the time would be a silent data gap,
    not just a display convenience. See the print override below.
 
-   Rows stay `display: table-row` at all times (screen and print alike) -
-   only `visibility` changes. `visibility: collapse` is the table-row-
-   specific value for this: a collapsed row renders nothing and takes up no
-   space, same end result as `display: none`, but - unlike `display` - it's
-   a property transitions can be delayed on, which is what lets the shrink
-   below finish before the row actually disappears, instead of the row's
-   cells snapping to zero size and vanishing in the same instant. */
-@media screen {
-  /*
-   * Category rows use real <tr>/<td> elements, so animating `display` or
-   * `visibility: collapse` makes the browser remove the row from the table
-   * layout immediately. That causes the old "snap shut" effect.
-   *
-   * Instead, keep the row in the table and animate the things that determine
-   * its intrinsic height: cell padding, line-height, font-size and the height
-   * of interactive children. This lets the table close continuously while
-   * keeping the layout stable and reversible if the user clicks again.
-   */
-  .ae-cat-row {
-    visibility: visible;
-  }
+   `visibility: collapse`, not `display: none` - both remove the row from
+   view and from the tab order, but `display: none` also removes it from
+   the table's own column-width calculation, so collapsing a category could
+   change which cell is now the widest in a column and visibly shift every
+   header (and every other column's numbers) sideways. `visibility: collapse`
+   still counts a hidden row's content toward that calculation, so column
+   widths always match how the table looks fully expanded, collapsed or not.
 
-  /*
-   * Product rows should feel like they are being revealed from directly
-   * underneath the category header.  The table row itself still participates
-   * in layout, but its cells/content slide upward into the category row while
-   * opening and reverse that motion while closing.
-   */
-  .ae-cat-row > td {
-    padding-top: 4px;
-    padding-bottom: 4px;
-    line-height: 1.35;
-    border-top-width: 1px;
-    border-bottom-width: 1px;
-    transform-origin: top center;
-    clip-path: inset(0 0 0 0);
-    transition:
-      padding 360ms cubic-bezier(0.22, 1, 0.36, 1),
-      line-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
-      font-size 260ms ease,
-      border-color 260ms ease,
-      background-color 180ms ease,
-      transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
-      clip-path 360ms cubic-bezier(0.22, 1, 0.36, 1);
-    transition-delay: calc(var(--ae-row-i, 0) * 18ms);
-  }
-
-  .ae-cat-row > td > * {
-    max-height: 100px;
-    opacity: 1;
-    transform: translateY(0);
-    transform-origin: top center;
-    overflow: hidden;
-    transition:
-      max-height 360ms cubic-bezier(0.22, 1, 0.36, 1),
-      opacity 220ms ease,
-      transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
-    transition-delay: calc(var(--ae-row-i, 0) * 18ms);
-  }
-
-  /* Closed: contents tuck upward into the category row rather than simply
-     disappearing. */
-  .ae-cat-row.ae-row-collapsed > td {
-    padding-top: 0;
-    padding-bottom: 0;
-    line-height: 0;
-    font-size: 0;
-    border-top-color: transparent;
-    border-bottom-color: transparent;
-    transform: translateY(-7px);
-    clip-path: inset(0 0 100% 0);
-  }
-
-  .ae-cat-row.ae-row-collapsed > td > * {
-    max-height: 0;
-    min-height: 0 !important;
-    height: 0 !important;
-    opacity: 0;
-    transform: translateY(-14px);
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-  }
-
-  /* Inputs/buttons can otherwise impose their own minimum height while the
-     row is sliding closed. */
-  .ae-cat-row.ae-row-collapsed input,
-  .ae-cat-row.ae-row-collapsed button,
-  .ae-cat-row.ae-row-collapsed select,
-  .ae-cat-row.ae-row-collapsed textarea {
-    min-height: 0 !important;
-    height: 0 !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
-    border-width: 0 !important;
-  }
-
-
-@media (prefers-reduced-motion: reduce) {
-  .ae-cat-row > td,
-  .ae-cat-row > td > *,
-  .ae-cat-row.ae-row-collapsed {
-    transition: none !important;
-    transform: none !important;
-  }
+   Collapsing a category just removes its rows from the table layout - no
+   transition, no per-row animation delay. */
+.ae-cat-row.ae-row-collapsed {
+  visibility: collapse;
 }
 
 @media print {
   .no-print {
     display: none !important;
   }
-  .ae-row-collapsed {
+  /* A collapsed category should still print/PDF in full - a printed grid
+     missing whatever happened to be collapsed on screen at the time would be
+     a silent data gap, not just a display convenience. */
+  .ae-cat-row.ae-row-collapsed {
     visibility: visible !important;
   }
 
@@ -1828,24 +1912,96 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
 :root[data-theme="dark"] .ae-dash-subtitle {
   color: #ffffff;
 }
+/* Hero row: Monthly Monitoring on the left taking whatever width is left
+   over, the stat 2x2 grid and Recent Activity on the right each claiming a
+   fixed-ish width (in that order, "aligned with the 4 cards" instead of
+   the old separate "Today" section below) - all three stretched to match
+   height. The chart's own column is `1fr`, not a content-based/capped
+   width, specifically so it fills that leftover space rather than leaving
+   blank room off to one side. */
+.ae-dash-hero-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 480px) minmax(260px, 420px);
+  gap: 14px;
+  margin: 12px 0 24px;
+  align-items: stretch;
+}
+@media (max-width: 900px) {
+  .ae-dash-hero-row {
+    grid-template-columns: 1fr;
+  }
+  .ae-dash-hero-chart {
+    width: 100%;
+  }
+}
 .ae-dash-stats {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
-  margin: 12px 0 24px;
-  flex-shrink: 0;
+}
+/* Without this, a 1fr grid item defaults to min-width: auto (its content's
+   natural width), which would let the chart's own 12-month row force this
+   whole column wider than its 1fr share instead of scrolling inside it. */
+.ae-dash-hero-chart {
+  min-width: 0;
+}
+.ae-dash-hero-chart .ae-dash-section,
+.ae-dash-hero-activity {
+  height: 100%;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ae-dash-hero-chart .ae-dash-card,
+.ae-dash-hero-activity .ae-dash-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ae-dash-hero-activity .ae-dash-table-scroll {
+  flex: 1;
+  overflow-y: auto;
 }
 .ae-dash-stat {
   position: relative;
   overflow: hidden;
-  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 22px;
   background: var(--ae-surface);
   border: 1px solid var(--ae-toolbar-border);
-  border-radius: 0;
-  box-shadow: 0 1px 3px rgba(20, 17, 13, 0.06);
+  /* Same 8px radius as .ae-page-header - every card on this page reads as
+     the same family of "rounded brand chrome" instead of the old sharp-
+     cornered boxes. */
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 4px 10px rgba(20, 17, 13, 0.06);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.ae-dash-stat:hover {
+  box-shadow: 0 2px 4px rgba(20, 17, 13, 0.06), 0 8px 20px rgba(20, 17, 13, 0.1);
+  transform: translateY(-1px);
 }
 .ae-dash-stat--alert {
   border-color: #c1272d;
+}
+/* Icon badge - the small rounded chip each stat card leads with, CRM-tile
+   style, tinted brand gold (or danger red for the alert variant). */
+.ae-dash-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #c99a2e 14%, transparent);
+  color: #c99a2e;
+}
+.ae-dash-stat--alert .ae-dash-stat-icon {
+  background: color-mix(in srgb, #c1272d 14%, transparent);
+  color: #c1272d;
 }
 /* Cursor-follow glow - same idea as the toolbar's, tinted brand gold. */
 .ae-dash-stat-spotlight {
@@ -1858,8 +2014,7 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
 }
 .ae-dash-stat-value {
   position: relative;
-  margin-bottom: 8px;
-  font-size: clamp(22px, 5vw, 30px);
+  font-size: clamp(26px, 5vw, 36px);
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -1879,6 +2034,78 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
 :root[data-theme="dark"] .ae-dash-stat--alert .ae-dash-stat-value,
 :root[data-theme="dark"] .ae-dash-stat--alert .ae-dash-stat-label {
   color: #ef5a5f;
+}
+/* Dot pager under RotatingStockCard's crossfading value/label - which of
+   the two channels (Online/Offline) is currently on screen. */
+.ae-dash-stat-dots {
+  display: flex;
+  gap: 5px;
+}
+.ae-dash-stat-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ae-border);
+  transition: background-color 0.25s ease, transform 0.25s ease;
+}
+.ae-dash-stat-dot--active {
+  background: #c99a2e;
+  transform: scale(1.3);
+}
+
+/* Dashboard "Quick Access" - one-click shortcuts to the app's major
+   Data Entry pages, so a supervisor lands here and can jump straight to
+   the page they actually need instead of opening the nav drawer first. */
+.ae-dash-quicklinks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin: 12px 0 24px;
+  flex-shrink: 0;
+}
+.ae-dash-quicklink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 8px;
+  color: var(--ae-text);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 4px 10px rgba(20, 17, 13, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.ae-dash-quicklink-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, #c99a2e 14%, transparent);
+  color: #c99a2e;
+}
+.ae-dash-quicklink-label {
+  flex: 1;
+  min-width: 0;
+}
+.ae-dash-quicklink:hover {
+  border-color: #ffd400;
+  box-shadow: 0 4px 14px rgba(201, 154, 46, 0.22);
+  transform: translateY(-1px);
+}
+.ae-dash-quicklink-arrow {
+  flex-shrink: 0;
+  color: var(--ae-text-muted);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.ae-dash-quicklink:hover .ae-dash-quicklink-arrow {
+  color: #c99a2e;
+  transform: translateX(2px);
 }
 
 .ae-dash-section {
@@ -1908,52 +2135,8 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   overflow: hidden;
   background: var(--ae-surface);
   border: 1px solid var(--ae-border);
-  border-radius: 0;
-}
-
-.ae-dash-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 24px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--ae-border-soft);
-  border-left: 3px solid transparent;
-  color: var(--ae-text);
-  text-decoration: none;
-  transition: background-color 120ms ease;
-}
-.ae-dash-row:last-child {
-  border-bottom: none;
-}
-.ae-dash-row:hover {
-  background: var(--ae-row-hover);
-}
-.ae-dash-row:focus-visible {
-  outline: 2px solid #c99a2e;
-  outline-offset: -2px;
-}
-.ae-dash-row-headline {
-  font-size: 14px;
-  font-weight: 500;
-}
-.ae-dash-row-action {
-  flex-shrink: 0;
-  font-size: 12.5px;
-  color: var(--ae-text-muted);
-}
-.ae-dash-row--muted .ae-dash-row-headline {
-  color: var(--ae-text-muted);
-}
-/* Needs-attention row: the same flagged-row tint the stock grids use. */
-.ae-dash-row--alert,
-.ae-dash-row--alert:hover {
-  background: var(--ae-warning-bg);
-  border-left-color: #c1272d;
-}
-.ae-dash-row--alert .ae-dash-row-headline {
-  font-weight: 700;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 4px 10px rgba(20, 17, 13, 0.06);
 }
 
 .ae-dash-table-scroll {
@@ -2086,4 +2269,4 @@ body.ae-sidebar-collapsed-icon .ae-main > div > h2:first-child + .ae-toolbar {
   .ae-top-progress-bar {
     transition: none !important;
   }
-}}
+}

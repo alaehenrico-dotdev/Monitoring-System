@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { DatabaseBackupPage } from "./DatabaseBackupPage";
 import { DataResetPage } from "./DataResetPage";
+import { PageHeader } from "../components/PageHeader";
 import { colors } from "../theme";
 
 type Tab = "backup" | "reset";
@@ -20,10 +21,10 @@ export function SettingsPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Settings</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 20px", maxWidth: 760 }}>
-        System-level tools for administrators - back up the database or wipe it for a fresh start.
-      </p>
+      <PageHeader
+        title="Settings"
+        subtitle="System-level tools for administrators - back up the database or wipe it for a fresh start."
+      />
 
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${colors.border}`, marginBottom: 24 }}>
         {TABS.map((t) => {

@@ -8,6 +8,7 @@ import {
 import type { DeliveryDestination } from "../types";
 import { Button, Field, TextInput } from "../components/ui";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PageHeader } from "../components/PageHeader";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
@@ -85,12 +86,10 @@ export function DeliveryDestinationsAdminPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Delivery Destinations</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Manage the delivery routes/destinations that make up Offline's Delivery (Out) breakdown (e.g. Western, Cavite). Each
-        active destination gets its own column on the Offline Entry grid, summing into Delivery (Out) automatically.
-        Deactivated destinations stay listed here (dimmed) so they can be reactivated.
-      </p>
+      <PageHeader
+        title="Delivery Destinations"
+        subtitle="Manage the delivery routes/destinations that make up Offline's Delivery (Out) breakdown (e.g. Western, Cavite). Each active destination gets its own column on the Offline Entry grid, summing into Delivery (Out) automatically. Deactivated destinations stay listed here (dimmed) so they can be reactivated."
+      />
 
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 20 }}>
         <Field label="Destination name">

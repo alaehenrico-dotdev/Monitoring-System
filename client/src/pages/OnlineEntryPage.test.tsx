@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { TopProgressProvider } from "../hooks/useTopProgress";
+import { ThemeProvider } from "../context/ThemeContext";
+import { NavDrawerProvider } from "../context/NavDrawerContext";
 
 // jsdom has no ResizeObserver - Toolbar and RowGlowScroll (used by StockGrid)
 // both use one purely for layout measurement, which is meaningless in a
@@ -45,9 +47,13 @@ const gridRow = { product, entry: onlineEntry, isSaved: true };
 
 function renderPage() {
   return render(
-    <TopProgressProvider>
-      <OnlineEntryPage />
-    </TopProgressProvider>,
+    <ThemeProvider>
+      <NavDrawerProvider>
+        <TopProgressProvider>
+          <OnlineEntryPage />
+        </TopProgressProvider>
+      </NavDrawerProvider>
+    </ThemeProvider>,
   );
 }
 

@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/http";
 import { LogoMark } from "../components/LogoMark";
+import { TopBar } from "../components/TopBar";
 import { Button, Field, TextInput } from "../components/ui";
 import { colors, fonts } from "../theme";
 
@@ -31,20 +32,25 @@ export function LoginPage() {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "100vh",
-        padding: "24px 16px",
-        boxSizing: "border-box",
-        fontFamily: fonts.body,
-        background: colors.black,
-        backgroundImage: `radial-gradient(circle at 50% -10%, ${colors.blackSoft}, ${colors.black} 70%)`,
-      }}
-    >
+    <>
+      {/* Login has no page toolbar of its own to carry the clock/toggle
+          (see HeaderExtras, used everywhere past this screen), so it keeps
+          the old fixed top-right chrome. */}
+      <TopBar />
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          padding: "24px 16px",
+          boxSizing: "border-box",
+          fontFamily: fonts.body,
+          background: colors.black,
+          backgroundImage: `radial-gradient(circle at 50% -10%, ${colors.blackSoft}, ${colors.black} 70%)`,
+        }}
+      >
       <LogoMark size={104} />
       <h1 style={{ fontFamily: fonts.wordmark, fontSize: 26, fontWeight: 800, color: colors.yellow, margin: "12px 0 2px" }}>Ala Eh!</h1>
       <p style={{ fontSize: 12.5, color: colors.cream, opacity: 0.8, margin: "0 0 24px", letterSpacing: 0.4 }}>
@@ -84,6 +90,7 @@ export function LoginPage() {
           {submitting ? "Signing in…" : "Sign in"}
         </Button>
       </form>
-    </div>
+      </div>
+    </>
   );
 }

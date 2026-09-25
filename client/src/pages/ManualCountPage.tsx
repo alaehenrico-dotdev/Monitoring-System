@@ -11,6 +11,7 @@ import {
   ToolbarControls,
   ToolbarDivider,
 } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { ShiftFilter } from "../components/ShiftFilter";
@@ -33,7 +34,12 @@ const csvColumns = [
   // The real monthly report (Section 8.1) headers this column "MANUAL
   // COUNTING", not "Manual Count" - a genuine wording difference (not just
   // case/punctuation), same reasoning as stockColumns.ts's other aliases.
-  { key: "manualCount", label: "Manual Count", editable: true, aliases: ["Manual Counting"] },
+  {
+    key: "manualCount",
+    label: "Manual Count",
+    editable: true,
+    aliases: ["Manual Counting"],
+  },
   // Also system-computed (calculateVariance, server-side) - a file's own
   // "VARIANCE" column is never imported, so it can't disagree with what the
   // server derives from System Remaining - Manual Count.
@@ -248,13 +254,15 @@ export function ManualCountPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>
-        Manual Counting &amp; Variance - {formatDateDisplay(date)} -{" "}
-        {SHIFT_SHORT_LABELS[shift]} Shift
-      </h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Review and correct manual counts for the selected date.
-      </p>
+      <PageHeader
+        title={
+          <>
+            Manual Counting &amp; Variance - {formatDateDisplay(date)} -{" "}
+            {SHIFT_SHORT_LABELS[shift]} Shift
+          </>
+        }
+        subtitle="Review and correct manual counts for the selected date."
+      >
       <Toolbar className="no-print">
         <div
           style={{
@@ -265,7 +273,12 @@ export function ManualCountPage() {
             minWidth: 0,
           }}
         >
-          <DatePicker aria-label="Date" value={date} onChange={setDate} todayValue={getCurrentShiftAndDate().date} />
+          <DatePicker
+            aria-label="Date"
+            value={date}
+            onChange={setDate}
+            todayValue={getCurrentShiftAndDate().date}
+          />
           <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
           <Dropdown
             aria-label="Location"
@@ -342,10 +355,17 @@ export function ManualCountPage() {
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
       </Toolbar>
+      </PageHeader>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
         <TableSkeleton
-          headers={["SKU", "Product", "System Remaining", "Manual Count", "Variance"]}
+          headers={[
+            "SKU",
+            "Product",
+            "System Remaining",
+            "Manual Count",
+            "Variance",
+          ]}
           minWidth={640}
           label="Loading manual counts…"
         />
@@ -358,7 +378,10 @@ export function ManualCountPage() {
           <RowGlowScroll
             focusStorageKey={`ala-eh-focus:manual-count:${date}:${shift}:${location}`}
           >
-            <table className="ae-table ae-table--center-head" style={{ minWidth: 640 }}>
+            <table
+              className="ae-table ae-table--center-head"
+              style={{ minWidth: 640 }}
+            >
               <thead>
                 <tr>
                   {[
@@ -407,7 +430,8 @@ export function ManualCountPage() {
                                 transform: isCollapsed
                                   ? "rotate(-90deg)"
                                   : "none",
-                                transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                                transition:
+                                  "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
                               }}
                             >
                               <ChevronIcon />
@@ -416,20 +440,19 @@ export function ManualCountPage() {
                           </button>
                         </td>
                       </tr>
-                      {groupRows.map((r, i) => (
+                      {groupRows.map((r) => (
                         <tr
                           key={r.product.id}
                           data-row-id={r.product.id}
                           className={
-                            isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"
+                            isCollapsed
+                              ? "ae-cat-row ae-row-collapsed"
+                              : "ae-cat-row"
                           }
                           style={
-                            {
-                              "--ae-row-i": i,
-                              ...(r.isFlagged
-                                ? { background: colors.warningBg }
-                                : {}),
-                            } as CSSProperties
+                            r.isFlagged
+                              ? { background: colors.warningBg }
+                              : undefined
                           }
                         >
                           <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>

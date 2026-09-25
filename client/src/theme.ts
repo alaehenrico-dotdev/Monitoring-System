@@ -39,7 +39,11 @@ export const colors = {
 
 export const fonts = {
   wordmark: "'Baloo 2', system-ui, sans-serif",
-  body: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+  // Inter - the clean, small-size-legible grotesque most CRM/SaaS dashboards
+  // (Linear, Notion, GitHub, HubSpot's own UI, etc.) build their UI text on,
+  // instead of whatever sans the OS happens to ship. Falls back to the old
+  // system stack if the Google Fonts request is ever blocked.
+  body: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
 } as const;
 
 /**

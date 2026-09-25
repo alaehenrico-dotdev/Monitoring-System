@@ -6,6 +6,7 @@ import { DatePicker } from "../components/DatePicker";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { onlineStockColumns, buildOfflineStockColumns } from "../config/stockColumns";
 import { listDeliveryDestinations } from "../api/deliveryDestinations";
@@ -219,39 +220,40 @@ export function DailyReportPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Daily Report - {formatDateDisplay(date)}</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Generate a printable snapshot of a given date's Online, Offline, and Total stock.
-      </p>
-      <Toolbar className="no-print">
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-          <DatePicker aria-label="Date" value={date} onChange={setDate} />
-          <Dropdown
-            aria-label="Report section"
-            value={reportSection}
-            onChange={(v) => setReportSection(v as ReportSection)}
-            title="Which section to view/export"
-            options={(Object.keys(SECTION_LABELS) as ReportSection[]).map((s) => ({ value: s, label: SECTION_LABELS[s] }))}
-          />
-          {report && <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />}
-          <Button onClick={load}>Generate</Button>
-        </div>
-        <ToolbarControls>
-          {report && (
-            <>
-              <Button variant="secondary" onClick={handleExport} title={reportSection === "all" ? "Export all sections as one Excel file" : `Export just the ${SECTION_LABELS[reportSection]} as an Excel file`}>
-                Export Excel
-              </Button>
-              <Button variant="secondary" onClick={handlePdf} title="Download as PDF">
-                <PrinterIcon /> PDF
-              </Button>
-            </>
-          )}
-          <Link to="/daily-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
-            Daily History
-          </Link>
-        </ToolbarControls>
-      </Toolbar>
+      <PageHeader
+        title={`Daily Report - ${formatDateDisplay(date)}`}
+        subtitle="Generate a printable snapshot of a given date's Online, Offline, and Total stock."
+      >
+        <Toolbar className="no-print">
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
+            <DatePicker aria-label="Date" value={date} onChange={setDate} />
+            <Dropdown
+              aria-label="Report section"
+              value={reportSection}
+              onChange={(v) => setReportSection(v as ReportSection)}
+              title="Which section to view/export"
+              options={(Object.keys(SECTION_LABELS) as ReportSection[]).map((s) => ({ value: s, label: SECTION_LABELS[s] }))}
+            />
+            {report && <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />}
+            <Button onClick={load}>Generate</Button>
+          </div>
+          <ToolbarControls>
+            {report && (
+              <>
+                <Button variant="secondary" onClick={handleExport} title={reportSection === "all" ? "Export all sections as one Excel file" : `Export just the ${SECTION_LABELS[reportSection]} as an Excel file`}>
+                  Export Excel
+                </Button>
+                <Button variant="secondary" onClick={handlePdf} title="Download as PDF">
+                  <PrinterIcon /> PDF
+                </Button>
+              </>
+            )}
+            <Link to="/daily-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
+              Daily History
+            </Link>
+          </ToolbarControls>
+        </Toolbar>
+      </PageHeader>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 

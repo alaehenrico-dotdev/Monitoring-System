@@ -3,6 +3,7 @@ import { createProduct, deactivateProduct, listProducts, updateProduct } from ".
 import type { Product } from "../types";
 import { Button, Field, TextInput } from "../components/ui";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { PageHeader } from "../components/PageHeader";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
@@ -87,10 +88,10 @@ export function ProductsAdminPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>SKU &amp; Category Master List</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Manage the SKUs and categories used throughout the system. Deactivated SKUs stay listed here (dimmed) so they can be reactivated.
-      </p>
+      <PageHeader
+        title="SKU &amp; Category Master List"
+        subtitle="Manage the SKUs and categories used throughout the system. Deactivated SKUs stay listed here (dimmed) so they can be reactivated."
+      />
 
       <form onSubmit={handleSubmit} style={{ display: "flex", gap: 12, alignItems: "flex-end", marginBottom: 20 }}>
         <Field label="SKU code">
