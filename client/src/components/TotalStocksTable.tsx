@@ -17,7 +17,9 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
   // clicked open; kept per-table-instance rather than shared, so expanding a
   // category in Total Stocks doesn't also expand it in the Daily Report's
   // copy of this same table.
-  const [expandedOverride, setExpandedOverride] = useState<Record<string, boolean>>({});
+  const [expandedOverride, setExpandedOverride] = useState<
+    Record<string, boolean>
+  >({});
 
   const groups = new Map<string, TotalStockRow[]>();
   for (const row of rows) {
@@ -30,10 +32,21 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
 
   return (
     <RowGlowScroll>
-      <table className="ae-table ae-table--center-head" style={{ minWidth: 640 }}>
+      <table
+        className="ae-table ae-table--center-head"
+        style={{ minWidth: 640 }}
+      >
         <thead>
           <tr>
-            {["SKU", "Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"].map((h) => (
+            {[
+              "SKU",
+              "Product",
+              "Online Remaining",
+              "Offline Remaining",
+              "Total Remaining",
+              "Manual Count",
+              "Variance",
+            ].map((h) => (
               <th key={h}>{h}</th>
             ))}
           </tr>
@@ -42,54 +55,104 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
           {[...groups.entries()].map(([category, groupRows]) => {
             const isCollapsed = !expandedOverride[category];
             return (
-            <Fragment key={category}>
-              <tr>
-                <td colSpan={7} style={{ padding: 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => setExpandedOverride((e) => ({ ...e, [category]: isCollapsed }))}
-                    aria-expanded={!isCollapsed}
-                    aria-controls={groupRows.map((r) => `ae-totalstocks-row-${r.product.id}`).join(" ")}
-                    title={isCollapsed ? `Expand ${category}` : `Collapse ${category}`}
-                    style={categoryToggleStyle}
-                  >
-                    <span style={{ display: "inline-flex", transform: isCollapsed ? "rotate(-90deg)" : "none", transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)" }}>
-                      <ChevronIcon />
-                    </span>
-                    {category}
-                  </button>
-                </td>
-              </tr>
-              {groupRows.map((r, i) => (
-                <tr
-                  key={r.product.id}
-                  id={`ae-totalstocks-row-${r.product.id}`}
-                  className={isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"}
-                  style={{ "--ae-row-i": i, ...(r.totalVariance ? { background: colors.warningBg } : undefined) } as CSSProperties}
-                >
-                  <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
-                  <td style={nameCellStyle}>{r.product.name}</td>
-                  <td>{r.onlineRemainingStock.toLocaleString()}</td>
-                  <td>{r.offlineRemainingStock.toLocaleString()}</td>
-                  <td style={{ fontWeight: 600 }}>{r.totalRemainingStock.toLocaleString()}</td>
-                  <td>{r.totalManualCount ?? "—"}</td>
-                  <td>{r.totalVariance ?? "—"}</td>
+              <Fragment key={category}>
+                <tr>
+                  <td colSpan={7} style={{ padding: 0 }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedOverride((e) => ({
+                          ...e,
+                          [category]: isCollapsed,
+                        }))
+                      }
+                      aria-expanded={!isCollapsed}
+                      aria-controls={groupRows
+                        .map((r) => `ae-totalstocks-row-${r.product.id}`)
+                        .join(" ")}
+                      title={
+                        isCollapsed
+                          ? `Expand ${category}`
+                          : `Collapse ${category}`
+                      }
+                      style={categoryToggleStyle}
+                    >
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          transform: isCollapsed ? "rotate(-90deg)" : "none",
+                          transition:
+                            "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                        }}
+                      >
+                        <ChevronIcon />
+                      </span>
+                      {category}
+                    </button>
+                  </td>
                 </tr>
-              ))}
-              <tr style={subtotalRowStyle}>
-                <td colSpan={2} style={nameCellStyle}>Subtotal - {category}</td>
-                <td>{groupRows.reduce((s, r) => s + r.onlineRemainingStock, 0).toLocaleString()}</td>
-                <td>{groupRows.reduce((s, r) => s + r.offlineRemainingStock, 0).toLocaleString()}</td>
-                <td>{groupRows.reduce((s, r) => s + r.totalRemainingStock, 0).toLocaleString()}</td>
-                <td colSpan={2} />
-              </tr>
-            </Fragment>
+                {groupRows.map((r) => (
+                  <tr
+                    key={r.product.id}
+                    id={`ae-totalstocks-row-${r.product.id}`}
+                    className={
+                      isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"
+                    }
+                    style={
+                      r.totalVariance
+                        ? { background: colors.warningBg }
+                        : undefined
+                    }
+                  >
+                    <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
+                    <td style={nameCellStyle}>{r.product.name}</td>
+                    <td>{r.onlineRemainingStock.toLocaleString()}</td>
+                    <td>{r.offlineRemainingStock.toLocaleString()}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      {r.totalRemainingStock.toLocaleString()}
+                    </td>
+                    <td>{r.totalManualCount ?? "—"}</td>
+                    <td>{r.totalVariance ?? "—"}</td>
+                  </tr>
+                ))}
+                <tr style={subtotalRowStyle}>
+                  <td colSpan={2} style={nameCellStyle}>
+                    Subtotal - {category}
+                  </td>
+                  <td>
+                    {groupRows
+                      .reduce((s, r) => s + r.onlineRemainingStock, 0)
+                      .toLocaleString()}
+                  </td>
+                  <td>
+                    {groupRows
+                      .reduce((s, r) => s + r.offlineRemainingStock, 0)
+                      .toLocaleString()}
+                  </td>
+                  <td>
+                    {groupRows
+                      .reduce((s, r) => s + r.totalRemainingStock, 0)
+                      .toLocaleString()}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </Fragment>
             );
           })}
           <tr style={grandTotalRowStyle}>
-            <td colSpan={2} style={nameCellStyle}>GRAND TOTAL</td>
-            <td>{rows.reduce((s, r) => s + r.onlineRemainingStock, 0).toLocaleString()}</td>
-            <td>{rows.reduce((s, r) => s + r.offlineRemainingStock, 0).toLocaleString()}</td>
+            <td colSpan={2} style={nameCellStyle}>
+              GRAND TOTAL
+            </td>
+            <td>
+              {rows
+                .reduce((s, r) => s + r.onlineRemainingStock, 0)
+                .toLocaleString()}
+            </td>
+            <td>
+              {rows
+                .reduce((s, r) => s + r.offlineRemainingStock, 0)
+                .toLocaleString()}
+            </td>
             <td>{grandTotal.toLocaleString()}</td>
             <td colSpan={2} />
           </tr>
@@ -99,8 +162,17 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
   );
 }
 
-const nameCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.ink };
-const skuCellStyle: CSSProperties = { textAlign: "left", whiteSpace: "nowrap", color: colors.yellow, fontVariantNumeric: "tabular-nums" };
+const nameCellStyle: CSSProperties = {
+  textAlign: "left",
+  whiteSpace: "nowrap",
+  color: colors.ink,
+};
+const skuCellStyle: CSSProperties = {
+  textAlign: "left",
+  whiteSpace: "nowrap",
+  color: colors.yellow,
+  fontVariantNumeric: "tabular-nums",
+};
 // See StockGrid's identical categoryToggleStyle - a real <button> spanning
 // every column so the expand/collapse arrow has one clickable/keyboard-
 // focusable target instead of a styled, inert <td>.
@@ -119,5 +191,12 @@ const categoryToggleStyle: CSSProperties = {
   color: colors.yellow,
   cursor: "pointer",
 };
-const subtotalRowStyle: CSSProperties = { fontWeight: 600, background: colors.paperAlt };
-const grandTotalRowStyle: CSSProperties = { fontWeight: 700, background: colors.warningBg, borderTop: `2px solid ${colors.black}` };
+const subtotalRowStyle: CSSProperties = {
+  fontWeight: 600,
+  background: colors.paperAlt,
+};
+const grandTotalRowStyle: CSSProperties = {
+  fontWeight: 700,
+  background: colors.warningBg,
+  borderTop: `2px solid ${colors.black}`,
+};

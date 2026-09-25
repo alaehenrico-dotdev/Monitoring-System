@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "reac
 import { listChangeLog } from "../api/changeLog";
 import type { ChangeLogEntry } from "../types";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { Dropdown } from "../components/Dropdown";
 import { matchesSearch } from "../utils/search";
@@ -54,23 +55,23 @@ export function ChangeLogPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Change Log</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Every create/update/delete across the app, attributed and timestamped - click a row to see exactly what changed.
-      </p>
-
-      <Toolbar>
-        <Dropdown
-          aria-label="Table"
-          value={tableFilter}
-          onChange={setTableFilter}
-          options={TABLE_FILTERS.map((t) => ({ value: t, label: t ? (TABLE_LABELS[t] ?? t) : "All tables" }))}
-          style={{ minWidth: 160 }}
-        />
-        <ToolbarControls>
-          <SearchInput value={query} onChange={setQuery} placeholder="Search by table, action, or user…" />
-        </ToolbarControls>
-      </Toolbar>
+      <PageHeader
+        title="Change Log"
+        subtitle="Every create/update/delete across the app, attributed and timestamped - click a row to see exactly what changed."
+      >
+        <Toolbar>
+          <Dropdown
+            aria-label="Table"
+            value={tableFilter}
+            onChange={setTableFilter}
+            options={TABLE_FILTERS.map((t) => ({ value: t, label: t ? (TABLE_LABELS[t] ?? t) : "All tables" }))}
+            style={{ minWidth: 160 }}
+          />
+          <ToolbarControls>
+            <SearchInput value={query} onChange={setQuery} placeholder="Search by table, action, or user…" />
+          </ToolbarControls>
+        </Toolbar>
+      </PageHeader>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!entries ? (

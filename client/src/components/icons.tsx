@@ -140,3 +140,52 @@ export function FileAddIcon() {
     </svg>
   );
 }
+
+/// Dashboard stat-card icons - a small set matching this file's own stroke
+/// style (viewBox 0 0 16 16, currentColor, rounded caps/joins) rather than
+/// a general-purpose icon library, since only these few are needed.
+export function TagIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.7 1.5H3.5a1 1 0 0 0-1 1v5.2a1 1 0 0 0 .3.7l6.1 6.1a1 1 0 0 0 1.4 0l5.2-5.2a1 1 0 0 0 0-1.4l-6.1-6.1a1 1 0 0 0-.7-.3Z" />
+      <circle cx="5.7" cy="4.7" r="1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+export function BoxIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 5.2 8 2l6 3.2v5.6L8 14 2 10.8V5.2Z" />
+      <path d="M2 5.2 8 8.4l6-3.2M8 8.4V14" />
+    </svg>
+  );
+}
+
+export function LayersIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 1.5 14 5 8 8.5 2 5l6-3.5Z" />
+      <path d="M2 8 8 11.5 14 8M2 11l6 3.5L14 11" />
+    </svg>
+  );
+}
+
+export function ReceiptIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 1.5h8v13l-1.5-1-1.5 1-1.5-1-1.5 1-1.5-1-1.5 1v-13Z" />
+      <path d="M6 5h4M6 8h4M6 11h2" />
+    </svg>
+  );
+}
+
+export function AlertTriangleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 1.8 14.8 13.5a1 1 0 0 1-.86 1.5H2.06a1 1 0 0 1-.86-1.5L8 1.8Z" />
+      <path d="M8 6.2v3.2" />
+      <circle cx="8" cy="11.8" r="0.15" fill="currentColor" stroke="currentColor" />
+    </svg>
+  );
+}

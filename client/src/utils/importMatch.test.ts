@@ -11,8 +11,10 @@ import {
 // The static (non-destination) part of buildOfflineStockColumns/onlineStockColumns
 // from config/stockColumns.ts, duplicated here rather than imported so this test
 // doesn't need a DeliveryDestination[] just to exercise the column-matching logic.
+const openingStockAliases = ["Stocks", "Remaining Stocks", "Reaining Stocks", "Total Remaining Stock", "Total Remaining Stocks", "Total Stocks"];
+
 const offlineColumns: ImportableColumn[] = [
-  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Stocks"] },
+  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: openingStockAliases },
   { key: "stockInOlToOff", label: "Stocks In (Ol→Off)", editable: true, aliases: ["Stocks In"] },
   { key: "stockOutOffToOl", label: "Stocks Out (Off→Ol)", editable: true, aliases: ["Stocks Out"] },
   { key: "offlineStock", label: "Offline Stocks", editable: false },
@@ -24,7 +26,7 @@ const offlineColumns: ImportableColumn[] = [
 ];
 
 const onlineColumns: ImportableColumn[] = [
-  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Stocks"] },
+  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: openingStockAliases },
   { key: "stockInOffToOl", label: "Stocks In (Off→Ol)", editable: true, aliases: ["Stocks In"] },
   { key: "stockOutOlToOff", label: "Stocks Out (Ol→Off)", editable: true, aliases: ["Stocks Out"] },
   { key: "onlineStock", label: "Online Stocks", editable: false },
@@ -105,6 +107,26 @@ describe("matchColumnIndexes against the real monthly report", () => {
     const headerWithoutRts = ONLINE_REPORT_HEADER.filter((h) => h !== "RTS");
     const missing = unmatchedColumns(onlineColumns, headerWithoutRts);
     expect(missing.map((c) => c.key)).toEqual(["rts"]);
+  });
+
+  it("still resolves openingStock to the real 'Stocks' column, not Remaining Stocks, on a normal full report", () => {
+    // Both columns are present in the real report - "Stocks" (the file's own
+    // opening balance) must win, since it appears first in the header.
+    const idx = matchColumnIndexes(onlineColumns, ONLINE_REPORT_HEADER);
+    expect(idx.find((c) => c.key === "openingStock")?.idx).toBe(ONLINE_REPORT_HEADER.indexOf(" STOCKS"));
+  });
+
+  it("seeds openingStock from a switchover file that only has a product name and an ending/total balance", () => {
+    // The encoder's last pre-system report - no daily movement columns at
+    // all, just whatever the business was already tracking as each
+    // product's current balance. This is meant to become the new system's
+    // very first day's opening stock (Section 4.6), not a day's worth of
+    // in/out movements.
+    for (const header of ["Remaining Stocks", "REAINING STOCKS", "Total Remaining Stock", "TOTAL STOCKS"]) {
+      const switchoverHeader = ["Product", header];
+      const idx = matchColumnIndexes(onlineColumns, switchoverHeader);
+      expect(idx).toEqual([{ key: "openingStock", idx: 1 }]);
+    }
   });
 });
 

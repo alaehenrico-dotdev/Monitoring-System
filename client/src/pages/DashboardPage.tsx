@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { getTotalStocks } from "../api/totalStocks";
 import { listProducts } from "../api/products";
 import { listReceipts } from "../api/receipts";
@@ -7,24 +8,39 @@ import { listChangeLog } from "../api/changeLog";
 import type { ChangeLogEntry } from "../types";
 import { ACTION_COLOR, TABLE_LABELS } from "../config/changeLog";
 import { formatRelativeTime } from "../utils/dateFormat";
-import { RowsSkeleton, StatCardsSkeleton, TableSkeleton } from "../components/Skeleton";
+import { StatCardsSkeleton, TableSkeleton } from "../components/Skeleton";
 import { MonthlyMonitoring } from "../components/MonthlyMonitoring";
+import { PageHeader } from "../components/PageHeader";
+import { TagIcon, BoxIcon, LayersIcon, ReceiptIcon, AlertTriangleIcon, ChevronRightIcon } from "../components/icons";
 import { colors } from "../theme";
 
 type Analytics = {
   activeProducts: number;
-  /// Online and Offline are separate stock pools (Section 2.1) - kept apart
-  /// here too, same as Total Stocks/Daily Report. totalRemaining is kept
-  /// alongside them only as an explicitly-labeled combined figure.
+  /// Online and Offline are separate stock pools (Section 2.1) - shown as
+  /// one rotating stat card (RotatingStockCard) rather than a combined sum,
+  /// since summing them implies a single pool that doesn't really exist.
   onlineRemaining: number;
   offlineRemaining: number;
-  totalRemaining: number;
   todayReceipts: number;
   varianceFlags: number;
 };
 
 const RECENT_ACTIVITY_LIMIT = 6;
 const COUNT_UP_DURATION_MS = 700;
+// How long each face (Online, then Offline) stays on screen before the
+// rotating stat card crossfades to the next one.
+const STOCK_ROTATE_MS = 3500;
+
+// The app's major day-to-day pages (mirrors the nav drawer's own "Data
+// Entry" section, minus Dashboard itself) - one-click shortcuts so landing
+// here doesn't require opening the nav drawer first for the common case.
+const QUICK_LINKS: { to: string; label: string; icon: ReactNode }[] = [
+  { to: "/online", label: "Online Entry", icon: <BoxIcon /> },
+  { to: "/offline", label: "Offline Entry", icon: <BoxIcon /> },
+  { to: "/manual-count", label: "Manual Count", icon: <LayersIcon /> },
+  { to: "/total-stocks", label: "Total Stocks", icon: <LayersIcon /> },
+  { to: "/receipts", label: "Receipts", icon: <ReceiptIcon /> },
+];
 
 // Animates a displayed number from its previous value up (or down) to
 // `target` whenever `target` changes, instead of the digits just snapping
@@ -110,7 +126,6 @@ export function DashboardPage() {
           activeProducts: products.filter((product) => product.isActive).length,
           onlineRemaining: stocks.reduce((sum, row) => sum + Number(row.onlineRemainingStock || 0), 0),
           offlineRemaining: stocks.reduce((sum, row) => sum + Number(row.offlineRemainingStock || 0), 0),
-          totalRemaining: stocks.reduce((sum, row) => sum + Number(row.totalRemainingStock || 0), 0),
           todayReceipts: receipts.length,
           varianceFlags: stocks.filter((row) => Number(row.totalVariance || 0) !== 0).length,
         });
@@ -132,106 +147,98 @@ export function DashboardPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Dashboard</h2>
-      <p className="ae-dash-subtitle">Here's where things stand for {formatDate(today)}.</p>
+      <PageHeader title="Dashboard" subtitle={`Here's where things stand for ${formatDate(today)}.`} subtitleClassName="ae-dash-subtitle" />
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 
-      <div className="ae-dash-stats" role={analytics ? undefined : "status"} aria-busy={analytics ? undefined : "true"}>
-        {analytics ? (
-          <>
-            <StatCard label="Active SKUs" value={analytics.activeProducts} />
-            <StatCard label="Online remaining stock" value={analytics.onlineRemaining} />
-            <StatCard label="Offline remaining stock" value={analytics.offlineRemaining} />
-            <StatCard label="Total remaining stock (combined)" value={analytics.totalRemaining} />
-            <StatCard label="Receipts today" value={analytics.todayReceipts} />
-            <StatCard label={hasVariance ? "Variance flags — needs review" : "Variance flags"} value={analytics.varianceFlags} alert={hasVariance} />
-          </>
-        ) : (
-          <StatCardsSkeleton count={6} />
-        )}
+      <div className="ae-dash-quicklinks">
+        {QUICK_LINKS.map((l) => (
+          <Link key={l.to} to={l.to} className="ae-dash-quicklink">
+            <span aria-hidden className="ae-dash-quicklink-icon">
+              {l.icon}
+            </span>
+            <span className="ae-dash-quicklink-label">{l.label}</span>
+            <span aria-hidden className="ae-dash-quicklink-arrow">
+              <ChevronRightIcon />
+            </span>
+          </Link>
+        ))}
       </div>
 
-      <MonthlyMonitoring />
+      {/* Graph first - it takes whatever width is left over once the stat
+          grid and Recent Activity (both fixed-ish width, see index.css)
+          claim theirs, instead of the other way around. */}
+      <div className="ae-dash-hero-row">
+        <div className="ae-dash-hero-chart">
+          <MonthlyMonitoring />
+        </div>
 
-      {/* Today: what the numbers above mean you should do, not a menu. */}
-      <section className="ae-dash-section">
-        <h3 className="ae-dash-heading">Today</h3>
-        <div className="ae-dash-card">
+        <div className="ae-dash-stats" role={analytics ? undefined : "status"} aria-busy={analytics ? undefined : "true"}>
           {analytics ? (
             <>
-              {hasVariance && (
-                <TodayRow
-                  to="/variance-report"
-                  tone="alert"
-                  headline={`${analytics.varianceFlags} product${analytics.varianceFlags === 1 ? "" : "s"} ${
-                    analytics.varianceFlags === 1 ? "shows" : "show"
-                  } a stock variance today`}
-                  action="Review the variance report"
-                />
-              )}
-              {analytics.todayReceipts === 0 ? (
-                <TodayRow to="/receipts" headline="No receipts have been recorded yet today" action="Create a receipt" />
-              ) : (
-                <TodayRow
-                  to="/receipts"
-                  headline={`${analytics.todayReceipts} receipt${analytics.todayReceipts === 1 ? "" : "s"} recorded so far today`}
-                  action="View today's receipts"
-                />
-              )}
-              <TodayRow to="/daily-report" headline={`Full activity log for ${formatDate(today)}`} action="Open the daily report" />
-              {!hasVariance && <TodayRow to="/variance-report" headline="No variances flagged today" action="Open the variance report" muted />}
+              <StatCard icon={<TagIcon />} label="Active SKUs" value={analytics.activeProducts} />
+              <RotatingStockCard online={analytics.onlineRemaining} offline={analytics.offlineRemaining} />
+              <StatCard icon={<ReceiptIcon />} label="Receipts today" value={analytics.todayReceipts} />
+              <StatCard
+                icon={<AlertTriangleIcon />}
+                label={hasVariance ? "Variance flags — needs review" : "Variance flags"}
+                value={analytics.varianceFlags}
+                alert={hasVariance}
+              />
             </>
           ) : (
-            <RowsSkeleton rows={3} height={38} label="Loading today's activity…" />
+            <StatCardsSkeleton count={4} />
           )}
         </div>
-      </section>
 
-      {/* Recent Activity: the change_log (Section 5.8) is otherwise only
-          visible on its own dedicated page - surfacing the last few edits
-          here means a supervisor can spot something odd (a bulk edit, a
-          deletion, an unfamiliar name) without navigating away first. */}
-      <section className="ae-dash-section">
-        <h3 className="ae-dash-heading">
-          Recent Activity
-          <Link to="/change-log" className="ae-dash-link">
-            View full change log →
-          </Link>
-        </h3>
-        <div className="ae-dash-card">
-          {recentActivity === null ? (
-            <TableSkeleton
-              headers={["Action", "Record", "Changed by", "When"]}
-              minWidth={480}
-              rows={5}
-              cellPadding="8px 12px"
-              label="Loading recent activity…"
-            />
-          ) : recentActivityError ? (
-            <CardMessage>Couldn't load recent activity - try refreshing the page.</CardMessage>
-          ) : recentActivity.length === 0 ? (
-            <CardMessage>No activity recorded yet.</CardMessage>
-          ) : (
-            <div className="ae-dash-table-scroll">
-              <table className="ae-table ae-table--left" style={{ minWidth: 480 }}>
-                <thead>
-                  <tr>
-                    {["Action", "Record", "Changed by", "When"].map((h) => (
-                      <th key={h}>{h}</th>
+        {/* Recent Activity: the change_log (Section 5.8) is otherwise only
+            visible on its own dedicated page - surfacing the last few edits
+            here means a supervisor can spot something odd (a bulk edit, a
+            deletion, an unfamiliar name) without navigating away first.
+            Aligned with the stat grid in this same row rather than a
+            separate section below (the old "Today" section - now removed -
+            used to sit there instead). */}
+        <section className="ae-dash-section ae-dash-hero-activity">
+          <h3 className="ae-dash-heading">
+            Recent Activity
+            <Link to="/change-log" className="ae-dash-link">
+              View full change log →
+            </Link>
+          </h3>
+          <div className="ae-dash-card">
+            {recentActivity === null ? (
+              <TableSkeleton
+                headers={["Action", "Record", "Changed by", "When"]}
+                minWidth={320}
+                rows={5}
+                cellPadding="8px 12px"
+                label="Loading recent activity…"
+              />
+            ) : recentActivityError ? (
+              <CardMessage>Couldn't load recent activity - try refreshing the page.</CardMessage>
+            ) : recentActivity.length === 0 ? (
+              <CardMessage>No activity recorded yet.</CardMessage>
+            ) : (
+              <div className="ae-dash-table-scroll">
+                <table className="ae-table ae-table--left" style={{ minWidth: 320 }}>
+                  <thead>
+                    <tr>
+                      {["Action", "Record", "When"].map((h) => (
+                        <th key={h}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentActivity.map((entry) => (
+                      <ActivityRow key={entry.id} entry={entry} />
                     ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentActivity.map((entry) => (
-                    <ActivityRow key={entry.id} entry={entry} />
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }
@@ -246,7 +253,7 @@ function CardMessage({ children }: { children: ReactNode }) {
 /// leave. `--mx`/`--my`/`--spotlight-opacity` are written straight onto the
 /// card's DOM node rather than through React state, so a `mousemove` never
 /// re-renders the card (or re-runs the count-up effect).
-function StatCard({ label, value, alert }: { label: string; value: number | undefined; alert?: boolean }) {
+function StatCard({ icon, label, value, alert }: { icon: ReactNode; label: string; value: number | undefined; alert?: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
 
   // Counts up from the previous displayed value to `value` any time it
@@ -270,19 +277,79 @@ function StatCard({ label, value, alert }: { label: string; value: number | unde
   return (
     <div ref={cardRef} className={`ae-dash-stat${alert ? " ae-dash-stat--alert" : ""}`} onMouseMove={handlePointerMove} onMouseLeave={handlePointerLeave}>
       <div aria-hidden className="ae-dash-stat-spotlight" />
+      <div aria-hidden className="ae-dash-stat-icon">
+        {icon}
+      </div>
       <div className="ae-dash-stat-value">{value !== undefined ? animatedValue.toLocaleString() : "—"}</div>
       <div className="ae-dash-stat-label">{label}</div>
     </div>
   );
 }
 
-function TodayRow({ to, headline, action, tone, muted }: { to: string; headline: string; action: string; tone?: "alert"; muted?: boolean }) {
-  const className = ["ae-dash-row", tone === "alert" && "ae-dash-row--alert", muted && "ae-dash-row--muted"].filter(Boolean).join(" ");
+/// Replaces separate "Online remaining stock" / "Offline remaining stock"
+/// cards (and the combined-sum one) with a single tile that crossfades
+/// between the two channels every few seconds - summing them into one
+/// number would imply a single stock pool that doesn't actually exist
+/// (Section 2.1), so this shows each in turn instead of adding them
+/// together. Same surface/spotlight chrome as StatCard, just with an
+/// animated face instead of a static value + a small dot pager showing
+/// which channel is currently on screen.
+function RotatingStockCard({ online, offline }: { online: number | undefined; offline: number | undefined }) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [faceIndex, setFaceIndex] = useState(0);
+  const faces = [
+    { label: "Online remaining stock", value: online },
+    { label: "Offline remaining stock", value: offline },
+  ];
+
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => setFaceIndex((i) => (i + 1) % faces.length), STOCK_ROTATE_MS);
+    return () => clearInterval(id);
+    // faces.length is a fixed constant (always 2) - not a real dependency.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>) {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    card.style.setProperty("--mx", `${((e.clientX - rect.left) / rect.width) * 100}%`);
+    card.style.setProperty("--my", `${((e.clientY - rect.top) / rect.height) * 100}%`);
+    card.style.setProperty("--spotlight-opacity", "1");
+  }
+
+  function handlePointerLeave() {
+    cardRef.current?.style.setProperty("--spotlight-opacity", "0");
+  }
+
+  const face = faces[faceIndex];
+
   return (
-    <Link to={to} className={className}>
-      <span className="ae-dash-row-headline">{headline}</span>
-      <span className="ae-dash-row-action">{action} →</span>
-    </Link>
+    <div ref={cardRef} className="ae-dash-stat" onMouseMove={handlePointerMove} onMouseLeave={handlePointerLeave}>
+      <div aria-hidden className="ae-dash-stat-spotlight" />
+      <div aria-hidden className="ae-dash-stat-icon">
+        <BoxIcon />
+      </div>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={faceIndex}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+        >
+          <div className="ae-dash-stat-value">{face.value !== undefined ? face.value.toLocaleString() : "—"}</div>
+          <div className="ae-dash-stat-label">{face.label}</div>
+        </motion.div>
+      </AnimatePresence>
+      <div aria-hidden className="ae-dash-stat-dots">
+        {faces.map((f, i) => (
+          <span key={f.label} className={`ae-dash-stat-dot${i === faceIndex ? " ae-dash-stat-dot--active" : ""}`} />
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -290,7 +357,9 @@ function ActivityRow({ entry }: { entry: ChangeLogEntry }) {
   const navigate = useNavigate();
   return (
     // The whole row is clickable; the Record cell holds a real link so the
-    // row is also reachable by keyboard.
+    // row is also reachable by keyboard. "Changed by" dropped from this
+    // compact side-panel version (see .ae-dash-hero-activity) - still on
+    // the full Change Log page this links out to.
     <tr style={{ cursor: "pointer" }} onClick={() => navigate("/change-log")}>
       <td style={{ fontWeight: 700, color: ACTION_COLOR[entry.action] }}>{entry.action}</td>
       <td style={{ whiteSpace: "nowrap" }}>
@@ -298,7 +367,6 @@ function ActivityRow({ entry }: { entry: ChangeLogEntry }) {
           {TABLE_LABELS[entry.tableName] ?? entry.tableName} #{entry.recordId}
         </Link>
       </td>
-      <td style={{ whiteSpace: "nowrap" }}>{entry.changedBy?.name ?? "system"}</td>
       <td style={{ whiteSpace: "nowrap", color: colors.subtleInk }} title={new Date(entry.changedAt).toLocaleString()}>
         {formatRelativeTime(entry.changedAt)}
       </td>

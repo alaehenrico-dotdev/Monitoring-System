@@ -6,6 +6,11 @@ import { colors } from "../theme";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const CHART_HEIGHT = 130;
+// Each month stretches to fill this chart's own column (the dashboard's
+// hero row gives it whatever width is left over, see .ae-dash-hero-row) -
+// this is only the floor it won't shrink below, so on a narrow screen the
+// row scrolls sideways instead of squeezing every month unreadably thin.
+const MONTH_MIN_WIDTH = 46;
 const CURRENT_YEAR = new Date().getFullYear();
 
 const ONLINE_COLOR = colors.yellow;
@@ -71,12 +76,19 @@ export function MonthlyMonitoring() {
         ) : !data ? (
           <BarsSkeleton count={12} chartHeight={CHART_HEIGHT} />
         ) : (
-          <div style={{ padding: "20px 20px 8px" }}>
+          <div style={{ padding: "20px 20px 8px", display: "flex", flexDirection: "column", height: "100%" }}>
             <Legend />
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: CHART_HEIGHT, marginTop: 14 }}>
-              {data.map((entry) => (
-                <MonthBars key={entry.month} entry={entry} year={year} max={max} />
-              ))}
+            {/* Months stretch to fill the available width (see MonthBars'
+                own flex:1) with no blank space; overflow-x: auto only
+                kicks in once they've all shrunk to MONTH_MIN_WIDTH and
+                still don't fit, scrolling sideways rather than squeezing
+                further. */}
+            <div style={{ overflowX: "auto", overflowY: "hidden", marginTop: 14 }}>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: CHART_HEIGHT, minWidth: "100%" }}>
+                {data.map((entry) => (
+                  <MonthBars key={entry.month} entry={entry} year={year} max={max} />
+                ))}
+              </div>
             </div>
             <p style={{ margin: "14px 0 0", fontSize: 11.5, color: colors.subtleInk }}>
               Each bar pair is that month's Online/Offline remaining stock as of its last recorded entry - the two
@@ -115,7 +127,10 @@ function MonthBars({ entry, year, max }: { entry: MonthlyOverviewEntry; year: nu
     : `${monthName} — No entries recorded yet`;
 
   return (
-    <div title={title} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%" }}>
+    <div
+      title={title}
+      style={{ flex: "1 1 0", minWidth: MONTH_MIN_WIDTH, display: "flex", flexDirection: "column", alignItems: "center", height: "100%" }}
+    >
       <div style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 2, width: "100%" }}>
         <ChannelBar value={entry.onlineRemainingStock} max={max} color={ONLINE_COLOR} />
         <ChannelBar value={entry.offlineRemainingStock} max={max} color={OFFLINE_COLOR} />

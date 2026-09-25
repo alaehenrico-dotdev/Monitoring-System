@@ -9,6 +9,7 @@ import { getVarianceReport } from "../api/manualCounts";
 import { Button, TextInput } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
@@ -176,10 +177,7 @@ export function VarianceReportPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Variance Report</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Review differences between recorded stock and manual counts.
-      </p>
+      <PageHeader title="Variance Report" subtitle="Review differences between recorded stock and manual counts.">
       <Toolbar className="no-print">
         <form
           onSubmit={runReport}
@@ -221,6 +219,7 @@ export function VarianceReportPage() {
           </Link>
         </ToolbarControls>
       </Toolbar>
+      </PageHeader>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 

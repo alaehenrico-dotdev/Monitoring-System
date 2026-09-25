@@ -24,6 +24,7 @@ import { Button, Select } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useAuth } from "../context/AuthContext";
 import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { SkuCombobox } from "../components/SkuCombobox";
@@ -510,14 +511,14 @@ export function ReceiptsPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Receipts / Sales Orders</h2>
-
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        {mode === "single"
-          ? "Fill in the receipt on the left - the card on the right always shows exactly what will be saved."
-          : "One delivery date and location for the whole sheet - add a customer column per order, fill in quantities, and Save creates every customer's receipt together, posted to Offline Delivery."}
-      </p>
-
+      <PageHeader
+        title="Receipts / Sales Orders"
+        subtitle={
+          mode === "single"
+            ? "Fill in the receipt on the left - the card on the right always shows exactly what will be saved."
+            : "One delivery date and location for the whole sheet - add a customer column per order, fill in quantities, and Save creates every customer's receipt together, posted to Offline Delivery."
+        }
+      >
       <Toolbar>
         <div>
           <div style={{ display: "flex", flex: mode === "bulk" ? "0 0 auto" : "1 1 auto", minWidth: 0 }}>
@@ -586,6 +587,7 @@ export function ReceiptsPage() {
           </Link>
         </ToolbarControls>
       </Toolbar>
+      </PageHeader>
 
       {mode === "bulk" && error && <p style={{ color: colors.danger }}>{error}</p>}
       {mode === "bulk" && bulkSaved && (

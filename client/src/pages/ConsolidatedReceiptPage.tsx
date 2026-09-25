@@ -6,6 +6,7 @@ import { Button } from "../components/ui";
 import { Dropdown } from "../components/Dropdown";
 import { DatePicker } from "../components/DatePicker";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { ConsolidatedReceiptTable } from "../components/ConsolidatedReceiptTable";
 import { TableSkeleton } from "../components/Skeleton";
 import { formatDateDisplay } from "../utils/dateFormat";
@@ -117,38 +118,36 @@ export function ConsolidatedReceiptPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Consolidated Receipt - {formatDateDisplay(date)}</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Combine every receipt logged for a date into one matrix - products by category down the side, customers across the top.
-      </p>
-
-      <Toolbar className="no-print">
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-          <DatePicker aria-label="Delivery date" value={date} onChange={setDate} />
-          <Dropdown
-            aria-label="Pool"
-            value={pool}
-            onChange={(v) => setPool(v as ReceiptPool)}
-            title="Narrow to receipts posted to a given stock pool"
-            options={(Object.keys(POOL_LABELS) as ReceiptPool[]).map((p) => ({ value: p, label: POOL_LABELS[p] }))}
-          />
-          <Button onClick={generate} disabled={loading}>
-            {loading ? "Loading…" : "Generate"}
-          </Button>
-        </div>
-        <ToolbarControls>
+      <PageHeader
+        title={`Consolidated Receipt - ${formatDateDisplay(date)}`}
+        subtitle="Combine every receipt logged for a date into one matrix - products by category down the side, customers across the top."
+      >
+        <Toolbar className="no-print">
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
+            <DatePicker aria-label="Delivery date" value={date} onChange={setDate} />
+            <Dropdown
+              aria-label="Pool"
+              value={pool}
+              onChange={(v) => setPool(v as ReceiptPool)}
+              title="Narrow to receipts posted to a given stock pool"
+              options={(Object.keys(POOL_LABELS) as ReceiptPool[]).map((p) => ({ value: p, label: POOL_LABELS[p] }))}
+            />
+            <Button onClick={generate} disabled={loading}>
+              {loading ? "Loading…" : "Generate"}
+            </Button>
+          </div>
           {data && (
-            <>
+            <ToolbarControls>
               <Button variant="secondary" onClick={handleExport} title="Download as Excel">
                 Export Excel
               </Button>
               <Button variant="secondary" onClick={handlePdf} title="Download as PDF">
                 <PrinterIcon /> PDF
               </Button>
-            </>
+            </ToolbarControls>
           )}
-        </ToolbarControls>
-      </Toolbar>
+        </Toolbar>
+      </PageHeader>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
 

@@ -19,8 +19,15 @@ export const onlineStockColumns: GridColumn[] = [
   // the prior day's Remaining Stock) but still importable: a file's very
   // first date has nothing to carry forward from, so the file's own
   // "STOCKS" column is what gives that first day a real starting balance
-  // instead of everything defaulting to 0.
-  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Stocks"] },
+  // instead of everything defaulting to 0. The Remaining/Total Stocks
+  // aliases cover switching over from an encoder's last pre-system report,
+  // which has no "Stocks (Opening)" column of its own - only that report's
+  // own ending balance, meant to seed this system's very first day. A file
+  // that has BOTH columns (a normal full daily report) still resolves to the
+  // real "Stocks" column, never these aliases: matchColumnIndexes takes
+  // whichever named column appears first in the header, and "Stocks" always
+  // precedes "Remaining Stocks" in this report's own column order.
+  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Stocks", "Remaining Stocks", "Reaining Stocks", "Total Remaining Stock", "Total Remaining Stocks", "Total Stocks"] },
   { key: "stockInOffToOl", label: "Stocks In (Off→Ol)", editable: true, aliases: ["Stocks In"] },
   { key: "stockOutOlToOff", label: "Stocks Out (Ol→Off)", editable: true, aliases: ["Stocks Out"] },
   { key: "onlineStock", label: "Online Stocks", editable: false },
@@ -58,8 +65,10 @@ export function buildOfflineStockColumns(destinations: DeliveryDestination[]): G
     // the prior day's Remaining Stock) but still importable: a file's very
     // first date has nothing to carry forward from, so the file's own
     // "STOCKS" column is what gives that first day a real starting balance
-    // instead of everything defaulting to 0.
-    { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Stocks"] },
+    // instead of everything defaulting to 0. See onlineStockColumns' own copy
+    // of this comment for why the Remaining/Total Stocks aliases are safe to
+    // add alongside "Stocks" rather than replacing it.
+    { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Stocks", "Remaining Stocks", "Reaining Stocks", "Total Remaining Stock", "Total Remaining Stocks", "Total Stocks"] },
     { key: "stockInOlToOff", label: "Stocks In (Ol→Off)", editable: true, aliases: ["Stocks In"] },
     { key: "stockOutOffToOl", label: "Stocks Out (Off→Ol)", editable: true, aliases: ["Stocks Out"] },
     { key: "offlineStock", label: "Offline Stocks", editable: false },

@@ -6,6 +6,7 @@ import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
 import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { TableSkeleton } from "../components/Skeleton";
@@ -66,35 +67,36 @@ export function TotalStocksPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>Total Stocks (Online + Offline) - {formatDateDisplay(date)}</h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Review combined online and offline stock balances.
-      </p>
-      <Toolbar className="no-print">
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-          <DatePicker aria-label="Date" value={date} onChange={setDate} style={{ maxWidth: 180 }} />
-          <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
-          <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
-        </div>
-        <ToolbarControls>
-          {csvRows && (
-            <>
-              <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} getPendingValue={() => undefined} canImport={false}
-                exportFormat="excel"
-                pdf={{
-                  title: "Total Stocks (Online + Offline)",
-                  subtitle: formatDateDisplay(date),
-                  // Same as TotalStocksTable: only the three "remaining" columns are summed.
-                  sumKeys: ["onlineRemainingStock", "offlineRemainingStock", "totalRemainingStock"],
-                  flagKey: "totalVariance",
-                }}
-              />
-              <ToolbarDivider />
-            </>
-          )}
-          <ZoomControl zoom={zoom} onChange={setZoom} />
-        </ToolbarControls>
-      </Toolbar>
+      <PageHeader
+        title={`Total Stocks (Online + Offline) - ${formatDateDisplay(date)}`}
+        subtitle="Review combined online and offline stock balances."
+      >
+        <Toolbar className="no-print">
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
+            <DatePicker aria-label="Date" value={date} onChange={setDate} style={{ maxWidth: 180 }} />
+            <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
+            <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
+          </div>
+          <ToolbarControls>
+            {csvRows && (
+              <>
+                <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} getPendingValue={() => undefined} canImport={false}
+                  exportFormat="excel"
+                  pdf={{
+                    title: "Total Stocks (Online + Offline)",
+                    subtitle: formatDateDisplay(date),
+                    // Same as TotalStocksTable: only the three "remaining" columns are summed.
+                    sumKeys: ["onlineRemainingStock", "offlineRemainingStock", "totalRemainingStock"],
+                    flagKey: "totalVariance",
+                  }}
+                />
+                <ToolbarDivider />
+              </>
+            )}
+            <ZoomControl zoom={zoom} onChange={setZoom} />
+          </ToolbarControls>
+        </Toolbar>
+      </PageHeader>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
         <TableSkeleton

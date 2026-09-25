@@ -4,7 +4,6 @@ import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { Layout } from "./components/Layout";
-import { TopBar } from "./components/TopBar";
 import { TopProgressBar } from "./components/TopProgressBar";
 import { TopProgressProvider } from "./hooks/useTopProgress";
 import { LoadingBlock } from "./components/Spinner";
@@ -44,7 +43,6 @@ export default function App() {
       <AuthProvider>
         <TopProgressProvider>
           <TopProgressBar />
-          <TopBar />
           <Suspense fallback={<LoadingBlock label="Loading…" minHeight="100vh" size="lg" />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />

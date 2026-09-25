@@ -8,6 +8,7 @@ import { Button } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageHeader } from "../components/PageHeader";
 import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
 import { PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
@@ -321,12 +322,10 @@ export function OfflineEntryPage() {
 
   return (
     <div>
-      <h2 style={{ margin: "-8px 0 0px" }}>
-        Daily Offline Stock Monitoring - {formatDateDisplay(date)} - {SHIFT_SHORT_LABELS[shift]} Shift
-      </h2>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 8px" }}>
-        Stocks In/Out transfers here mirror automatically onto the Online table.
-      </p>
+      <PageHeader
+        title={`Daily Offline Stock Monitoring - ${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`}
+        subtitle="Stocks In/Out transfers here mirror automatically onto the Online table."
+      >
       <Toolbar className="no-print ae-toolbar-entry">
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
           {canEdit && (
@@ -386,6 +385,7 @@ export function OfflineEntryPage() {
           <ZoomControl zoom={zoom} onChange={setZoom} />
         </ToolbarControls>
       </Toolbar>
+      </PageHeader>
       {otherShiftCount !== null && otherShiftCount > 0 && (
         <p style={{ fontSize: 12, color: colors.warningText, margin: "0 0 8px" }}>
           ⚠ {SHIFT_LABELS[otherShift(shift)]} already has {otherShiftCount} saved entr{otherShiftCount === 1 ? "y" : "ies"} for {date} - double-check you're on the right shift before entering data.
