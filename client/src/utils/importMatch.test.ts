@@ -11,7 +11,7 @@ import {
 // The static (non-destination) part of buildOfflineStockColumns/onlineStockColumns
 // from config/stockColumns.ts, duplicated here rather than imported so this test
 // doesn't need a DeliveryDestination[] just to exercise the column-matching logic.
-const openingStockAliases = ["Stocks", "Remaining Stocks", "Reaining Stocks", "Total Remaining Stock", "Total Remaining Stocks", "Total Stocks"];
+const openingStockAliases = ["Remaining Stocks", "Reaining Stocks", "Total Remaining Stock", "Total Remaining Stocks", "Total Stocks", "Stocks"];
 
 const offlineColumns: ImportableColumn[] = [
   { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: openingStockAliases },
@@ -109,11 +109,13 @@ describe("matchColumnIndexes against the real monthly report", () => {
     expect(missing.map((c) => c.key)).toEqual(["rts"]);
   });
 
-  it("still resolves openingStock to the real 'Stocks' column, not Remaining Stocks, on a normal full report", () => {
-    // Both columns are present in the real report - "Stocks" (the file's own
-    // opening balance) must win, since it appears first in the header.
+  it("resolves openingStock to Remaining Stocks, not the file's own stale 'Stocks' column, on a normal full report", () => {
+    // Both columns are present in the real report - "Remaining Stocks" (that
+    // day's ending balance, which becomes the opening balance for whatever
+    // date this file is imported onto) must win, even though "Stocks" (that
+    // day's already-stale opening balance) appears first in the header.
     const idx = matchColumnIndexes(onlineColumns, ONLINE_REPORT_HEADER);
-    expect(idx.find((c) => c.key === "openingStock")?.idx).toBe(ONLINE_REPORT_HEADER.indexOf(" STOCKS"));
+    expect(idx.find((c) => c.key === "openingStock")?.idx).toBe(ONLINE_REPORT_HEADER.indexOf("REAINING STOCKS"));
   });
 
   it("seeds openingStock from a switchover file that only has a product name and an ending/total balance", () => {

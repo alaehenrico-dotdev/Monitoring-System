@@ -48,7 +48,23 @@ function loadPending(storageKey: string | undefined): PendingByProduct {
  * own state from storage on the same schedule instead of being told to
  * clear). Omit `storageKey` to get the old, in-memory-only behavior.
  */
-export function usePendingEntryChanges(rows: GridRow[] | null, storageKey?: string) {
+export function usePendingEntryChanges(
+  rows: GridRow[] | null,
+  storageKey?: string,
+  /**
+   * Recomputes this row's derived/locked columns (Offline or Online Stocks,
+   * Remaining Stock, and - for Offline - Delivery (Out)) from a staged-but-
+   * not-yet-saved change, so the live grid reflects e.g. a changed Opening
+   * Stock immediately instead of only once Save round-trips to the server
+   * and back. Given the last-saved entry plus this product's own pending
+   * diff (not the already-merged display entry - same shape
+   * computeNewDeliveryOut/validateImportRow already expect); returns just
+   * the fields to override on top of the merged entry. Omit entirely for a
+   * read-only table (Daily Report) with nothing to stage in the first
+   * place, or if the caller doesn't have these columns at all.
+   */
+  recompute?: (entry: Record<string, unknown>, changes: Record<string, number>) => Record<string, unknown>,
+) {
   const [pending, setPending] = useState<PendingByProduct>(() => loadPending(storageKey));
 
   // Re-derives pending from storage only when the key itself changes (a
@@ -72,14 +88,21 @@ export function usePendingEntryChanges(rows: GridRow[] | null, storageKey?: stri
 
   // What the grid should actually render - the last-saved rows with any
   // staged-but-not-yet-saved edits overlaid on top, so typing a value shows
-  // up immediately without a round trip.
+  // up immediately without a round trip. `recompute` (if given) then
+  // re-derives the locked/computed columns from that same staged diff, so
+  // e.g. a changed Opening Stock is reflected in Offline/Online Stocks and
+  // Remaining Stock right away too - otherwise those would keep showing
+  // last-saved figures until the edit is actually Saved.
   const displayRows = useMemo(() => {
     if (!rows || Object.keys(pending).length === 0) return rows;
     return rows.map((r) => {
       const changes = pending[r.product.id];
-      return changes ? { ...r, entry: { ...r.entry, ...changes }, isSaved: false } : r;
+      if (!changes) return r;
+      const merged = { ...r.entry, ...changes };
+      const entry = recompute ? { ...merged, ...recompute(r.entry, changes) } : merged;
+      return { ...r, entry, isSaved: false };
     });
-  }, [rows, pending]);
+  }, [rows, pending, recompute]);
 
   /// Stages one cell's edit. Editing a cell back to its last-saved value
   /// removes it from the pending set entirely, rather than leaving a

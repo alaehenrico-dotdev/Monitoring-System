@@ -1,4 +1,5 @@
 import { motion, useReducedMotion } from "motion/react";
+import { createPortal } from "react-dom";
 import { colors } from "../theme";
 
 const SIZES = { sm: 16, md: 24, lg: 36 } as const;
@@ -73,5 +74,41 @@ export function InlineLoading({ label = "Loading…", size = "sm" }: { label?: s
       <Spinner size={size} />
       {label}
     </span>
+  );
+}
+
+/// Full-screen dimmed backdrop + centered spinner - the unmissable "actively
+/// saving, don't touch anything" signal for an action already in progress
+/// (unlike LoadingBlock/InlineLoading above, which mark a section that's
+/// still waiting on its first fetch). Complements useTopProgress's thin
+/// top-of-viewport bar rather than replacing it: that bar reports real
+/// per-item progress: this is purely the center-of-screen "something is
+/// happening" cue. Styled after Modal.tsx's own overlay (fixed/inset:0,
+/// same dim background) but with no bordered dialog panel, and portaled to
+/// document.body the same way, for the same stacking-context reasons - with
+/// a higher z-index (300 vs Modal's 200) since Save can still be in flight
+/// while the dialog that triggered it (e.g. "Unsaved changes") is still
+/// open underneath.
+export function LoadingOverlay({ label = "Saving…" }: { label?: string }) {
+  return createPortal(
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 300,
+        background: "rgba(20, 17, 13, 0.55)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+        <Spinner size="lg" />
+        <span style={{ color: colors.cream, fontSize: 14, fontWeight: 600 }}>{label}</span>
+      </div>
+    </div>,
+    document.body,
   );
 }

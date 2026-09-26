@@ -86,7 +86,7 @@ export function ConsolidatedReceiptPage() {
     ? (["FULFILLMENT", "OFFLINE_DELIVERY", "NOT_POSTED"] as const).map((p) => ({
         pool: p,
         count: allReceipts.filter((r) => receiptPool(r) === p).length,
-        qty: allReceipts.filter((r) => receiptPool(r) === p).reduce((sum, r) => sum + r.items.reduce((s, it) => s + it.quantity, 0), 0),
+        qty: allReceipts.filter((r) => receiptPool(r) === p).reduce((sum, r) => sum + r.items.reduce((s, it) => s + Number(it.quantity), 0), 0),
       }))
     : [];
 

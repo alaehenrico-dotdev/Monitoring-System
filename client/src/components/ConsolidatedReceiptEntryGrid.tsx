@@ -15,6 +15,24 @@ import { formatPeso, formatQty } from "../utils/consolidatedReceipts";
 const CUSTOMERS_PER_PAGE = 4;
 /** Fixed width for the frozen SKU column, so the Product-name column next to it has a deterministic sticky offset (see .ae-bulk-fixed-col in index.css). */
 const SKU_COL_WIDTH = 72;
+/**
+ * The header's first row (customer name + sales rep, stacked) is the one
+ * header row in the whole app that isn't a single line of text - unlike
+ * every other table's `.ae-table th` (a plain ~29px row), it holds two
+ * stacked inputs. Left to its natural content height, the second header
+ * row's own sticky `top` (below) would have to guess that height - and a
+ * wrong guess means row 2 freezes a few pixels too early once scrolled,
+ * overlapping the bottom of row 1's real box instead of sitting cleanly
+ * under it. Giving row 1 (and its inputs) an explicit height makes the
+ * number exact instead of guessed, so row 2's `top` - and the category
+ * row's own sticky offset further below - can match it exactly.
+ */
+const HEADER_ROW1_HEIGHT = 56;
+const HEADER_ROW2_HEIGHT = 29;
+// Where a category row sticks once scrolled up to it - directly under both
+// header rows (see ConsolidatedReceiptTable.tsx's identical constant/
+// reasoning for the sticky-header-handoff technique itself).
+const CATEGORY_ROW_TOP = HEADER_ROW1_HEIGHT + HEADER_ROW2_HEIGHT;
 
 export interface EntryCustomerColumn {
   id: string;
@@ -270,64 +288,79 @@ export function ConsolidatedReceiptEntryGrid({
                     colSpan={3}
                     style={sheetStyle(i, {
                       top: 0,
-                      position: "relative",
+                      height: HEADER_ROW1_HEIGHT,
+                      boxSizing: "border-box",
                       ...cardEdgeStyle,
                     })}
                   >
-                    {/* Absolutely positioned in its own reserved gutter
-                        (both inputs are narrower than the cell, not just
-                        padded) so it never overlaps either input - customer
-                        name and sales rep still measure the same as each
-                        other. */}
-                    <button
-                      type="button"
-                      onClick={() => onRemoveCustomer(c.id)}
-                      aria-label="Remove customer"
-                      title="Remove customer"
-                      className="ae-tap-target"
-                      style={removeButtonStyle}
-                    >
-                      ×
-                    </button>
-                    <TextInput
-                      aria-label="Customer name"
-                      placeholder="Customer name"
-                      value={c.customer}
-                      onChange={(e) =>
-                        onRenameCustomer(c.id, { customer: e.target.value })
-                      }
-                      // display: block (inputs default to inline-block) so
-                      // it always stacks above Sales Rep rather than
-                      // sitting beside it - .ae-table th is white-space:
-                      // nowrap for its usual single-line labels, which
-                      // would otherwise keep two width: 100% inline-block
-                      // inputs from wrapping onto their own lines.
-                      style={{
-                        display: "block",
-                        fontSize: 11,
-                        fontWeight: 700,
-                        padding: "3px 5px",
-                        width: "calc(100% - 22px)",
-                        boxSizing: "border-box",
-                        marginBottom: 3,
-                      }}
-                    />
-                    <TextInput
-                      aria-label="Sales rep (optional)"
-                      placeholder="Sales rep (optional)"
-                      value={c.salesRepName}
-                      onChange={(e) =>
-                        onRenameCustomer(c.id, { salesRepName: e.target.value })
-                      }
-                      style={{
-                        display: "block",
-                        fontSize: 10.5,
-                        fontWeight: 400,
-                        padding: "2px 5px",
-                        width: "calc(100% - 22px)",
-                        boxSizing: "border-box",
-                      }}
-                    />
+                    {/* position: relative lives on this inner wrapper, not
+                        the <th> itself - the <th> needs to stay
+                        position: sticky (its default, from .ae-table th) so
+                        this header row actually sticks to the top; setting
+                        "relative" directly on the <th> used to silently
+                        override that via inline-style specificity, so this
+                        row never stuck at all despite looking like it should. */}
+                    <div style={{ position: "relative", height: "100%" }}>
+                      {/* Absolutely positioned in its own reserved gutter
+                          (both inputs are narrower than the cell, not just
+                          padded) so it never overlaps either input - customer
+                          name and sales rep still measure the same as each
+                          other. */}
+                      <button
+                        type="button"
+                        onClick={() => onRemoveCustomer(c.id)}
+                        aria-label="Remove customer"
+                        title="Remove customer"
+                        className="ae-tap-target"
+                        style={removeButtonStyle}
+                      >
+                        ×
+                      </button>
+                      <TextInput
+                        aria-label="Customer name"
+                        placeholder="Customer name"
+                        value={c.customer}
+                        onChange={(e) =>
+                          onRenameCustomer(c.id, { customer: e.target.value })
+                        }
+                        // display: block (inputs default to inline-block) so
+                        // it always stacks above Sales Rep rather than
+                        // sitting beside it - .ae-table th is white-space:
+                        // nowrap for its usual single-line labels, which
+                        // would otherwise keep two width: 100% inline-block
+                        // inputs from wrapping onto their own lines. Height
+                        // is explicit (not just padding) so this row's total
+                        // content height is deterministic - see
+                        // HEADER_ROW1_HEIGHT's own doc comment.
+                        style={{
+                          display: "block",
+                          height: 21,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          padding: "3px 5px",
+                          width: "calc(100% - 22px)",
+                          boxSizing: "border-box",
+                          marginBottom: 3,
+                        }}
+                      />
+                      <TextInput
+                        aria-label="Sales rep (optional)"
+                        placeholder="Sales rep (optional)"
+                        value={c.salesRepName}
+                        onChange={(e) =>
+                          onRenameCustomer(c.id, { salesRepName: e.target.value })
+                        }
+                        style={{
+                          display: "block",
+                          height: 18,
+                          fontSize: 10.5,
+                          fontWeight: 400,
+                          padding: "2px 5px",
+                          width: "calc(100% - 22px)",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -336,7 +369,7 @@ export function ConsolidatedReceiptEntryGrid({
                   <Fragment key={c.id}>
                     <th
                       style={sheetStyle(i, {
-                        top: 34,
+                        top: HEADER_ROW1_HEIGHT,
                         minWidth: 68,
                         textAlign: "center",
                       })}
@@ -345,7 +378,7 @@ export function ConsolidatedReceiptEntryGrid({
                     </th>
                     <th
                       style={sheetStyle(i, {
-                        top: 34,
+                        top: HEADER_ROW1_HEIGHT,
                         minWidth: 86,
                         textAlign: "center",
                       })}
@@ -354,7 +387,7 @@ export function ConsolidatedReceiptEntryGrid({
                     </th>
                     <th
                       style={sheetStyle(i, {
-                        top: 34,
+                        top: HEADER_ROW1_HEIGHT,
                         minWidth: 96,
                         textAlign: "center",
                         ...cardEdgeStyle,
@@ -377,7 +410,29 @@ export function ConsolidatedReceiptEntryGrid({
                 return (
                   <Fragment key={category}>
                     <tr>
-                      <td colSpan={totalCols} style={{ padding: 0 }}>
+                      {/* Sticky Scroll, same technique as
+                          ConsolidatedReceiptTable/StockGrid/TotalStocksTable:
+                          this <td> sticks vertically (top: CATEGORY_ROW_TOP,
+                          right under both header rows) so the band stays
+                          pinned while this category's rows scroll by, and
+                          the next category's own row - later in the DOM, so
+                          painted after - covers it once its own rows come
+                          into view. The nested button additionally sticks
+                          horizontally (left: 0, see categoryToggleStyle),
+                          same reasoning as ConsolidatedReceiptTable: this
+                          grid's customer-card columns can require
+                          horizontal scroll too, and the label should stay
+                          visible on both axes at once. */}
+                      <td
+                        colSpan={totalCols}
+                        style={{
+                          padding: 0,
+                          background: "var(--ae-category-bg)",
+                          position: "sticky",
+                          top: CATEGORY_ROW_TOP,
+                          zIndex: 2,
+                        }}
+                      >
                         <button
                           type="button"
                           onClick={() =>
@@ -623,15 +678,23 @@ const skuCellStyle: CSSProperties = {
 const numCellStyle: CSSProperties = { textAlign: "center" };
 const priceInputStyle: CSSProperties = { width: 76, textAlign: "center" };
 const qtyInputStyle: CSSProperties = { width: 64, textAlign: "center" };
+// Same horizontal-sticky treatment as ConsolidatedReceiptTable's own
+// categoryToggleStyle (see its doc comment for the full reasoning): a
+// content-sized (not 100%) width with position: sticky; left: 0, so the
+// label stays pinned to the left edge as the customer cards scroll
+// horizontally, rather than scrolling away with the rest of the row.
 const categoryToggleStyle: CSSProperties = {
-  display: "flex",
+  display: "inline-flex",
   alignItems: "center",
   gap: 6,
-  width: "100%",
+  width: "max-content",
+  position: "sticky",
+  left: 0,
+  zIndex: 2,
   textAlign: "left",
   font: "inherit",
   fontWeight: 700,
-  padding: "6px 8px",
+  padding: "5px 6px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
   background: "var(--ae-category-bg)",

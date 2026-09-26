@@ -27,6 +27,18 @@ export function UndoIcon() {
   );
 }
 
+/// Discards unsaved staged edits (Section 3.1's "Clear" toolbar action, next
+/// to Save) - a plain trash can, distinct from UndoIcon (which reverts an
+/// already-committed save) since clearing never touches the server.
+export function ClearIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4.5h10M6.5 4.5V3a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v1.5M4.5 4.5v9a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-9" />
+      <path d="M6.7 7.2v4M9.3 7.2v4" />
+    </svg>
+  );
+}
+
 export function SearchIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">

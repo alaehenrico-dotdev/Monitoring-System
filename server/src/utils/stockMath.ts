@@ -9,6 +9,17 @@ export function toNum(value: unknown): number {
   return value === null || value === undefined ? 0 : Number(value);
 }
 
+/// Section 4.4/4.6 - a manual count logged for a period supersedes that
+/// period's own system-computed Remaining Stock as the opening balance the
+/// next period carries forward (see dailyOnlineStockRepository/
+/// dailyOfflineStockRepository's getOpeningStock for the full reasoning).
+/// Nullish-coalescing, not `||` - a real manual count of exactly 0 is a
+/// genuine physical count (nothing on hand) and must still win, not be
+/// treated as "no count" and silently fall back to the system figure.
+export function resolveOpeningStock(manualCount: unknown, systemRemainingStock: unknown): number {
+  return toNum(manualCount ?? systemRemainingStock);
+}
+
 /// Section 4.2 - Online Stocks (subtotal) = opening + Stocks In - Stocks Out.
 export function calculateOnlineStock(opening: number, stockIn: number, stockOut: number): number {
   return opening + stockIn - stockOut;

@@ -26,7 +26,7 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
       { to: "/dashboard", label: "Dashboard", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/online", label: "Online Entry", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/offline", label: "Offline Entry", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/manual-count", label: "Manual Count", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
+      { to: "/manual-count", label: "Audit", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/total-stocks", label: "Total Stocks", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
       { to: "/receipts", label: "Receipts", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
     ],

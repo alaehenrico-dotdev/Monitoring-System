@@ -22,8 +22,6 @@ const csvColumns = [
   { key: "onlineRemainingStock", label: "Online Remaining" },
   { key: "offlineRemainingStock", label: "Offline Remaining" },
   { key: "totalRemainingStock", label: "Total Remaining" },
-  { key: "totalManualCount", label: "Manual Count" },
-  { key: "totalVariance", label: "Variance" },
 ];
 
 /// Section 4.5 - a read-only, always-current grid combining Online + Offline
@@ -100,7 +98,7 @@ export function TotalStocksPage() {
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
         <TableSkeleton
-          headers={["SKU", "Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"]}
+          headers={["SKU", "Product", "Online Remaining", "Offline Remaining", "Total Remaining"]}
           minWidth={640}
           label="Loading total stocks…"
         />

@@ -68,6 +68,11 @@ function toNum(v: unknown): number {
   return Number(v);
 }
 
+// Height of the single sticky header row (`.ae-table th`'s own `top: 0` /
+// `position: sticky`) - where a category row's own sticky offset starts, so
+// it sits right under the header rather than overlapping it.
+const HEADER_ROW_HEIGHT = 29;
+
 /**
  * Section 3.1 - An Excel-Like Data Entry Experience: rows are products
  * (grouped by category, in the same order as the current sheet), cells are
@@ -168,7 +173,20 @@ export function StockGrid({
             return (
               <Fragment key={category}>
                 <tr key={`${category}-header`}>
-                  <td colSpan={columns.length + 2} style={{ padding: 0 }}>
+                  {/* Sticky Scroll (CSS-only, no JS): pinned right under the
+                      header while this category's rows scroll by; once they
+                      scroll past, the next category's own row reaches the
+                      same top offset and, being later in the DOM (painted
+                      after), simply covers this one - the standard sticky-
+                      header handoff. See ConsolidatedReceiptTable.tsx for
+                      the same treatment on a table whose columns also need
+                      a horizontal-sticky label; this grid's column count is
+                      fixed per page (not unbounded like that one), so only
+                      the vertical stick is needed here. */}
+                  <td
+                    colSpan={columns.length + 2}
+                    style={{ padding: 0, position: "sticky", top: HEADER_ROW_HEIGHT, zIndex: 2 }}
+                  >
                     <button
                       type="button"
                       onClick={() =>
@@ -326,7 +344,7 @@ const categoryToggleStyle: CSSProperties = {
   textAlign: "left",
   font: "inherit",
   fontWeight: 700,
-  padding: "6px 8px",
+  padding: "5px 6px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
   background: "var(--ae-category-bg)",

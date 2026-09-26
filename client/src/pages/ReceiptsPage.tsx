@@ -8,7 +8,13 @@ import {
   type ReactNode,
 } from "react";
 import { Link } from "react-router-dom";
-import { createReceipt, createReceiptsBatch, listLastCustomers, listReceipts, type CreateReceiptBatchInput } from "../api/receipts";
+import {
+  createReceipt,
+  createReceiptsBatch,
+  listLastCustomers,
+  listReceipts,
+  type CreateReceiptBatchInput,
+} from "../api/receipts";
 import { listProducts } from "../api/products";
 import { listDeliveryDestinations } from "../api/deliveryDestinations";
 import type { DeliveryDestination, Product, Receipt } from "../types";
@@ -19,17 +25,27 @@ import {
   ReceiptPaper,
   RECEIPT_CARD_WIDTH,
 } from "../components/ReceiptCard";
-import { ConsolidatedReceiptEntryGrid, type EntryCustomerColumn } from "../components/ConsolidatedReceiptEntryGrid";
+import {
+  ConsolidatedReceiptEntryGrid,
+  type EntryCustomerColumn,
+} from "../components/ConsolidatedReceiptEntryGrid";
 import { Button, Select } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useAuth } from "../context/AuthContext";
-import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
+import {
+  Toolbar,
+  ToolbarControls,
+  ToolbarDivider,
+} from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { SkuCombobox } from "../components/SkuCombobox";
 import { formatPeso } from "../utils/consolidatedReceipts";
-import { AddDestinationModal, ADD_DESTINATION_VALUE } from "../components/AddDestinationModal";
+import {
+  AddDestinationModal,
+  ADD_DESTINATION_VALUE,
+} from "../components/AddDestinationModal";
 import { useSessionState } from "../hooks/useSessionState";
 import { RECEIPT_DRAFT_PREFIX } from "../utils/unsavedWork";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
@@ -112,14 +128,18 @@ interface LineItem {
 export function ReceiptsPage() {
   const { user } = useAuth();
   const progress = useTopProgress();
-  const canBulk = user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
+  const canBulk =
+    user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
 
   // Everything typed on this page (both modes) is kept in sessionStorage
   // under RECEIPT_DRAFT_PREFIX, so switching to another tab and back doesn't
   // wipe an in-progress receipt or bulk sheet - same idea as the Online/
   // Offline Entry pages' staged edits. Cleared by a successful save, by
   // Data Reset, or by closing the browser tab.
-  const [modeState, setModeState] = useSessionState<EntryMode>(`${RECEIPT_DRAFT_PREFIX}mode`, "single");
+  const [modeState, setModeState] = useSessionState<EntryMode>(
+    `${RECEIPT_DRAFT_PREFIX}mode`,
+    "single",
+  );
   // A restored "bulk" is ignored for roles that can't use it.
   const mode: EntryMode = canBulk ? modeState : "single";
   function setMode(next: EntryMode) {
@@ -141,21 +161,39 @@ export function ReceiptsPage() {
   // receipt selections within a session so repeat prints don't require
   // re-picking the same size each time.
   const [paperSize, setPaperSize] = useState<ThermalPaperSize>(
-    DEFAULT_THERMAL_PAPER_SIZE
+    DEFAULT_THERMAL_PAPER_SIZE,
   );
 
-  const [orderDate, setOrderDate] = useSessionState(`${RECEIPT_DRAFT_PREFIX}order-date`, today);
-  const [customer, setCustomer] = useSessionState(`${RECEIPT_DRAFT_PREFIX}customer`, "");
-  const [location, setLocation] = useSessionState(`${RECEIPT_DRAFT_PREFIX}location`, "");
-  const [salesRepName, setSalesRepName] = useSessionState(`${RECEIPT_DRAFT_PREFIX}sales-rep`, "");
+  const [orderDate, setOrderDate] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}order-date`,
+    today,
+  );
+  const [customer, setCustomer] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}customer`,
+    "",
+  );
+  const [location, setLocation] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}location`,
+    "",
+  );
+  const [salesRepName, setSalesRepName] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}sales-rep`,
+    "",
+  );
   // Which stock pool (if any) this receipt tallies against. Online and
   // Offline are separate pools that aren't expected to tally with each
   // other (Section 2.1), so at most one of these is ever true - checking
   // one clears the other rather than letting both post at once. Defaults
   // to the pre-existing Online behavior so nothing changes for anyone who
   // never touches the new control.
-  const [postToFulfillment, setPostToFulfillment] = useSessionState(`${RECEIPT_DRAFT_PREFIX}post-fulfillment`, true);
-  const [postToOfflineDelivery, setPostToOfflineDelivery] = useSessionState(`${RECEIPT_DRAFT_PREFIX}post-offline`, false);
+  const [postToFulfillment, setPostToFulfillment] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}post-fulfillment`,
+    true,
+  );
+  const [postToOfflineDelivery, setPostToOfflineDelivery] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}post-offline`,
+    false,
+  );
 
   function toggleFulfillment(checked: boolean) {
     setPostToFulfillment(checked);
@@ -167,25 +205,43 @@ export function ReceiptsPage() {
     if (checked) setPostToFulfillment(false);
   }
 
-  const [items, setItems] = useSessionState<LineItem[]>(`${RECEIPT_DRAFT_PREFIX}items`, [
-    { productId: 0, quantity: "", unitPrice: "" },
-  ]);
+  const [items, setItems] = useSessionState<LineItem[]>(
+    `${RECEIPT_DRAFT_PREFIX}items`,
+    [{ productId: 0, quantity: "", unitPrice: "" }],
+  );
 
   // ---------------------------------------------------------------------
   // Bulk entry state (Section 4.7's Consolidated Receipt bulk entry).
   // ---------------------------------------------------------------------
-  const [bulkDate, setBulkDate] = useSessionState(`${RECEIPT_DRAFT_PREFIX}bulk-date`, today);
-  const [bulkLocation, setBulkLocation] = useSessionState(`${RECEIPT_DRAFT_PREFIX}bulk-location`, "");
-  const [bulkCustomers, setBulkCustomers] = useSessionState<EntryCustomerColumn[]>(`${RECEIPT_DRAFT_PREFIX}bulk-customers`, []);
+  const [bulkDate, setBulkDate] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}bulk-date`,
+    today,
+  );
+  const [bulkLocation, setBulkLocation] = useSessionState(
+    `${RECEIPT_DRAFT_PREFIX}bulk-location`,
+    "",
+  );
+  const [bulkCustomers, setBulkCustomers] = useSessionState<
+    EntryCustomerColumn[]
+  >(`${RECEIPT_DRAFT_PREFIX}bulk-customers`, []);
   // Keyed by `${productId}:${customerId}` - price is entered per customer, per product.
-  const [bulkUnitPrices, setBulkUnitPrices] = useSessionState<Record<string, string>>(`${RECEIPT_DRAFT_PREFIX}bulk-prices`, {});
-  const [bulkQuantities, setBulkQuantities] = useSessionState<Record<string, string>>(`${RECEIPT_DRAFT_PREFIX}bulk-quantities`, {});
+  const [bulkUnitPrices, setBulkUnitPrices] = useSessionState<
+    Record<string, string>
+  >(`${RECEIPT_DRAFT_PREFIX}bulk-prices`, {});
+  const [bulkQuantities, setBulkQuantities] = useSessionState<
+    Record<string, string>
+  >(`${RECEIPT_DRAFT_PREFIX}bulk-quantities`, {});
   // View-only filter for the bulk grid's rows - not part of the draft.
   const [bulkCategory, setBulkCategory] = useState("");
   // Which destination <select> asked for "+ Add new destination…" (null = modal closed).
-  const [addDestinationFor, setAddDestinationFor] = useState<"single" | "bulk" | null>(null);
+  const [addDestinationFor, setAddDestinationFor] = useState<
+    "single" | "bulk" | null
+  >(null);
   const [bulkSaving, setBulkSaving] = useState(false);
-  const [bulkSaved, setBulkSaved] = useState<{ count: number; date: string } | null>(null);
+  const [bulkSaved, setBulkSaved] = useState<{
+    count: number;
+    date: string;
+  } | null>(null);
 
   /*
    * Load receipts, products, and delivery destinations.
@@ -201,7 +257,7 @@ export function ReceiptsPage() {
     listProducts()
       .then(setProducts)
       .catch((e) =>
-        setError(e instanceof Error ? e.message : "Failed to load SKUs")
+        setError(e instanceof Error ? e.message : "Failed to load SKUs"),
       );
 
     listDeliveryDestinations()
@@ -221,7 +277,9 @@ export function ReceiptsPage() {
   // that would silently swap the customers the person had just set up for
   // the location's previous ones. Only skips the restored date/location
   // pair; changing either one afterwards behaves as before.
-  const skipPrefillKey = useRef<string | null>(bulkCustomers.length > 0 ? `${bulkLocation}|${bulkDate}` : null);
+  const skipPrefillKey = useRef<string | null>(
+    bulkCustomers.length > 0 ? `${bulkLocation}|${bulkDate}` : null,
+  );
 
   useEffect(() => {
     if (!bulkLocation) return;
@@ -234,7 +292,13 @@ export function ReceiptsPage() {
     listLastCustomers(bulkLocation, bulkDate)
       .then((names) => {
         if (cancelled || names.length === 0) return;
-        setBulkCustomers(names.map((name) => ({ id: newCustomerId(), customer: name, salesRepName: "" })));
+        setBulkCustomers(
+          names.map((name) => ({
+            id: newCustomerId(),
+            customer: name,
+            salesRepName: "",
+          })),
+        );
       })
       .catch(() => {}); // best-effort - never blocks manually adding customers
     return () => {
@@ -248,7 +312,7 @@ export function ReceiptsPage() {
    */
   function updateItem(index: number, patch: Partial<LineItem>) {
     setItems((prev) =>
-      prev.map((it, i) => (i === index ? { ...it, ...patch } : it))
+      prev.map((it, i) => (i === index ? { ...it, ...patch } : it)),
     );
   }
 
@@ -256,7 +320,10 @@ export function ReceiptsPage() {
    * Add another product row.
    */
   function addItemRow() {
-    setItems((prev) => [...prev, { productId: 0, quantity: "", unitPrice: "" }]);
+    setItems((prev) => [
+      ...prev,
+      { productId: 0, quantity: "", unitPrice: "" },
+    ]);
   }
 
   /*
@@ -264,7 +331,7 @@ export function ReceiptsPage() {
    */
   function removeItemRow(index: number) {
     setItems((prev) =>
-      prev.length === 1 ? prev : prev.filter((_, i) => i !== index)
+      prev.length === 1 ? prev : prev.filter((_, i) => i !== index),
     );
   }
 
@@ -276,12 +343,13 @@ export function ReceiptsPage() {
     setError(null);
 
     const validItems = items.filter(
-      (it) => it.productId && Number(it.quantity) > 0 && Number(it.unitPrice) > 0
+      (it) =>
+        it.productId && Number(it.quantity) > 0 && Number(it.unitPrice) > 0,
     );
 
     if (!customer || !location || !validItems.length) {
       setError(
-        "Customer, location, and at least one order item (with a unit price) are required."
+        "Customer, location, and at least one order item (with a unit price) are required.",
       );
       return;
     }
@@ -347,17 +415,36 @@ export function ReceiptsPage() {
       salesRepId: null,
       salesRep: null,
       createdBy: user
-        ? { id: user.id, username: user.username, name: user.name, role: user.role }
+        ? {
+            id: user.id,
+            username: user.username,
+            name: user.name,
+            role: user.role,
+          }
         : null,
       createdAt: new Date().toISOString(),
       items: previewItems,
-      postedPool: postToFulfillment ? "FULFILLMENT" : postToOfflineDelivery ? "OFFLINE_DELIVERY" : "NONE",
+      postedPool: postToFulfillment
+        ? "FULFILLMENT"
+        : postToOfflineDelivery
+          ? "OFFLINE_DELIVERY"
+          : "NONE",
       // Never actually rendered - ReceiptCard skips the QR code entirely
       // for `isPreview` receipts (there's nothing stable to encode until
       // the receipt has a real, server-issued id/token).
       qrToken: "",
     };
-  }, [orderDate, customer, location, items, products, user, salesRepName, postToFulfillment, postToOfflineDelivery]);
+  }, [
+    orderDate,
+    customer,
+    location,
+    items,
+    products,
+    user,
+    salesRepName,
+    postToFulfillment,
+    postToOfflineDelivery,
+  ]);
 
   // ---------------------------------------------------------------------
   // Destination dropdowns' "+ Add new destination…" option.
@@ -373,24 +460,37 @@ export function ReceiptsPage() {
   }
 
   function handleDestinationCreated(destination: DeliveryDestination) {
-    setDestinations((prev) => (prev.some((d) => d.id === destination.id) ? prev : [...prev, destination]));
+    setDestinations((prev) =>
+      prev.some((d) => d.id === destination.id) ? prev : [...prev, destination],
+    );
     if (addDestinationFor === "bulk") setBulkLocation(destination.name);
     else setLocation(destination.name);
     setAddDestinationFor(null);
   }
 
-  const bulkCategories = useMemo(() => Array.from(new Set(products.map((p) => p.category))).sort(), [products]);
+  const bulkCategories = useMemo(
+    () => Array.from(new Set(products.map((p) => p.category))).sort(),
+    [products],
+  );
 
   // ---------------------------------------------------------------------
   // Bulk entry handlers.
   // ---------------------------------------------------------------------
 
   function addBulkCustomer() {
-    setBulkCustomers((prev) => [...prev, { id: newCustomerId(), customer: "", salesRepName: "" }]);
+    setBulkCustomers((prev) => [
+      ...prev,
+      { id: newCustomerId(), customer: "", salesRepName: "" },
+    ]);
   }
 
-  function renameBulkCustomer(id: string, patch: Partial<Omit<EntryCustomerColumn, "id">>) {
-    setBulkCustomers((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+  function renameBulkCustomer(
+    id: string,
+    patch: Partial<Omit<EntryCustomerColumn, "id">>,
+  ) {
+    setBulkCustomers((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    );
   }
 
   function removeBulkCustomer(id: string) {
@@ -411,12 +511,26 @@ export function ReceiptsPage() {
     });
   }
 
-  function setBulkUnitPrice(productId: number, customerId: string, value: string) {
-    setBulkUnitPrices((prev) => ({ ...prev, [bulkCellKey(productId, customerId)]: value }));
+  function setBulkUnitPrice(
+    productId: number,
+    customerId: string,
+    value: string,
+  ) {
+    setBulkUnitPrices((prev) => ({
+      ...prev,
+      [bulkCellKey(productId, customerId)]: value,
+    }));
   }
 
-  function setBulkQuantity(productId: number, customerId: string, value: string) {
-    setBulkQuantities((prev) => ({ ...prev, [bulkCellKey(productId, customerId)]: value }));
+  function setBulkQuantity(
+    productId: number,
+    customerId: string,
+    value: string,
+  ) {
+    setBulkQuantities((prev) => ({
+      ...prev,
+      [bulkCellKey(productId, customerId)]: value,
+    }));
   }
 
   function resetBulkForm() {
@@ -455,7 +569,11 @@ export function ReceiptsPage() {
         .map((p) => {
           const qty = Number(bulkQuantities[bulkCellKey(p.id, c.id)]);
           if (!(qty > 0)) return null;
-          return { productId: p.id, quantity: qty, unitPrice: Number(bulkUnitPrices[bulkCellKey(p.id, c.id)]) };
+          return {
+            productId: p.id,
+            quantity: qty,
+            unitPrice: Number(bulkUnitPrices[bulkCellKey(p.id, c.id)]),
+          };
         })
         .filter((it): it is NonNullable<typeof it> => it !== null);
       if (batchItems.length === 0) continue;
@@ -502,11 +620,15 @@ export function ReceiptsPage() {
           ...r.items.map((it) => it.product.name),
           ...r.items.map((it) => it.product.sku),
         ],
-        query
-      )
+        query,
+      ),
     )
     .sort((a, b) =>
-      a.orderDate < b.orderDate ? 1 : a.orderDate > b.orderDate ? -1 : b.id - a.id
+      a.orderDate < b.orderDate
+        ? 1
+        : a.orderDate > b.orderDate
+          ? -1
+          : b.id - a.id,
     );
 
   return (
@@ -516,83 +638,122 @@ export function ReceiptsPage() {
         subtitle={
           mode === "single"
             ? "Fill in the receipt on the left - the card on the right always shows exactly what will be saved."
-            : "One delivery date and location for the whole sheet - add a customer column per order, fill in quantities, and Save creates every customer's receipt together, posted to Offline Delivery."
+            : "Set one date and location, enter customer quantities, and click Save to batch-generate receipts to Offline Delivery."
         }
       >
-      <Toolbar>
-        <div>
-          <div style={{ display: "flex", flex: mode === "bulk" ? "0 0 auto" : "1 1 auto", minWidth: 0 }}>
-            <SearchInput
-              className={mode === "bulk" ? "ae-search-fixed" : undefined}
-              value={query}
-              onChange={setQuery}
-              placeholder="Search customer, location, sales rep, or SKU…"
-            />
+        <Toolbar>
+          <div>
+            <div
+              style={{
+                display: "flex",
+                flex: mode === "bulk" ? "0 0 auto" : "1 1 auto",
+                minWidth: 0,
+              }}
+            >
+              <SearchInput
+                className={mode === "bulk" ? "ae-search-fixed" : undefined}
+                value={query}
+                onChange={setQuery}
+                placeholder="Search customer, location, sales rep, or SKU…"
+              />
+            </div>
+
+            {mode === "bulk" && (
+              <>
+                <DatePicker
+                  aria-label="Delivery date"
+                  value={bulkDate}
+                  onChange={setBulkDate}
+                />
+                <Select
+                  aria-label="Delivery location"
+                  value={bulkLocation}
+                  onChange={(e) =>
+                    handleDestinationChange(e.target.value, "bulk")
+                  }
+                  required
+                >
+                  <option value="" disabled>
+                    Select destination…
+                  </option>
+                  {/* Same as the single form: a saved-in-draft destination that
+                    isn't in the active list any more still renders as selected. */}
+                  {bulkLocation &&
+                    !destinations.some((d) => d.name === bulkLocation) && (
+                      <option value={bulkLocation}>{bulkLocation}</option>
+                    )}
+                  {destinations.map((d) => (
+                    <option key={d.id} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                  <option value={ADD_DESTINATION_VALUE}>
+                    + Add new destination…
+                  </option>
+                </Select>
+                <CategoryFilter
+                  categories={bulkCategories}
+                  value={bulkCategory}
+                  onChange={setBulkCategory}
+                />
+              </>
+            )}
+
+            {canBulk && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setMode(mode === "single" ? "bulk" : "single")}
+              >
+                {mode === "single" ? "Bulk Entry" : "Single Receipt"}
+              </Button>
+            )}
           </div>
 
-          {mode === "bulk" && (
-            <>
-              <DatePicker aria-label="Delivery date" value={bulkDate} onChange={setBulkDate} />
-              <Select aria-label="Delivery location" value={bulkLocation} onChange={(e) => handleDestinationChange(e.target.value, "bulk")} required>
-                <option value="" disabled>
-                  Select destination…
-                </option>
-                {/* Same as the single form: a saved-in-draft destination that
-                    isn't in the active list any more still renders as selected. */}
-                {bulkLocation && !destinations.some((d) => d.name === bulkLocation) && <option value={bulkLocation}>{bulkLocation}</option>}
-                {destinations.map((d) => (
-                  <option key={d.id} value={d.name}>
-                    {d.name}
-                  </option>
-                ))}
-                <option value={ADD_DESTINATION_VALUE}>+ Add new destination…</option>
-              </Select>
-              <CategoryFilter categories={bulkCategories} value={bulkCategory} onChange={setBulkCategory} />
-            </>
-          )}
-
-          {canBulk && (
-            <Button type="button" variant="secondary" onClick={() => setMode(mode === "single" ? "bulk" : "single")}>
-              {mode === "single" ? "Bulk Entry" : "Single Receipt"}
-            </Button>
-          )}
-        </div>
-
-        <ToolbarControls>
-          {mode === "bulk" && (
-            <>
-              {/* Icon + .ae-toolbar-btn-label, same as Save on the entry pages.
+          <ToolbarControls>
+            {mode === "bulk" && (
+              <>
+                {/* Icon + .ae-toolbar-btn-label, same as Save on the entry pages.
                   --keep-label (index.css) makes it show "Save All" in the
                   full AND compact tiers and only shrink to a round icon in
                   the circle tier, when the toolbar genuinely has no room. */}
-              <Button
-                className="ae-toolbar-save ae-toolbar-save--keep-label"
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleBulkSave}
-                disabled={bulkSaving}
-                aria-label="Save all receipts"
-                title="Save every customer's receipt"
-              >
-                <SaveIcon />
-                <span className="ae-toolbar-btn-label">{bulkSaving ? "Saving…" : "Save All"}</span>
-              </Button>
-              <ToolbarDivider />
-            </>
-          )}
-          <ZoomControl zoom={zoom} onChange={setZoom} />
-          <Link to="/consolidated-receipts" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
-            Consolidated Receipt
-          </Link>
-        </ToolbarControls>
-      </Toolbar>
+                <Button
+                  className="ae-toolbar-save ae-toolbar-save--keep-label"
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleBulkSave}
+                  disabled={bulkSaving}
+                  aria-label="Save all receipts"
+                  title="Save every customer's receipt"
+                >
+                  <SaveIcon />
+                  <span className="ae-toolbar-btn-label">
+                    {bulkSaving ? "Saving…" : "Save All"}
+                  </span>
+                </Button>
+                <ToolbarDivider />
+              </>
+            )}
+            <ZoomControl zoom={zoom} onChange={setZoom} />
+            <Link
+              to="/consolidated-receipts"
+              className="ae-btn ae-btn-secondary"
+              style={{ textDecoration: "none" }}
+            >
+              Consolidated Receipt
+            </Link>
+          </ToolbarControls>
+        </Toolbar>
       </PageHeader>
 
-      {mode === "bulk" && error && <p style={{ color: colors.danger }}>{error}</p>}
+      {mode === "bulk" && error && (
+        <p style={{ color: colors.danger }}>{error}</p>
+      )}
       {mode === "bulk" && bulkSaved && (
         <p style={{ color: colors.ink, fontWeight: 600 }}>
-          Saved {bulkSaved.count} receipt{bulkSaved.count === 1 ? "" : "s"} for {formatDateDisplay(bulkSaved.date)} -{" "}
+          Saved {bulkSaved.count} receipt{bulkSaved.count === 1 ? "" : "s"} for{" "}
+          {formatDateDisplay(bulkSaved.date)} -{" "}
           <Link to="/consolidated-receipts">view in Consolidated Receipt</Link>.
         </p>
       )}
@@ -642,7 +803,12 @@ export function ReceiptsPage() {
                 <Divider />
 
                 <FormRow label="Date">
-                  <DatePicker aria-label="Order date" style={receiptInputStyle} value={orderDate} onChange={setOrderDate} />
+                  <DatePicker
+                    aria-label="Order date"
+                    style={receiptInputStyle}
+                    value={orderDate}
+                    onChange={setOrderDate}
+                  />
                 </FormRow>
 
                 <FormRow label="Customer">
@@ -659,7 +825,9 @@ export function ReceiptsPage() {
                   <Select
                     style={receiptInputStyle}
                     value={location}
-                    onChange={(e) => handleDestinationChange(e.target.value, "single")}
+                    onChange={(e) =>
+                      handleDestinationChange(e.target.value, "single")
+                    }
                     required
                   >
                     <option value="" disabled>
@@ -671,9 +839,10 @@ export function ReceiptsPage() {
                         valid selected option - otherwise an old receipt would
                         silently fall back to the blank placeholder and look
                         like its location was lost. */}
-                    {location && !destinations.some((d) => d.name === location) && (
-                      <option value={location}>{location}</option>
-                    )}
+                    {location &&
+                      !destinations.some((d) => d.name === location) && (
+                        <option value={location}>{location}</option>
+                      )}
 
                     {destinations.map((d) => (
                       <option key={d.id} value={d.name}>
@@ -681,7 +850,9 @@ export function ReceiptsPage() {
                       </option>
                     ))}
 
-                    <option value={ADD_DESTINATION_VALUE}>+ Add new destination…</option>
+                    <option value={ADD_DESTINATION_VALUE}>
+                      + Add new destination…
+                    </option>
                   </Select>
                 </FormRow>
 
@@ -705,18 +876,34 @@ export function ReceiptsPage() {
                       products={products}
                       value={item.productId}
                       onChange={(productId) => updateItem(i, { productId })}
-                      style={{ width: "100%", boxSizing: "border-box", fontSize: 11, padding: "4px 8px", marginBottom: 4 }}
+                      style={{
+                        width: "100%",
+                        boxSizing: "border-box",
+                        fontSize: 11,
+                        padding: "4px 8px",
+                        marginBottom: 4,
+                      }}
                     />
 
-                    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <div
+                      style={{ display: "flex", gap: 4, alignItems: "center" }}
+                    >
                       <input
                         type="number"
                         className="ae-input"
                         placeholder="Qty"
                         aria-label="Quantity"
                         value={item.quantity}
-                        onChange={(e) => updateItem(i, { quantity: e.target.value })}
-                        style={{ width: 56, flexShrink: 0, fontSize: 11, padding: "4px 4px", textAlign: "right" }}
+                        onChange={(e) =>
+                          updateItem(i, { quantity: e.target.value })
+                        }
+                        style={{
+                          width: 56,
+                          flexShrink: 0,
+                          fontSize: 11,
+                          padding: "4px 4px",
+                          textAlign: "right",
+                        }}
                       />
 
                       <input
@@ -727,12 +914,32 @@ export function ReceiptsPage() {
                         value={item.unitPrice}
                         min={0}
                         step="0.01"
-                        onChange={(e) => updateItem(i, { unitPrice: e.target.value })}
-                        style={{ width: 70, flexShrink: 0, fontSize: 11, padding: "4px 4px", textAlign: "right" }}
+                        onChange={(e) =>
+                          updateItem(i, { unitPrice: e.target.value })
+                        }
+                        style={{
+                          width: 70,
+                          flexShrink: 0,
+                          fontSize: 11,
+                          padding: "4px 4px",
+                          textAlign: "right",
+                        }}
                       />
 
-                      <span style={{ flex: 1, minWidth: 0, textAlign: "right", fontSize: 11, color: colors.subtleInk, whiteSpace: "nowrap" }}>
-                        {formatPeso((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)) || "—"}
+                      <span
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          textAlign: "right",
+                          fontSize: 11,
+                          color: colors.subtleInk,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {formatPeso(
+                          (Number(item.quantity) || 0) *
+                            (Number(item.unitPrice) || 0),
+                        ) || "—"}
                       </span>
 
                       <button
@@ -804,18 +1011,35 @@ export function ReceiptsPage() {
                  * instead of leaving it implicit in the two checkboxes.
                  */}
                 {!postToFulfillment && !postToOfflineDelivery && (
-                  <p style={{ fontSize: 10, color: colors.subtleInk, margin: "-6px 0 10px" }}>
-                    Not posted to Online or Offline - this receipt won't tally against either entry.
+                  <p
+                    style={{
+                      fontSize: 10,
+                      color: colors.subtleInk,
+                      margin: "-6px 0 10px",
+                    }}
+                  >
+                    Not posted to Online or Offline - this receipt won't tally
+                    against either entry.
                   </p>
                 )}
 
                 {error && (
-                  <p style={{ color: colors.danger, fontSize: 11, marginBottom: 8 }}>
+                  <p
+                    style={{
+                      color: colors.danger,
+                      fontSize: 11,
+                      marginBottom: 8,
+                    }}
+                  >
                     {error}
                   </p>
                 )}
 
-                <Button type="submit" disabled={submitting} style={{ width: "100%", color: colors.yellow }}>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  style={{ width: "100%", color: colors.yellow }}
+                >
                   {submitting ? "Saving…" : "Save Receipt"}
                 </Button>
               </ReceiptPaper>
@@ -837,7 +1061,15 @@ export function ReceiptsPage() {
 
         {!receipts ? (
           <TableSkeleton
-            headers={["Receipt #", "Date", "Customer", "Location", "Sales Rep", "Items", "Total Qty"]}
+            headers={[
+              "Receipt #",
+              "Date",
+              "Customer",
+              "Location",
+              "Sales Rep",
+              "Items",
+              "Total Qty",
+            ]}
             minWidth={720}
             rows={6}
             label="Loading receipts…"
@@ -858,7 +1090,10 @@ export function ReceiptsPage() {
               borderRadius: 0,
             }}
           >
-            <table className="ae-table ae-table--left" style={{ minWidth: 720 }}>
+            <table
+              className="ae-table ae-table--left"
+              style={{ minWidth: 720 }}
+            >
               <thead>
                 <tr>
                   <th>Receipt #</th>
@@ -884,9 +1119,24 @@ export function ReceiptsPage() {
                     <td>{r.customer || "—"}</td>
                     <td>{r.location || "—"}</td>
                     <td>{r.salesRepName || "—"}</td>
-                    <td style={{ textAlign: "center", color: "var(--ae-num-text)" }}>{r.items.length}</td>
-                    <td style={{ textAlign: "center", color: "var(--ae-num-text)" }}>
-                      {r.items.reduce((sum, it) => sum + Number(it.quantity), 0)}
+                    <td
+                      style={{
+                        textAlign: "center",
+                        color: "var(--ae-num-text)",
+                      }}
+                    >
+                      {r.items.length}
+                    </td>
+                    <td
+                      style={{
+                        textAlign: "center",
+                        color: "var(--ae-num-text)",
+                      }}
+                    >
+                      {r.items.reduce(
+                        (sum, it) => sum + Number(it.quantity),
+                        0,
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -897,7 +1147,11 @@ export function ReceiptsPage() {
       </div>
 
       {addDestinationFor && (
-        <AddDestinationModal existing={destinations} onClose={() => setAddDestinationFor(null)} onCreated={handleDestinationCreated} />
+        <AddDestinationModal
+          existing={destinations}
+          onClose={() => setAddDestinationFor(null)}
+          onCreated={handleDestinationCreated}
+        />
       )}
 
       {/*
@@ -918,7 +1172,13 @@ export function ReceiptsPage() {
            * (see utils/receiptPdf.ts's "PDF" button below), so it never
            * affects what's shown on screen here.
            */}
-          <div style={{ display: "flex", justifyContent: "center", overflowX: "auto" }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              overflowX: "auto",
+            }}
+          >
             <ReceiptCard receipt={selectedReceipt} />
           </div>
 
@@ -960,7 +1220,12 @@ export function ReceiptsPage() {
             <Button
               type="button"
               size="sm"
-              onClick={() => selectedReceipt && void progress.track(() => generateReceiptPdf(selectedReceipt, paperSize))}
+              onClick={() =>
+                selectedReceipt &&
+                void progress.track(() =>
+                  generateReceiptPdf(selectedReceipt, paperSize),
+                )
+              }
               title="Print or save as PDF"
             >
               <PrinterIcon /> PDF

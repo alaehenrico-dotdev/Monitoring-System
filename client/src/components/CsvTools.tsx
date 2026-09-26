@@ -253,12 +253,16 @@ function UnmatchedImportRowView({
 }
 
 /**
- * Section 3.1 - "Copy/paste of a block of numbers from an external
- * spreadsheet into the grid is supported for bulk correction." Implemented
- * here as CSV export/import rather than literal clipboard paste: export
- * gives encoders a real file they can open in Excel, edit offline, and
- * re-import, which is the more common real-world bulk-correction workflow
- * than pasting a raw block of cells.
+ * Export always dumps every column (Section 3.1's Excel-like round-trip
+ * file). Import is narrower: it only ever reads and writes Opening Stock
+ * (from that file's own Opening Stock or, more commonly, its Remaining
+ * Stock / ending-balance column - see handleImportFile). Every other cell
+ * (Stock In/Out, Production, per-destination delivery, Upsell, Backloads)
+ * starts at 0 each day and is meant to be entered fresh as that day's real
+ * activity happens - re-importing an old file must never fabricate those
+ * from a different day's own figures. Encoders still get a real file they
+ * can open in Excel and re-import purely to seed/correct Opening Stock from
+ * existing data (e.g. the last pre-system report, or a day that had none).
  */
 export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTools({
   filenamePrefix,
@@ -383,12 +387,20 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
       const productIdx = findProductColumnIndex(header);
       const categoryIdx = header.indexOf("category");
 
-      const columnIndexes = matchColumnIndexes(columns, header);
-      // Every column this grid reads on import that this particular file
-      // doesn't have a header for at all - worth a heads-up, since those
-      // rows will otherwise just look "unchanged" for that column with no
-      // indication why (see the toast message below).
-      const missingColumns = unmatchedColumns(columns, header);
+      // Import only ever writes Opening Stock. Every other cell (Stock In/
+      // Out, Production, per-destination delivery, Upsell, Backloads, ...)
+      // starts at 0 each day and is meant to be entered fresh as that day's
+      // real activity happens - importing a past day's own figures for
+      // those onto a different day would silently fabricate movements that
+      // never happened on the day being seeded. A file's Remaining Stock
+      // (or an Opening Stock column of its own) is the one figure that's
+      // legitimately "existing data" to carry over.
+      const importedColumns = columns.filter((c) => c.key === "openingStock");
+      const columnIndexes = matchColumnIndexes(importedColumns, header);
+      // Whether Opening Stock itself wasn't found in this file at all -
+      // worth a heads-up, since every row will otherwise just look
+      // "unchanged" with no indication why (see the toast message below).
+      const missingColumns = unmatchedColumns(importedColumns, header);
 
       const matchedRows: MatchedImportRow[] = [];
       const unmatchedRows: UnmatchedImportRow[] = [];
@@ -761,7 +773,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
               <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.ink }}>
                 Unmatched ({importReview.unmatchedRows.length})
               </h4>
-              <div style={{ maxHeight: 240, overflowY: "auto" }}>
+              <div className="table-scroll" style={{ maxHeight: 240, overflowY: "auto" }}>
                 {importReview.unmatchedRows.map((row) => (
                   <UnmatchedImportRowView
                     key={row.rawLineIndex}

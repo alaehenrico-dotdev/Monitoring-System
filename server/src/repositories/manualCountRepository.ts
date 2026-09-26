@@ -1,5 +1,5 @@
 import { Shift, StockLocation } from "@prisma/client";
-import { prisma } from "../lib/prisma";
+import { prisma, type Db } from "../lib/prisma";
 
 export interface ManualCountData {
   productId: number;
@@ -23,14 +23,29 @@ export interface VarianceReportFilters {
 
 /// Section 5.4 - manual_counts: physical count capture; variance is derived, never typed.
 export const manualCountRepository = {
-  findOne(productId: number, entryDate: Date, shift: Shift, location: StockLocation) {
-    return prisma.manualCount.findUnique({
+  findOne(productId: number, entryDate: Date, shift: Shift, location: StockLocation, db: Db = prisma) {
+    return db.manualCount.findUnique({
       where: { productId_entryDate_shift_location: { productId, entryDate, shift, location } },
     });
   },
 
   findAllForDateAndLocation(entryDate: Date, shift: Shift, location: StockLocation) {
     return prisma.manualCount.findMany({ where: { entryDate, shift, location } });
+  },
+
+  /// Batched form of findOne, for a set of (productId, entryDate, shift)
+  /// keys that don't all share the same date/shift - see
+  /// dailyOnlineStockRepository/dailyOfflineStockRepository's
+  /// getOpeningStocksForProducts, which resolves each product's own
+  /// "immediately preceding period" independently and then needs this one
+  /// batched lookup to check all of them for a superseding manual count at
+  /// once, rather than one query per product.
+  findManyForKeys(keys: { productId: number; entryDate: Date; shift: Shift }[], location: StockLocation) {
+    if (!keys.length) return Promise.resolve([]);
+    return prisma.manualCount.findMany({
+      where: { location, OR: keys.map((k) => ({ productId: k.productId, entryDate: k.entryDate, shift: k.shift })) },
+      select: { productId: true, manualCount: true },
+    });
   },
 
   /// Used by the Total Stocks view (Section 4.5), which is a per-date (not

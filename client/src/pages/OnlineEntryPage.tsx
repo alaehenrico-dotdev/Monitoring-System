@@ -9,11 +9,12 @@ import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
 import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
-import { PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
+import { ClearIcon, PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { ShiftFilter } from "../components/ShiftFilter";
 import { TableSkeleton } from "../components/Skeleton";
+import { LoadingOverlay } from "../components/Spinner";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { Modal } from "../components/Modal";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
@@ -27,6 +28,24 @@ import { getCurrentShiftAndDate, otherShift, SHIFT_LABELS, SHIFT_SHORT_LABELS } 
 import { calculateOfflineRemaining, calculateOfflineStock, calculateOnlineRemaining, calculateOnlineStock, isNegativeStock } from "../utils/stockMath";
 import { colors } from "../theme";
 import type { Shift } from "../types";
+
+/// Re-derives Online Stocks + Remaining Stock from a last-saved entry plus a
+/// staged (not-yet-saved) diff on top of it - shared by the live grid
+/// preview (usePendingEntryChanges' `recompute`, below) and validateImportRow's
+/// advisory negative-stock pre-check, so the two never drift apart on what
+/// "the new figures would be" actually means.
+function computeOnlineFigures(entry: Record<string, unknown>, changes: Record<string, number>) {
+  const openingStock = changes.openingStock ?? Number(entry.openingStock ?? 0);
+  const stockInOffToOl = changes.stockInOffToOl ?? Number(entry.stockInOffToOl ?? 0);
+  const stockOutOlToOff = changes.stockOutOlToOff ?? Number(entry.stockOutOlToOff ?? 0);
+  const productionIn = changes.productionIn ?? Number(entry.productionIn ?? 0);
+  const fulfillmentOut = changes.fulfillmentOut ?? Number(entry.fulfillmentOut ?? 0);
+  const rts = changes.rts ?? Number(entry.rts ?? 0);
+
+  const onlineStock = calculateOnlineStock(openingStock, stockInOffToOl, stockOutOlToOff);
+  const remainingStock = calculateOnlineRemaining(onlineStock, productionIn, fulfillmentOut, rts);
+  return { onlineStock, remainingStock };
+}
 
 export function OnlineEntryPage() {
   const { user } = useAuth();
@@ -45,6 +64,7 @@ export function OnlineEntryPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   // One level of Undo for the most recent Save - the pre-save value of
   // every field that batch touched, keyed the same way as pending edits.
   // Undoing re-submits those old values through the same save endpoint (so
@@ -65,7 +85,11 @@ export function OnlineEntryPage() {
   // sessionStorage under this date+shift's own key, so navigating to another
   // page and back - or just switching shift/date and back - doesn't lose an
   // edit still in progress.
-  const { pending, displayRows, stage, clear, pendingCount } = usePendingEntryChanges(rows, `ala-eh-pending:online:${date}:${shift}`);
+  const { pending, displayRows, stage, clear, clearAll, pendingCount } = usePendingEntryChanges(
+    rows,
+    `ala-eh-pending:online:${date}:${shift}`,
+    computeOnlineFigures,
+  );
 
   // Search and the category dropdown only affect what's displayed in the
   // grid - both are local filters over the same already-loaded rows, not a
@@ -155,9 +179,17 @@ export function OnlineEntryPage() {
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
     setSaving(true);
+    // Real per-item progress (Section: Loading system) - same pattern
+    // CsvTools' own import Save already uses. Particularly worth it here:
+    // a bulk CSV import can stage dozens of products at once, so this can be
+    // a genuinely long sequential save, not the near-instant single-cell
+    // edit this button started out handling.
+    progress.start();
     const failed: string[] = [];
     const revertTo: PendingByProduct = {};
-    for (const [productIdStr, changes] of Object.entries(pending)) {
+    const entries = Object.entries(pending);
+    for (let i = 0; i < entries.length; i++) {
+      const [productIdStr, changes] = entries[i];
       const productId = Number(productIdStr);
       // Snapshot each field's pre-save value before overwriting it, so
       // Undo has something to put back - taken from `rows` (last-saved
@@ -181,17 +213,38 @@ export function OnlineEntryPage() {
         const reason = e instanceof Error ? e.message : "unknown error";
         failed.push(`${name} (${reason})`);
       }
+      progress.set(Math.round(((i + 1) / entries.length) * 100));
     }
     setSaving(false);
     setShowPreview(false);
     if (Object.keys(revertTo).length > 0) setLastSavedBatch(revertTo);
-    if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
+    if (failed.length) {
+      setError(`Failed to save: ${failed.join("; ")}`);
+      progress.fail();
+    } else {
+      progress.done();
+    }
     // Whatever CsvTools' own "Undo Import" batch might still reference is no
     // longer just staged - some or all of it just got committed for real by
     // this Save (see CsvTools' notifyCommitted doc comment). Safe to call
     // even when nothing was actually imported - it's a no-op then.
     csvToolsRef.current?.notifyCommitted();
     return failed.length === 0;
+  }
+
+  // Discards every currently-staged edit (manual or imported) without
+  // saving any of it - the counterpart to Save for "actually I don't want
+  // any of this", so an encoder doesn't have to hand-revert each cell (or
+  // reload the page and lose the sessionStorage-persisted draft some other
+  // way). Never touches the server - there's nothing to undo once this
+  // runs, unlike handleUndoLastSave.
+  function handleClearAll() {
+    clearAll();
+    setShowClearConfirm(false);
+    // Same reasoning as handleSaveAll's own call: a cleared pending set can
+    // no longer be reverted, so CsvTools' "Undo Import" toast must stop
+    // offering to.
+    csvToolsRef.current?.notifyCommitted();
   }
 
   // CSV import (Section 3.1) stages every column it touched exactly like a
@@ -221,15 +274,9 @@ export function OnlineEntryPage() {
     if (!row) return undefined;
     const entry = row.entry as unknown as Record<string, unknown>;
 
-    const openingStock = changes.openingStock ?? Number(entry.openingStock ?? 0);
     const stockInOffToOl = changes.stockInOffToOl ?? Number(entry.stockInOffToOl ?? 0);
     const stockOutOlToOff = changes.stockOutOlToOff ?? Number(entry.stockOutOlToOff ?? 0);
-    const productionIn = changes.productionIn ?? Number(entry.productionIn ?? 0);
-    const fulfillmentOut = changes.fulfillmentOut ?? Number(entry.fulfillmentOut ?? 0);
-    const rts = changes.rts ?? Number(entry.rts ?? 0);
-
-    const onlineStock = calculateOnlineStock(openingStock, stockInOffToOl, stockOutOlToOff);
-    const remainingStock = calculateOnlineRemaining(onlineStock, productionIn, fulfillmentOut, rts);
+    const { remainingStock } = computeOnlineFigures(entry, changes);
     if (isNegativeStock(remainingStock)) {
       return `This would take ${row.product.name}'s Online stock below zero (would end at ${remainingStock}).`;
     }
@@ -341,6 +388,20 @@ export function OnlineEntryPage() {
               <span className="ae-toolbar-btn-label">Save{pendingCount > 0 ? ` (${pendingCount})` : ""}</span>
             </Button>
           )}
+          {canEdit && (
+            <Button
+              className="ae-toolbar-save"
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowClearConfirm(true)}
+              disabled={pendingCount === 0 || saving}
+              title="Discard unsaved changes on this sheet"
+            >
+              <ClearIcon />
+              <span className="ae-toolbar-btn-label">Clear</span>
+            </Button>
+          )}
           <Button
             className="ae-toolbar-save"
             type="button"
@@ -419,6 +480,23 @@ export function OnlineEntryPage() {
           </div>
         </Modal>
       )}
+      {showClearConfirm && (
+        <Modal title="Discard unsaved changes?" onClose={() => setShowClearConfirm(false)}>
+          <PendingChangesPreview items={describePendingChanges(rows, pending, columns)} />
+          <p style={{ margin: "12px 0 0", fontSize: 12.5, color: colors.subtleInk }}>
+            This clears every unsaved edit on this sheet (typed or imported) - nothing has been saved yet, so nothing on the server is affected.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setShowClearConfirm(false)}>
+              Keep editing
+            </Button>
+            <Button type="button" variant="danger" size="sm" onClick={handleClearAll}>
+              Discard {pendingCount}
+            </Button>
+          </div>
+        </Modal>
+      )}
+      {saving && <LoadingOverlay label="Saving changes…" />}
     </div>
   );
 }
