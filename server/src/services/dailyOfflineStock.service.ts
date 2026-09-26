@@ -81,11 +81,16 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
   return products.map((product) => {
     const existing = rowByProduct.get(product.id);
     if (existing) {
-      // deliveryOut is always recomputed from the breakdown rows here, not
-      // read off the column - see resolveDeliveryOut/saveOfflineEntry for
-      // why the column can't be trusted as the source of truth post-migration.
+      // Whichever mode this entry was last saved in stays authoritative on
+      // read, mirroring resolveDeliveryOut's write-side rule: an entry with
+      // breakdown rows on file has those summed (they're the source of
+      // truth once destinations are in play - the column is just a
+      // write-through cache of their sum); an entry saved as a flat figure
+      // (no destinations configured, or Delivery (Out) typed directly) has
+      // none, so the column itself - the only place that value was ever
+      // written - is used as-is instead of collapsing to a false 0.
       const deliveryByDestination = toDeliveryMap(deliveriesByEntryId.get(existing.id));
-      const deliveryOut = sumDeliveryMap(deliveryByDestination);
+      const deliveryOut = Object.keys(deliveryByDestination).length > 0 ? sumDeliveryMap(deliveryByDestination) : toNum(existing.deliveryOut);
       return { product, entry: { ...existing, deliveryOut, deliveryByDestination }, isSaved: true };
     }
 

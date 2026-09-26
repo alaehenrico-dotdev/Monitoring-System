@@ -124,7 +124,14 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
 - Product & category master list (Section 4.1), admin-managed, cached server-side and
   invalidated on write.
 - Daily Online / Offline stock entry grids with auto carry-forward of opening stock (Section 4.6),
-  category grouping, and subtotal/grand-total rows — an Excel-like editable grid (Section 3.1).
+  category grouping, and subtotal/grand-total rows — an Excel-like editable grid (Section 3.1). A
+  period's opening stock normally carries forward from the immediately preceding period's own
+  Remaining Stock, but if that period also has a saved Online/Offline manual count (Section 4.4),
+  the physical count supersedes it instead — the correction, not the pre-correction figure, is what
+  the next period actually starts from. Only ever the one period being carried forward from, never
+  retroactive: correcting a count later doesn't ripple into a later period already saved. A
+  combined Total-location count stays purely informational (Variance Report / Total Stocks) since
+  it can't be unambiguously split back between the two pools.
 - Auto-mirrored Online↔Offline transfer figures (Section 4.3), written once and reflected on both
   sides without duplicate typing. A Stock Out (Fulfillment/Delivery, or a transfer to the other
   channel) that would take a channel's Remaining Stock below zero is rejected server-side, on
@@ -152,9 +159,11 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
 **Data entry & reporting tools**
 - Excel-style zoom (25%–200%) on every grid page and the Receipts page — genuinely re-lays-out
   text/cells/inputs at the new scale (CSS `zoom`, not a visual stretch).
-- CSV export/import on Online Entry, Offline Entry, Total Stocks, and Manual Count, for bulk
-  correction via a spreadsheet (Section 3.1) — import only ever applies fields that actually
-  changed, so a round-tripped export doesn't resubmit 60 unchanged rows as edits.
+- CSV export on Online Entry, Offline Entry, Total Stocks, and Manual Count (Section 3.1). Import
+  (Online/Offline Entry only) writes just Opening Stock, read from the file's Remaining Stock/
+  ending-balance column (or its own Opening Stock column, for a day with no prior balance to carry
+  forward) — every other cell starts at 0 each day and is entered fresh, so import never applies a
+  file's old Stock In/Out, Production, delivery, Upsell, or Backload figures onto a different day.
 - One-file, multi-section CSV export on the Daily Report (Online + Offline + Total in a single
   download).
 - Export as a real generated PDF (not the browser's print dialog) on every grid page and the

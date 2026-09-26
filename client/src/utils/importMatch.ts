@@ -43,6 +43,13 @@ export function findProductColumnIndex(header: string[]): number {
 /// any alias, case-insensitively. A column with no match in this file is
 /// left out of the result entirely (nothing to read for it), not an error -
 /// a file doesn't have to carry every column.
+///
+/// When a column's label AND one of its aliases both appear in the same
+/// header row (e.g. openingStock's "Stocks (Opening)" label alongside its
+/// "Remaining Stocks" alias on a re-imported full report), the label/alias
+/// LIST ORDER decides the winner, not which one the header happens to list
+/// first - see openingStock's own alias order in stockColumns.ts for why
+/// that matters there.
 export function matchColumnIndexes(
   columns: ImportableColumn[],
   header: string[],
@@ -52,8 +59,11 @@ export function matchColumnIndexes(
     .filter((c) => c.editable || c.importable)
     .map((col) => {
       const names = [col.label, ...(col.aliases ?? [])].map((n) => n.toLowerCase());
-      const idx = normalizedHeader.findIndex((h) => names.includes(h));
-      return { key: col.key, idx };
+      for (const name of names) {
+        const idx = normalizedHeader.indexOf(name);
+        if (idx !== -1) return { key: col.key, idx };
+      }
+      return { key: col.key, idx: -1 };
     })
     .filter((c) => c.idx !== -1);
 }

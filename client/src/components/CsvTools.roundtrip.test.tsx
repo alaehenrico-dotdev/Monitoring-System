@@ -13,7 +13,12 @@ vi.mock("../utils/csv", async (importOriginal) => {
 });
 import { downloadCsv } from "../utils/csv";
 
+// Opening Stock is the ONLY column Import ever writes (see handleImportFile's
+// own doc comment) - the other columns here (editable and importable-only
+// alike) exist purely so these tests can prove a file that also changes them
+// is still ignored for anything but Opening Stock.
 const columns: CsvColumn[] = [
+  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Remaining Stocks"] },
   { key: "stockInOlToOff", label: "Stocks In (Ol→Off)", editable: true, aliases: ["Stocks In"] },
   { key: "productionIn", label: "Production (In)", editable: true },
   { key: "deliveryOut", label: "Delivery (Out)", editable: false, importable: true, aliases: ["Delivery(Out)"] },
@@ -29,7 +34,7 @@ const product: Product = {
   sortOrder: 0,
 };
 
-const rows = [{ product, entry: { stockInOlToOff: 5, productionIn: 10, deliveryOut: 3 } }];
+const rows = [{ product, entry: { openingStock: 20, stockInOlToOff: 5, productionIn: 10, deliveryOut: 3 } }];
 
 function renderCsvTools(validateImport?: (productId: number, changes: Record<string, number>) => string | undefined) {
   const onImportRow = vi.fn().mockResolvedValue(undefined);
@@ -51,11 +56,11 @@ function renderCsvTools(validateImport?: (productId: number, changes: Record<str
 }
 
 /**
- * Section 3.1's own round-trip guarantee: exporting a grid and re-importing
- * it completely unmodified must stage zero changes - a round-tripped file
- * (open in Excel, don't touch anything, save) is common enough that this
- * silently resubmitting every cell as a "real" edit would be its own bug
- * (spurious change-log entries, "changed" cells that never actually changed).
+ * Import's sole job is carrying Opening Stock forward from a file's
+ * Remaining Stock (see handleImportFile's own doc comment) - every other
+ * cell starts at 0 each day and is entered fresh, so a file that also
+ * carries old figures for those must never apply them, even when they
+ * genuinely differ from what's on the grid.
  */
 describe("CsvTools - export/import round trip", () => {
   it("stages zero changes when the exported CSV is re-imported unmodified", async () => {
@@ -76,13 +81,12 @@ describe("CsvTools - export/import round trip", () => {
     expect(onImportRow).not.toHaveBeenCalled();
   });
 
-  it("a blank cell is left untouched, not silently staged as 0", async () => {
+  it("imports a changed Opening Stock but ignores every other column even when they also changed", async () => {
     const { onImportRow } = renderCsvTools();
 
-    // Production (In) is blank - only Stocks In (Ol→Off) actually changed.
     const csv = [
-      "CATEGORY,SKU,STOCKS IN (OL→OFF),PRODUCTION (IN),DELIVERY (OUT)",
-      "Class A (Liter),Sweet A,7,,3",
+      "CATEGORY,SKU,STOCKS (OPENING),STOCKS IN (OL→OFF),PRODUCTION (IN),DELIVERY (OUT)",
+      "Class A (Liter),Sweet A,50,999,999,999",
     ].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -91,13 +95,52 @@ describe("CsvTools - export/import round trip", () => {
     await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
 
     expect(screen.getByRole("button", { name: "Save (1)" })).toBeEnabled();
-    expect(screen.getByText("Stocks In (Ol→Off)")).toBeInTheDocument();
+    expect(screen.getByText("Stocks (Opening)")).toBeInTheDocument();
+    expect(screen.queryByText("Stocks In (Ol→Off)")).not.toBeInTheDocument();
     expect(screen.queryByText("Production (In)")).not.toBeInTheDocument();
+    expect(screen.queryByText("Delivery (Out)")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Save (1)" }));
     await waitFor(() => expect(onImportRow).toHaveBeenCalledTimes(1));
-    // The blank Production (In) cell must not have been folded in as 0.
-    expect(onImportRow).toHaveBeenCalledWith(product.id, { stockInOlToOff: 7 });
+    // Only openingStock is ever passed through, never the other columns that
+    // also differed in the file.
+    expect(onImportRow).toHaveBeenCalledWith(product.id, { openingStock: 50 });
+  });
+
+  it("a blank Opening Stock cell is left untouched, not silently staged as 0", async () => {
+    const { onImportRow } = renderCsvTools();
+
+    const csv = [
+      "CATEGORY,SKU,STOCKS (OPENING),STOCKS IN (OL→OFF),PRODUCTION (IN),DELIVERY (OUT)",
+      "Class A (Liter),Sweet A,,999,999,999",
+    ].join("\r\n");
+    const file = new File([csv], "edit.csv", { type: "text/csv" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+
+    const saveButton = screen.getByRole("button", { name: "Save (0)" });
+    expect(saveButton).toBeDisabled();
+    expect(onImportRow).not.toHaveBeenCalled();
+  });
+
+  it("reads Opening Stock from a Remaining Stock column when the file has no Opening Stock column of its own", async () => {
+    const { onImportRow } = renderCsvTools();
+
+    // Mirrors the real monthly report (Section 8.1): its own "Stocks"
+    // column is that day's already-stale opening balance, but this fixture
+    // only has the ending balance - exactly the switchover/backfill case
+    // Opening Stock import exists for.
+    const csv = ["CATEGORY,SKU,REMAINING STOCKS", "Class A (Liter),Sweet A,50"].join("\r\n");
+    const file = new File([csv], "monthly-report.csv", { type: "text/csv" });
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Save (1)" }));
+    await waitFor(() => expect(onImportRow).toHaveBeenCalledTimes(1));
+    expect(onImportRow).toHaveBeenCalledWith(product.id, { openingStock: 50 });
   });
 });
 
@@ -119,7 +162,7 @@ describe("CsvTools - saving state", () => {
       </TopProgressProvider>,
     );
 
-    const csv = ["CATEGORY,SKU,STOCKS IN (OL→OFF),PRODUCTION (IN),DELIVERY (OUT)", "Class A (Liter),Sweet A,7,10,3"].join("\r\n");
+    const csv = ["CATEGORY,SKU,STOCKS (OPENING)", "Class A (Liter),Sweet A,50"].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
@@ -144,10 +187,13 @@ describe("CsvTools - saving state", () => {
 describe("CsvTools - validateImport advisory warning", () => {
   it("shows the warning in the Review modal but still stages and counts the row toward Save", async () => {
     const { onImportRow } = renderCsvTools(
-      (productId, changes) => (productId === product.id && changes.stockInOlToOff === 7 ? "This would take Sweet A's Offline stock below zero (would end at -3)." : undefined),
+      (productId, changes) =>
+        productId === product.id && changes.openingStock === 50
+          ? "This would take Sweet A's Offline stock below zero (would end at -3)."
+          : undefined,
     );
 
-    const csv = ["CATEGORY,SKU,STOCKS IN (OL→OFF),PRODUCTION (IN),DELIVERY (OUT)", "Class A (Liter),Sweet A,7,10,3"].join("\r\n");
+    const csv = ["CATEGORY,SKU,STOCKS (OPENING)", "Class A (Liter),Sweet A,50"].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
@@ -167,7 +213,7 @@ describe("CsvTools - validateImport advisory warning", () => {
   it("shows no warning section when validateImport finds nothing wrong", async () => {
     renderCsvTools(() => undefined);
 
-    const csv = ["CATEGORY,SKU,STOCKS IN (OL→OFF),PRODUCTION (IN),DELIVERY (OUT)", "Class A (Liter),Sweet A,7,10,3"].join("\r\n");
+    const csv = ["CATEGORY,SKU,STOCKS (OPENING)", "Class A (Liter),Sweet A,50"].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });

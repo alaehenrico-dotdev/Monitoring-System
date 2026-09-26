@@ -6,6 +6,7 @@ import {
   calculateOnlineStock,
   calculateVariance,
   isNegativeStock,
+  resolveOpeningStock,
   toNum,
 } from "./stockMath";
 
@@ -82,6 +83,28 @@ describe("calculateVariance (Section 4.4)", () => {
 
   it("is 0 when the count matches exactly - not flagged as a variance", () => {
     expect(calculateVariance(50, 50)).toBe(0);
+  });
+});
+
+describe("resolveOpeningStock (Section 4.4/4.6 - a manual count supersedes system Remaining Stock as opening balance)", () => {
+  it("uses the manual count when one was logged for the prior period", () => {
+    expect(resolveOpeningStock(90, 100)).toBe(90);
+  });
+
+  it("falls back to system Remaining Stock when no manual count was logged", () => {
+    expect(resolveOpeningStock(null, 100)).toBe(100);
+    expect(resolveOpeningStock(undefined, 100)).toBe(100);
+  });
+
+  it("a real manual count of exactly 0 still wins - not treated as 'no count'", () => {
+    // A naive `manualCount || systemRemainingStock` would wrongly fall back
+    // here (0 is falsy) and silently ignore a real "nothing on hand" count.
+    expect(resolveOpeningStock(0, 100)).toBe(0);
+  });
+
+  it("coerces Prisma's Decimal-as-string values from either side", () => {
+    expect(resolveOpeningStock("42.00", 100)).toBe(42);
+    expect(resolveOpeningStock(null, "100.00")).toBe(100);
   });
 });
 

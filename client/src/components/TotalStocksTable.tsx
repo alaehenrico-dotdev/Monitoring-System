@@ -11,6 +11,11 @@ import { ChevronIcon } from "./icons";
  * row per category and a grand total row, matching Section 3.1's pattern for
  * every other grid in the app - Total Stocks was the one place missing it.
  */
+// Height of the single sticky header row (`.ae-table th`'s own `top: 0` /
+// `position: sticky`) - where a category row's own sticky offset starts, so
+// it sits right under the header rather than overlapping it.
+const HEADER_ROW_HEIGHT = 29;
+
 export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
   // See StockGrid's identical `expandedOverride` state - categories start
   // collapsed (absent from this map) and only expand once explicitly
@@ -44,8 +49,6 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
               "Online Remaining",
               "Offline Remaining",
               "Total Remaining",
-              "Manual Count",
-              "Variance",
             ].map((h) => (
               <th key={h}>{h}</th>
             ))}
@@ -57,7 +60,17 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
             return (
               <Fragment key={category}>
                 <tr>
-                  <td colSpan={7} style={{ padding: 0 }}>
+                  {/* Sticky Scroll (CSS-only, no JS): pinned right under the
+                      header while this category's rows scroll by; once they
+                      scroll past, the next category's own row reaches the
+                      same top offset and, being later in the DOM (painted
+                      after), simply covers this one - the standard sticky-
+                      header handoff. See ConsolidatedReceiptTable.tsx for
+                      the same treatment on a table whose columns also need
+                      a horizontal-sticky label; this table's fixed 5-column
+                      layout never scrolls horizontally, so only the
+                      vertical stick is needed here. */}
+                  <td colSpan={5} style={{ padding: 0, position: "sticky", top: HEADER_ROW_HEIGHT, zIndex: 2 }}>
                     <button
                       type="button"
                       onClick={() =>
@@ -111,8 +124,6 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                     <td style={{ fontWeight: 600 }}>
                       {r.totalRemainingStock.toLocaleString()}
                     </td>
-                    <td>{r.totalManualCount ?? "—"}</td>
-                    <td>{r.totalVariance ?? "—"}</td>
                   </tr>
                 ))}
                 <tr style={subtotalRowStyle}>
@@ -134,7 +145,6 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                       .reduce((s, r) => s + r.totalRemainingStock, 0)
                       .toLocaleString()}
                   </td>
-                  <td colSpan={2} />
                 </tr>
               </Fragment>
             );
@@ -154,7 +164,6 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                 .toLocaleString()}
             </td>
             <td>{grandTotal.toLocaleString()}</td>
-            <td colSpan={2} />
           </tr>
         </tbody>
       </table>
@@ -184,7 +193,7 @@ const categoryToggleStyle: CSSProperties = {
   textAlign: "left",
   font: "inherit",
   fontWeight: 700,
-  padding: "6px 8px",
+  padding: "5px 6px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
   background: "var(--ae-category-bg)",

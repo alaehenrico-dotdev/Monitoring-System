@@ -132,7 +132,12 @@ export function buildConsolidatedReceiptData(receipts: Receipt[], products: Prod
   for (const r of receipts) {
     for (const item of r.items) {
       const byReceipt = quantities.get(item.productId) ?? new Map<number, number>();
-      byReceipt.set(r.id, (byReceipt.get(r.id) ?? 0) + item.quantity);
+      // quantity is a Prisma Decimal, which arrives over JSON as a string -
+      // without Number() here, this silently turns into string
+      // concatenation ("0" + "4" -> "04") instead of addition, corrupting
+      // every total downstream (see amountsByProduct below, which already
+      // guards against this the same way).
+      byReceipt.set(r.id, (byReceipt.get(r.id) ?? 0) + Number(item.quantity));
       quantities.set(item.productId, byReceipt);
 
       if (item.unitPrice != null) {

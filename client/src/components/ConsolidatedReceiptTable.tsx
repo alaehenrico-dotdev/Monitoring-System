@@ -19,6 +19,13 @@ import { ChevronIcon } from "./icons";
 // all three visible, one under the next, the way a single sticky header row
 // already works everywhere else in the app.
 const HEADER_ROW_HEIGHT = 29;
+// Where a category row sticks once scrolled up to it - directly under the
+// stacked header (see above), not the very top of the scroll container. The
+// page itself never scrolls (Layout.tsx's .app-shell is a fixed 100vh, only
+// its <main> - .ae-main - has overflow-y: auto), and .ae-main is exactly the
+// scrolling ancestor the header rows above already stick relative to, so
+// this lines up with them for free.
+const CATEGORY_ROW_TOP = HEADER_ROW_HEIGHT * 3;
 
 export function ConsolidatedReceiptTable({
   data,
@@ -113,7 +120,32 @@ export function ConsolidatedReceiptTable({
             return (
               <Fragment key={group.category}>
                 <tr>
-                  <td colSpan={totalCols} style={{ padding: 0 }}>
+                  {/* Sticky on both axes, independently. This <td> sticks
+                      vertically (top: CATEGORY_ROW_TOP, right under the
+                      header stack): while this category is expanded and its
+                      rows are scrolled through, the band stays pinned there;
+                      once its rows scroll past, the next category's own row
+                      reaches the same top offset and - being later in the
+                      DOM, so painted after - simply covers the previous one.
+                      Standard sticky-header handoff, no JS needed. The
+                      row's own background band spans every column (unlike
+                      StockGrid/TotalStocksTable, this table's column count
+                      is unbounded - one per receipt - so it scrolls
+                      horizontally as a matter of course too) so the colored
+                      band still covers the full row width once scrolled; the
+                      nested button is the piece that sticks horizontally
+                      (left: 0, see categoryToggleStyle), so the label/
+                      chevron stays visible on both scroll axes at once. */}
+                  <td
+                    colSpan={totalCols}
+                    style={{
+                      padding: 0,
+                      background: "var(--ae-category-bg)",
+                      position: "sticky",
+                      top: CATEGORY_ROW_TOP,
+                      zIndex: 2,
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() =>
@@ -218,18 +250,30 @@ const skuCellStyle: CSSProperties = {
 // SKU/Product text columns) - the numeric quantity columns need their own
 // explicit centering since they don't inherit the base .ae-table td rule.
 const numCellStyle: CSSProperties = { textAlign: "center" };
-// Same treatment as StockGrid/TotalStocksTable's identical style - a real
-// <button> spanning every column so the expand/collapse arrow has one
-// clickable/keyboard-focusable target instead of a styled, inert <td>.
+// Same clickable-spanning-<button> idea as StockGrid/TotalStocksTable's own
+// categoryToggleStyle, but NOT identical: this table's columns are unbounded
+// (one per receipt) and horizontal scroll is the norm here, unlike those two
+// - so unlike their width:100% (which just fills a spanned cell that's
+// already fully in view), this one is `position: sticky; left: 0` with a
+// content-sized (not 100%) width, so the label stays pinned to the left edge
+// as the table scrolls horizontally instead of scrolling away with the rest
+// of the row. Its own background matches the <td>'s band color (see the
+// caller) so the sticky label reads as part of the row, not a separate
+// floating chip, and z-index 2 matches the app's other horizontal-sticky
+// convention (.ae-bulk-fixed-col in index.css) so it stays above the
+// table's own sticky vertical header (z-index 1) if the two ever overlap.
 const categoryToggleStyle: CSSProperties = {
-  display: "flex",
+  display: "inline-flex",
   alignItems: "center",
   gap: 6,
-  width: "100%",
+  width: "max-content",
+  position: "sticky",
+  left: 0,
+  zIndex: 2,
   textAlign: "left",
   font: "inherit",
   fontWeight: 700,
-  padding: "6px 8px",
+  padding: "5px 6px",
   border: "none",
   borderLeft: `4px solid ${colors.red}`,
   background: "var(--ae-category-bg)",
