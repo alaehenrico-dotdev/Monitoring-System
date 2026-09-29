@@ -13,6 +13,7 @@ import { TableSkeleton } from "../components/Skeleton";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
+import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -35,9 +36,11 @@ export function TotalStocksPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
-  useEffect(() => {
+  useResetOnKeyChange(date, () => {
     setRows(null);
     setError(null);
+  });
+  useEffect(() => {
     getTotalStocks(date)
       .then(setRows)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load total stocks"));

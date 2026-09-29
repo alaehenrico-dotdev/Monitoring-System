@@ -11,15 +11,22 @@
 // index.css) actually flip when the theme toggle (ThemeContext) changes
 // document.documentElement's data-theme attribute.
 export const colors = {
-  black: "#14110D", // seal background
-  blackSoft: "#1D1812", // sidebar / dark surfaces, slightly lifted off pure black
-  gold: "#C99A2E", // seal ring + accents
-  goldLight: "#E4B94D", // hover / highlight state for gold elements
-  goldDark: "#8B6A1E", // borders, pressed state
+  black: "#0C0C0C", // seal background / sidebar (ink-900)
+  blackSoft: "#111111", // sidebar / dark surfaces (ink-850)
+  // Charcoal backgrounds for the permanently-dark chrome (sidebar panel,
+  // login) - softer than the near-black above, which now stays only for text
+  // on gold and hairline rules. Matches the dark-mode page tokens in index.css.
+  charcoal: "#1A1A1A", // page-level charcoal
+  charcoalRaised: "#232323", // header card / sidebar panel / raised chrome
+  charcoalSoft: "#2A2A2A", // lighter end of gradients
+  gold: "#D4A000", // seal ring + accents
+  goldLight: "#FDD023", // hover / highlight state for gold elements
+  goldDark: "#D4A000", // borders, pressed state
   red: "#C1272D", // banner red - fixed brand color for decorative accents (borders, the receipt wordmark); not for error/status text - use `danger` for that so it stays visible in dark mode
   redDark: "#9E1F24", // hover/pressed red
-  yellow: "#FFD400", // "Ala Eh!" lettering
-  cream: "#F1E9D0", // "FOOD PRODUCTS" text, light text on dark surfaces
+  green: "#2F6B3C", // category-row-header background (StockGrid, TotalStocksTable, ManualCountPage) - see --ae-category-bg in index.css, which actually carries this value so it can flip to a darker tint in dark mode
+  yellow: "#F5C000", // "Ala Eh!" lettering, primary gold (brand-500)
+  cream: "#E5E5E5", // "FOOD PRODUCTS" text, light text on dark surfaces
   paper: "var(--ae-bg)", // app content background
   paperAlt: "var(--ae-bg-alt)", // tinted rows (locked cells, subtotals, expanded diff rows)
   surface: "var(--ae-surface)", // card/input/modal background

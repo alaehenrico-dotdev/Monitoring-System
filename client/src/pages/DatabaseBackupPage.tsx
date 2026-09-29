@@ -57,7 +57,7 @@ export function DatabaseBackupPage() {
         maxWidth: 760,
         background: colors.surface,
         border: `1px solid ${colors.border}`,
-        borderRadius: 4,
+        borderRadius: 8,
         padding: "32px 36px",
       }}
     >

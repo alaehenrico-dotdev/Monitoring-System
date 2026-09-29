@@ -6,7 +6,6 @@ export interface MonthlyOverviewEntry {
   offlineRemainingStock: number | null;
   totalRemainingStock: number | null;
   varianceFlags: number | null;
-  receipts: number;
   snapshotDate: string | null;
 }
 

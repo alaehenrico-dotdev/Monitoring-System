@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StockGrid, type GridRow } from "../components/StockGrid";
-import { computeNewDeliveryOut, getOfflineGrid, saveOfflineEntry } from "../api/offlineStock";
+import {
+  computeNewDeliveryOut,
+  getOfflineGrid,
+  saveOfflineEntry,
+} from "../api/offlineStock";
 import { getOnlineGrid } from "../api/onlineStock";
 import { listDeliveryDestinations } from "../api/deliveryDestinations";
 import { useAuth } from "../context/AuthContext";
@@ -10,24 +14,46 @@ import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
 import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
-import { ClearIcon, PrinterIcon, SaveIcon, UndoIcon } from "../components/icons";
+import {
+  ClearIcon,
+  PrinterIcon,
+  SaveIcon,
+  UndoIcon,
+} from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { ShiftFilter } from "../components/ShiftFilter";
 import { TableSkeleton } from "../components/Skeleton";
 import { LoadingOverlay } from "../components/Spinner";
 import { useTopProgress } from "../hooks/useTopProgress";
+import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { Modal } from "../components/Modal";
+import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
-import { describePendingChanges, usePendingEntryChanges, type PendingByProduct } from "../hooks/usePendingEntryChanges";
+import {
+  describePendingChanges,
+  usePendingEntryChanges,
+  type PendingByProduct,
+} from "../hooks/usePendingEntryChanges";
 import { buildOfflineStockColumns } from "../config/stockColumns";
 import type { DeliveryDestination } from "../types";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { filterNotes, pdfFileName, stockGridSection } from "../utils/pdfTables";
-import { getCurrentShiftAndDate, otherShift, SHIFT_LABELS, SHIFT_SHORT_LABELS } from "../utils/shift";
-import { calculateOfflineRemaining, calculateOfflineStock, calculateOnlineRemaining, calculateOnlineStock, isNegativeStock } from "../utils/stockMath";
+import {
+  getCurrentShiftAndDate,
+  otherShift,
+  SHIFT_LABELS,
+  SHIFT_SHORT_LABELS,
+} from "../utils/shift";
+import {
+  calculateOfflineRemaining,
+  calculateOfflineStock,
+  calculateOnlineRemaining,
+  calculateOnlineStock,
+  isNegativeStock,
+} from "../utils/stockMath";
 import { colors } from "../theme";
 import type { Shift } from "../types";
 
@@ -37,17 +63,32 @@ import type { Shift } from "../types";
 /// preview (usePendingEntryChanges' `recompute`, below) and validateImportRow's
 /// advisory negative-stock pre-check, so the two never drift apart on what
 /// "the new figures would be" actually means.
-function computeOfflineFigures(entry: Record<string, unknown>, changes: Record<string, number>) {
+function computeOfflineFigures(
+  entry: Record<string, unknown>,
+  changes: Record<string, number>,
+) {
   const openingStock = changes.openingStock ?? Number(entry.openingStock ?? 0);
-  const stockInOlToOff = changes.stockInOlToOff ?? Number(entry.stockInOlToOff ?? 0);
-  const stockOutOffToOl = changes.stockOutOffToOl ?? Number(entry.stockOutOffToOl ?? 0);
+  const stockInOlToOff =
+    changes.stockInOlToOff ?? Number(entry.stockInOlToOff ?? 0);
+  const stockOutOffToOl =
+    changes.stockOutOffToOl ?? Number(entry.stockOutOffToOl ?? 0);
   const productionIn = changes.productionIn ?? Number(entry.productionIn ?? 0);
   const backloads = changes.backloads ?? Number(entry.backloads ?? 0);
   const upsellOut = changes.upsellOut ?? Number(entry.upsellOut ?? 0);
   const deliveryOut = computeNewDeliveryOut(entry, changes);
 
-  const offlineStock = calculateOfflineStock(openingStock, stockInOlToOff, stockOutOffToOl);
-  const remainingStock = calculateOfflineRemaining(offlineStock, productionIn, deliveryOut, backloads, upsellOut);
+  const offlineStock = calculateOfflineStock(
+    openingStock,
+    stockInOlToOff,
+    stockOutOffToOl,
+  );
+  const remainingStock = calculateOfflineRemaining(
+    offlineStock,
+    productionIn,
+    deliveryOut,
+    backloads,
+    upsellOut,
+  );
   return { deliveryOut, offlineStock, remainingStock };
 }
 
@@ -60,7 +101,8 @@ export function OfflineEntryPage() {
   // midnight and belongs to the *previous* calendar date after 12am.
   const [{ date, shift }, setDateShift] = useState(getCurrentShiftAndDate);
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
-  const setShift = (s: Shift) => setDateShift((prev) => ({ ...prev, shift: s }));
+  const setShift = (s: Shift) =>
+    setDateShift((prev) => ({ ...prev, shift: s }));
   const [rows, setRows] = useState<GridRow[] | null>(null);
   // Destinations aren't date/shift-scoped (unlike rows above) - loaded once
   // and reused across every date/shift this page is switched to. Starts
@@ -69,7 +111,10 @@ export function OfflineEntryPage() {
   // graceful-degradation the "otherShiftCount" banner below already uses for
   // its own best-effort fetch.
   const [destinations, setDestinations] = useState<DeliveryDestination[]>([]);
-  const columns = useMemo(() => buildOfflineStockColumns(destinations), [destinations]);
+  const columns = useMemo(
+    () => buildOfflineStockColumns(destinations),
+    [destinations],
+  );
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("offline-entry");
   const [query, setQuery] = useState("");
@@ -83,9 +128,12 @@ export function OfflineEntryPage() {
   // it shows up in the Change Log like any other edit, not a silent
   // rewrite) and is itself one-shot: undoing clears this, it doesn't turn
   // into a redo stack.
-  const [lastSavedBatch, setLastSavedBatch] = useState<PendingByProduct | null>(null);
+  const [lastSavedBatch, setLastSavedBatch] = useState<PendingByProduct | null>(
+    null,
+  );
   const [undoing, setUndoing] = useState(false);
-  const canEdit = user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
+  const canEdit =
+    user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   // So handleSaveAll (below) can tell CsvTools its own last import batch is
   // no longer just "pending" once a real Save has committed it - see
   // CsvTools' notifyCommitted doc comment.
@@ -103,21 +151,29 @@ export function OfflineEntryPage() {
   // sessionStorage under this date+shift's own key, so navigating to another
   // page and back - or just switching shift/date and back - doesn't lose an
   // edit still in progress.
-  const { pending, displayRows, stage, clear, clearAll, pendingCount } = usePendingEntryChanges(
-    rows,
-    `ala-eh-pending:offline:${date}:${shift}`,
-    computeOfflineFigures,
-  );
+  const { pending, displayRows, stage, clear, clearAll, pendingCount } =
+    usePendingEntryChanges(
+      rows,
+      `ala-eh-pending:offline:${date}:${shift}`,
+      computeOfflineFigures,
+    );
 
   // Search and the category dropdown only affect what's displayed in the
   // grid - both are local filters over the same already-loaded rows, not a
   // separate request per category.
-  const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
+  const categories = Array.from(
+    new Set((rows ?? []).map((r) => r.product.category)),
+  ).sort();
   const visibleRows = displayRows?.filter(
-    (r) => matchesSearch([r.product.sku, r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+    (r) =>
+      matchesSearch(
+        [r.product.sku, r.product.name, r.product.category],
+        query,
+      ) &&
+      (categoryFilter === "" || r.product.category === categoryFilter),
   );
 
-  useEffect(() => {
+  useResetOnKeyChange(`${date}:${shift}`, () => {
     setRows(null);
     // Pending edits aren't cleared here - usePendingEntryChanges re-derives
     // its own state from storage as soon as its date+shift-keyed storageKey
@@ -125,10 +181,11 @@ export function OfflineEntryPage() {
     // there if switched back to) and the one being loaded picks up whatever
     // it already had staged (if any), instead of both always starting empty.
     setLastSavedBatch(null); // Undo has no such persistence - it can only ever apply to the shift it was saved on
+  });
+  useEffect(() => {
     getOfflineGrid(date, shift)
       .then((data) => setRows(data as unknown as GridRow[]))
       .catch((e) => setError(e.message));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, shift]);
 
   // Best-effort check of whether the *other* shift already has saved
@@ -137,10 +194,17 @@ export function OfflineEntryPage() {
   // second, near-empty record when the shift that's actually still open
   // already has work in it. Never blocks the page if this call fails.
   const [otherShiftCount, setOtherShiftCount] = useState<number | null>(null);
+  const [dismissedShiftWarning, setDismissedShiftWarning] = useState<
+    string | null
+  >(null);
+  useResetOnKeyChange(`${date}:${shift}`, () => setOtherShiftCount(null));
   useEffect(() => {
-    setOtherShiftCount(null);
     getOfflineGrid(date, otherShift(shift))
-      .then((data) => setOtherShiftCount((data as unknown as GridRow[]).filter((r) => r.isSaved).length))
+      .then((data) =>
+        setOtherShiftCount(
+          (data as unknown as GridRow[]).filter((r) => r.isSaved).length,
+        ),
+      )
       .catch(() => setOtherShiftCount(null));
   }, [date, shift]);
 
@@ -149,9 +213,13 @@ export function OfflineEntryPage() {
   // predict whether a Stocks In/Out (Ol<->Off) change would push a
   // mirrored transfer negative on the Online side. If this fails to load,
   // the pre-check just skips that one case rather than blocking anything.
-  const [onlineRowsForImportCheck, setOnlineRowsForImportCheck] = useState<GridRow[] | null>(null);
+  const [onlineRowsForImportCheck, setOnlineRowsForImportCheck] = useState<
+    GridRow[] | null
+  >(null);
+  useResetOnKeyChange(`${date}:${shift}`, () =>
+    setOnlineRowsForImportCheck(null),
+  );
   useEffect(() => {
-    setOnlineRowsForImportCheck(null);
     getOnlineGrid(date, shift)
       .then((data) => setOnlineRowsForImportCheck(data as unknown as GridRow[]))
       .catch(() => setOnlineRowsForImportCheck(null));
@@ -172,8 +240,13 @@ export function OfflineEntryPage() {
   // One round trip per edit instead of two - the save endpoint already
   // returns the recalculated row.
   function mergeEntry(productId: number, saved: unknown) {
-    setRows((prev) =>
-      prev?.map((r) => (r.product.id === productId ? { ...r, entry: saved as unknown as typeof r.entry, isSaved: true } : r)) ?? prev
+    setRows(
+      (prev) =>
+        prev?.map((r) =>
+          r.product.id === productId
+            ? { ...r, entry: saved as unknown as typeof r.entry, isSaved: true }
+            : r,
+        ) ?? prev,
     );
   }
 
@@ -182,7 +255,9 @@ export function OfflineEntryPage() {
   // last-saved value, so re-editing a cell back to its saved value still
   // correctly drops it from the pending set.
   function handleCommit(productId: number, key: string, value: number) {
-    const savedValue = Number(rows?.find((r) => r.product.id === productId)?.entry[key] ?? 0);
+    const savedValue = Number(
+      rows?.find((r) => r.product.id === productId)?.entry[key] ?? 0,
+    );
     stage(productId, key, value, savedValue);
   }
 
@@ -213,7 +288,8 @@ export function OfflineEntryPage() {
       // "changed" in the first place.
       const priorRow = rows?.find((r) => r.product.id === productId);
       const oldValues: Record<string, number> = {};
-      for (const key of Object.keys(changes)) oldValues[key] = Number(priorRow?.entry[key] ?? 0);
+      for (const key of Object.keys(changes))
+        oldValues[key] = Number(priorRow?.entry[key] ?? 0);
 
       try {
         const saved = await saveOfflineEntry(productId, date, shift, changes);
@@ -271,7 +347,10 @@ export function OfflineEntryPage() {
   // across the system before the user ever got a chance to review or save.
   // Routing it through `stage` means Save is the same explicit, previewable
   // step for an import as it already is for a typed edit.
-  async function handleImportRow(productId: number, values: Record<string, number>) {
+  async function handleImportRow(
+    productId: number,
+    values: Record<string, number>,
+  ) {
     const savedRow = rows?.find((r) => r.product.id === productId);
     for (const [key, value] of Object.entries(values)) {
       stage(productId, key, value, Number(savedRow?.entry[key] ?? 0));
@@ -285,13 +364,18 @@ export function OfflineEntryPage() {
   // Save, never to block it. The server remains the only real enforcement;
   // this can be wrong (stale data, a concurrent edit) without any real risk,
   // since Save always re-checks for real.
-  function validateImportRow(productId: number, changes: Record<string, number>): string | undefined {
+  function validateImportRow(
+    productId: number,
+    changes: Record<string, number>,
+  ): string | undefined {
     const row = rows?.find((r) => r.product.id === productId);
     if (!row) return undefined;
     const entry = row.entry as unknown as Record<string, unknown>;
 
-    const stockInOlToOff = changes.stockInOlToOff ?? Number(entry.stockInOlToOff ?? 0);
-    const stockOutOffToOl = changes.stockOutOffToOl ?? Number(entry.stockOutOffToOl ?? 0);
+    const stockInOlToOff =
+      changes.stockInOlToOff ?? Number(entry.stockInOlToOff ?? 0);
+    const stockOutOffToOl =
+      changes.stockOutOffToOl ?? Number(entry.stockOutOffToOl ?? 0);
     const { remainingStock } = computeOfflineFigures(entry, changes);
     if (isNegativeStock(remainingStock)) {
       return `This would take ${row.product.name}'s Offline stock below zero (would end at ${remainingStock}).`;
@@ -299,14 +383,26 @@ export function OfflineEntryPage() {
 
     // Only relevant when the transfer fields themselves changed - an edit
     // to, say, Production (In) alone never touches the Online side.
-    if (changes.stockInOlToOff !== undefined || changes.stockOutOffToOl !== undefined) {
-      const onlineRow = onlineRowsForImportCheck?.find((r) => r.product.id === productId);
+    if (
+      changes.stockInOlToOff !== undefined ||
+      changes.stockOutOffToOl !== undefined
+    ) {
+      const onlineRow = onlineRowsForImportCheck?.find(
+        (r) => r.product.id === productId,
+      );
       if (onlineRow) {
-        const onlineEntry = onlineRow.entry as unknown as Record<string, unknown>;
+        const onlineEntry = onlineRow.entry as unknown as Record<
+          string,
+          unknown
+        >;
         // Same mapping as mirrorTransferToOnline (dailyOfflineStock.service.ts):
         // Offline's stockOutOffToOl becomes Online's stockInOffToOl, and
         // Offline's stockInOlToOff becomes Online's stockOutOlToOff.
-        const onlineStock = calculateOnlineStock(Number(onlineEntry.openingStock ?? 0), stockOutOffToOl, stockInOlToOff);
+        const onlineStock = calculateOnlineStock(
+          Number(onlineEntry.openingStock ?? 0),
+          stockOutOffToOl,
+          stockInOlToOff,
+        );
         const onlineRemaining = calculateOnlineRemaining(
           onlineStock,
           Number(onlineEntry.productionIn ?? 0),
@@ -337,7 +433,9 @@ export function OfflineEntryPage() {
         const saved = await saveOfflineEntry(productId, date, shift, oldValues);
         mergeEntry(productId, saved);
       } catch (e) {
-        const name = rows?.find((r) => r.product.id === productId)?.product.name ?? `#${productId}`;
+        const name =
+          rows?.find((r) => r.product.id === productId)?.product.name ??
+          `#${productId}`;
         const reason = e instanceof Error ? e.message : "unknown error";
         failed.push(`${name} (${reason})`);
       }
@@ -368,89 +466,146 @@ export function OfflineEntryPage() {
     }
   }
 
+  const otherShiftWarning =
+    otherShiftCount !== null && otherShiftCount > 0
+      ? `${SHIFT_LABELS[otherShift(shift)]} already has ${otherShiftCount} saved entr${otherShiftCount === 1 ? "y" : "ies"} for ${date} - double-check you're on the right shift before entering data.`
+      : null;
+
   return (
     <div>
       <PageHeader
         title={`Daily Offline Stock Monitoring - ${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`}
         subtitle="Stocks In/Out transfers here mirror automatically onto the Online table."
       >
-      <Toolbar className="no-print ae-toolbar-entry">
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-          {canEdit && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={handleUndoLastSave}
-              disabled={!lastSavedBatch || undoing}
-              aria-label="Undo last save"
-              title="Undo last save"
-              className="ae-tap-target"
-              style={{ width: 30, height: 30, padding: 0, display: "inline-flex", alignItems: "center", justifyContent: "center" }}
-            >
-              <UndoIcon />
-            </Button>
-          )}
-          <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
-          <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
-          <DatePicker aria-label="Date" value={date} onChange={setDate} todayValue={getCurrentShiftAndDate().date} style={{ maxWidth: 180 }} />
-          <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-        </div>
-        <ToolbarControls>
-          {canEdit && (
-            <Button className="ae-toolbar-save" type="button" variant="secondary" size="sm" onClick={() => setShowPreview(true)} disabled={pendingCount === 0} title="Review and save changes">
-              <SaveIcon />
-              <span className="ae-toolbar-btn-label">Save{pendingCount > 0 ? ` (${pendingCount})` : ""}</span>
-            </Button>
-          )}
-          {canEdit && (
+        <Toolbar className="no-print ae-toolbar-entry">
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "nowrap",
+              minWidth: 0,
+            }}
+          >
+            {canEdit && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleUndoLastSave}
+                disabled={!lastSavedBatch || undoing}
+                aria-label="Undo last save"
+                title="Undo last save"
+                className="ae-tap-target ae-toolbar-icon-btn"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <UndoIcon />
+              </Button>
+            )}
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Search SKU or category…"
+            />
+            <CategoryFilter
+              categories={categories}
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+            />
+            <DatePicker
+              aria-label="Date"
+              value={date}
+              onChange={setDate}
+              todayValue={getCurrentShiftAndDate().date}
+              style={{ maxWidth: 180 }}
+            />
+            <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
+          </div>
+          <ToolbarControls>
+            {canEdit && (
+              <Button
+                className="ae-toolbar-save ae-toolbar-primary"
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowPreview(true)}
+                disabled={pendingCount === 0}
+                title="Review and save changes"
+              >
+                <SaveIcon />
+                <span className="ae-toolbar-btn-label">
+                  Save{pendingCount > 0 ? ` (${pendingCount})` : ""}
+                </span>
+              </Button>
+            )}
+            {canEdit && (
+              <Button
+                className="ae-toolbar-save"
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowClearConfirm(true)}
+                disabled={pendingCount === 0 || saving}
+                title="Discard unsaved changes on this sheet"
+              >
+                <ClearIcon />
+                <span className="ae-toolbar-btn-label">Clear</span>
+              </Button>
+            )}
             <Button
               className="ae-toolbar-save"
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => setShowClearConfirm(true)}
-              disabled={pendingCount === 0 || saving}
-              title="Discard unsaved changes on this sheet"
+              onClick={handlePdf}
+              disabled={pendingCount > 0 || !visibleRows}
+              title={
+                pendingCount > 0
+                  ? "Save your changes first - PDF reflects only saved data"
+                  : "Download as PDF"
+              }
             >
-              <ClearIcon />
-              <span className="ae-toolbar-btn-label">Clear</span>
+              <PrinterIcon />
+              <span className="ae-toolbar-btn-label">PDF</span>
             </Button>
-          )}
-          <Button
-            className="ae-toolbar-save"
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={handlePdf}
-            disabled={pendingCount > 0 || !visibleRows}
-            title={pendingCount > 0 ? "Save your changes first - PDF reflects only saved data" : "Download as PDF"}
-          >
-            <PrinterIcon />
-            <span className="ae-toolbar-btn-label">PDF</span>
-          </Button>
-          {canEdit && rows && (
-            <CsvTools
-              ref={csvToolsRef}
-              filenamePrefix="offline-entry"
-              date={date}
-              rows={rows}
-              columns={columns}
-              onImportRow={handleImportRow}
-              getPendingValue={(productId, key) => pending[productId]?.[key]}
-              validateImport={validateImportRow}
-              canImport
-              showExport={false}
-              showPdf={false}
-            />
-          )}
-          <ZoomControl zoom={zoom} onChange={setZoom} />
-        </ToolbarControls>
-      </Toolbar>
+            {canEdit && rows && (
+              <CsvTools
+                ref={csvToolsRef}
+                filenamePrefix="offline-entry"
+                date={date}
+                rows={rows}
+                columns={columns}
+                onImportRow={handleImportRow}
+                getPendingValue={(productId, key) => pending[productId]?.[key]}
+                validateImport={validateImportRow}
+                canImport
+                showExport={false}
+                showPdf={false}
+              />
+            )}
+            <ZoomControl zoom={zoom} onChange={setZoom} />
+          </ToolbarControls>
+        </Toolbar>
       </PageHeader>
+      <Toast
+        message={
+          otherShiftWarning && otherShiftWarning !== dismissedShiftWarning
+            ? otherShiftWarning
+            : null
+        }
+        onDismiss={() => setDismissedShiftWarning(otherShiftWarning)}
+        variant="warning"
+        duration={10000}
+      />
       {otherShiftCount !== null && otherShiftCount > 0 && (
-        <p style={{ fontSize: 12, color: colors.warningText, margin: "0 0 8px" }}>
-          ⚠ {SHIFT_LABELS[otherShift(shift)]} already has {otherShiftCount} saved entr{otherShiftCount === 1 ? "y" : "ies"} for {date} - double-check you're on the right shift before entering data.
+        <p
+          style={{ fontSize: 12, color: colors.warningText, margin: "0 0 8px" }}
+        >
+          ⚠ {otherShiftWarning}
         </p>
       )}
       {error && <p style={{ color: colors.danger }}>{error}</p>}
@@ -481,31 +636,83 @@ export function OfflineEntryPage() {
           />
         </div>
       )}
-      {!canEdit && <p style={{ fontSize: 12, color: colors.subtleInk, marginTop: 8 }}>Read-only: your role can view but not edit Offline entries.</p>}
+      {!canEdit && (
+        <p style={{ fontSize: 12, color: colors.subtleInk, marginTop: 8 }}>
+          Read-only: your role can view but not edit Offline entries.
+        </p>
+      )}
       {showPreview && (
         <Modal title="Unsaved changes" onClose={() => setShowPreview(false)}>
-          <PendingChangesPreview items={describePendingChanges(rows, pending, columns)} />
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setShowPreview(false)}>
+          <PendingChangesPreview
+            items={describePendingChanges(rows, pending, columns)}
+          />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 8,
+              marginTop: 16,
+            }}
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowPreview(false)}
+            >
               Keep editing
             </Button>
-            <Button type="button" size="sm" onClick={handleSaveAll} disabled={pendingCount === 0 || saving}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleSaveAll}
+              disabled={pendingCount === 0 || saving}
+            >
               {saving ? "Saving…" : `Save (${pendingCount})`}
             </Button>
           </div>
         </Modal>
       )}
       {showClearConfirm && (
-        <Modal title="Discard unsaved changes?" onClose={() => setShowClearConfirm(false)}>
-          <PendingChangesPreview items={describePendingChanges(rows, pending, columns)} />
-          <p style={{ margin: "12px 0 0", fontSize: 12.5, color: colors.subtleInk }}>
-            This clears every unsaved edit on this sheet (typed or imported) - nothing has been saved yet, so nothing on the server is affected.
+        <Modal
+          title="Discard unsaved changes?"
+          onClose={() => setShowClearConfirm(false)}
+        >
+          <PendingChangesPreview
+            items={describePendingChanges(rows, pending, columns)}
+          />
+          <p
+            style={{
+              margin: "12px 0 0",
+              fontSize: 12.5,
+              color: colors.subtleInk,
+            }}
+          >
+            This clears every unsaved edit on this sheet (typed or imported) -
+            nothing has been saved yet, so nothing on the server is affected.
           </p>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setShowClearConfirm(false)}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 8,
+              marginTop: 16,
+            }}
+          >
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowClearConfirm(false)}
+            >
               Keep editing
             </Button>
-            <Button type="button" variant="danger" size="sm" onClick={handleClearAll}>
+            <Button
+              type="button"
+              variant="danger"
+              size="sm"
+              onClick={handleClearAll}
+            >
               Discard {pendingCount}
             </Button>
           </div>

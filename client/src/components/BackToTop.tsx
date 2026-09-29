@@ -78,7 +78,7 @@ export function BackToTop({ containerRef }: { containerRef: RefObject<HTMLElemen
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: "0 2px 8px rgba(20,17,13,0.2)",
+        boxShadow: "0 2px 8px rgba(12, 12, 12,0.2)",
         transition: "background-color 120ms ease, transform 120ms ease",
       }}
       onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}

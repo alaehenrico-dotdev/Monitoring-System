@@ -8,7 +8,6 @@ import dailyOnlineStockRoutes from "./dailyOnlineStock.routes";
 import dailyOfflineStockRoutes from "./dailyOfflineStock.routes";
 import manualCountsRoutes from "./manualCounts.routes";
 import totalStocksRoutes from "./totalStocks.routes";
-import receiptsRoutes from "./receipts.routes";
 import reportsRoutes from "./reports.routes";
 import changeLogRoutes from "./changeLog.routes";
 import dataResetRoutes from "./dataReset.routes";
@@ -17,8 +16,8 @@ import dashboardRoutes from "./dashboard.routes";
 
 /// Single mount point for every feature's router (Section 3 - the app is
 /// organized around Daily Online Entry, Daily Offline Entry, Manual Count &
-/// Variance, Total Stocks, and the Receipt/Order page, plus supporting
-/// Products/Users/Reports/Change-Log endpoints).
+/// Variance, and Total Stocks, plus supporting Products/Users/Reports/
+/// Change-Log endpoints).
 const router = Router();
 
 router.use("/auth", authRoutes);
@@ -29,7 +28,6 @@ router.use("/online-stock", dailyOnlineStockRoutes);
 router.use("/offline-stock", dailyOfflineStockRoutes);
 router.use("/manual-counts", manualCountsRoutes);
 router.use("/total-stocks", totalStocksRoutes);
-router.use("/receipts", receiptsRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/change-log", changeLogRoutes);
 router.use("/data-reset", dataResetRoutes);

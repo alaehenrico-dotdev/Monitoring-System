@@ -37,10 +37,7 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
 
   return (
     <RowGlowScroll>
-      <table
-        className="ae-table ae-table--center-head"
-        style={{ minWidth: 640 }}
-      >
+      <table className="ae-table ae-table--center-head ae-table--compact">
         <thead>
           <tr>
             {[
@@ -65,12 +62,18 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                       scroll past, the next category's own row reaches the
                       same top offset and, being later in the DOM (painted
                       after), simply covers this one - the standard sticky-
-                      header handoff. See ConsolidatedReceiptTable.tsx for
-                      the same treatment on a table whose columns also need
-                      a horizontal-sticky label; this table's fixed 5-column
-                      layout never scrolls horizontally, so only the
-                      vertical stick is needed here. */}
-                  <td colSpan={5} style={{ padding: 0, position: "sticky", top: HEADER_ROW_HEIGHT, zIndex: 2 }}>
+                      header handoff. This table's fixed 5-column layout
+                      never scrolls horizontally, so only the vertical
+                      stick is needed here. */}
+                  <td
+                    colSpan={5}
+                    style={{
+                      padding: 0,
+                      position: "sticky",
+                      top: HEADER_ROW_HEIGHT,
+                      zIndex: 2,
+                    }}
+                  >
                     <button
                       type="button"
                       onClick={() =>

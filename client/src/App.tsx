@@ -14,17 +14,15 @@ import { LoginPage } from "./pages/LoginPage";
 // even logged in - login is the one page that's NOT lazy, since it's the
 // very first thing an unauthenticated visitor needs and lazy-loading it
 // would just add a network round trip to the critical first-paint path for
-// zero benefit. This is also what lets the PDF/CSV/QR libraries
-// (jspdf/jspdf-autotable/qrcode - see utils/tablePdf.ts, utils/receiptPdf.ts)
-// actually stay out of every route's bundle: those are dynamically imported
+// zero benefit. This is also what lets the PDF/CSV libraries
+// (jspdf/jspdf-autotable - see utils/tablePdf.ts) actually stay out of every
+// route's bundle: those are dynamically imported
 // at the point of use, but that only pays off if the *page* that reaches
 // them isn't itself eagerly bundled into the same chunk as everything else.
 const OnlineEntryPage = lazy(() => import("./pages/OnlineEntryPage").then((m) => ({ default: m.OnlineEntryPage })));
 const OfflineEntryPage = lazy(() => import("./pages/OfflineEntryPage").then((m) => ({ default: m.OfflineEntryPage })));
 const TotalStocksPage = lazy(() => import("./pages/TotalStocksPage").then((m) => ({ default: m.TotalStocksPage })));
 const ManualCountPage = lazy(() => import("./pages/ManualCountPage").then((m) => ({ default: m.ManualCountPage })));
-const ReceiptsPage = lazy(() => import("./pages/ReceiptsPage").then((m) => ({ default: m.ReceiptsPage })));
-const ConsolidatedReceiptPage = lazy(() => import("./pages/ConsolidatedReceiptPage").then((m) => ({ default: m.ConsolidatedReceiptPage })));
 const VarianceReportPage = lazy(() => import("./pages/VarianceReportPage").then((m) => ({ default: m.VarianceReportPage })));
 const DailyReportPage = lazy(() => import("./pages/DailyReportPage").then((m) => ({ default: m.DailyReportPage })));
 const ProductsAdminPage = lazy(() => import("./pages/ProductsAdminPage").then((m) => ({ default: m.ProductsAdminPage })));
@@ -54,10 +52,6 @@ export default function App() {
                   <Route path="/offline" element={<OfflineEntryPage />} />
                   <Route path="/total-stocks" element={<TotalStocksPage />} />
                   <Route path="/manual-count" element={<ManualCountPage />} />
-                  <Route path="/receipts" element={<ReceiptsPage />} />
-                  <Route path="/consolidated-receipts" element={<ConsolidatedReceiptPage />} />
-                  {/* Bulk entry merged into ReceiptsPage's "Bulk Entry" mode - redirect any old link/bookmark. */}
-                  <Route path="/consolidated-receipts/entry" element={<Navigate to="/receipts" replace />} />
 
                   <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
                     <Route path="/dashboard" element={<DashboardPage />} />

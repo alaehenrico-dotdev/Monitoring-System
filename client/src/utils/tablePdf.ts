@@ -17,10 +17,10 @@
  *   - the same category / subtotal / grand-total styling as the grids.
  *
  * Calling `downloadTablePdf()` produces a real PDF and triggers a normal
- * "Save File" prompt - same experience as receiptPdf.ts.
+ * "Save File" prompt.
  *
- * Dependencies (jsPDF is already installed for receipts):
- *   npm install jspdf-autotable
+ * Dependencies:
+ *   npm install jspdf jspdf-autotable
  */
 // Type-only imports (erased at compile time, zero runtime cost) - the actual
 // jspdf/jspdf-autotable modules are ~230KB combined and only needed at the
@@ -51,11 +51,11 @@ const MIN_FONT_SIZE = 6;
 type RGB = [number, number, number];
 const INK: RGB = [36, 29, 20]; // #241D14
 const MUTED: RGB = [107, 98, 85]; // #6B6255
-const BLACK: RGB = [20, 17, 13]; // #14110D
-const GOLD: RGB = [201, 154, 46]; // #C99A2E
-const GOLD_DARK: RGB = [139, 106, 30]; // #8B6A1E
-const CREAM: RGB = [241, 233, 208]; // #F1E9D0
-const YELLOW: RGB = [255, 212, 0]; // #FFD400
+const BLACK: RGB = [12, 12, 12]; // #0C0C0C
+const GOLD: RGB = [212, 160, 0]; // #D4A000
+const GOLD_DARK: RGB = [138, 104, 0]; // #8A6800
+const CREAM: RGB = [229, 229, 229]; // #E5E5E5
+const YELLOW: RGB = [245, 192, 0]; // #F5C000
 const RED: RGB = [193, 39, 45]; // #C1272D
 const GRID_LINE: RGB = [217, 207, 180];
 const SUBTOTAL_FILL: RGB = [247, 241, 225];

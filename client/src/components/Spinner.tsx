@@ -98,7 +98,7 @@ export function LoadingOverlay({ label = "Saving…" }: { label?: string }) {
         position: "fixed",
         inset: 0,
         zIndex: 300,
-        background: "rgba(20, 17, 13, 0.55)",
+        background: "rgba(12, 12, 12, 0.55)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

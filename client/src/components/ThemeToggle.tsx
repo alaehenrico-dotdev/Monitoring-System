@@ -99,7 +99,7 @@ export function ThemeToggle() {
         background: "var(--ae-surface)",
         color: "var(--ae-text)",
         cursor: "pointer",
-        boxShadow: "0 1px 4px rgba(20,17,13,0.15)",
+        boxShadow: "0 1px 4px rgba(12, 12, 12,0.15)",
         transition: "background-color 120ms ease, color 120ms ease, transform 120ms ease",
       }}
       onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}

@@ -33,6 +33,49 @@ export interface GridColumn {
    * real starting balance instead. Unused by the grid itself.
    */
   importable?: boolean;
+  /**
+   * Header color coding for stock movement columns: "in" (stocks in), "out"
+   * (stocks out) and "delivery" (delivery / fulfillment out). Purely visual -
+   * see columnToneStyle below; unused by CSV/PDF/Excel exports.
+   */
+  tone?: "in" | "out" | "delivery";
+}
+
+// Header fills for the color-coded columns. Pastel fills on purpose, with the
+// near-black brand ink as the label color, so the header text stays readable
+// in both light and dark mode (these do not flip with the theme).
+const TONE_COLOR: Record<NonNullable<GridColumn["tone"]>, string> = {
+  in: "#9DB0FF", // light blue / periwinkle
+  out: "#F59A9A", // light red
+  delivery: "#F7A8CC", // pink
+};
+export const columnToneStyle: Record<
+  NonNullable<GridColumn["tone"]>,
+  CSSProperties
+> = {
+  in: { background: TONE_COLOR.in, color: "#0C0C0C" },
+  out: { background: TONE_COLOR.out, color: "#0C0C0C" },
+  delivery: { background: TONE_COLOR.delivery, color: "#0C0C0C" },
+};
+
+// Body-cell tint for the same columns. Drawn as a translucent background-IMAGE
+// layer (not background-color), so the table's row-hover fill - which is a
+// background-color - keeps showing through underneath and the hover effect is
+// unchanged.
+export const columnTintStyle: Record<
+  NonNullable<GridColumn["tone"]>,
+  CSSProperties
+> = {
+  in: tintLayer(TONE_COLOR.in),
+  out: tintLayer(TONE_COLOR.out),
+  delivery: tintLayer(TONE_COLOR.delivery),
+};
+function tintLayer(color: string): CSSProperties {
+  const tint = `color-mix(in srgb, ${color} 22%, transparent)`;
+  return { backgroundImage: `linear-gradient(${tint}, ${tint})` };
+}
+function tintFor(col: GridColumn): CSSProperties | undefined {
+  return col.tone ? columnTintStyle[col.tone] : undefined;
 }
 
 interface StockGridProps {
@@ -160,7 +203,12 @@ export function StockGrid({
             <th>SKU</th>
             <th>Product</th>
             {columns.map((c) => (
-              <th key={c.key}>{c.label}</th>
+              <th
+                key={c.key}
+                style={c.tone ? columnToneStyle[c.tone] : undefined}
+              >
+                {c.label}
+              </th>
             ))}
           </tr>
         </thead>
@@ -178,14 +226,17 @@ export function StockGrid({
                       scroll past, the next category's own row reaches the
                       same top offset and, being later in the DOM (painted
                       after), simply covers this one - the standard sticky-
-                      header handoff. See ConsolidatedReceiptTable.tsx for
-                      the same treatment on a table whose columns also need
-                      a horizontal-sticky label; this grid's column count is
-                      fixed per page (not unbounded like that one), so only
-                      the vertical stick is needed here. */}
+                      header handoff. This grid's column count is
+                      fixed per page, so only the vertical stick is needed
+                      here. */}
                   <td
                     colSpan={columns.length + 2}
-                    style={{ padding: 0, position: "sticky", top: HEADER_ROW_HEIGHT, zIndex: 2 }}
+                    style={{
+                      padding: 0,
+                      position: "sticky",
+                      top: HEADER_ROW_HEIGHT,
+                      zIndex: 2,
+                    }}
                   >
                     <button
                       type="button"
@@ -249,7 +300,10 @@ export function StockGrid({
                         return (
                           <td
                             key={col.key}
-                            style={col.editable ? undefined : lockedStyle}
+                            style={{
+                              ...(col.editable ? undefined : lockedStyle),
+                              ...tintFor(col),
+                            }}
                           >
                             {raw === null || raw === undefined
                               ? "—"
@@ -258,7 +312,7 @@ export function StockGrid({
                         );
                       }
                       return (
-                        <td key={col.key}>
+                        <td key={col.key} style={tintFor(col)}>
                           <NumberCellInput
                             data-cell={draftKey}
                             value={displayValue}
@@ -284,7 +338,7 @@ export function StockGrid({
                 <tr key={`${category}-subtotal`} style={subtotalRowStyle}>
                   <td colSpan={2}>Subtotal - {category}</td>
                   {columns.map((col) => (
-                    <td key={col.key}>
+                    <td key={col.key} style={tintFor(col)}>
                       {groupRows
                         .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
                         .toLocaleString()}
@@ -297,7 +351,7 @@ export function StockGrid({
           <tr style={grandTotalRowStyle}>
             <td colSpan={2}>GRAND TOTAL</td>
             {columns.map((col) => (
-              <td key={col.key}>
+              <td key={col.key} style={tintFor(col)}>
                 {rows
                   .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
                   .toLocaleString()}
@@ -326,7 +380,7 @@ const skuCellStyle: CSSProperties = {
   fontVariantNumeric: "tabular-nums",
 };
 const lockedStyle: CSSProperties = {
-  background: colors.paperAlt,
+  backgroundColor: colors.paperAlt,
   color: "var(--ae-num-text)",
 };
 // Border/radius/focus ring come from the shared .ae-input class - only the

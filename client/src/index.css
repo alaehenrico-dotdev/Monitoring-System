@@ -36,78 +36,159 @@
   --ae-text-muted: #6b6255;
   --ae-border: #e7dfc9;
   --ae-border-soft: #f1ebd8;
-  --ae-row-hover: rgba(20, 17, 13, 0.035);
+  --ae-row-hover: rgba(12, 12, 12, 0.035);
   --ae-warning-bg: #f7e7c2;
-  --ae-warning-text: #8b6a1e;
+  --ae-warning-text: #8a6800;
   --ae-header-bg: #e7dfc9;
-  --ae-header-rule: #14110d;
+  --ae-header-rule: #0c0c0c;
   --ae-num-text: var(--ae-text);
   --ae-danger-text: #c1272d;
   /* Category group-header bar inside data tables (StockGrid,
-     TotalStocksTable, ManualCountPage, ConsolidatedReceiptTable) - a
-     lighter gray in light mode instead of the brand-black used everywhere
-     else, since a pure-black bar reads too heavy against the paper-white
-     table around it. */
-  --ae-category-bg: #5c574c;
+     TotalStocksTable, ManualCountPage) - green (theme.ts's `colors.green`)
+     so the category bar reads distinctly from the red/gold/yellow used
+     elsewhere in the table chrome. */
+  --ae-category-bg: #2f6b3c;
   /* Editable grid-cell number inputs (.ae-input-cell) - lighter in light
      mode to match the airier table; dark mode keeps the original
      near-black fill since it already suits that surface. */
   --ae-input-cell-bg: #fff8e0;
   --ae-input-cell-text: #241d14;
   --ae-input-cell-text-muted: #6b6255;
-  --ae-input-cell-border: #c99a2e;
-  --ae-input-cell-focus-ring: rgba(201, 154, 46, 0.35);
+  --ae-input-cell-border: #d4a000;
+  --ae-input-cell-focus-ring: rgba(212, 160, 0, 0.35);
   /* The up/down stepper triangles on grid number inputs - darker gold reads
      against the new light cream fill; dark mode keeps the original bright
      yellow, which needs the near-black fill to stay legible. */
-  --ae-input-cell-spin: #c99a2e;
-  --ae-input-cell-spin-hover-bg: rgba(201, 154, 46, 0.18);
+  --ae-input-cell-spin: #d4a000;
+  --ae-input-cell-spin-hover-bg: rgba(212, 160, 0, 0.18);
 
   /* Toolbar tokens - brand colors, identical in light and dark mode so the
      toolbar border and its action buttons are always visible. */
-  --ae-toolbar-border: #c99a2e;
-  --ae-btn-yellow: #ffd400;
-  --ae-btn-yellow-hover: #e4b94d;
-  --ae-btn-yellow-active: #c99a2e;
-  --ae-btn-yellow-text: #14110d;
+  --ae-toolbar-border: #d4a000;
+  --ae-btn-yellow: #f5c000;
+  --ae-btn-yellow-hover: #fdd023;
+  --ae-btn-yellow-active: #d4a000;
+  --ae-btn-yellow-text: #0c0c0c;
+
+  /* Glass chrome (page header card + nav drawer) - one set of tokens so the
+     two always match. Light mode is frosted cream glass with dark text, so
+     the chrome is no longer a dark slab on the light page. */
+  --ae-glass-bg: rgba(255, 252, 245, 0.66);
+  --ae-glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.6),
+    rgba(255, 255, 255, 0) 45%
+  );
+  --ae-glass-text: #241d14;
+  --ae-glass-text-muted: #6b6255;
+  /* Text-safe gold: #d4a000 is too faint on cream. */
+  --ae-glass-accent: #8a6800;
+  --ae-glass-divider: rgba(36, 29, 20, 0.14);
+  --ae-glass-solid: #fffcf5;
+  --ae-glass-shadow:
+    0 8px 24px rgba(60, 45, 10, 0.16), 0 0 14px rgba(245, 192, 0, 0.22),
+    0 0 28px rgba(245, 192, 0, 0.1);
+  --ae-glass-panel-shadow:
+    0 16px 40px rgba(60, 45, 10, 0.22), 0 2px 8px rgba(60, 45, 10, 0.12);
+  /* Cursor-follow glow: gold on normal blend (white "screen" is invisible on
+     a light surface). */
+  --ae-glow-a: rgba(245, 192, 0, 0.3);
+  --ae-glow-b: rgba(245, 192, 0, 0.08);
+  --ae-glow-blend: normal;
+
+  /* Toolbar controls that sit on the glass header. */
+  --ae-tb-bg: rgba(255, 255, 255, 0.4);
+  --ae-tb-border: rgba(36, 29, 20, 0.16);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.6);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.9);
+  --ae-tb-field-bg-active: rgba(212, 160, 0, 0.22);
+  --ae-tb-hairline: rgba(36, 29, 20, 0.18);
+  --ae-tb-text: #241d14;
+  --ae-tb-text-muted: rgba(36, 29, 20, 0.6);
 }
 
 :root[data-theme="dark"] {
-  --ae-bg: #14110d;
-  --ae-bg-alt: #1d1812;
-  --ae-surface: #241e15;
-  --ae-surface-hover: #2e2718;
-  --ae-text: #f1e9d0;
-  --ae-text-muted: #a89a7d;
-  --ae-border: #3a3020;
-  --ae-border-soft: #2a2418;
+  /* Charcoal black instead of near-pure black (#070707) - easier on the
+     eyes for long sessions. Steps go lightest-on-top: page < tinted rows <
+     cards/modals < hover, header, editable cells. */
+  --ae-bg: #1a1a1a;
+  --ae-bg-alt: #222222;
+  --ae-surface: #262626;
+  --ae-surface-hover: #2e2e2e;
+  --ae-text: #ffffff;
+  --ae-text-muted: #a3a3a3;
+  /* ink-500, one step lighter than the old ink-600 (#2E2E2E) - a hairline
+     border at ink-600 all but disappears against the ink-950/900 surfaces
+     it usually sits on; this is the thinnest weight that still reads as a
+     visible edge rather than just a rendering artifact. --ae-border-soft
+     stays at ink-700 for the rarer case (internal, low-emphasis dividers)
+     that's supposed to stay closer to invisible. */
+  --ae-border: #3d3d3d;
+  --ae-border-soft: #2e2e2e;
   --ae-row-hover: rgba(255, 255, 255, 0.045);
-  --ae-warning-bg: #3d2f14;
-  --ae-warning-text: #e4b94d;
-  --ae-header-bg: #2a2318;
-  --ae-header-rule: #c99a2e;
+  --ae-warning-bg: #2b2306;
+  --ae-warning-text: #fdd023;
+  --ae-header-bg: #2a2a2a;
+  --ae-header-rule: #d4a000;
   --ae-num-text: #fff;
   /* The brand red (#c1272d) is a dark, low-luminance red - readable on the
      light paper background but too close to the near-black dark-mode
-     background (#14110d) to read as error text. Same pattern as
+     background (charcoal #1A1A1A) to read as error text. Same pattern as
      --ae-warning-text above: a lighter tint of the same hue for dark mode. */
   --ae-danger-text: #e5626a;
-  /* Unchanged from the original fixed values - dark mode already suits a
-     near-black category bar and near-black input-cell fill, so only light
-     mode (above) gets the new lighter/grayer treatment. */
-  --ae-category-bg: #14110d;
-  --ae-input-cell-bg: #14110d;
+  /* A darker, lower-luminance green than light mode's --ae-category-bg -
+     same relationship as --ae-warning-bg/--ae-danger-text above, so the
+     bar stays green but doesn't glow against the near-black page. */
+  --ae-category-bg: #17331d;
+  --ae-input-cell-bg: #262626;
   --ae-input-cell-text: #fff;
   --ae-input-cell-text-muted: rgba(255, 255, 255, 0.55);
-  --ae-input-cell-border: #ffd400;
+  --ae-input-cell-border: #f5c000;
   --ae-input-cell-focus-ring: rgba(255, 255, 255, 0.45);
-  --ae-input-cell-spin: #ffd400;
-  --ae-input-cell-spin-hover-bg: rgba(255, 212, 0, 0.18);
+  --ae-input-cell-spin: #f5c000;
+  --ae-input-cell-spin-hover-bg: rgba(245, 192, 0, 0.18);
+
+  /* Dark glass - same look the nav drawer always had. */
+  --ae-glass-bg: rgba(35, 35, 35, 0.72);
+  --ae-glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0) 45%
+  );
+  --ae-glass-text: #e5e5e5;
+  --ae-glass-text-muted: #a3a3a3;
+  --ae-glass-accent: #d4a000;
+  --ae-glass-divider: rgba(229, 229, 229, 0.18);
+  --ae-glass-solid: #232323;
+  --ae-glass-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(245, 192, 0, 0.28),
+    0 0 28px rgba(245, 192, 0, 0.12);
+  --ae-glass-panel-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --ae-glow-a: rgba(255, 255, 255, 0.3);
+  --ae-glow-b: rgba(255, 255, 255, 0.07);
+  --ae-glow-blend: screen;
+
+  --ae-tb-bg: rgba(255, 255, 255, 0.035);
+  --ae-tb-border: rgba(255, 255, 255, 0.09);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.06);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.11);
+  --ae-tb-field-bg-active: rgba(255, 255, 255, 0.17);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.14);
+  /* Toolbar item text/icons are brand yellow in dark mode (the solid-yellow
+     primary buttons keep their own dark text). */
+  --ae-tb-text: #f5c000;
+  --ae-tb-text-muted: rgba(245, 192, 0, 0.65);
 }
 
 body {
   margin: 0;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
   color: var(--ae-text);
   background: var(--ae-bg);
 }
@@ -124,8 +205,8 @@ table input[type="number"] {
 }
 
 ::selection {
-  background: #ffd400;
-  color: #14110d;
+  background: #f5c000;
+  color: #0c0c0c;
 }
 
 .ae-table {
@@ -149,7 +230,7 @@ table input[type="number"] {
 .ae-table td {
   text-align: center;
   padding: 3px 6px;
-  border-bottom: 0.5px solid var(--ae-border);
+  border-bottom: 1px solid var(--ae-border);
   transition: background-color 120ms ease;
 }
 .ae-table:not(.ae-table--left) td {
@@ -167,6 +248,19 @@ table input[type="number"] {
 .ae-table--center-head th {
   text-align: center;
 }
+/* Compact variant (Total Stocks and Manual Count/Audit tables): columns size
+   to their content instead of stretching to fill the whole pane, and use
+   tighter horizontal padding, so the table reads thinner. Vertical padding
+   is left as-is on purpose - the sticky category bars offset from the header
+   row's height (HEADER_ROW_HEIGHT), so it must not change. */
+.ae-table--compact {
+  width: auto;
+}
+.ae-table--compact th,
+.ae-table--compact td {
+  padding-left: 4px;
+  padding-right: 4px;
+}
 
 @keyframes ae-row-ring-sweep {
   0%,
@@ -181,19 +275,28 @@ table input[type="number"] {
 .ae-row-ring {
   position: absolute;
   z-index: 0;
-  height: 1.5px;
+  height: 1px;
   pointer-events: none;
   background-image: linear-gradient(
     90deg,
-    #14110d, #ffd400, #14110d, #c99a2e, #14110d,
-    #f1e9d0, #14110d, #c99a2e, #14110d, #ffd400, #14110d
+    #0c0c0c,
+    #f5c000,
+    #0c0c0c,
+    #d4a000,
+    #0c0c0c,
+    #e5e5e5,
+    #0c0c0c,
+    #d4a000,
+    #0c0c0c,
+    #f5c000,
+    #0c0c0c
   );
   background-size: 400% 100%;
   animation: ae-row-ring-sweep 13s linear infinite;
 }
 
 /* Full-box version of .ae-row-ring's sweep, for the shared Modal panel
-   (Modal.tsx) - same gradient, same 13s sweep, same 1.5px thickness, just
+   (Modal.tsx) - same gradient, same 13s sweep, same 1px thickness, just
    traced around all four edges instead of top/bottom bars only. Always
    animating (a modal has no per-row "hover" state to key off), so every
    dialog built on Modal - AlertDialog, ConfirmDialog, and page-level
@@ -204,15 +307,26 @@ table input[type="number"] {
   z-index: 1;
   pointer-events: none;
   border-radius: inherit;
-  padding: 1.5px;
+  padding: 1px;
   background-image: linear-gradient(
     100deg,
-    #14110d, #ffd400, #14110d, #c99a2e, #14110d,
-    #f1e9d0, #14110d, #c99a2e, #14110d, #ffd400, #14110d
+    #0c0c0c,
+    #f5c000,
+    #0c0c0c,
+    #d4a000,
+    #0c0c0c,
+    #e5e5e5,
+    #0c0c0c,
+    #d4a000,
+    #0c0c0c,
+    #f5c000,
+    #0c0c0c
   );
   background-size: 400% 100%;
   animation: ae-row-ring-sweep 13s linear infinite;
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
 }
@@ -255,7 +369,7 @@ table input[type="number"] {
 .ae-table-scroll {
   position: relative;
   overflow-x: auto;
-  border: 0.5px solid var(--ae-border);
+  border: 1px solid var(--ae-border);
   border-radius: 0;
   flex: 1;
   min-height: 0;
@@ -263,119 +377,6 @@ table input[type="number"] {
   border-left: 0;
   border-right: 0;
   border-bottom: 0;
-}
-
-/* Bulk Entry grid (ConsolidatedReceiptEntryGrid) - a batch of receipts,
-   one per customer column, dressed as a stack of paper sheets fanned open
-   to the right (see the reference mockup) rather than the usual
-   edge-to-edge page grid: each customer's own Quantity/Price/Total
-   columns are tinted and edge-shadowed a little differently (sheetStyle in
-   the component) so they read as sheets peeking out from under one
-   another, and a genuinely blank "next page" sheet - Add Customer - sits
-   at the very front. Sized to its own content (not full page width) so a
-   single-customer sheet reads as one page in a stack instead of a lonely
-   row stretched across the screen. */
-.ae-bulk-stack {
-  position: relative;
-  display: inline-block;
-  max-width: 100%;
-  margin: 0 4px 6px 0;
-  vertical-align: top;
-}
-.ae-bulk-fan {
-  display: flex;
-  align-items: stretch;
-  max-width: 100%;
-}
-.ae-bulk-stack-scroll.ae-table-scroll {
-  margin: 0;
-  border-radius: 0;
-  border: 0.5px solid var(--ae-border);
-  box-shadow: 0 10px 24px rgba(20, 17, 13, 0.16);
-  z-index: 1;
-}
-/* The near-black shadow above all but disappears against the dark-mode
-   background, so the sheets stop reading as stacked. Swap it for a
-   brand-yellow glow, which stays visible on the dark surface. */
-:root[data-theme="dark"] .ae-bulk-stack-scroll.ae-table-scroll {
-  box-shadow: 0 10px 24px rgba(255, 212, 0, 0.16);
-}
-/* The blank "next page" sheet, tucked behind the table rather than on top
-   of it - lowest z-index of the stack, sitting mostly underneath the last
-   customer sheet with only a strip peeking out to the right (and a
-   correspondingly quieter shadow, since it's not the sheet closest to the
-   viewer anymore). Still fully clickable on the strip that peeks out. */
-.ae-bulk-add-page {
-  flex: 0 0 96px;
-  margin-left: -28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 16px 8px 16px 24px;
-  border: 0.5px solid var(--ae-border);
-  border-radius: 0;
-  background: var(--ae-surface);
-  color: var(--ae-text-muted);
-  font: inherit;
-  font-size: 11.5px;
-  font-weight: 600;
-  line-height: 1.3;
-  text-align: center;
-  cursor: pointer;
-  box-shadow: 3px 4px 12px rgba(20, 17, 13, 0.14);
-  z-index: 0;
-  transition:
-    transform 120ms ease,
-    box-shadow 120ms ease,
-    color 120ms ease;
-}
-.ae-bulk-add-page:hover {
-  color: #c99a2e;
-  box-shadow: 3px 6px 16px rgba(20, 17, 13, 0.18);
-}
-:root[data-theme="dark"] .ae-bulk-add-page {
-  box-shadow: 3px 4px 12px rgba(255, 212, 0, 0.14);
-}
-:root[data-theme="dark"] .ae-bulk-add-page:hover {
-  box-shadow: 3px 6px 16px rgba(255, 212, 0, 0.18);
-}
-
-/* Bulk Entry's frozen SKU/Products column (ConsolidatedReceiptEntryGrid) -
-   position: sticky rather than a genuinely separate table, so it stays put
-   as the customer cards page through the stack (see the pager below) or
-   scroll horizontally: the SKU and Product-name cells pin to the left edge
-   of .ae-bulk-stack-scroll instead of travelling with the rest of the row.
-   Needs its own opaque background (the default transparent cell would let
-   whichever customer cell now sits underneath show through once scrolled)
-   - --ae-surface here, overridden inline per row on the subtotal/grand-total
-   rows, which use their own tinted row background instead. */
-.ae-bulk-fixed-col {
-  position: sticky;
-  z-index: 2;
-  background: var(--ae-surface);
-}
-/* The right-hand edge of the frozen block (Product name, and the spanning
-   header/subtotal/total-label cells) - a plain border rather than a shadow,
-   since --ae-border already flips to a legible tint in dark mode on its own
-   (unlike a fixed dark rgba shadow, which vanishes there - see the stack's
-   own box-shadow rules above). */
-.ae-bulk-fixed-col--edge {
-  border-right: 1px solid var(--ae-border);
-}
-
-/* Bulk Entry's page bar - shown once there's more than one page of customer
-   cards, so a long batch doesn't force the stack ever wider. Only the cards
-   themselves page; the frozen SKU/Products column above is unaffected. */
-.ae-bulk-pager {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ae-text-muted);
 }
 
 /* Themed scrollbars for table containers, modal bodies, and the main content
@@ -419,7 +420,7 @@ table input[type="number"] {
 .table-scroll::-webkit-scrollbar-thumb:hover,
 .ae-main::-webkit-scrollbar-thumb:hover,
 .ae-modal-body::-webkit-scrollbar-thumb:hover {
-  background-color: #c99a2e;
+  background-color: #d4a000;
 }
 .ae-table-scroll::-webkit-scrollbar-corner,
 .table-scroll::-webkit-scrollbar-corner,
@@ -443,13 +444,13 @@ table input[type="number"] {
 }
 .ae-input:hover:not(:disabled):not(:focus),
 .ae-select:hover:not(:disabled):not(:focus) {
-  border-color: #c99a2e;
+  border-color: #d4a000;
 }
 .ae-input:focus,
 .ae-select:focus {
   outline: none;
-  border-color: #c99a2e;
-  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.18);
+  border-color: #d4a000;
+  box-shadow: 0 0 0 3px rgba(212, 160, 0, 0.18);
 }
 .ae-input:disabled,
 .ae-select:disabled {
@@ -458,13 +459,10 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
-/* Always-active border - for a field that should read as "focused" even
-   at rest (Customer / Sales Rep on the single-receipt form), rather than
-   only turning gold on hover/focus like every other .ae-input. */
-.ae-input.ae-input-emphasis {
-  border-color: #c99a2e;
-}
 .ae-input-cell {
+  /* Same corner radius as .ae-page-header (8px), instead of the pill
+     radius inherited from .ae-input. */
+  border-radius: 8px;
   padding: 2px 5px;
   background: var(--ae-input-cell-bg);
   color: var(--ae-input-cell-text);
@@ -545,18 +543,6 @@ table input[type="number"] {
   border-top: 5px solid var(--ae-input-cell-spin);
 }
 
-.ae-receipt-paper .ae-input,
-.ae-receipt-paper .ae-select {
-  background: #fff;
-  color: #241d14;
-  border-color: #e7dfc9;
-}
-.ae-receipt-paper .ae-input:disabled,
-.ae-receipt-paper .ae-select:disabled {
-  background: #f3efe4;
-  color: #8a8272;
-}
-
 /* ---- Date picker (components/DatePicker.tsx) ---------------------------
    The trigger is a <button> styled as an .ae-input; the calendar dialog is
    portaled to <body>, so its rules key off .ae-datepicker rather than any
@@ -573,8 +559,8 @@ table input[type="number"] {
   cursor: pointer;
 }
 .ae-date-trigger[aria-expanded="true"] {
-  border-color: #c99a2e;
-  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.18);
+  border-color: #d4a000;
+  box-shadow: 0 0 0 3px rgba(212, 160, 0, 0.18);
 }
 .ae-date-trigger-text {
   min-width: 0;
@@ -584,18 +570,15 @@ table input[type="number"] {
 .ae-date-trigger-icon {
   display: inline-flex;
   flex-shrink: 0;
-  color: #8b6a1e;
+  color: #d4a000;
   transition: color 120ms ease;
 }
 .ae-date-trigger:hover:not(:disabled) .ae-date-trigger-icon,
 .ae-date-trigger[aria-expanded="true"] .ae-date-trigger-icon {
-  color: #c99a2e;
+  color: #d4a000;
 }
 :root[data-theme="dark"] .ae-date-trigger-icon {
-  color: #ffd400;
-}
-:root[data-theme="dark"] .ae-receipt-paper .ae-date-trigger-icon {
-  color: #8b6a1e; /* the receipt paper stays white in dark mode - yellow would vanish on it */
+  color: #f5c000;
 }
 /* Compact and circle toolbar tiers squeeze the field to ~100px / ~84px, so
    they swap to the numeric "9/19/26" form (circle also drops the icon). The
@@ -621,8 +604,10 @@ table input[type="number"] {
   background: var(--ae-surface);
   color: var(--ae-text);
   border: 1px solid var(--ae-toolbar-border);
-  border-radius: 0;
-  box-shadow: 0 16px 48px rgba(20, 17, 13, 0.35);
+  /* Same 8px radius as .ae-page-header/.ae-modal-panel - every floating
+     panel in the app reads as the same family of rounded brand chrome. */
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
   font-size: 13px;
   user-select: none;
   outline: none;
@@ -635,8 +620,8 @@ table input[type="number"] {
   align-items: center;
   gap: 4px;
   padding: 10px;
-  background: #14110d;
-  color: #f1e9d0;
+  background: #232323;
+  color: #e5e5e5;
 }
 .ae-datepicker-title {
   flex: 1;
@@ -651,7 +636,7 @@ table input[type="number"] {
   transition: background-color 120ms ease;
 }
 .ae-datepicker-title:hover {
-  background: rgba(255, 212, 0, 0.14);
+  background: rgba(245, 192, 0, 0.14);
 }
 .ae-datepicker-nav {
   flex-shrink: 0;
@@ -664,19 +649,19 @@ table input[type="number"] {
   border: 1px solid transparent;
   border-radius: 50%;
   background: transparent;
-  color: #ffd400;
+  color: #f5c000;
   cursor: pointer;
   transition:
     background-color 120ms ease,
     border-color 120ms ease;
 }
 .ae-datepicker-nav:hover {
-  background: rgba(255, 212, 0, 0.16);
-  border-color: rgba(255, 212, 0, 0.5);
+  background: rgba(245, 192, 0, 0.16);
+  border-color: rgba(245, 192, 0, 0.5);
 }
 .ae-datepicker-title:focus-visible,
 .ae-datepicker-nav:focus-visible {
-  outline: 2px solid #ffd400;
+  outline: 2px solid #f5c000;
   outline-offset: 1px;
 }
 .ae-datepicker-body {
@@ -721,21 +706,21 @@ table input[type="number"] {
   opacity: 0.55;
 }
 .ae-datepicker-day--today {
-  border-color: #c99a2e;
+  border-color: #d4a000;
   font-weight: 700;
 }
 .ae-datepicker-day--selected,
 .ae-datepicker-day--selected:hover {
-  background: #ffd400;
-  border-color: #ffd400;
-  color: #14110d;
+  background: #f5c000;
+  border-color: #f5c000;
+  color: #0c0c0c;
   font-weight: 800;
   opacity: 1;
 }
 .ae-datepicker-day:focus-visible,
 .ae-datepicker-month:focus-visible,
 .ae-datepicker-today:focus-visible {
-  outline: 2px solid #c99a2e;
+  outline: 2px solid #d4a000;
   outline-offset: 1px;
 }
 .ae-datepicker-months {
@@ -760,9 +745,9 @@ table input[type="number"] {
 }
 .ae-datepicker-month--selected,
 .ae-datepicker-month--selected:hover {
-  background: #ffd400;
-  border-color: #ffd400;
-  color: #14110d;
+  background: #f5c000;
+  border-color: #f5c000;
+  color: #0c0c0c;
   font-weight: 800;
 }
 .ae-datepicker-foot {
@@ -784,17 +769,17 @@ table input[type="number"] {
 .ae-datepicker-today {
   flex-shrink: 0;
   padding: 5px 12px;
-  border: 1px solid #8b6a1e;
+  border: 1px solid #d4a000;
   border-radius: 999px;
   background: transparent;
-  color: #c99a2e;
+  color: #d4a000;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: background-color 120ms ease;
 }
 .ae-datepicker-today:hover {
-  background: rgba(201, 154, 46, 0.14);
+  background: rgba(212, 160, 0, 0.14);
 }
 @media print {
   .ae-datepicker {
@@ -807,8 +792,7 @@ table input[type="number"] {
    (CategoryFilter, ShiftFilter, ZoomControl, and the page-level filter
    selects). Same trigger-plus-portaled-panel shape as the date picker
    above, and deliberately styled to match it: same .ae-input trigger, same
-   square (border-radius: 0), dark-shadowed panel, same brand-yellow
-   selected state. */
+   8px radius, dark-shadowed panel, same brand-yellow selected state. */
 .ae-select-trigger {
   display: inline-flex;
   align-items: center;
@@ -820,8 +804,8 @@ table input[type="number"] {
   cursor: pointer;
 }
 .ae-select-trigger[aria-expanded="true"] {
-  border-color: #c99a2e;
-  box-shadow: 0 0 0 3px rgba(201, 154, 46, 0.18);
+  border-color: #d4a000;
+  box-shadow: 0 0 0 3px rgba(212, 160, 0, 0.18);
 }
 .ae-select-trigger-text {
   min-width: 0;
@@ -831,23 +815,20 @@ table input[type="number"] {
 .ae-select-trigger-icon {
   display: inline-flex;
   flex-shrink: 0;
-  color: #8b6a1e;
+  color: #d4a000;
   transition:
     color 120ms ease,
     transform 120ms ease;
 }
 .ae-select-trigger:hover:not(:disabled) .ae-select-trigger-icon,
 .ae-select-trigger[aria-expanded="true"] .ae-select-trigger-icon {
-  color: #c99a2e;
+  color: #d4a000;
 }
 .ae-select-trigger[aria-expanded="true"] .ae-select-trigger-icon {
   transform: rotate(180deg);
 }
 :root[data-theme="dark"] .ae-select-trigger-icon {
-  color: #ffd400;
-}
-:root[data-theme="dark"] .ae-receipt-paper .ae-select-trigger-icon {
-  color: #8b6a1e; /* matches .ae-date-trigger-icon's same override */
+  color: #f5c000;
 }
 .ae-select-trigger:disabled {
   cursor: not-allowed;
@@ -860,8 +841,8 @@ table input[type="number"] {
   background: var(--ae-surface);
   color: var(--ae-text);
   border: 1px solid var(--ae-toolbar-border);
-  border-radius: 0;
-  box-shadow: 0 16px 48px rgba(20, 17, 13, 0.35);
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
   font-size: 13px;
   outline: none;
 }
@@ -904,12 +885,12 @@ table input[type="number"] {
 }
 .ae-dropdown-option--selected,
 .ae-dropdown-option--selected:hover {
-  background: #ffd400;
-  color: #14110d;
+  background: #f5c000;
+  color: #0c0c0c;
   font-weight: 800;
 }
 .ae-dropdown-option:focus-visible {
-  outline: 2px solid #c99a2e;
+  outline: 2px solid #d4a000;
   outline-offset: -2px;
 }
 @media print {
@@ -964,17 +945,17 @@ table input[type="number"] {
 .ae-btn-primary {
   background: #c1272d;
   border-color: #c1272d;
-  color: #f1e9d0;
+  color: #e5e5e5;
 }
 .ae-btn-secondary {
   background: transparent;
-  border-color: #8b6a1e;
+  border-color: #d4a000;
   color: var(--ae-text);
 }
 .ae-btn-ghost {
   background: transparent;
-  border-color: #8b6a1e;
-  color: #c99a2e;
+  border-color: #d4a000;
+  color: #d4a000;
 }
 .ae-btn-danger {
   background: transparent;
@@ -1022,30 +1003,30 @@ table input[type="number"] {
   justify-content: flex-start;
   flex-wrap: nowrap;
   gap: var(--ae-toolbar-gap);
-  /* Horizontal padding must clear the pill's own end caps. border-radius:
-     9999px makes each end a true semicircle of radius = row-height/2 (~22px),
-     centered on the row's vertical middle - the cap curves back in toward
-     that center as you move up/down from mid-height, reaching all the way
-     in at the very top/bottom edge. A full-height circular control (the
-     compact/circle round Save button, a segment group) sitting flush
-     against a too-thin 6px padding poked past that curve at its own
-     top/bottom edge, and overflow-hidden clipped the sliver off - a small
-     crescent "bite" out of the button right where it met the toolbar's
-     rounded end. 10px keeps every tier's flush end control inside the cap. */
-  padding: 4px 4px;
+  /* Professional command-bar look: a rounded rectangle (not a pill). Every
+     Toolbar lives inside the glass .ae-page-header, so its control colors
+     follow the light/dark glass tokens (--ae-tb-* in :root above). */
+  --tb-h: 34px;
+  --tb-radius: 8px;
+  --tb-field-bg: var(--ae-tb-field-bg);
+  --tb-field-bg-hover: var(--ae-tb-field-bg-hover);
+  --tb-hairline: var(--ae-tb-hairline);
+  --tb-text: var(--ae-tb-text);
+  --tb-text-muted: var(--ae-tb-text-muted);
+  padding: 5px;
   /* Pulls the strip 8px past the page padding on each side at every screen
      size (the small-screen rules below used to widen this to -12/-16px). */
   margin: 0 -8px 6px;
   background: var(--ae-surface);
   border: 1px solid var(--ae-toolbar-border);
-  border-radius: 9999px;
-  box-shadow: 0 1px 3px rgba(20, 17, 13, 0.06);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(12, 12, 12, 0.06);
   position: relative;
 
   /* Never let the page's column layout squash the toolbar. Pages render as
      `.ae-main > div { display: flex; flex-direction: column; min-height: 0 }`,
      so when the content below is taller than the viewport (a loaded Daily
-     Report, the Receipts form + list) the column has negative free space and
+     Report) the column has negative free space and
      shrinks whatever it can. Anything with overflow other than `visible`
      (this row) is allowed to shrink to 0 height, so the toolbar collapsed and
      clipped its controls. It must always keep its natural height. */
@@ -1070,6 +1051,9 @@ table input[type="number"] {
 }
 .ae-toolbar--circle {
   --ae-toolbar-gap: 4px;
+  /* Smaller floor-tier height applies to EVERY control (inputs, selects,
+     dates, buttons) so they stay the same size as each other. */
+  --tb-h: 30px;
   /* Only tier that can be wider than the viewport. */
   overflow-x: auto;
 }
@@ -1090,11 +1074,11 @@ table input[type="number"] {
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--ae-glow-blend);
   background: radial-gradient(
     circle 220px at var(--mx, 50%) var(--my, 50%),
-    rgba(255, 255, 255, 0.35),
-    rgba(255, 255, 255, 0.08) 55%,
+    var(--ae-glow-a),
+    var(--ae-glow-b) 55%,
     transparent 75%
   );
   opacity: var(--spotlight-opacity, 0);
@@ -1136,8 +1120,8 @@ table input[type="number"] {
   flex: 0 0 1px;
   width: 1px;
   min-width: 1px;
-  height: 24px;
-  background: var(--ae-toolbar-border);
+  height: 22px;
+  background: var(--tb-hairline);
 }
 
 /* ---- Filters: borders always visible, no hover-only border ------------- */
@@ -1147,7 +1131,50 @@ table input[type="number"] {
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
-  border-color: var(--ae-toolbar-border);
+  height: var(--tb-h);
+  padding-top: 0;
+  padding-bottom: 0;
+  border-radius: var(--tb-radius);
+  border-color: var(--tb-hairline);
+  background-color: var(--tb-field-bg);
+  color: var(--tb-text);
+}
+.ae-toolbar .ae-input:hover:not(:disabled):not(:focus),
+.ae-toolbar .ae-select:hover:not(:disabled):not(:focus) {
+  background-color: var(--tb-field-bg-hover);
+  border-color: rgba(245, 192, 0, 0.55);
+}
+.ae-toolbar .ae-input:disabled {
+  background-color: var(--tb-field-bg);
+  color: var(--tb-text-muted);
+  opacity: 0.55;
+}
+.ae-toolbar .ae-input::placeholder {
+  color: var(--tb-text-muted);
+}
+.ae-toolbar .ae-search-icon {
+  color: var(--tb-text-muted);
+}
+/* Leading icon inside a filter trigger (Dropdown's `icon` prop): only in
+   the full tier - the narrower tiers give the text every pixel. */
+.ae-select-trigger-lead {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-right: 7px;
+  color: var(--tb-text-muted, #a3a3a3);
+}
+.ae-select-trigger-lead svg {
+  width: 14px;
+  height: 14px;
+}
+.ae-select-trigger:has(.ae-select-trigger-lead) {
+  justify-content: flex-start;
+}
+.ae-select-trigger:has(.ae-select-trigger-lead) .ae-select-trigger-text {
+  flex: 1 1 auto;
+}
+.ae-toolbar--compact .ae-select-trigger-lead {
+  display: none;
 }
 
 /* ---- Filters: sizing per tier ------------------------------------------ */
@@ -1156,16 +1183,6 @@ table input[type="number"] {
   flex: 1 1 280px;
   width: 280px !important;
   min-width: 72px;
-}
-/* Bulk Entry's search box (ReceiptsPage): pinned to just its placeholder's
-   width instead of growing, so the date/destination/mode-toggle controls
-   sitting beside it in the filter cluster get room instead of search
-   eating all the toolbar's leftover space. Scoped to the full tier only -
-   :not(.ae-toolbar--compact) drops out in compact/circle, where the
-   generic rules below still shrink it like any other toolbar search box. */
-.ae-toolbar:not(.ae-toolbar--compact) input.ae-search-fixed[type="search"] {
-  flex: 0 0 280px;
-  width: 280px !important;
 }
 .ae-toolbar .ae-select,
 .ae-toolbar .ae-select-trigger,
@@ -1230,10 +1247,10 @@ table input[type="number"] {
    last, so it beats compact). ZoomControl no longer sets any sizing inline;
    this is the single source of truth. */
 .ae-toolbar .ae-zoom-control {
-  flex: 0 0 76px !important;
-  width: 76px !important;
-  min-width: 76px !important;
-  max-width: 76px !important;
+  flex: 0 0 94px !important;
+  width: 94px !important;
+  min-width: 94px !important;
+  max-width: 94px !important;
 }
 .ae-toolbar--compact .ae-zoom-control {
   flex: 0 0 72px !important;
@@ -1248,53 +1265,102 @@ table input[type="number"] {
   max-width: 68px !important;
 }
 
-/* ---- Buttons: always yellow -------------------------------------------- */
-/* Save, PDF, Import, CSV export, zoom... every toolbar action is yellow in
-   every tier and in both themes. Only a danger button keeps its own look. */
+/* ---- Buttons: neutral by default, one yellow primary ------------------- */
+/* Every toolbar action is a quiet, icon-led button (dark fill, hairline
+   border) so the row reads as a tidy command bar instead of a strip of
+   yellow pills. The single most important action gets solid yellow:
+   .ae-toolbar-primary (Save) or a default-variant .ae-btn-primary
+   (Generate / Run report). Danger buttons keep their own look. */
 .ae-toolbar .ae-btn,
 .ae-toolbar .ae-toolbar-save,
 .ae-toolbar .ae-segment-group {
   flex: 0 0 auto;
 }
 .ae-toolbar .ae-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: var(--tb-h);
+  padding: 0 13px;
+  border-radius: var(--tb-radius);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  text-decoration: none;
   white-space: nowrap;
 }
 .ae-toolbar .ae-btn:not(.ae-btn-danger),
 .ae-toolbar .ae-toolbar-save,
 .ae-toolbar .ae-segment-btn {
-  background: var(--ae-btn-yellow);
-  color: var(--ae-btn-yellow-text);
+  background: var(--tb-field-bg);
+  color: var(--tb-text);
 }
 .ae-toolbar .ae-btn:not(.ae-btn-danger),
 .ae-toolbar .ae-toolbar-save {
-  border-color: var(--ae-btn-yellow-active);
+  border-color: var(--tb-hairline);
 }
 .ae-toolbar .ae-btn:not(.ae-btn-danger):hover:not(:disabled),
 .ae-toolbar .ae-toolbar-save:hover:not(:disabled),
 .ae-toolbar .ae-segment-btn:hover:not(:disabled) {
-  background: var(--ae-btn-yellow-hover);
+  background: var(--tb-field-bg-hover);
+  border-color: rgba(245, 192, 0, 0.55);
 }
 .ae-toolbar .ae-btn:not(.ae-btn-danger):active:not(:disabled),
 .ae-toolbar .ae-toolbar-save:active:not(:disabled),
 .ae-toolbar .ae-segment-btn:active:not(:disabled) {
-  background: var(--ae-btn-yellow-active);
+  background: var(--ae-tb-field-bg-active);
+}
+.ae-toolbar .ae-btn:disabled,
+.ae-toolbar .ae-segment-btn:disabled {
+  opacity: 0.4;
+}
+.ae-toolbar .ae-btn:focus-visible,
+.ae-toolbar .ae-segment-btn:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: 2px;
 }
 
-/* Segmented group (e.g. Import | Export | PDF): a yellow pill in full mode.
-   Selector is .ae-toolbar-prefixed so it beats the generic .ae-segment-group
-   further down the file (which is a surface-colored, 8px-radius box). */
-.ae-toolbar .ae-segment-group {
+/* Primary action: solid yellow. */
+.ae-toolbar .ae-toolbar-primary,
+.ae-toolbar .ae-btn-primary {
   background: var(--ae-btn-yellow);
-  border: none;
-  border-radius: 999px;
+  border-color: var(--ae-btn-yellow-active);
+  color: var(--ae-btn-yellow-text);
+}
+.ae-toolbar .ae-toolbar-primary:hover:not(:disabled),
+.ae-toolbar .ae-btn-primary:hover:not(:disabled) {
+  background: var(--ae-btn-yellow-hover);
+  border-color: var(--ae-btn-yellow-hover);
+}
+.ae-toolbar .ae-toolbar-primary:active:not(:disabled),
+.ae-toolbar .ae-btn-primary:active:not(:disabled) {
+  background: var(--ae-btn-yellow-active);
+}
+.ae-toolbar .ae-toolbar-primary:disabled {
+  opacity: 0.45;
+}
+
+/* Segmented group (e.g. Import | Export): one bordered control with hairline
+   dividers. Selector is .ae-toolbar-prefixed so it beats the generic
+   .ae-segment-group further down the file. */
+.ae-toolbar .ae-segment-group {
+  height: var(--tb-h);
+  background: var(--tb-field-bg);
+  border: 1px solid var(--tb-hairline);
+  border-radius: var(--tb-radius);
   transition: gap 220ms ease;
 }
 .ae-toolbar .ae-segment-divider {
-  background: var(--ae-btn-yellow-active);
+  background: var(--tb-hairline);
 }
 .ae-toolbar .ae-segment-btn {
-  padding: 0 10px;
-  font-weight: 700;
+  background: transparent;
+  padding: 0 12px;
+  font-weight: 600;
+}
+.ae-toolbar .ae-segment-btn:hover:not(:disabled) {
+  border-color: transparent;
 }
 
 /* Button labels collapse to nothing in compact/circle. */
@@ -1317,22 +1383,25 @@ table input[type="number"] {
 /* ---- Compact: icon-only buttons ---------------------------------------- */
 .ae-toolbar--compact .ae-segment-group {
   background: transparent;
+  border-color: transparent;
   gap: 4px;
 }
 .ae-toolbar--compact .ae-segment-divider {
   display: none;
 }
 .ae-toolbar--compact .ae-segment-btn {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
+  width: var(--tb-h);
+  height: var(--tb-h);
+  min-width: var(--tb-h);
   padding: 0;
   gap: 0;
-  border-radius: 50%;
+  border-radius: var(--tb-radius);
+  border: 1px solid var(--tb-hairline);
+  background: var(--tb-field-bg);
 }
 .ae-toolbar--compact .ae-btn {
-  min-width: 32px;
-  height: 32px;
+  min-width: var(--tb-h);
+  height: var(--tb-h);
   padding: 0 10px;
 }
 .ae-toolbar--compact .ae-btn,
@@ -1343,52 +1412,36 @@ table input[type="number"] {
   gap: 0;
 }
 .ae-toolbar--compact .ae-toolbar-save {
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  height: var(--tb-h);
   padding: 0;
-  border-radius: 50%;
-}
-/* Opt-in: a Save button that keeps its text through the compact tier and
-   only collapses to a round icon in the circle (floor) tier - e.g. Save All
-   on the Receipts bulk sheet, where the toolbar is crowded enough that it
-   sits in compact most of the time. The circle tier's own rules (28px, label
-   hidden) still win there because this only targets compact-but-not-circle.
-   The tier measurement sees this too (the sizers use the same CSS), so the
-   width it reserves for compact already includes the label. */
-.ae-toolbar--compact:not(.ae-toolbar--circle) .ae-toolbar-save.ae-toolbar-save--keep-label {
-  width: auto;
-  min-width: 32px;
-  padding: 0 0 0 10px;
-  border-radius: 9999px;
-}
-.ae-toolbar--compact:not(.ae-toolbar--circle) .ae-toolbar-save--keep-label .ae-toolbar-btn-label {
-  max-width: 160px;
-  opacity: 1;
+  border-radius: var(--tb-radius);
 }
 /* The gap: 0 above exists so an icon whose label collapsed to nothing stays
    centered. A button whose text is NOT in a label span (e.g. "[icon] PDF")
    keeps its text, so it needs its normal icon/text spacing back. */
-.ae-toolbar--compact .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
-  gap: 5px;
+.ae-toolbar--compact
+  .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
+  gap: 6px;
 }
 
-/* ---- Circle: floor tier, fixed-diameter round buttons ------------------- */
+/* ---- Circle: floor tier, fixed-size compact buttons ------------------- */
 .ae-toolbar--circle .ae-segment-group {
   gap: 3px;
 }
 .ae-toolbar--circle .ae-segment-btn,
 .ae-toolbar--circle .ae-btn,
 .ae-toolbar--circle .ae-toolbar-save {
-  width: 28px;
-  min-width: 28px;
-  max-width: 28px;
-  height: 28px;
-  min-height: 28px;
-  max-height: 28px;
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  max-width: var(--tb-h);
+  height: var(--tb-h);
+  min-height: var(--tb-h);
+  max-height: var(--tb-h);
   padding: 0;
-  border-radius: 50%;
-  flex: 0 0 28px;
+  border-radius: var(--tb-radius);
+  flex: 0 0 var(--tb-h);
 }
 
 /* A button with no collapsible label (plain text like "Generate", "Export
@@ -1397,17 +1450,109 @@ table input[type="number"] {
    28px circle just clips its text. It stays a pill and only gets tighter.
    Separate rule on purpose: a browser without :has() drops just this rule
    and keeps the old behavior. */
-.ae-toolbar--circle .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
+.ae-toolbar--circle
+  .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
   width: auto;
   min-width: 0;
   max-width: none;
-  height: 28px;
-  min-height: 28px;
-  max-height: 28px;
+  height: var(--tb-h);
+  min-height: var(--tb-h);
+  max-height: var(--tb-h);
   padding: 0 10px;
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: var(--tb-radius);
   flex: 0 0 auto;
+}
+
+/* ---- Consistency pass: every toolbar item shares one size system --------
+   Height, corner radius, border weight, font size, horizontal padding and
+   icon size all come from the same few values, in every tier, so search
+   boxes, dropdowns, date pickers, buttons, segmented groups and the zoom
+   select line up as one row instead of each carrying its own numbers.
+   (--tb-h is 34px, or 30px in the circle tier - see above.) Placed after
+   the tier rules on purpose so it wins over their older per-control
+   values. */
+.ae-toolbar {
+  --tb-pad-x: 12px;
+  --tb-font: 12.5px;
+  --tb-icon: 15px;
+}
+.ae-toolbar--circle {
+  --tb-pad-x: 10px;
+}
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger,
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-group,
+.ae-toolbar .ae-segment-btn {
+  box-sizing: border-box;
+  height: var(--tb-h);
+  min-height: var(--tb-h);
+  max-height: var(--tb-h);
+  border-radius: var(--tb-radius);
+  font-family: inherit;
+  font-size: var(--tb-font);
+  line-height: 1;
+}
+/* Same 1px hairline border on every bordered control (the segmented group's
+   own border is dropped in compact/circle, where each button carries one). */
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger,
+.ae-toolbar
+  .ae-btn:not(.ae-btn-danger):not(.ae-toolbar-primary):not(.ae-btn-primary),
+.ae-toolbar .ae-toolbar-save:not(.ae-toolbar-primary) {
+  border-width: 1px;
+  border-style: solid;
+}
+/* Same side padding on dropdown/date triggers and text buttons (the search
+   box keeps its own, it reserves room for its icon). */
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger,
+.ae-toolbar .ae-select {
+  padding-left: var(--tb-pad-x);
+  padding-right: var(--tb-pad-x);
+}
+.ae-toolbar .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save),
+.ae-toolbar .ae-segment-btn {
+  padding-left: var(--tb-pad-x);
+  padding-right: var(--tb-pad-x);
+}
+/* Icon-only buttons (label collapsed away) are perfect squares. */
+.ae-toolbar--compact .ae-btn:has(.ae-toolbar-btn-label),
+.ae-toolbar--compact .ae-toolbar-save,
+.ae-toolbar--compact .ae-segment-btn {
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  max-width: var(--tb-h);
+  padding-left: 0;
+  padding-right: 0;
+}
+/* A button that is only an icon (e.g. Undo) is a square at every tier. */
+.ae-toolbar .ae-btn.ae-toolbar-icon-btn {
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  max-width: var(--tb-h);
+  padding-left: 0;
+  padding-right: 0;
+  flex: 0 0 var(--tb-h);
+}
+/* One icon size across buttons and dropdown/date leading icons. */
+.ae-toolbar .ae-btn svg,
+.ae-toolbar .ae-toolbar-save svg,
+.ae-toolbar .ae-segment-btn svg,
+.ae-toolbar .ae-select-trigger-lead svg,
+.ae-toolbar .ae-date-trigger-icon svg {
+  width: var(--tb-icon);
+  height: var(--tb-icon);
+  flex-shrink: 0;
+}
+/* Zoom select follows the same height as everything else. */
+.ae-toolbar .ae-zoom-control {
+  height: var(--tb-h) !important;
 }
 
 /* Toolbar entries always remain a single horizontal strip. */
@@ -1438,10 +1583,24 @@ table input[type="number"] {
    per-tier/hover-state styling that needed recomputing against live
    `colors.*` values). */
 .ae-sidebar-tab:hover:not([aria-current="page"]) {
-  background: color-mix(in srgb, #ffd400 16%, transparent) !important;
-  color: #ffd400 !important;
+  background: color-mix(in srgb, #f5c000 16%, transparent) !important;
+  color: var(--ae-glass-hover-text, #f5c000) !important;
+}
+:root:not([data-theme="dark"])
+  .ae-sidebar-tab:hover:not([aria-current="page"]) {
+  --ae-glass-hover-text: #6b5000;
 }
 .ae-sidebar-tab-spotlight {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: var(--ae-glow-blend);
+  background: radial-gradient(
+    circle 90px at var(--mx, 50%) var(--my, 50%),
+    var(--ae-glow-a),
+    var(--ae-glow-b) 55%,
+    transparent 75%
+  );
   opacity: var(--spotlight-opacity, 0);
   transition: opacity 220ms ease;
 }
@@ -1535,7 +1694,14 @@ table input[type="number"] {
    ------------------------------------------------------------------------ */
 .ae-page-header {
   position: relative;
-  background: #14110d;
+  /* Glass, same recipe as the nav drawer (Sidebar.tsx): translucent tinted
+     fill + blur, themed via --ae-glass-* so light mode is frosted cream
+     instead of a dark slab. The diagonal sheen is a background layer (not
+     an overlay) so it never washes out the text. */
+  background: var(--ae-glass-sheen), var(--ae-glass-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  color: var(--ae-glass-text);
   border: 1px solid var(--ae-toolbar-border);
   border-radius: 8px;
   padding: 12px 14px 10px;
@@ -1544,10 +1710,30 @@ table input[type="number"] {
      (Sidebar.tsx's boxShadow) - a soft drop shadow plus two rings of the
      brand yellow bleeding outward, so the card reads as the same kind of
      glowing chrome instead of a flat bordered box. */
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.55),
-    0 0 14px rgba(255, 212, 0, 0.28),
-    0 0 28px rgba(255, 212, 0, 0.12);
+  box-shadow: var(--ae-glass-shadow);
+}
+/* Cursor-follow spotlight, same trick as .ae-toolbar::before /
+   .ae-sidebar-tab-spotlight: --mx/--my/--spotlight-opacity are written by
+   PageHeader.tsx on mousemove/mouseleave, no React state involved. A
+   pseudo-element (not a child) so it paints behind everything else in the
+   card - the title, logo, toolbar, and HeaderExtras - purely by DOM order,
+   with no z-index needed. pointer-events: none keeps it from ever
+   intercepting a click on the logo/collapse button/toolbar controls. */
+.ae-page-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: var(--ae-glow-blend);
+  background: radial-gradient(
+    circle 260px at var(--mx, 50%) var(--my, 50%),
+    var(--ae-glow-a),
+    var(--ae-glow-b) 55%,
+    transparent 75%
+  );
+  opacity: var(--spotlight-opacity, 0);
+  transition: opacity 220ms ease;
 }
 /* Nothing sits below the title once collapsed - drop its own bottom
    margin, since the toolbar row (still present for the collapse button
@@ -1577,8 +1763,18 @@ table input[type="number"] {
 .ae-page-header--collapsed .ae-page-header-collapsible-inner {
   opacity: 0;
 }
+/* The toolbar is no longer inside the titles column (which sits to the
+   right of the logo): it is its own full-width row below the logo/title
+   row, so it starts at the card's left end under the logo. The -8px side
+   margin lives on this wrapper, not the toolbar, because the inner element
+   clips (overflow: hidden) and would cut off a toolbar that overhangs it. */
+.ae-page-header-collapsible--toolbar {
+  margin: 0 -8px;
+}
 .ae-page-header-toolbar-slot {
   min-width: 0;
+  /* Padding (not a margin) so it collapses away with the row. */
+  padding-top: 6px;
 }
 /* Bottom-center collapse tab - a small nub straddling the card's own
    bottom border (half in, half out, via the negative bottom offset) so it
@@ -1603,13 +1799,17 @@ table input[type="number"] {
   padding: 0;
   border: 1px solid var(--ae-toolbar-border);
   border-radius: 50%;
-  background: #14110d;
-  color: #c99a2e;
+  background: var(--ae-glass-solid);
+  color: var(--ae-glass-accent);
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 140ms ease, transform 140ms ease, background-color 120ms ease,
-    box-shadow 120ms ease, color 120ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    background-color 120ms ease,
+    box-shadow 120ms ease,
+    color 120ms ease;
 }
 .ae-page-header:hover .ae-page-header-collapse-btn,
 .ae-page-header:focus-within .ae-page-header-collapse-btn,
@@ -1622,11 +1822,11 @@ table input[type="number"] {
 /* Glowing yellow fill, arrow flips to black - same brand yellow as the
    toolbar's own buttons. */
 .ae-page-header-collapse-btn:hover {
-  background: #ffd400;
-  color: #14110d;
+  background: #f5c000;
+  color: #0c0c0c;
   box-shadow:
-    0 0 8px 2px rgba(255, 212, 0, 0.55),
-    0 0 18px 4px rgba(255, 212, 0, 0.25);
+    0 0 8px 2px rgba(245, 192, 0, 0.55),
+    0 0 18px 4px rgba(245, 192, 0, 0.25);
 }
 .ae-page-header-collapse-btn svg {
   width: 9px;
@@ -1665,7 +1865,9 @@ table input[type="number"] {
 .ae-page-header-logo .ae-logo-mark {
   display: block;
   overflow: visible;
-  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), filter 0.25s ease;
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.25s ease;
 }
 .ae-page-header-logo:hover .ae-logo-mark,
 .ae-page-header-logo:focus-visible .ae-logo-mark {
@@ -1677,13 +1879,23 @@ table input[type="number"] {
 }
 .ae-page-header h2 {
   margin: 0 0 3px;
-  color: #f1e9d0;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ae-glass-text);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
 }
 .ae-page-header p {
   margin: 0 0 8px;
-  color: #a89a7d;
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--ae-glass-text-muted);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    sans-serif;
 }
 /* The toolbar's own pill background/border/shadow would double up on the
    card's - strip them so its controls sit directly on the card instead.
@@ -1691,12 +1903,12 @@ table input[type="number"] {
    reads as fitted to the card rather than floating with its usual
    free-standing breathing room. */
 .ae-page-header .ae-toolbar {
-  background: transparent;
-  border: none;
+  background: var(--ae-tb-bg);
+  border: 1px solid var(--ae-tb-border);
   box-shadow: none;
   margin: 0;
-  padding: 2px 0;
-  --ae-toolbar-gap: 6px;
+  padding: 5px;
+  --ae-toolbar-gap: 8px;
 }
 /* Small screens only adjust page padding / edge-to-edge margins. Toolbar
    gap, padding and control sizes are owned by the tier classes above - the
@@ -1743,8 +1955,8 @@ table input[type="number"] {
   }
 
   /* Page titles and subtitles: every page follows the same <h2>/<p> intro
-     pattern (see DashboardPage, ReceiptsPage, etc.), so sizing them down
-     here covers all of them at once rather than per-page. */
+     pattern (see DashboardPage, etc.), so sizing them down here covers all
+     of them at once rather than per-page. */
   .ae-main h2 {
     font-size: 19px;
     line-height: 1.25;
@@ -1758,50 +1970,13 @@ table input[type="number"] {
      per row down to ~420px, which on a phone reads as cramped half-width
      cards with truncated labels - one full-width column reads far better
      at this size. */
-  .ae-dash-stats {
-    grid-template-columns: 1fr;
-  }
   .ae-dash-stat-value {
     font-size: 26px;
   }
-
-  /* Receipts entry form + live preview: side-by-side on desktop, but at
-     phone widths there isn't room for both without shrinking either past
-     the point of being usable - stack them in one column instead, form
-     first so it's what a phone user reaches first. */
-  .ae-receipt-columns {
-    flex-direction: column;
-    align-items: center;
-  }
 }
 
-/* Receipts entry form + live preview. On desktop the two sit side by side;
-   the row wraps (see the inline flex-wrap on .ae-receipt-columns) so the
-   preview drops under the form when there isn't room for both, instead of
-   scrolling sideways. The paper is a fixed 460px wide (its zigzag edge is a
-   pixel-exact clip-path), so on phones it's scaled down to fit rather than
-   overflowing the screen. */
-.ae-receipt-columns > * {
-  max-width: 100%;
-}
-@media (max-width: 520px) {
-  .ae-receipt-columns > * {
-    zoom: 0.8;
-  }
-}
-@media (max-width: 420px) {
-  .ae-receipt-columns > * {
-    zoom: 0.7;
-  }
-}
-@media (max-width: 360px) {
-  .ae-receipt-columns > * {
-    zoom: 0.62;
-  }
-}
-
-/* A collapsed category (StockGrid, TotalStocksTable, ConsolidatedReceiptTable,
-   ConsolidatedReceiptEntryGrid, ManualCountPage) hides its product rows on
+/* A collapsed category (StockGrid, TotalStocksTable, ManualCountPage) hides
+   its product rows on
    screen but should still print/PDF in full - a printed grid missing
    whatever happened to be collapsed at the time would be a silent data gap,
    not just a display convenience. See the print override below.
@@ -1859,50 +2034,8 @@ table input[type="number"] {
   tr {
     page-break-inside: avoid;
   }
-
-  body.ae-printing-receipt .app-shell {
-    display: none !important;
-  }
-
-  body.ae-printing-receipt {
-    page: receipt;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
-  body.ae-printing-receipt .ae-modal-overlay {
-    position: static !important;
-    background: none !important;
-    padding: 0 !important;
-    display: block !important;
-  }
-  body.ae-printing-receipt .ae-modal-panel {
-    box-shadow: none !important;
-    max-height: none !important;
-    max-width: none !important;
-    width: auto !important;
-  }
-
-  body.ae-printing-receipt .ae-receipt-paper {
-    box-shadow: none !important;
-    border: none !important;
-    clip-path: none !important;
-    margin: 0 !important;
-  }
-
-  body.ae-printing-receipt .ae-modal-body {
-    padding: 0 !important;
-    overflow: visible !important;
-  }
-  body.ae-printing-receipt .ae-modal-body > div:not(.no-print) {
-    display: block !important;
-  }
 }
 
-@page receipt {
-  size: 80mm 500mm;
-  margin: 0;
-}
 /* =========================================================================
    Dashboard (pages/DashboardPage.tsx)
    =========================================================================
@@ -1921,16 +2054,14 @@ table input[type="number"] {
 :root[data-theme="dark"] .ae-dash-subtitle {
   color: #ffffff;
 }
-/* Hero row: Monthly Monitoring on the left taking whatever width is left
-   over, the stat 2x2 grid and Recent Activity on the right each claiming a
-   fixed-ish width (in that order, "aligned with the 4 cards" instead of
-   the old separate "Today" section below) - all three stretched to match
-   height. The chart's own column is `1fr`, not a content-based/capped
-   width, specifically so it fills that leftover space rather than leaving
-   blank room off to one side. */
+/* Hero row: two columns. LEFT (.ae-dash-hero-left): the monitoring stat
+   cards in one 3-up row, with Recent Activity stacked directly underneath on
+   the same grid and width, at a reduced size. RIGHT (.ae-dash-hero-chart):
+   the Monthly Monitoring graph, the largest card - it takes all the
+   remaining width and is stretched to the full height of the left column. */
 .ae-dash-hero-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 480px) minmax(260px, 420px);
+  grid-template-columns: minmax(340px, 460px) minmax(0, 1fr);
   gap: 14px;
   margin: 12px 0 24px;
   align-items: stretch;
@@ -1939,14 +2070,17 @@ table input[type="number"] {
   .ae-dash-hero-row {
     grid-template-columns: 1fr;
   }
-  .ae-dash-hero-chart {
-    width: 100%;
-  }
+}
+.ae-dash-hero-left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 .ae-dash-stats {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
 }
 /* Without this, a 1fr grid item defaults to min-width: auto (its content's
    natural width), which would let the chart's own 12-month row force this
@@ -1968,9 +2102,52 @@ table input[type="number"] {
   display: flex;
   flex-direction: column;
 }
+/* Left column: the activity block takes the space under the stat cards. */
+.ae-dash-hero-left .ae-dash-hero-activity {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
 .ae-dash-hero-activity .ae-dash-table-scroll {
   flex: 1;
   overflow-y: auto;
+}
+/* Reduced size: smaller heading + table type and tighter cells than the
+   full-size cards (and than the Change Log page this links to). */
+.ae-dash-hero-activity .ae-dash-heading {
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.ae-dash-hero-activity .ae-dash-link {
+  font-size: 11px;
+}
+.ae-dash-hero-activity .ae-dash-card .ae-table {
+  font-size: 12px;
+}
+.ae-dash-hero-activity .ae-dash-card .ae-table th,
+.ae-dash-hero-activity .ae-dash-card .ae-table td {
+  padding: 6px 10px;
+}
+/* Compact stat tiles - three across the left column. */
+.ae-dash-hero-left .ae-dash-stat {
+  gap: 8px;
+  padding: 14px 12px;
+}
+.ae-dash-hero-left .ae-dash-stat-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+}
+.ae-dash-hero-left .ae-dash-stat-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.ae-dash-hero-left .ae-dash-stat-value {
+  font-size: clamp(22px, 2.4vw, 28px);
+}
+.ae-dash-hero-left .ae-dash-stat-label {
+  font-size: 11px;
+  line-height: 1.25;
 }
 .ae-dash-stat {
   position: relative;
@@ -1986,11 +2163,17 @@ table input[type="number"] {
      the same family of "rounded brand chrome" instead of the old sharp-
      cornered boxes. */
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 4px 10px rgba(20, 17, 13, 0.06);
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  box-shadow:
+    0 1px 2px rgba(12, 12, 12, 0.04),
+    0 4px 10px rgba(12, 12, 12, 0.06);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 .ae-dash-stat:hover {
-  box-shadow: 0 2px 4px rgba(20, 17, 13, 0.06), 0 8px 20px rgba(20, 17, 13, 0.1);
+  box-shadow:
+    0 2px 4px rgba(12, 12, 12, 0.06),
+    0 8px 20px rgba(12, 12, 12, 0.1);
   transform: translateY(-1px);
 }
 .ae-dash-stat--alert {
@@ -2005,8 +2188,8 @@ table input[type="number"] {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  background: color-mix(in srgb, #c99a2e 14%, transparent);
-  color: #c99a2e;
+  background: color-mix(in srgb, #d4a000 14%, transparent);
+  color: #d4a000;
 }
 .ae-dash-stat--alert .ae-dash-stat-icon {
   background: color-mix(in srgb, #c1272d 14%, transparent);
@@ -2019,7 +2202,12 @@ table input[type="number"] {
   pointer-events: none;
   opacity: var(--spotlight-opacity, 0);
   transition: opacity 220ms ease;
-  background: radial-gradient(circle 180px at var(--mx, 50%) var(--my, 50%), rgba(201, 154, 46, 0.2), rgba(201, 154, 46, 0.07) 55%, transparent 75%);
+  background: radial-gradient(
+    circle 180px at var(--mx, 50%) var(--my, 50%),
+    rgba(212, 160, 0, 0.2),
+    rgba(212, 160, 0, 0.07) 55%,
+    transparent 75%
+  );
 }
 .ae-dash-stat-value {
   position: relative;
@@ -2055,10 +2243,12 @@ table input[type="number"] {
   height: 5px;
   border-radius: 50%;
   background: var(--ae-border);
-  transition: background-color 0.25s ease, transform 0.25s ease;
+  transition:
+    background-color 0.25s ease,
+    transform 0.25s ease;
 }
 .ae-dash-stat-dot--active {
-  background: #c99a2e;
+  background: #d4a000;
   transform: scale(1.3);
 }
 
@@ -2084,8 +2274,13 @@ table input[type="number"] {
   text-decoration: none;
   font-size: 13.5px;
   font-weight: 700;
-  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 4px 10px rgba(20, 17, 13, 0.06);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  box-shadow:
+    0 1px 2px rgba(12, 12, 12, 0.04),
+    0 4px 10px rgba(12, 12, 12, 0.06);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 }
 .ae-dash-quicklink-icon {
   display: flex;
@@ -2095,25 +2290,27 @@ table input[type="number"] {
   height: 32px;
   flex-shrink: 0;
   border-radius: 8px;
-  background: color-mix(in srgb, #c99a2e 14%, transparent);
-  color: #c99a2e;
+  background: color-mix(in srgb, #d4a000 14%, transparent);
+  color: #d4a000;
 }
 .ae-dash-quicklink-label {
   flex: 1;
   min-width: 0;
 }
 .ae-dash-quicklink:hover {
-  border-color: #ffd400;
-  box-shadow: 0 4px 14px rgba(201, 154, 46, 0.22);
+  border-color: #f5c000;
+  box-shadow: 0 4px 14px rgba(212, 160, 0, 0.22);
   transform: translateY(-1px);
 }
 .ae-dash-quicklink-arrow {
   flex-shrink: 0;
   color: var(--ae-text-muted);
-  transition: transform 0.15s ease, color 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
 }
 .ae-dash-quicklink:hover .ae-dash-quicklink-arrow {
-  color: #c99a2e;
+  color: #d4a000;
   transform: translateX(2px);
 }
 
@@ -2145,7 +2342,9 @@ table input[type="number"] {
   background: var(--ae-surface);
   border: 1px solid var(--ae-border);
   border-radius: 8px;
-  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 4px 10px rgba(20, 17, 13, 0.06);
+  box-shadow:
+    0 1px 2px rgba(12, 12, 12, 0.04),
+    0 4px 10px rgba(12, 12, 12, 0.06);
 }
 
 .ae-dash-table-scroll {
@@ -2166,7 +2365,7 @@ table input[type="number"] {
   text-decoration: underline;
 }
 .ae-dash-cell-link:focus-visible {
-  outline: 2px solid #c99a2e;
+  outline: 2px solid #d4a000;
   outline-offset: 2px;
 }
 
@@ -2199,7 +2398,12 @@ table input[type="number"] {
    ========================================================================= */
 .ae-skeleton {
   display: block;
-  background-image: linear-gradient(100deg, var(--ae-bg-alt) 38%, var(--ae-border-soft) 50%, var(--ae-bg-alt) 62%);
+  background-image: linear-gradient(
+    100deg,
+    var(--ae-bg-alt) 38%,
+    var(--ae-border-soft) 50%,
+    var(--ae-bg-alt) 62%
+  );
   background-size: 250% 100%;
   background-position: 200% 0;
   animation: ae-skeleton-shimmer 1.8s ease-in-out infinite;
@@ -2222,7 +2426,9 @@ table input[type="number"] {
   height: 100%;
   object-fit: cover;
   filter: blur(18px);
-  transform: scale(1.08); /* hides the blurred edge halo the filter leaves along the border */
+  transform: scale(
+    1.08
+  ); /* hides the blurred edge halo the filter leaves along the border */
   transition: opacity 0.4s ease;
 }
 .ae-progressive-img-full {
@@ -2233,7 +2439,9 @@ table input[type="number"] {
   object-fit: cover;
   opacity: 0;
   filter: blur(14px);
-  transition: opacity 0.4s ease-out, filter 0.4s ease-out;
+  transition:
+    opacity 0.4s ease-out,
+    filter 0.4s ease-out;
 }
 .ae-progressive-img-full.is-loaded {
   opacity: 1;
@@ -2277,5 +2485,12 @@ table input[type="number"] {
   }
   .ae-top-progress-bar {
     transition: none !important;
+  }
+}
+
+/* Phones: three stat tiles per row get too narrow - stack them. */
+@media (max-width: 520px) {
+  .ae-dash-stats {
+    grid-template-columns: 1fr;
   }
 }

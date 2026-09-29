@@ -12,7 +12,6 @@ export interface MonthlyOverviewEntry {
   offlineRemainingStock: number | null;
   totalRemainingStock: number | null;
   varianceFlags: number | null;
-  receipts: number;
   /// The date the stock/variance snapshot was actually taken from (the last
   /// day within the month that any online/offline entry was saved) - null
   /// when the month has no stock data at all yet.
@@ -41,10 +40,8 @@ async function findLatestStockDateInRange(start: Date, end: Date): Promise<Date 
  *  - totalRemainingStock / varianceFlags reuse the same month-end-snapshot
  *    approach as the Total Stocks grid (getTotalStocksGrid) - taken from
  *    the last day within that month any online/offline entry was actually
- *    saved, not a true sum-over-the-month (remaining stock doesn't add up
- *    across days the way receipts do). A month with no entries at all comes
- *    back with null rather than a misleading 0.
- *  - receipts is a genuine count of every receipt placed during that month.
+ *    saved, not a true sum-over-the-month. A month with no entries at all
+ *    comes back with null rather than a misleading 0.
  */
 export async function getMonthlyOverview(year: number): Promise<MonthlyOverviewEntry[]> {
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -53,10 +50,7 @@ export async function getMonthlyOverview(year: number): Promise<MonthlyOverviewE
     months.map(async (month): Promise<MonthlyOverviewEntry> => {
       const { start, end } = monthRange(year, month);
 
-      const [snapshotDate, receipts] = await Promise.all([
-        findLatestStockDateInRange(start, end),
-        prisma.receipt.count({ where: { orderDate: { gte: start, lt: end } } }),
-      ]);
+      const snapshotDate = await findLatestStockDateInRange(start, end);
 
       if (!snapshotDate) {
         return {
@@ -65,7 +59,6 @@ export async function getMonthlyOverview(year: number): Promise<MonthlyOverviewE
           offlineRemainingStock: null,
           totalRemainingStock: null,
           varianceFlags: null,
-          receipts,
           snapshotDate: null,
         };
       }
@@ -82,7 +75,6 @@ export async function getMonthlyOverview(year: number): Promise<MonthlyOverviewE
         offlineRemainingStock,
         totalRemainingStock,
         varianceFlags,
-        receipts,
         snapshotDate: toDateOnlyString(snapshotDate),
       };
     }),

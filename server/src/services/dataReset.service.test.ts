@@ -11,7 +11,6 @@ const db = vi.hoisted(() => ({
   dailyOfflineStock: [] as Record<string, unknown>[],
   offlineEntryDelivery: [] as Record<string, unknown>[],
   manualCount: [] as Record<string, unknown>[],
-  receipt: [] as Record<string, unknown>[],
   changeLog: [] as Record<string, unknown>[],
   deliveryDestination: [] as Record<string, unknown>[],
 }));
@@ -39,7 +38,6 @@ vi.mock("../lib/prisma", () => ({
         dailyOfflineStock: makeModel(db.dailyOfflineStock),
         offlineEntryDelivery: makeModel(db.offlineEntryDelivery),
         manualCount: makeModel(db.manualCount),
-        receipt: makeModel(db.receipt),
         changeLog: makeModel(db.changeLog),
         // Present on tx (like every other model) purely so a future change
         // that mistakenly starts calling deleteMany on it would still show
