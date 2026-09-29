@@ -1,5 +1,9 @@
 import {
   Fragment,
+  memo,
+  useCallback,
+  useLayoutEffect,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -116,6 +120,65 @@ function toNum(v: unknown): number {
 // it sits right under the header rather than overlapping it.
 const HEADER_ROW_HEIGHT = 29;
 
+function focusCell(productId: number, key: string) {
+  const el = document.querySelector<HTMLInputElement>(
+    `[data-cell="${productId}:${key}"]`,
+  );
+  el?.focus();
+  el?.select();
+}
+
+interface DraftCellProps {
+  productId: number;
+  colKey: string;
+  /** The row's own saved/staged value - what the input shows when no draft is in progress. */
+  raw: unknown;
+  onCommit: (productId: number, key: string, value: number) => void | Promise<void>;
+  onKeyDown: (
+    e: KeyboardEvent<HTMLInputElement>,
+    productId: number,
+    key: string,
+  ) => void;
+}
+
+/**
+ * One editable grid cell. The in-progress text (`draft`) lives here rather
+ * than in StockGrid, so a keystroke re-renders just this cell instead of every
+ * row, cell and subtotal in the table. Behavior is unchanged: the draft shows
+ * while typing, is cleared and committed on blur, and falls back to `raw`.
+ * `memo` keeps sibling cells from re-rendering when the grid itself does
+ * (props are all primitives or stable callbacks).
+ */
+const DraftCell = memo(function DraftCell({
+  productId,
+  colKey,
+  raw,
+  onCommit,
+  onKeyDown,
+}: DraftCellProps) {
+  const [draft, setDraft] = useState<string | undefined>(undefined);
+  const displayValue =
+    draft ?? (raw === null || raw === undefined ? "" : String(raw));
+
+  async function commit() {
+    if (draft === undefined) return;
+    const value = toNum(draft);
+    setDraft(undefined);
+    await onCommit(productId, colKey, value);
+  }
+
+  return (
+    <NumberCellInput
+      data-cell={`${productId}:${colKey}`}
+      value={displayValue}
+      onChange={setDraft}
+      onBlur={commit}
+      onKeyDown={(e) => onKeyDown(e, productId, colKey)}
+      style={inputStyle}
+    />
+  );
+});
+
 /**
  * Section 3.1 - An Excel-Like Data Entry Experience: rows are products
  * (grouped by category, in the same order as the current sheet), cells are
@@ -131,7 +194,6 @@ export function StockGrid({
   pending,
   focusStorageKey,
 }: StockGridProps) {
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
   // Explicit expand/collapse choices, keyed by category name - absent means
   // "no choice made yet", which defaults to collapsed (below), not expanded.
   // Categories start collapsed so a long product list opens as a manageable
@@ -149,51 +211,52 @@ export function StockGrid({
     groups.set(row.product.category, list);
   }
 
-  function cellId(productId: number, key: string) {
-    return `${productId}:${key}`;
-  }
-
-  function focusCell(productId: number, key: string) {
-    const el = document.querySelector<HTMLInputElement>(
-      `[data-cell="${cellId(productId, key)}"]`,
-    );
-    el?.focus();
-    el?.select();
-  }
-
-  function handleKeyDown(
-    e: KeyboardEvent<HTMLInputElement>,
-    productId: number,
-    key: string,
-    rowIds: number[],
-  ) {
-    const rowIndex = rowIds.indexOf(productId);
-    if (e.key === "Enter" || e.key === "ArrowDown") {
-      e.preventDefault();
-      const nextId = rowIds[rowIndex + 1];
-      if (nextId !== undefined) focusCell(nextId, key);
-      e.currentTarget.blur();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      const prevId = rowIds[rowIndex - 1];
-      if (prevId !== undefined) focusCell(prevId, key);
-    }
-  }
-
-  async function commit(productId: number, key: string) {
-    const draftKey = cellId(productId, key);
-    const draft = drafts[draftKey];
-    if (draft === undefined) return;
-    const value = toNum(draft);
-    setDrafts((d) => {
-      const next = { ...d };
-      delete next[draftKey];
-      return next;
-    });
-    await onCommit(productId, key, value);
-  }
-
   const allProductIds = rows.map((r) => r.product.id);
+  const editableColKeys = columns.filter((c) => c.editable).map((c) => c.key);
+
+  // The page hands over a fresh `onCommit` (and this render a fresh id/column
+  // list) every render. Reading them through refs keeps the callbacks passed
+  // to the memoized cells below referentially stable, so a re-render of the
+  // grid doesn't re-render every cell.
+  const onCommitRef = useRef(onCommit);
+  const navRef = useRef({ rowIds: allProductIds, colKeys: editableColKeys });
+  useLayoutEffect(() => {
+    onCommitRef.current = onCommit;
+    navRef.current = { rowIds: allProductIds, colKeys: editableColKeys };
+  });
+
+  const commitCell = useCallback(
+    (productId: number, key: string, value: number) =>
+      onCommitRef.current(productId, key, value),
+    [],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>, productId: number, key: string) => {
+      const { rowIds, colKeys } = navRef.current;
+      const rowIndex = rowIds.indexOf(productId);
+      const colIndex = colKeys.indexOf(key);
+      if (e.key === "Enter" || e.key === "ArrowDown") {
+        e.preventDefault();
+        const nextId = rowIds[rowIndex + 1];
+        if (nextId !== undefined) focusCell(nextId, key);
+        e.currentTarget.blur();
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        const prevId = rowIds[rowIndex - 1];
+        if (prevId !== undefined) focusCell(prevId, key);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const nextKey = colKeys[colIndex + 1];
+        if (nextKey !== undefined) focusCell(productId, nextKey);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const prevKey = colKeys[colIndex - 1];
+        if (prevKey !== undefined) focusCell(productId, prevKey);
+      }
+    },
+    [],
+  );
 
   return (
     <RowGlowScroll focusStorageKey={focusStorageKey}>
@@ -291,11 +354,7 @@ export function StockGrid({
                     <td style={skuCellStyle}>{row.product.sku ?? "—"}</td>
                     <td style={nameCellStyle}>{row.product.name}</td>
                     {columns.map((col) => {
-                      const draftKey = cellId(row.product.id, col.key);
                       const raw = row.entry[col.key];
-                      const displayValue =
-                        drafts[draftKey] ??
-                        (raw === null || raw === undefined ? "" : String(raw));
                       if (!col.editable || readOnly) {
                         return (
                           <td
@@ -313,22 +372,12 @@ export function StockGrid({
                       }
                       return (
                         <td key={col.key} style={tintFor(col)}>
-                          <NumberCellInput
-                            data-cell={draftKey}
-                            value={displayValue}
-                            onChange={(v) =>
-                              setDrafts((d) => ({ ...d, [draftKey]: v }))
-                            }
-                            onBlur={() => commit(row.product.id, col.key)}
-                            onKeyDown={(e) =>
-                              handleKeyDown(
-                                e,
-                                row.product.id,
-                                col.key,
-                                allProductIds,
-                              )
-                            }
-                            style={inputStyle}
+                          <DraftCell
+                            productId={row.product.id}
+                            colKey={col.key}
+                            raw={raw}
+                            onCommit={commitCell}
+                            onKeyDown={handleKeyDown}
                           />
                         </td>
                       );

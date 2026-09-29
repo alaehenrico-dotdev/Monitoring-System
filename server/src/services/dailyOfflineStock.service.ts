@@ -6,6 +6,7 @@ import { deliveryDestinationRepository } from "../repositories/deliveryDestinati
 import { offlineEntryDeliveryRepository } from "../repositories/offlineEntryDeliveryRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
+import { broadcastRealtimeEvent } from "../lib/realtime";
 import { HttpError } from "../utils/HttpError";
 import {
   calculateOfflineRemaining,
@@ -239,6 +240,7 @@ export async function saveOfflineEntry(
     db,
   );
 
+  broadcastRealtimeEvent();
   return saved;
 }
 

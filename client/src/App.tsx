@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { RealtimeProvider } from "./context/RealtimeContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { Layout } from "./components/Layout";
@@ -39,38 +40,40 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <TopProgressProvider>
-          <TopProgressBar />
-          <Suspense fallback={<LoadingBlock label="Loading…" minHeight="100vh" size="lg" />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
+        <RealtimeProvider>
+          <TopProgressProvider>
+            <TopProgressBar />
+            <Suspense fallback={<LoadingBlock label="Loading…" minHeight="100vh" size="lg" />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
 
-              <Route element={<ProtectedRoute />}>
-                <Route element={<Layout />}>
-                  <Route index element={<Navigate to="/online" replace />} />
-                  <Route path="/online" element={<OnlineEntryPage />} />
-                  <Route path="/offline" element={<OfflineEntryPage />} />
-                  <Route path="/total-stocks" element={<TotalStocksPage />} />
-                  <Route path="/manual-count" element={<ManualCountPage />} />
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<Layout />}>
+                    <Route index element={<Navigate to="/online" replace />} />
+                    <Route path="/online" element={<OnlineEntryPage />} />
+                    <Route path="/offline" element={<OfflineEntryPage />} />
+                    <Route path="/total-stocks" element={<TotalStocksPage />} />
+                    <Route path="/manual-count" element={<ManualCountPage />} />
 
-                  <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/daily-report-history" element={<DailyReportHistoryPage />} />
-                    <Route path="/variance-report-history" element={<VarianceReportHistoryPage />} />
-                    <Route path="/variance-report" element={<VarianceReportPage />} />
-                    <Route path="/daily-report" element={<DailyReportPage />} />
-                    <Route path="/change-log" element={<ChangeLogPage />} />
-                    <Route path="/products" element={<ProductsAdminPage />} />
-                    <Route path="/delivery-destinations" element={<DeliveryDestinationsAdminPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
+                      <Route path="/dashboard" element={<DashboardPage />} />
+                      <Route path="/daily-report-history" element={<DailyReportHistoryPage />} />
+                      <Route path="/variance-report-history" element={<VarianceReportHistoryPage />} />
+                      <Route path="/variance-report" element={<VarianceReportPage />} />
+                      <Route path="/daily-report" element={<DailyReportPage />} />
+                      <Route path="/change-log" element={<ChangeLogPage />} />
+                      <Route path="/products" element={<ProductsAdminPage />} />
+                      <Route path="/delivery-destinations" element={<DeliveryDestinationsAdminPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                    </Route>
                   </Route>
                 </Route>
-              </Route>
 
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </TopProgressProvider>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </TopProgressProvider>
+        </RealtimeProvider>
       </AuthProvider>
     </ThemeProvider>
   );

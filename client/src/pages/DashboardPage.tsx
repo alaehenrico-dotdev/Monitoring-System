@@ -25,6 +25,7 @@ import {
 } from "../components/icons";
 import { colors } from "../theme";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 
 type Analytics = {
   activeProducts: number;
@@ -144,6 +145,7 @@ export function DashboardPage() {
   const [recentActivityError, setRecentActivityError] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const today = localISODate();
+  const realtimeVersion = useRealtimeVersion();
 
   useResetOnKeyChange(today, () => setRecentActivityError(false));
   useEffect(() => {
@@ -180,7 +182,7 @@ export function DashboardPage() {
         setRecentActivityError(true);
         setRecentActivity([]);
       });
-  }, [today]);
+  }, [today, realtimeVersion]);
 
   const hasVariance = !!analytics && analytics.varianceFlags > 0;
 

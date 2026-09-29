@@ -4,6 +4,7 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
+import { broadcastRealtimeEvent } from "../lib/realtime";
 import { calculateVariance, toNum } from "../utils/stockMath";
 import { HttpError } from "../utils/HttpError";
 
@@ -56,6 +57,7 @@ export async function saveManualCount(
     newValue: saved,
   });
 
+  broadcastRealtimeEvent();
   return saved;
 }
 

@@ -19,6 +19,19 @@
   z-index: 1;
 }
 
+/* Present on <html> only while a theme switch is in flight (ThemeToggle.tsx).
+   The theme change repaints everything at once, so per-element color/background
+   transitions starting on top of it (and inside the View Transition snapshot)
+   just add style work and show half-blended colors under the ripple. Nothing
+   visible is lost: the ripple / instant swap is the theme animation, and every
+   transition is back the moment the switch finishes. Animations (keyframes,
+   spinners, motion) are unaffected - this only stops CSS transitions. */
+:root.ae-theme-switching *,
+:root.ae-theme-switching *::before,
+:root.ae-theme-switching *::after {
+  transition: none !important;
+}
+
 /* Light/dark theme tokens (see ThemeContext.tsx, which toggles the
    data-theme attribute on <html>, and theme.ts's `colors` object, whose
    paper/ink/subtleInk/border/warningBg/warningText re-export these same
@@ -105,6 +118,15 @@
   --ae-tb-hairline: rgba(36, 29, 20, 0.18);
   --ae-tb-text: #241d14;
   --ae-tb-text-muted: rgba(36, 29, 20, 0.6);
+
+  /* Glass page surfaces (cards, stat tiles, table panes): translucent +
+     blurred so the Ala Eh! seal watermark behind the app (.app-shell::before)
+     shows through them. Form fields, dropdown panels and dialogs stay solid
+     for legibility. The sticky table header is more opaque than the panes so
+     rows scrolling under it don't clash with its labels. */
+  --ae-surface-glass: rgba(255, 255, 255, 0.58);
+  --ae-header-glass: rgba(231, 223, 201, 0.86);
+  --ae-glass-blur: blur(14px) saturate(140%);
 }
 
 :root[data-theme="dark"] {
@@ -179,6 +201,21 @@
      primary buttons keep their own dark text). */
   --ae-tb-text: #f5c000;
   --ae-tb-text-muted: rgba(245, 192, 0, 0.65);
+
+  --ae-surface-glass: rgba(38, 38, 38, 0.58);
+  --ae-header-glass: rgba(42, 42, 42, 0.88);
+}
+
+/* No backdrop-filter support: a translucent surface without blur would let
+   the watermark fight the text, so fall back to the old solid surfaces. */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  :root,
+  :root[data-theme="dark"] {
+    --ae-surface-glass: var(--ae-surface);
+    --ae-header-glass: var(--ae-header-bg);
+  }
 }
 
 body {
@@ -221,7 +258,9 @@ table input[type="number"] {
   z-index: 1;
   text-align: left;
   padding: 5px 6px;
-  background: var(--ae-header-bg);
+  background: var(--ae-header-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
   color: var(--ae-text);
   font-weight: 700;
   white-space: nowrap;
@@ -368,15 +407,24 @@ table input[type="number"] {
 
 .ae-table-scroll {
   position: relative;
+  min-width: 0;
   overflow-x: auto;
   border: 1px solid var(--ae-border);
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
   border-radius: 0;
   flex: 1;
   min-height: 0;
-  margin: 0 -24px -24px;
+  margin: 0 calc(-24px / var(--ae-zoom, 1)) calc(-24px / var(--ae-zoom, 1));
   border-left: 0;
   border-right: 0;
   border-bottom: 0;
+}
+
+.ae-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
 }
 
 /* Themed scrollbars for table containers, modal bodies, and the main content
@@ -389,34 +437,41 @@ table input[type="number"] {
    own scroll area (e.g. the Review Import modal's Unmatched list, which
    also gets .table-scroll directly - see CsvTools.tsx) for free. */
 .ae-table-scroll,
+.ae-table-wrap,
 .table-scroll,
 .ae-main,
 .ae-modal-body {
   scrollbar-width: thin;
-  scrollbar-color: var(--ae-border) var(--ae-bg-alt);
+  scrollbar-color: #f5c000 var(--ae-bg-alt);
 }
 .ae-table-scroll::-webkit-scrollbar,
+.ae-table-wrap::-webkit-scrollbar,
 .table-scroll::-webkit-scrollbar,
 .ae-main::-webkit-scrollbar,
 .ae-modal-body::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  /* Divided by the page zoom (see zoomStyle in ZoomControl.tsx) so the bar
+     stays a constant, grabbable 10px on screen at 50%-200%. */
+  width: calc(10px / var(--ae-zoom, 1));
+  height: calc(10px / var(--ae-zoom, 1));
 }
 .ae-table-scroll::-webkit-scrollbar-track,
+.ae-table-wrap::-webkit-scrollbar-track,
 .table-scroll::-webkit-scrollbar-track,
 .ae-main::-webkit-scrollbar-track,
 .ae-modal-body::-webkit-scrollbar-track {
   background: var(--ae-bg-alt);
 }
 .ae-table-scroll::-webkit-scrollbar-thumb,
+.ae-table-wrap::-webkit-scrollbar-thumb,
 .table-scroll::-webkit-scrollbar-thumb,
 .ae-main::-webkit-scrollbar-thumb,
 .ae-modal-body::-webkit-scrollbar-thumb {
-  background-color: var(--ae-border);
+  background-color: #f5c000;
   border-radius: 999px;
   border: 2px solid var(--ae-bg-alt);
 }
 .ae-table-scroll::-webkit-scrollbar-thumb:hover,
+.ae-table-wrap::-webkit-scrollbar-thumb:hover,
 .table-scroll::-webkit-scrollbar-thumb:hover,
 .ae-main::-webkit-scrollbar-thumb:hover,
 .ae-modal-body::-webkit-scrollbar-thumb:hover {
@@ -603,7 +658,8 @@ table input[type="number"] {
   overflow: hidden;
   background: var(--ae-surface);
   color: var(--ae-text);
-  border: 1px solid var(--ae-toolbar-border);
+  /* Thin edge, matching the dialogs' 0.5px border (Modal.tsx). */
+  border: 0.5px solid var(--ae-toolbar-border);
   /* Same 8px radius as .ae-page-header/.ae-modal-panel - every floating
      panel in the app reads as the same family of rounded brand chrome. */
   border-radius: 8px;
@@ -1189,6 +1245,29 @@ table input[type="number"] {
 .ae-toolbar .ae-date-trigger {
   flex: 0 1 auto;
 }
+/* Tight controls: small gap between a label and its icon/chevron, and no
+   base min-width padding the dropdown/date triggers out with dead space
+   (full tier only - the compact/circle tiers set their own !important
+   min-widths below). */
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger {
+  gap: 4px;
+}
+.ae-toolbar .ae-select-trigger-lead {
+  margin-right: 4px;
+}
+.ae-toolbar:not(.ae-toolbar--compact) .ae-select-trigger,
+.ae-toolbar:not(.ae-toolbar--compact) .ae-date-trigger {
+  min-width: 0;
+}
+/* Search icon sits closer to its text (the input's own inline padding-left
+   is 30px, so this needs !important). */
+.ae-toolbar .ae-search-icon {
+  left: 8px !important;
+}
+.ae-toolbar input[type="search"] {
+  padding-left: 27px !important;
+}
 
 /* compact
    flex / min-width / max-width are !important too: a page (or ZoomControl)
@@ -1280,9 +1359,9 @@ table input[type="number"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 4px;
   height: var(--tb-h);
-  padding: 0 13px;
+  padding: 0 var(--tb-pad-x);
   border-radius: var(--tb-radius);
   font-size: 12.5px;
   font-weight: 600;
@@ -1356,7 +1435,8 @@ table input[type="number"] {
 }
 .ae-toolbar .ae-segment-btn {
   background: transparent;
-  padding: 0 12px;
+  padding: 0 var(--tb-pad-x);
+  gap: 4px;
   font-weight: 600;
 }
 .ae-toolbar .ae-segment-btn:hover:not(:disabled) {
@@ -1402,7 +1482,7 @@ table input[type="number"] {
 .ae-toolbar--compact .ae-btn {
   min-width: var(--tb-h);
   height: var(--tb-h);
-  padding: 0 10px;
+  padding: 0 var(--tb-pad-x);
 }
 .ae-toolbar--compact .ae-btn,
 .ae-toolbar--compact .ae-toolbar-save {
@@ -1423,7 +1503,7 @@ table input[type="number"] {
    keeps its text, so it needs its normal icon/text spacing back. */
 .ae-toolbar--compact
   .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
-  gap: 6px;
+  gap: 4px;
 }
 
 /* ---- Circle: floor tier, fixed-size compact buttons ------------------- */
@@ -1458,7 +1538,7 @@ table input[type="number"] {
   height: var(--tb-h);
   min-height: var(--tb-h);
   max-height: var(--tb-h);
-  padding: 0 10px;
+  padding: 0 var(--tb-pad-x);
   border-radius: var(--tb-radius);
   flex: 0 0 auto;
 }
@@ -1472,12 +1552,12 @@ table input[type="number"] {
    the tier rules on purpose so it wins over their older per-control
    values. */
 .ae-toolbar {
-  --tb-pad-x: 12px;
+  --tb-pad-x: 8px;
   --tb-font: 12.5px;
   --tb-icon: 15px;
 }
 .ae-toolbar--circle {
-  --tb-pad-x: 10px;
+  --tb-pad-x: 7px;
 }
 .ae-toolbar .ae-input,
 .ae-toolbar .ae-select,
@@ -1650,7 +1730,35 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
+/* App-wide default background: the page color with the Ala Eh! seal as a
+   large, centered, fixed watermark. It is a pseudo-element behind everything
+   (the cards, tables and inputs are opaque and simply cover it, so it only
+   shows in the gaps between them and through the glass header/nav drawer) -
+   it never affects layout or clicks. The image is a transparent cut-out of
+   the seal, so it sits on either theme's page color; the opacity is tuned per
+   theme (the seal is near-black, so light mode needs it much fainter). */
+.app-shell {
+  position: relative;
+  background: var(--ae-bg);
+  --ae-watermark-opacity: 0.07;
+  --ae-watermark-size: min(78vmin, 760px);
+}
+:root[data-theme="dark"] .app-shell {
+  --ae-watermark-opacity: 0.85;
+}
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url("./assets/alaeh-bg.webp") center / var(--ae-watermark-size)
+    no-repeat;
+  opacity: var(--ae-watermark-opacity);
+}
 .ae-main {
+  position: relative;
+  z-index: 1;
   min-width: 0;
   padding: 24px;
   display: flex;
@@ -1667,12 +1775,14 @@ table input[type="number"] {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  min-width: 0;
 }
 .ae-grid-fill {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  min-width: 0;
 }
 
 /* ------------------------------------------------------------------------
@@ -1705,6 +1815,13 @@ table input[type="number"] {
   border: 1px solid var(--ae-toolbar-border);
   border-radius: 8px;
   padding: 12px 14px 10px;
+  /* One duration + one curve for everything that moves when the header
+     collapses/expands (height, padding, logo size, title spacing, fades), so
+     the pieces read as a single motion. Ease-out with a long tail: fast
+     start, gentle settle - much less abrupt than the default `ease`. */
+  --ae-collapse-dur: 340ms;
+  --ae-collapse-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  transition: padding var(--ae-collapse-dur) var(--ae-collapse-ease);
   margin: -18px -18px 8px;
   /* Same all-around gold glow as the sidebar's own collapsed-icon state
      (Sidebar.tsx's boxShadow) - a soft drop shadow plus two rings of the
@@ -1749,7 +1866,7 @@ table input[type="number"] {
 .ae-page-header-collapsible {
   display: grid;
   grid-template-rows: 1fr;
-  transition: grid-template-rows 220ms ease;
+  transition: grid-template-rows var(--ae-collapse-dur) var(--ae-collapse-ease);
 }
 .ae-page-header--collapsed .ae-page-header-collapsible {
   grid-template-rows: 0fr;
@@ -1758,10 +1875,14 @@ table input[type="number"] {
   overflow: hidden;
   min-height: 0;
   opacity: 1;
-  transition: opacity 160ms ease;
+  /* Expanding: wait a beat so the space has started opening, then fade in.
+     Collapsing (rule below): fade out fast, before the row squeezes away, so
+     text is never seen being crushed. */
+  transition: opacity 240ms ease-out 90ms;
 }
 .ae-page-header--collapsed .ae-page-header-collapsible-inner {
   opacity: 0;
+  transition: opacity 120ms ease-out 0ms;
 }
 /* The toolbar is no longer inside the titles column (which sits to the
    right of the logo): it is its own full-width row below the logo/title
@@ -1779,9 +1900,8 @@ table input[type="number"] {
 /* Bottom-center collapse tab - a small nub straddling the card's own
    bottom border (half in, half out, via the negative bottom offset) so it
    reads as an edge affordance rather than a toolbar button. Hidden until
-   the header itself is hovered/focused-within, then fades and nudges
-   into view; stays reachable by keyboard (focus-within) even without a
-   pointer. Rendered as a direct child of .ae-page-header (not the toolbar
+   the header itself is hovered, then fades and nudges into view; stays
+   reachable by keyboard (button :focus-visible) even without a pointer. Rendered as a direct child of .ae-page-header (not the toolbar
    row) so it always has a fixed spot regardless of collapsed state - the
    collapsed header (title row alone) can still be hovered to bring it
    back, since there'd otherwise be no way to expand again. */
@@ -1811,8 +1931,10 @@ table input[type="number"] {
     box-shadow 120ms ease,
     color 120ms ease;
 }
+/* Hover only (plus keyboard focus on the button itself). No :focus-within on
+   the card: clicking the button, the logo, or typing in a toolbar field kept
+   focus inside the header and pinned the button visible after the mouse left. */
 .ae-page-header:hover .ae-page-header-collapse-btn,
-.ae-page-header:focus-within .ae-page-header-collapse-btn,
 .ae-page-header-collapse-btn:focus-visible {
   opacity: 1;
   pointer-events: auto;
@@ -1832,7 +1954,7 @@ table input[type="number"] {
   width: 9px;
   height: 9px;
   transform: rotate(180deg);
-  transition: transform 160ms ease;
+  transition: transform var(--ae-collapse-dur) var(--ae-collapse-ease);
 }
 .ae-page-header--collapsed .ae-page-header-collapse-btn svg {
   transform: rotate(0deg);
@@ -1852,7 +1974,28 @@ table input[type="number"] {
 .ae-page-header-titles {
   min-width: 0;
   flex: 1;
+  /* Stretches to the top row's height and centers its content in it. While
+     expanded the column is as tall as the row, so this changes nothing; once
+     the subtitle has collapsed and the logo is the taller item, the title
+     sits centered against it. Doing the centering here (instead of flipping
+     the row's `align-items` from flex-start to center on collapse) means the
+     title glides there continuously as the sizes change, rather than
+     snapping a couple of pixels on the first frame. */
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  /* Top-aligned when expanded so the header lays out exactly as it always
+     has (a one-line subtitle on a narrow screen leaves this column a hair
+     shorter than the logo, and centering would nudge the title down).
+     Switching to `center` when collapsing happens while the column still
+     fills the row, so it's invisible; only the title's final resting spot
+     against the smaller logo is different. */
+  justify-content: flex-start;
 }
+.ae-page-header--collapsed .ae-page-header-titles {
+  justify-content: center;
+}
+
 .ae-page-header-logo {
   flex-shrink: 0;
   display: flex;
@@ -1867,7 +2010,9 @@ table input[type="number"] {
   overflow: visible;
   transition:
     transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
-    filter 0.25s ease;
+    filter 0.25s ease,
+    width var(--ae-collapse-dur) var(--ae-collapse-ease),
+    height var(--ae-collapse-dur) var(--ae-collapse-ease);
 }
 .ae-page-header-logo:hover .ae-logo-mark,
 .ae-page-header-logo:focus-visible .ae-logo-mark {
@@ -1879,6 +2024,7 @@ table input[type="number"] {
 }
 .ae-page-header h2 {
   margin: 0 0 3px;
+  transition: margin var(--ae-collapse-dur) var(--ae-collapse-ease);
   color: var(--ae-glass-text);
   font-family:
     "Inter",
@@ -1886,6 +2032,38 @@ table input[type="number"] {
     -apple-system,
     "Segoe UI",
     sans-serif;
+}
+/* Collapsed: the logo is smaller, so center the title against it and trim
+   the card's vertical padding. (Compound selector so it beats the plain
+   `.ae-page-header h2` margin above.) */
+.ae-page-header.ae-page-header--collapsed {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+.ae-page-header.ae-page-header--collapsed h2 {
+  margin: 0;
+}
+/* Title row: h2 on the left, clock + theme toggle on the right, both
+   vertically centered on the same line. The h2's 3px bottom margin moves
+   to the row so it doesn't skew the centering. The extras' negative block
+   margin keeps a toggle taller than the h2 from pushing the subtitle down. */
+.ae-page-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 3px;
+  transition: margin var(--ae-collapse-dur) var(--ae-collapse-ease);
+}
+.ae-page-header .ae-page-header-title-row h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.ae-page-header-title-row .ae-page-header-extras {
+  margin-block: -6px;
+}
+.ae-page-header.ae-page-header--collapsed .ae-page-header-title-row {
+  margin-bottom: 0;
 }
 .ae-page-header p {
   margin: 0 0 8px;
@@ -1903,12 +2081,28 @@ table input[type="number"] {
    reads as fitted to the card rather than floating with its usual
    free-standing breathing room. */
 .ae-page-header .ae-toolbar {
-  background: var(--ae-tb-bg);
-  border: 1px solid var(--ae-tb-border);
+  background: transparent;
+  border: none;
   box-shadow: none;
   margin: 0;
   padding: 5px;
   --ae-toolbar-gap: 8px;
+}
+/* With the toolbar's box gone, its own spotlight would show up as a
+   separate rectangle inside the header - the header's glow already covers
+   this area, so the toolbar's is off here. */
+.ae-page-header .ae-toolbar::before {
+  display: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-page-header {
+    --ae-collapse-dur: 1ms;
+  }
+  .ae-page-header-collapsible-inner,
+  .ae-page-header--collapsed .ae-page-header-collapsible-inner {
+    transition-duration: 1ms;
+    transition-delay: 0ms;
+  }
 }
 /* Small screens only adjust page padding / edge-to-edge margins. Toolbar
    gap, padding and control sizes are owned by the tier classes above - the
@@ -1919,7 +2113,7 @@ table input[type="number"] {
     padding: 16px;
   }
   .ae-table-scroll {
-    margin: 0 -16px -16px;
+    margin: 0 calc(-16px / var(--ae-zoom, 1)) calc(-16px / var(--ae-zoom, 1));
   }
   /* .ae-page-header's own -18px margin assumes .ae-main's default 24px
      padding (see its own comment) - rescale to this breakpoint's 16px so
@@ -1935,7 +2129,7 @@ table input[type="number"] {
     padding: 12px;
   }
   .ae-table-scroll {
-    margin: 0 -12px -12px;
+    margin: 0 calc(-12px / var(--ae-zoom, 1)) calc(-12px / var(--ae-zoom, 1));
   }
   .ae-page-header {
     margin: -6px -6px 8px;
@@ -2011,6 +2205,10 @@ table input[type="number"] {
     background: #fff !important;
   }
 
+  .app-shell::before {
+    display: none !important;
+  }
+
   .app-shell {
     display: block !important;
     height: auto !important;
@@ -2023,7 +2221,8 @@ table input[type="number"] {
     overflow: visible !important;
   }
 
-  .table-scroll {
+  .table-scroll,
+  .ae-table-wrap {
     overflow: visible !important;
   }
 
@@ -2157,7 +2356,9 @@ table input[type="number"] {
   justify-content: center;
   gap: 12px;
   padding: 24px 22px;
-  background: var(--ae-surface);
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
   border: 1px solid var(--ae-toolbar-border);
   /* Same 8px radius as .ae-page-header - every card on this page reads as
      the same family of "rounded brand chrome" instead of the old sharp-
@@ -2267,7 +2468,9 @@ table input[type="number"] {
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: var(--ae-surface);
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
   border: 1px solid var(--ae-toolbar-border);
   border-radius: 8px;
   color: var(--ae-text);
@@ -2339,7 +2542,9 @@ table input[type="number"] {
 }
 .ae-dash-card {
   overflow: hidden;
-  background: var(--ae-surface);
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
   border: 1px solid var(--ae-border);
   border-radius: 8px;
   box-shadow:
@@ -2493,4 +2698,186 @@ table input[type="number"] {
   .ae-dash-stats {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---- Report History pages (components/ReportHistoryPage.tsx) ------------
+   Glass cards grouped under day headings, in a responsive grid. Cards reuse
+   the page glass tokens so the seal watermark shows through. */
+.ae-hist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.ae-hist-count {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--ae-text-muted, var(--ae-text));
+  opacity: 0.75;
+}
+.ae-hist-day {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-hist-day span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ae-glass-accent);
+  border: 1px solid var(--ae-toolbar-border);
+}
+.ae-hist-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 10px;
+}
+.ae-hist-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 8px;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+.ae-hist-card:hover {
+  border-color: #f5c000;
+  box-shadow: 0 4px 14px rgba(212, 160, 0, 0.22);
+  transform: translateY(-1px);
+}
+.ae-hist-card-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #f5c000;
+  color: #0c0c0c;
+}
+.ae-hist-card-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.ae-hist-card-body {
+  flex: 1;
+  min-width: 0;
+}
+.ae-hist-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ae-text);
+  overflow-wrap: anywhere;
+}
+.ae-hist-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 4px 0 0;
+}
+.ae-hist-card-meta:empty {
+  display: none;
+}
+.ae-hist-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ae-text);
+  border: 1px solid var(--ae-border);
+}
+.ae-hist-chip--accent {
+  color: var(--ae-glass-accent);
+  border-color: var(--ae-toolbar-border);
+}
+.ae-hist-card-time {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  opacity: 0.7;
+}
+.ae-hist-card-time svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+.ae-hist-open {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.ae-hist-open svg {
+  width: 14px;
+  height: 14px;
+}
+/* Narrow cards: the button drops under the text instead of squeezing it. */
+@media (max-width: 420px) {
+  .ae-hist-card {
+    flex-wrap: wrap;
+  }
+  .ae-hist-open {
+    width: 100%;
+    justify-content: center;
+  }
+}
+.ae-hist-none {
+  margin-top: 16px;
+  opacity: 0.75;
+}
+.ae-hist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 460px;
+  margin: 40px auto;
+  padding: 32px 28px;
+  text-align: center;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 8px;
+}
+.ae-hist-empty h3 {
+  margin: 6px 0 0;
+  font-size: 16px;
+  color: var(--ae-text);
+}
+.ae-hist-empty p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+.ae-hist-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #f5c000;
+  color: #0c0c0c;
+}
+.ae-hist-empty-icon svg {
+  width: 22px;
+  height: 22px;
 }

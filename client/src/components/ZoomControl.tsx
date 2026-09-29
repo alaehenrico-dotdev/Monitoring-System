@@ -75,6 +75,11 @@ export function ZoomControl({
 }
 
 /// Apply to the direct wrapper of a table/grid to scale it Excel-style.
+///
+/// Also publishes the factor as `--ae-zoom` (1 = 100%). CSS `zoom` multiplies
+/// every length inside the wrapper, including .ae-table-scroll's negative
+/// margins and its scrollbar thickness, so index.css divides those by this
+/// variable to keep them the same on-screen size at any zoom level.
 export function zoomStyle(zoom: number): CSSProperties {
-  return { zoom: `${zoom}%` } as CSSProperties;
+  return { zoom: `${zoom}%`, "--ae-zoom": zoom / 100 } as CSSProperties;
 }

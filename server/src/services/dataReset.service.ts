@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
+import { broadcastRealtimeEvent } from "../lib/realtime";
 import { HttpError } from "../utils/HttpError";
 import type { AuthUser } from "../types/express";
 
@@ -57,7 +58,7 @@ function assertValidResetToken(token: string, user: AuthUser) {
 export async function resetAllData(resetToken: string, user: AuthUser) {
   assertValidResetToken(resetToken, user);
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     const onlineStock = await tx.dailyOnlineStock.deleteMany();
     // OfflineEntryDelivery has an ON DELETE RESTRICT FK onto
     // daily_offline_stock (schema.prisma), so its rows have to go first or
@@ -89,4 +90,7 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
 
     return { deleted };
   });
+
+  broadcastRealtimeEvent();
+  return result;
 }

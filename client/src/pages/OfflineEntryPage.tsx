@@ -27,6 +27,7 @@ import { TableSkeleton } from "../components/Skeleton";
 import { LoadingOverlay } from "../components/Spinner";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
@@ -134,6 +135,7 @@ export function OfflineEntryPage() {
   const [undoing, setUndoing] = useState(false);
   const canEdit =
     user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
+  const realtimeVersion = useRealtimeVersion();
   // So handleSaveAll (below) can tell CsvTools its own last import batch is
   // no longer just "pending" once a real Save has committed it - see
   // CsvTools' notifyCommitted doc comment.
@@ -186,7 +188,7 @@ export function OfflineEntryPage() {
     getOfflineGrid(date, shift)
       .then((data) => setRows(data as unknown as GridRow[]))
       .catch((e) => setError(e.message));
-  }, [date, shift]);
+  }, [date, shift, realtimeVersion]);
 
   // Best-effort check of whether the *other* shift already has saved
   // entries for this date - surfaced as a banner below, so switching (or
@@ -206,7 +208,7 @@ export function OfflineEntryPage() {
         ),
       )
       .catch(() => setOtherShiftCount(null));
-  }, [date, shift]);
+  }, [date, shift, realtimeVersion]);
 
   // Best-effort - CSV import's advisory negative-stock pre-check
   // (validateImportRow, below) needs the CURRENT shift's Online rows to
@@ -223,7 +225,7 @@ export function OfflineEntryPage() {
     getOnlineGrid(date, shift)
       .then((data) => setOnlineRowsForImportCheck(data as unknown as GridRow[]))
       .catch(() => setOnlineRowsForImportCheck(null));
-  }, [date, shift]);
+  }, [date, shift, realtimeVersion]);
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
   // easy to forget Save is a separate step now that cells no longer commit

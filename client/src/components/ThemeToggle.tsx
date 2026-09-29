@@ -1,7 +1,16 @@
+import { useEffect, useRef } from "react";
 import { flushSync } from "react-dom";
 import { useTheme } from "../context/ThemeContext";
 import { MoonIcon, SunIcon } from "./icons";
 import { useCursorGlow, CursorGlowOverlay } from "./CursorGlow";
+
+// Set on <html> only for the duration of a theme switch. index.css turns every
+// CSS transition off while it is present (see the matching rule there): the
+// theme change repaints the whole page at once, and letting dozens of
+// per-element background/color transitions start on top of that - plus the
+// View Transition's own snapshot - is what made toggling stutter. The ripple
+// (or the instant swap) is the only animation a theme switch should have.
+const SWITCHING_CLASS = "ae-theme-switching";
 
 /**
  * Rendered inside TopBar.tsx, which owns the fixed top-right positioning so
@@ -18,6 +27,14 @@ export function ThemeToggle() {
   const isDark = theme === "dark";
   const { hostRef, gradientRef, spotlightRef, handlePointerMove, handlePointerLeave } =
     useCursorGlow<HTMLButtonElement>();
+  // The in-flight view transition, so a rapid second click can skip it
+  // instead of stacking another full-page snapshot on top of it.
+  const activeTransition = useRef<ReturnType<Document["startViewTransition"]> | null>(null);
+
+  useEffect(
+    () => () => document.documentElement.classList.remove(SWITCHING_CLASS),
+    [],
+  );
 
   /**
    * Dark-mode switch as a circle that expands outward from this button
@@ -31,10 +48,18 @@ export function ThemeToggle() {
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
+    const root = document.documentElement;
+    root.classList.add(SWITCHING_CLASS);
+
     // Chrome/Edge only as of this writing - Safari/Firefox fall through to
     // the plain instant toggle, same as the reduced-motion guard above.
     if (!document.startViewTransition || prefersReducedMotion) {
-      toggleTheme();
+      flushSync(() => toggleTheme());
+      // Two frames: the first recalculates styles with transitions off, the
+      // second is safe to re-enable them after.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => root.classList.remove(SWITCHING_CLASS)),
+      );
       return;
     }
 
@@ -46,28 +71,45 @@ export function ThemeToggle() {
       Math.max(y, window.innerHeight - y),
     );
 
+    activeTransition.current?.skipTransition();
+
     const transition = document.startViewTransition(() => {
       // Forces the theme's state + DOM update to land synchronously inside
       // this callback, so the browser's "after" snapshot is the new theme
       // rather than the old one (see ThemeContext's useLayoutEffect).
       flushSync(() => toggleTheme());
     });
+    activeTransition.current = transition;
 
-    transition.ready.then(() => {
-      document.documentElement.animate(
-        {
-          clipPath: [
-            `circle(0px at ${x}px ${y}px)`,
-            `circle(${endRadius}px at ${x}px ${y}px)`,
-          ],
-        },
-        {
-          duration: 550,
-          easing: "ease-in-out",
-          pseudoElement: "::view-transition-new(root)",
-        },
-      );
-    });
+    transition.ready
+      .then(() => {
+        document.documentElement.animate(
+          {
+            clipPath: [
+              `circle(0px at ${x}px ${y}px)`,
+              `circle(${endRadius}px at ${x}px ${y}px)`,
+            ],
+          },
+          {
+            duration: 550,
+            easing: "ease-in-out",
+            pseudoElement: "::view-transition-new(root)",
+          },
+        );
+      })
+      // `ready` rejects when the transition is skipped (a newer click, or the
+      // browser bailing out) - the theme change itself has still applied.
+      .catch(() => {});
+
+    transition.finished
+      .catch(() => {})
+      .then(() => {
+        // A skipped transition's `finished` fires while its replacement is
+        // already running - only the latest one gets to end the switch.
+        if (activeTransition.current !== transition) return;
+        activeTransition.current = null;
+        root.classList.remove(SWITCHING_CLASS);
+      });
   }
 
   return (

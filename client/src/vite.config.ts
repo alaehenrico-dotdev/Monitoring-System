@@ -58,6 +58,26 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), cspPlugin(apiOrigin)],
+    build: {
+      rollupOptions: {
+        output: {
+          // Vendor code changes far less often than app code, so it gets
+          // its own long-lived chunks: after a deploy the browser only has
+          // to re-download the (small) app chunk, not React/router/motion
+          // again. Nothing here changes what loads or when - these three
+          // groups were already all part of the one eager main chunk. The
+          // lazily-imported PDF libraries (jspdf, html2canvas, ...) are
+          // deliberately NOT listed, so they stay out of the initial load.
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return "vendor-react";
+            if (/[\\/]node_modules[\\/](react-router|react-router-dom|@remix-run)[\\/]/.test(id)) return "vendor-router";
+            if (/[\\/]node_modules[\\/](motion|motion-dom|motion-utils|framer-motion)[\\/]/.test(id)) return "vendor-motion";
+            return undefined;
+          },
+        },
+      },
+    },
     server: {
       port: 5173,
       host: true,

@@ -1,4 +1,10 @@
-import { Fragment, useEffect, useState, type CSSProperties } from "react";
+import {
+  Fragment,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
 import { Button, NumberCellInput } from "../components/ui";
@@ -25,6 +31,7 @@ import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
 import type { Shift } from "../types";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 
 const LOCATIONS: StockLocation[] = ["ONLINE", "OFFLINE", "TOTAL"];
 
@@ -101,13 +108,14 @@ export function ManualCountPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const realtimeVersion = useRealtimeVersion();
 
   useResetOnKeyChange(`${date}:${shift}:${location}`, () => setRows(null));
   useEffect(() => {
     getManualCountGrid(date, shift, location)
       .then(setRows)
       .catch((e) => setError(e.message));
-  }, [date, shift, location]);
+  }, [date, shift, location, realtimeVersion]);
 
   // Re-derives drafts from storage whenever the key itself changes (a
   // different date/shift/location) - not cleared here the way `setRows(null)`
@@ -249,6 +257,32 @@ export function ManualCountPage() {
     const list = groupedRows.get(r.product.category) ?? [];
     list.push(r);
     groupedRows.set(r.product.category, list);
+  }
+  const visibleProductIds = (visibleRows ?? []).map((r) => r.product.id);
+
+  // Same Up/Down row-jump as StockGrid's handleKeyDown - this page has just
+  // the one editable column (Manual Count), so there's no left/right to
+  // support.
+  function focusManualCount(productId: number) {
+    document
+      .querySelector<HTMLInputElement>(`[data-cell="manual-count-${productId}"]`)
+      ?.focus();
+  }
+  function handleManualCountKeyDown(
+    e: KeyboardEvent<HTMLInputElement>,
+    productId: number,
+  ) {
+    const rowIndex = visibleProductIds.indexOf(productId);
+    if (e.key === "Enter" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const nextId = visibleProductIds[rowIndex + 1];
+      if (nextId !== undefined) focusManualCount(nextId);
+      e.currentTarget.blur();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prevId = visibleProductIds[rowIndex - 1];
+      if (prevId !== undefined) focusManualCount(prevId);
+    }
   }
 
   return (
@@ -463,6 +497,7 @@ export function ManualCountPage() {
                           </td>
                           <td style={manualCountTint["Manual Count"]}>
                             <NumberCellInput
+                              data-cell={`manual-count-${r.product.id}`}
                               value={String(
                                 drafts[r.product.id] ??
                                   r.entry.manualCount ??
@@ -472,8 +507,7 @@ export function ManualCountPage() {
                                 setDrafts((d) => ({ ...d, [r.product.id]: v }))
                               }
                               onKeyDown={(e) =>
-                                e.key === "Enter" &&
-                                (e.currentTarget as HTMLInputElement).blur()
+                                handleManualCountKeyDown(e, r.product.id)
                               }
                               style={{ width: 64, textAlign: "center" }}
                             />

@@ -23,7 +23,7 @@ const RING_THICKNESS = 1;
  * Drop-in replacement for the plain `<div className="ae-table-scroll
  * table-scroll">` wrapper used by every data grid (StockGrid,
  * TotalStocksTable, ManualCountPage, ChangeLogPage, VarianceReportPage,
- * ProductsAdminPage, ReportHistoryTable) - adds an animated gradient hover
+ * ProductsAdminPage) - adds an animated gradient hover
  * border to whichever <tr> the pointer is currently over: two thin bars (top
  * edge, bottom edge only - no left/right sides, see .ae-row-ring in
  * index.css for why) rather than a full box outline.
@@ -94,7 +94,9 @@ export function RowGlowScroll({
     // space regardless of ancestor zoom, so comparing it against the
     // on-screen width gives the effective cumulative zoom factor to divide
     // the screen-pixel deltas by before they're used as local values.
-    const zoomFactor = scrollEl.offsetWidth ? scrollRect.width / scrollEl.offsetWidth : 1;
+    const zoomFactor = scrollEl.offsetWidth
+      ? scrollRect.width / scrollEl.offsetWidth
+      : 1;
     return {
       top: (rowRect.top - scrollRect.top) / zoomFactor + scrollEl.scrollTop,
       left: (rowRect.left - scrollRect.left) / zoomFactor + scrollEl.scrollLeft,
@@ -103,7 +105,10 @@ export function RowGlowScroll({
     };
   }, []);
 
-  const measure = useCallback((row: Element | null) => setRing(rectOf(row)), [rectOf]);
+  const measure = useCallback(
+    (row: Element | null) => setRing(rectOf(row)),
+    [rectOf],
+  );
 
   function handleMouseOver(e: ReactMouseEvent<HTMLDivElement>) {
     const row = (e.target as Element).closest("tbody tr");
@@ -161,7 +166,9 @@ export function RowGlowScroll({
       rowId = null;
     }
     if (!rowId) return;
-    const row = scrollEl.querySelector(`tbody tr[data-row-id="${CSS.escape(rowId)}"]`);
+    const row = scrollEl.querySelector(
+      `tbody tr[data-row-id="${CSS.escape(rowId)}"]`,
+    );
     if (!row) return;
     focusedRowRef.current = row;
     setFocusRing(rectOf(row));

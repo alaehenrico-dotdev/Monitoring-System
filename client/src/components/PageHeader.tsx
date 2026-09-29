@@ -10,6 +10,9 @@ import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
 
 const LOGO_SIZE = 56;
+// Collapsed header: the logo shrinks to roughly the title's own height so
+// the h2 lines up with it and the card gets shorter.
+const LOGO_SIZE_COLLAPSED = 32;
 // Same hover-triggered spin cooldown the logo had inside the sidebar
 // itself - so hovering back and forth doesn't restart the animation
 // mid-spin.
@@ -114,7 +117,6 @@ export function PageHeader({
       onMouseMove={handlePointerMove}
       onMouseLeave={handlePointerLeave}
     >
-      <HeaderExtras />
       <div className="ae-page-header-top">
         <button
           ref={logoRef}
@@ -126,10 +128,16 @@ export function PageHeader({
           aria-label={open ? "Close navigation" : "Open navigation"}
           title={open ? "Close navigation" : "Open navigation"}
         >
-          <LogoMark size={LOGO_SIZE} spin={logoSpin} />
+          <LogoMark
+            size={collapsed ? LOGO_SIZE_COLLAPSED : LOGO_SIZE}
+            spin={logoSpin}
+          />
         </button>
         <div className="ae-page-header-titles">
-          <h2>{title}</h2>
+          <div className="ae-page-header-title-row">
+            <h2>{title}</h2>
+            <HeaderExtras />
+          </div>
           {subtitle && (
             <div className="ae-page-header-collapsible">
               <div className="ae-page-header-collapsible-inner">

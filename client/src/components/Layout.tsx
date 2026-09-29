@@ -15,13 +15,29 @@ export function Layout() {
     // state both of those need despite not being direct siblings (the
     // header is rendered deep inside <Outlet/>, not next to <Sidebar/>).
     <NavDrawerProvider>
-      <div className="app-shell" style={{ fontFamily: fonts.body, height: "100vh", display: "flex", overflow: "hidden" }}>
+      <div
+        className="app-shell"
+        style={{
+          fontFamily: fonts.body,
+          height: "100vh",
+          display: "flex",
+          overflow: "hidden",
+        }}
+      >
         <Sidebar />
 
         <main
           ref={mainRef}
           className="ae-main"
-          style={{ flex: 1, height: "100%", overflowX: "hidden", overflowY: "auto", background: colors.paper, color: colors.ink }}
+          // No background of its own: .app-shell paints the page color plus the
+          // Ala Eh! seal watermark (see index.css), and this sits on top of both.
+          style={{
+            flex: 1,
+            height: "100%",
+            overflowX: "hidden",
+            overflowY: "auto",
+            color: colors.ink,
+          }}
         >
           <Outlet />
         </main>

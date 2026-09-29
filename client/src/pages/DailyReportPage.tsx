@@ -25,6 +25,7 @@ import {
   type PdfSection,
 } from "../utils/pdfTables";
 import { colors } from "../theme";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
 import {
@@ -117,6 +118,7 @@ export function DailyReportPage() {
   // expanded again, even when re-generating the same date.
   const [reportVersion, setReportVersion] = useState(0);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
+  const realtimeVersion = useRealtimeVersion();
   // Alert dialogs shown instead of generating: unsaved entry/count edits for
   // this date, or a date with nothing saved to report on.
   const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(
@@ -142,6 +144,14 @@ export function DailyReportPage() {
     // History links intentionally generate the selected report once on open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep an already-generated report live - re-runs the same Generate this
+  // page's own toolbar button would, but only while a report is already on
+  // screen, so realtime updates never auto-run a report nobody asked for.
+  useEffect(() => {
+    if (report) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeVersion]);
 
   // Opened from the report history: build the PDF as soon as the report has
   // loaded (there's no DOM to wait for - the PDF is built from the data).

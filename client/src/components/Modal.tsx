@@ -68,7 +68,12 @@ export function Modal({
           flexDirection: "column",
         }}
       >
-        <div aria-hidden className="ae-modal-border-sweep" />
+        {/* 0.5px (the class default is 1px) - same thin edge as the nav drawer. */}
+        <div
+          aria-hidden
+          className="ae-modal-border-sweep"
+          style={{ padding: 0.5 }}
+        />
         <div
           className="ae-modal-header no-print"
           style={{
@@ -99,7 +104,12 @@ export function Modal({
             ✕
           </button>
         </div>
-        <div style={{ padding: 18, overflowY: "auto" }} className="ae-modal-body">{children}</div>
+        <div
+          style={{ padding: 18, overflowY: "auto" }}
+          className="ae-modal-body"
+        >
+          {children}
+        </div>
       </div>
     </div>,
     document.body,

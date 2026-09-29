@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 
 export type Theme = "light" | "dark";
 
@@ -25,16 +25,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // flushSync() specifically so this attribute is already on <html> before
   // the View Transition API takes its "after" snapshot; with the async
   // useEffect that snapshot would still show the old theme.
+  // Only the attribute lives here: the localStorage write below is a
+  // synchronous disk-backed call, and doing it inside this layout effect
+  // would put it on the critical path of the transition's snapshot.
   useLayoutEffect(() => {
     document.documentElement.dataset.theme = theme;
-    localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  function toggleTheme() {
-    setTheme((t) => (t === "light" ? "dark" : "light"));
-  }
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // Storage blocked/full (private mode, quota) - the theme still applies
+      // for this session, it just won't be remembered.
+    }
+  }, [theme]);
 
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => (t === "light" ? "dark" : "light"));
+  }, []);
+
+  // Stable value: consumers only re-render when the theme actually changes,
+  // not whenever the provider itself re-renders.
+  const value = useMemo(() => ({ theme, toggleTheme }), [theme, toggleTheme]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
