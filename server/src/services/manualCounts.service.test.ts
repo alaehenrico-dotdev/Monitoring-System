@@ -8,10 +8,10 @@ vi.mock("../repositories/manualCountRepository", () => ({
   },
 }));
 vi.mock("../repositories/dailyOnlineStockRepository", () => ({
-  dailyOnlineStockRepository: { findByProductAndDate: vi.fn(), findAllForDate: vi.fn() },
+  dailyOnlineStockRepository: { findByProductAndDate: vi.fn(), findAllForDate: vi.fn(), findNext: vi.fn(), getOpeningStock: vi.fn(), upsert: vi.fn() },
 }));
 vi.mock("../repositories/dailyOfflineStockRepository", () => ({
-  dailyOfflineStockRepository: { findByProductAndDate: vi.fn(), findAllForDate: vi.fn() },
+  dailyOfflineStockRepository: { findByProductAndDate: vi.fn(), findAllForDate: vi.fn(), findNext: vi.fn(), getOpeningStock: vi.fn(), upsert: vi.fn() },
 }));
 vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(), findActive: vi.fn() },
@@ -85,5 +85,30 @@ describe("saveManualCount - Variance = System Remaining Stock - Manual Count", (
     await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 110);
 
     expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: -10 }));
+  });
+});
+
+describe("saveManualCount - carries the count into an already-saved next period", () => {
+  it("re-derives the next row's opening and remaining stock from the new count", async () => {
+    vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({ remainingStock: 100 } as never);
+    vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
+    vi.mocked(manualCountRepository.upsert).mockImplementation(((_id: number | undefined, data: object) =>
+      Promise.resolve({ id: 1, ...data })) as never);
+    vi.mocked(dailyOnlineStockRepository.findNext)
+      .mockResolvedValueOnce({
+        id: 7, entryDate: new Date("2026-06-16T00:00:00.000Z"), shift: "MORNING", openingStock: 100,
+        stockInOffToOl: 0, stockOutOlToOff: 0, productionIn: 5, fulfillmentOut: 10, rts: 0, remainingStock: 95,
+      } as never)
+      .mockResolvedValue(null);
+    vi.mocked(dailyOnlineStockRepository.getOpeningStock).mockResolvedValue(95);
+    vi.mocked(dailyOnlineStockRepository.upsert).mockImplementation(((id: number, data: object) =>
+      Promise.resolve({ id, ...data })) as never);
+
+    await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 95);
+
+    expect(dailyOnlineStockRepository.upsert).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ openingStock: 95, remainingStock: 90 })
+    );
   });
 });

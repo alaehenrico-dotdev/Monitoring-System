@@ -153,7 +153,6 @@ export function buildOfflineStockColumns(
       importable: true,
       aliases: ["Delivery(Out)"],
     },
-    { key: "upsellOut", label: "Upsell (Out)", editable: true },
     // The monthly report (Section 8.1) headers this column "BACKLOAD"
     // (singular) - the app's own label is plural, so without this alias a
     // real import would silently drop every backload figure in the file

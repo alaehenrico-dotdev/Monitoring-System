@@ -1,7 +1,7 @@
 import { Shift } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 import { manualCountRepository } from "./manualCountRepository";
-import { resolveOpeningStock } from "../utils/stockMath";
+import { periodRank, resolveOpeningStock } from "../utils/stockMath";
 
 export interface OfflineStockData {
   productId: number;
@@ -27,6 +27,17 @@ export const dailyOfflineStockRepository = {
 
   findAllForDate(entryDate: Date, shift: Shift) {
     return prisma.dailyOfflineStock.findMany({ where: { entryDate, shift } });
+  },
+
+  /// See dailyOnlineStockRepository.findNext.
+  findNext(productId: number, entryDate: Date, shift: Shift, db: Db = prisma) {
+    return db.dailyOfflineStock.findFirst({
+      where: {
+        productId,
+        OR: shift === "MORNING" ? [{ entryDate: { gt: entryDate } }, { entryDate, shift: "NIGHT" }] : [{ entryDate: { gt: entryDate } }],
+      },
+      orderBy: [{ entryDate: "asc" }, { shift: "asc" }],
+    });
   },
 
   /// Section 4.6 - same shift-aware carry-forward principle as the Online
@@ -60,9 +71,15 @@ export const dailyOfflineStockRepository = {
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       select: { entryDate: true, shift: true, remainingStock: true },
     });
+    // A saved count is the starting point of the next period even when the
+    // counted period has no daily row of its own - so the latest count
+    // before this period competes with the latest row, and the later wins.
+    const count = await manualCountRepository.findLatestBefore(productId, entryDate, shift, "OFFLINE", db);
+    if (count && (!prior || periodRank(count.entryDate, count.shift) >= periodRank(prior.entryDate, prior.shift))) {
+      return resolveOpeningStock(count.manualCount, 0);
+    }
     if (!prior) return 0;
-    const manualCount = await manualCountRepository.findOne(productId, prior.entryDate, prior.shift, "OFFLINE", db);
-    return resolveOpeningStock(manualCount?.manualCount, prior.remainingStock);
+    return resolveOpeningStock(undefined, prior.remainingStock);
   },
 
   /// Batched form of getOpeningStock - see dailyOnlineStockRepository's
@@ -108,16 +125,19 @@ export const dailyOfflineStockRepository = {
       }
     }
 
-    if (candidates.size === 0) return result;
+    // Same rule as getOpeningStock: the latest saved count before this
+    // period beats an earlier (or equal-period) daily row's Remaining Stock.
+    const counts = await manualCountRepository.findLatestBeforeForProducts(productIds, entryDate, shift, "OFFLINE");
+    const countByProduct = new Map(counts.map((m) => [m.productId, m]));
 
-    const manualCounts = await manualCountRepository.findManyForKeys(
-      [...candidates.entries()].map(([productId, c]) => ({ productId, entryDate: c.entryDate, shift: c.shift })),
-      "OFFLINE",
-    );
-    const manualCountByProduct = new Map(manualCounts.map((m) => [m.productId, m.manualCount]));
-
-    for (const [productId, c] of candidates) {
-      result.set(productId, resolveOpeningStock(manualCountByProduct.get(productId), c.remainingStock));
+    for (const productId of productIds) {
+      const c = candidates.get(productId);
+      const count = countByProduct.get(productId);
+      if (count && (!c || periodRank(count.entryDate, count.shift) >= periodRank(c.entryDate, c.shift))) {
+        result.set(productId, resolveOpeningStock(count.manualCount, 0));
+      } else if (c) {
+        result.set(productId, resolveOpeningStock(undefined, c.remainingStock));
+      }
     }
     return result;
   },

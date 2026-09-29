@@ -74,6 +74,11 @@
      yellow, which needs the near-black fill to stay legible. */
   --ae-input-cell-spin: #d4a000;
   --ae-input-cell-spin-hover-bg: rgba(212, 160, 0, 0.18);
+  /* Edited (staged, not yet saved) grid cells - green. */
+  --ae-input-cell-edited-bg: #c6ebcf;
+  --ae-input-cell-edited-text: #0c3b1a;
+  --ae-input-cell-edited-border: #2f6b3c;
+  --ae-input-cell-edited-ring: rgba(47, 107, 60, 0.35);
 
   /* Toolbar tokens - brand colors, identical in light and dark mode so the
      toolbar border and its action buttons are always visible. */
@@ -169,6 +174,10 @@
   --ae-input-cell-focus-ring: rgba(255, 255, 255, 0.45);
   --ae-input-cell-spin: #f5c000;
   --ae-input-cell-spin-hover-bg: rgba(245, 192, 0, 0.18);
+  --ae-input-cell-edited-bg: #1f5a2f;
+  --ae-input-cell-edited-text: #fff;
+  --ae-input-cell-edited-border: #4caf68;
+  --ae-input-cell-edited-ring: rgba(76, 175, 104, 0.45);
 
   /* Dark glass - same look the nav drawer always had. */
   --ae-glass-bg: rgba(35, 35, 35, 0.72);
@@ -534,6 +543,21 @@ table input[type="number"] {
 .ae-input-cell:disabled {
   background: var(--ae-input-cell-bg);
   color: var(--ae-input-cell-text-muted);
+}
+
+/* Edited cell: a value staged in the grid but not saved yet (see StockGrid's
+   `pending` prop). Goes back to normal once saved, discarded or reverted. */
+.ae-input-cell.ae-input-cell--edited,
+.ae-input-cell.ae-input-cell--edited:hover:not(:disabled):not(:focus) {
+  background: var(--ae-input-cell-edited-bg);
+  color: var(--ae-input-cell-edited-text);
+  border-color: var(--ae-input-cell-edited-border);
+}
+.ae-input-cell.ae-input-cell--edited:focus {
+  background: var(--ae-input-cell-edited-bg);
+  color: var(--ae-input-cell-edited-text);
+  border-color: var(--ae-input-cell-edited-border);
+  box-shadow: 0 0 0 2px var(--ae-input-cell-edited-ring);
 }
 
 .ae-number-cell {

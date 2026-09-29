@@ -20,6 +20,11 @@ export function resolveOpeningStock(manualCount: unknown, systemRemainingStock: 
   return toNum(manualCount ?? systemRemainingStock);
 }
 
+/// Orders periods on the timeline (Morning < Night within a date).
+export function periodRank(entryDate: Date, shift: string): number {
+  return entryDate.getTime() * 2 + (shift === "NIGHT" ? 1 : 0);
+}
+
 /// Section 4.2 - Online Stocks (subtotal) = opening + Stocks In - Stocks Out.
 export function calculateOnlineStock(opening: number, stockIn: number, stockOut: number): number {
   return opening + stockIn - stockOut;
