@@ -26,6 +26,7 @@ import {
 import { colors } from "../theme";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
+import { getCurrentShiftAndDate } from "../utils/shift";
 
 type Analytics = {
   activeProducts: number;
@@ -119,14 +120,6 @@ function useCountUp(
   return display;
 }
 
-// The local calendar date as YYYY-MM-DD. (`toISOString()` would give the UTC
-// date, which is still *yesterday* for the first hours of every local day in
-// a timezone ahead of UTC.)
-function localISODate(now: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 /**
  * Landing page. Uses the same page chrome as every other screen (h2 +
  * subtitle on the themed paper background, surface cards with the toolbar's
@@ -144,7 +137,9 @@ export function DashboardPage() {
   // "No activity recorded yet." message, silently hiding an actual outage.
   const [recentActivityError, setRecentActivityError] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const today = localISODate();
+  // The current BUSINESS date, same as the entry pages default to - Night
+  // runs past midnight, so just after 12am it's still yesterday's date.
+  const today = getCurrentShiftAndDate().date;
   const realtimeVersion = useRealtimeVersion();
 
   useResetOnKeyChange(today, () => setRecentActivityError(false));

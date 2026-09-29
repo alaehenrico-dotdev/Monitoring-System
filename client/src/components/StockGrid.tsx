@@ -133,7 +133,13 @@ interface DraftCellProps {
   colKey: string;
   /** The row's own saved/staged value - what the input shows when no draft is in progress. */
   raw: unknown;
-  onCommit: (productId: number, key: string, value: number) => void | Promise<void>;
+  /** True while this cell holds a staged, not-yet-saved edit - shown green. */
+  edited: boolean;
+  onCommit: (
+    productId: number,
+    key: string,
+    value: number,
+  ) => void | Promise<void>;
   onKeyDown: (
     e: KeyboardEvent<HTMLInputElement>,
     productId: number,
@@ -153,6 +159,7 @@ const DraftCell = memo(function DraftCell({
   productId,
   colKey,
   raw,
+  edited,
   onCommit,
   onKeyDown,
 }: DraftCellProps) {
@@ -170,6 +177,7 @@ const DraftCell = memo(function DraftCell({
   return (
     <NumberCellInput
       data-cell={`${productId}:${colKey}`}
+      className={edited ? "ae-input-cell--edited" : undefined}
       value={displayValue}
       onChange={setDraft}
       onBlur={commit}
@@ -376,6 +384,9 @@ export function StockGrid({
                             productId={row.product.id}
                             colKey={col.key}
                             raw={raw}
+                            edited={
+                              pending?.[row.product.id]?.[col.key] !== undefined
+                            }
                             onCommit={commitCell}
                             onKeyDown={handleKeyDown}
                           />

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
+import { healOpeningStocks } from "../services/manualCounts.service";
 import { getOnlineGrid, saveOnlineEntry } from "../services/dailyOnlineStock.service";
 
 const entrySchema = z.object({
@@ -21,6 +22,7 @@ const entrySchema = z.object({
 export async function getOnlineStockGrid(req: Request, res: Response) {
   const entryDate = parseDateOnly(req.query.date);
   const shift = parseShift(req.query.shift);
+  await healOpeningStocks("ONLINE", entryDate, shift, req.user?.id);
   res.json(await getOnlineGrid(entryDate, shift));
 }
 

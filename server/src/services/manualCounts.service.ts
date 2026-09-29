@@ -5,7 +5,14 @@ import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRe
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
-import { calculateVariance, toNum } from "../utils/stockMath";
+import {
+  calculateOfflineRemaining,
+  calculateOfflineStock,
+  calculateOnlineRemaining,
+  calculateOnlineStock,
+  calculateVariance,
+  toNum,
+} from "../utils/stockMath";
 import { HttpError } from "../utils/HttpError";
 
 const TABLE = "manual_counts";
@@ -15,20 +22,23 @@ const TABLE = "manual_counts";
 /// at save time, never typed, so it can't silently disappear the way an
 /// overwritten spreadsheet cell can (Section 2.1).
 export async function getSystemRemainingStock(productId: number, entryDate: Date, shift: Shift, location: StockLocation) {
-  if (location === "ONLINE") {
+  // No saved row for that date/shift is not 0 stock: the entry pages show it
+  // at its carried-forward opening (zero activity => remaining == opening),
+  // so the audit's System Remaining must too or variance is measured
+  // against 0.
+  const onlineRemaining = async () => {
     const row = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
-    return toNum(row?.remainingStock);
-  }
-  if (location === "OFFLINE") {
+    return row ? toNum(row.remainingStock) : toNum(await dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift));
+  };
+  const offlineRemaining = async () => {
     const row = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift);
-    return toNum(row?.remainingStock);
-  }
+    return row ? toNum(row.remainingStock) : toNum(await dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift));
+  };
+  if (location === "ONLINE") return onlineRemaining();
+  if (location === "OFFLINE") return offlineRemaining();
   // TOTAL - Online + Offline remaining stock combined (Section 4.5).
-  const [online, offline] = await Promise.all([
-    dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift),
-    dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift),
-  ]);
-  return toNum(online?.remainingStock) + toNum(offline?.remainingStock);
+  const [online, offline] = await Promise.all([onlineRemaining(), offlineRemaining()]);
+  return online + offline;
 }
 
 export async function saveManualCount(
@@ -57,8 +67,134 @@ export async function saveManualCount(
     newValue: saved,
   });
 
+  await propagateOpeningStock(productId, entryDate, shift, location, userId);
+
   broadcastRealtimeEvent();
   return saved;
+}
+
+/// Section 4.4/4.6 - a manual count is the starting point of the next
+/// period's opening stock. A next-period row that was already saved has its
+/// opening stock stored, so it must be re-derived here or it keeps carrying
+/// the old system figure. Walks forward row by row: each changed row's new
+/// Remaining Stock feeds the one after it, stopping once an opening stock
+/// comes out unchanged or a row has its own manual count for this location
+/// (which supersedes whatever carries into it). TOTAL counts are informational
+/// only - they can't be split back into Online/Offline balances.
+async function propagateOpeningStock(productId: number, entryDate: Date, shift: Shift, location: StockLocation, userId?: number) {
+  if (location === "TOTAL") return;
+  let cursor = { entryDate, shift };
+  for (;;) {
+    let nextPeriod: { entryDate: Date; shift: Shift } | null = null;
+
+    if (location === "ONLINE") {
+      const next = await dailyOnlineStockRepository.findNext(productId, cursor.entryDate, cursor.shift);
+      if (!next) return;
+      nextPeriod = { entryDate: next.entryDate, shift: next.shift };
+      const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift);
+      if (openingStock === toNum(next.openingStock)) return;
+      const onlineStock = calculateOnlineStock(openingStock, toNum(next.stockInOffToOl), toNum(next.stockOutOlToOff));
+      const remainingStock = calculateOnlineRemaining(onlineStock, toNum(next.productionIn), toNum(next.fulfillmentOut), toNum(next.rts));
+      const updated = await dailyOnlineStockRepository.upsert(next.id, {
+        productId,
+        entryDate: next.entryDate,
+        shift: next.shift,
+        openingStock,
+        stockInOffToOl: toNum(next.stockInOffToOl),
+        stockOutOlToOff: toNum(next.stockOutOlToOff),
+        onlineStock,
+        productionIn: toNum(next.productionIn),
+        fulfillmentOut: toNum(next.fulfillmentOut),
+        rts: toNum(next.rts),
+        remainingStock,
+        encodedById: next.encodedById ?? undefined,
+      });
+      await recordChange({ tableName: "daily_online_stock", recordId: updated.id, action: "UPDATE", changedById: userId, oldValue: next, newValue: updated });
+    } else {
+      const next = await dailyOfflineStockRepository.findNext(productId, cursor.entryDate, cursor.shift);
+      if (!next) return;
+      nextPeriod = { entryDate: next.entryDate, shift: next.shift };
+      const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift);
+      if (openingStock === toNum(next.openingStock)) return;
+      const offlineStock = calculateOfflineStock(openingStock, toNum(next.stockInOlToOff), toNum(next.stockOutOffToOl));
+      const remainingStock = calculateOfflineRemaining(
+        offlineStock,
+        toNum(next.productionIn),
+        toNum(next.deliveryOut),
+        toNum(next.backloads),
+        toNum(next.upsellOut)
+      );
+      const updated = await dailyOfflineStockRepository.upsert(next.id, {
+        productId,
+        entryDate: next.entryDate,
+        shift: next.shift,
+        openingStock,
+        stockInOlToOff: toNum(next.stockInOlToOff),
+        stockOutOffToOl: toNum(next.stockOutOffToOl),
+        offlineStock,
+        productionIn: toNum(next.productionIn),
+        deliveryOut: toNum(next.deliveryOut),
+        backloads: toNum(next.backloads),
+        upsellOut: toNum(next.upsellOut),
+        remainingStock,
+        encodedById: next.encodedById ?? undefined,
+      });
+      await recordChange({ tableName: "daily_offline_stock", recordId: updated.id, action: "UPDATE", changedById: userId, oldValue: next, newValue: updated });
+    }
+
+    const ownCount = await manualCountRepository.findOne(productId, nextPeriod.entryDate, nextPeriod.shift, location);
+    if (ownCount) {
+      // Its system figure just moved, so its stored variance must follow.
+      const systemRemainingStock = await getSystemRemainingStock(productId, nextPeriod.entryDate, nextPeriod.shift, location);
+      const variance = calculateVariance(systemRemainingStock, toNum(ownCount.manualCount));
+      await manualCountRepository.upsert(ownCount.id, {
+        productId,
+        entryDate: nextPeriod.entryDate,
+        shift: nextPeriod.shift,
+        location,
+        systemRemainingStock,
+        manualCount: toNum(ownCount.manualCount),
+        variance,
+        countedById: ownCount.countedById ?? undefined,
+      });
+      return;
+    }
+    cursor = nextPeriod;
+  }
+}
+
+/// Rows saved before a count was imported (or before counts carried forward
+/// at all) still hold the stale opening stock they captured. On grid load,
+/// re-derive any saved row whose opening should have started from a manual
+/// count but doesn't. Only that case is touched - an opening stock seeded by
+/// a CSV import with nothing (or no count) before it is left alone.
+export async function healOpeningStocks(location: "ONLINE" | "OFFLINE", entryDate: Date, shift: Shift, userId?: number) {
+  const rows =
+    location === "ONLINE"
+      ? await dailyOnlineStockRepository.findAllForDate(entryDate, shift)
+      : await dailyOfflineStockRepository.findAllForDate(entryDate, shift);
+  if (!rows.length) return;
+  const ids = rows.map((r) => r.productId);
+  const [expected, counts] = await Promise.all([
+    location === "ONLINE"
+      ? dailyOnlineStockRepository.getOpeningStocksForProducts(ids, entryDate, shift)
+      : dailyOfflineStockRepository.getOpeningStocksForProducts(ids, entryDate, shift),
+    manualCountRepository.findLatestBeforeForProducts(ids, entryDate, shift, location),
+  ]);
+  const countByProduct = new Map(counts.map((c) => [c.productId, toNum(c.manualCount)]));
+  const before =
+    shift === "NIGHT"
+      ? { entryDate, shift: "MORNING" as Shift }
+      : { entryDate: new Date(entryDate.getTime() - 24 * 60 * 60 * 1000), shift: "NIGHT" as Shift };
+  let changed = false;
+  for (const row of rows) {
+    const want = expected.get(row.productId);
+    if (want === undefined || countByProduct.get(row.productId) !== want) continue;
+    if (want === toNum(row.openingStock)) continue;
+    await propagateOpeningStock(row.productId, before.entryDate, before.shift, location, userId);
+    changed = true;
+  }
+  if (changed) broadcastRealtimeEvent();
 }
 
 /// For a TOTAL grid, the naive per-product getSystemRemainingStock call
@@ -81,10 +217,21 @@ export async function getManualCountGrid(entryDate: Date, shift: Shift, location
   const onlineByProduct = new Map(onlineRows.map((r) => [r.productId, r]));
   const offlineByProduct = new Map(offlineRows.map((r) => [r.productId, r]));
 
+  // Products with no saved daily row use their carried-forward opening stock
+  // (see getSystemRemainingStock) - batched, and skipped when none are missing.
+  const missingOnlineIds = needsOnline ? products.filter((p) => !rowByProduct.has(p.id) && !onlineByProduct.has(p.id)).map((p) => p.id) : [];
+  const missingOfflineIds = needsOffline ? products.filter((p) => !rowByProduct.has(p.id) && !offlineByProduct.has(p.id)).map((p) => p.id) : [];
+  const [carriedOnline, carriedOffline] = await Promise.all([
+    missingOnlineIds.length ? dailyOnlineStockRepository.getOpeningStocksForProducts(missingOnlineIds, entryDate, shift) : new Map<number, number>(),
+    missingOfflineIds.length ? dailyOfflineStockRepository.getOpeningStocksForProducts(missingOfflineIds, entryDate, shift) : new Map<number, number>(),
+  ]);
+  const onlineFor = (id: number) => (onlineByProduct.has(id) ? toNum(onlineByProduct.get(id)?.remainingStock) : toNum(carriedOnline.get(id)));
+  const offlineFor = (id: number) => (offlineByProduct.has(id) ? toNum(offlineByProduct.get(id)?.remainingStock) : toNum(carriedOffline.get(id)));
+
   function systemRemainingStockFor(productId: number): number {
-    if (location === "ONLINE") return toNum(onlineByProduct.get(productId)?.remainingStock);
-    if (location === "OFFLINE") return toNum(offlineByProduct.get(productId)?.remainingStock);
-    return toNum(onlineByProduct.get(productId)?.remainingStock) + toNum(offlineByProduct.get(productId)?.remainingStock);
+    if (location === "ONLINE") return onlineFor(productId);
+    if (location === "OFFLINE") return offlineFor(productId);
+    return onlineFor(productId) + offlineFor(productId);
   }
 
   return products.map((product) => {

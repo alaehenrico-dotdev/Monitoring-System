@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
 import {
@@ -15,7 +15,11 @@ import { downloadExcel, toExcelTable } from "../utils/excel";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { formatDateDisplay } from "../utils/dateFormat";
-import type { Product } from "../types";
+import type { Product, Shift, StockLocation } from "../types";
+import { DatePicker } from "./DatePicker";
+import { Dropdown } from "./Dropdown";
+import { ShiftFilter } from "./ShiftFilter";
+import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { toolbarLayoutTransition } from "../motion";
 import { DownloadIcon, PrinterIcon, UploadIcon } from "./icons";
 import { Toast, type ToastVariant } from "./Toast";
@@ -145,6 +149,19 @@ function bestFuzzyMatch(name: string, candidates: Product[]): { product: Product
   return best && best.score >= FUZZY_MATCH_THRESHOLD ? best : null;
 }
 
+/// Which sheet an import belongs to. When a page passes one, clicking Import
+/// first opens a dialog to confirm/change it, and the Review modal and result
+/// toast then name it, so it is always clear what an import went into.
+export interface ImportTarget {
+  date: string;
+  shift: Shift;
+  location: StockLocation;
+}
+
+function describeTarget(t: ImportTarget): string {
+  return `${formatDateDisplay(t.date)} · ${SHIFT_SHORT_LABELS[t.shift]} Shift · ${t.location}`;
+}
+
 interface CsvToolsProps {
   filenamePrefix: string;
   date: string;
@@ -174,6 +191,24 @@ interface CsvToolsProps {
   validateImport?: (productId: number, changes: Record<string, number>) => string | undefined;
   /// Writers only - readers can still Export but shouldn't see Import.
   canImport: boolean;
+  /// The date/shift/location the page is currently showing. When set,
+  /// Import opens a target dialog first (see ImportTarget).
+  importTarget?: ImportTarget;
+  /// Called when the dialog's choice differs from importTarget - the page
+  /// applies it so the grid shows exactly the sheet being imported into.
+  onImportTargetChange?: (target: ImportTarget) => void;
+  /// Locations the dialog offers. One entry (or none) locks the location.
+  importLocations?: StockLocation[];
+  /// What the dialog's date picker treats as "today" (business date).
+  importTodayValue?: string;
+  /// Which column keys Import reads. Defaults to just Opening Stock (the
+  /// Online/Offline Entry behavior). Manual Count passes ["manualCount"] so
+  /// it reads that column and never Remaining Stock.
+  importKeys?: string[];
+  /// When true, a blank cell in an imported column counts as 0 instead of
+  /// being skipped, and a value is "changed" whenever the current one is
+  /// unset (null) or different - so a confirmed 0 is still staged.
+  blankAsZero?: boolean;
   /// Hide the Export segment - e.g. a page that already has its own Export
   /// control and only wants this component for Import. Defaults to shown.
   showExport?: boolean;
@@ -252,6 +287,28 @@ function UnmatchedImportRowView({
   );
 }
 
+const targetFieldStyle = { display: "grid", gridTemplateColumns: "90px 1fr", alignItems: "center", gap: 10, fontSize: 13, color: colors.ink } as const;
+
+/// Highlighted "this import goes into ..." line - shown in the target dialog
+/// and again at the top of the Review modal.
+function ImportTargetBanner({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        margin: "14px 0 0",
+        padding: "8px 10px",
+        borderLeft: `4px solid ${colors.red}`,
+        background: colors.warningBg,
+        fontSize: 13,
+        fontWeight: 600,
+        color: colors.ink,
+      }}
+    >
+      Importing into: {label}
+    </div>
+  );
+}
+
 /**
  * Export always dumps every column (Section 3.1's Excel-like round-trip
  * file). Import is narrower: it only ever reads and writes Opening Stock
@@ -273,6 +330,12 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
   getPendingValue,
   validateImport,
   canImport,
+  importTarget,
+  onImportTargetChange,
+  importLocations,
+  importTodayValue,
+  importKeys = ["openingStock"],
+  blankAsZero = false,
   showExport = true,
   showPdf = true,
   disabled = false,
@@ -303,6 +366,22 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
   // message while a stale-but-not-yet-superseded batch still exists.
   const [showUndoImport, setShowUndoImport] = useState(false);
   const undoInFlightRef = useRef(false);
+  // Target dialog draft (null = closed) and the label of the sheet the
+  // current review/import belongs to.
+  const [targetDraft, setTargetDraft] = useState<ImportTarget | null>(null);
+  const [reviewLabel, setReviewLabel] = useState<string | null>(null);
+  // A file picked while the grid is still loading the newly chosen sheet is
+  // held here and parsed as soon as that data is ready (see effect below).
+  const pendingFileRef = useRef<File | null>(null);
+  useEffect(() => {
+    if (!disabled && pendingFileRef.current) {
+      const file = pendingFileRef.current;
+      pendingFileRef.current = null;
+      void handleImportFile(file);
+    }
+    // handleImportFile is re-created every render; only `disabled` matters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled]);
   const asExcel = exportFormat === "excel" && !canImport;
 
   useImperativeHandle(ref, () => ({
@@ -363,6 +442,30 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
     }
   }
 
+  /// One file line -> the values that differ from `entry`. A blank cell is
+  /// skipped normally, or read as 0 when blankAsZero is set (Manual Count).
+  /// With blankAsZero an unset current value (null/blank, "not counted yet")
+  /// always differs from an imported 0, so the zero is really staged.
+  function diffImportLine(
+    line: string[],
+    columnIndexes: { key: string; idx: number }[],
+    entry: Record<string, unknown>,
+  ): Record<string, number> {
+    const changes: Record<string, number> = {};
+    for (const { key, idx } of columnIndexes) {
+      const raw = line[idx];
+      const blank = raw === undefined || raw.trim() === "";
+      if (blank && !blankAsZero) continue;
+      const parsed = blank ? 0 : Number(raw);
+      if (Number.isNaN(parsed)) continue;
+      const cur = entry[key];
+      const unset = cur === null || cur === undefined || cur === "";
+      const differs = blankAsZero && unset ? true : parsed !== Number(cur ?? 0);
+      if (differs) changes[key] = parsed;
+    }
+    return changes;
+  }
+
   async function handleImportFile(file: File) {
     setBusy(true);
     setMessage(null);
@@ -395,7 +498,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
       // never happened on the day being seeded. A file's Remaining Stock
       // (or an Opening Stock column of its own) is the one figure that's
       // legitimately "existing data" to carry over.
-      const importedColumns = columns.filter((c) => c.key === "openingStock");
+      const importedColumns = columns.filter((c) => importKeys.includes(c.key));
       const columnIndexes = matchColumnIndexes(importedColumns, header);
       // Whether Opening Stock itself wasn't found in this file at all -
       // worth a heads-up, since every row will otherwise just look
@@ -433,7 +536,13 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
         }
 
         const hasAnyData = line.some((cell, i) => i !== productIdx && i !== categoryIdx && cell.trim() !== "");
-        if (!hasAnyData) {
+        // With blankAsZero, an all-blank row that is really a product (its
+        // Manual Count was just left empty) is a 0 count, not a section header.
+        const isBlankProductRow =
+          blankAsZero &&
+          !hasAnyData &&
+          !!findMatchingProduct(rows, productName, categoryIdx !== -1 ? line[categoryIdx]?.trim() : currentCategory);
+        if (!hasAnyData && !isBlankProductRow) {
           if (categoryIdx === -1) currentCategory = productName;
           continue;
         }
@@ -453,15 +562,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
         // re-import) otherwise resubmits every unchanged "0" as a real edit -
         // 60+ redundant writes (and change-log entries) for what's really a
         // one-cell correction.
-        const changes: Record<string, number> = {};
-        for (const { key, idx } of columnIndexes) {
-          const raw = line[idx];
-          if (raw === undefined || raw.trim() === "") continue;
-          const parsed = Number(raw);
-          if (Number.isNaN(parsed)) continue;
-          const current = Number(match.entry[key] ?? 0);
-          if (parsed !== current) changes[key] = parsed;
-        }
+        const changes = diffImportLine(line, columnIndexes, match.entry);
         if (Object.keys(changes).length === 0) {
           unchanged++;
           continue;
@@ -480,6 +581,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
       // raw lines/column layout again to re-derive a diff - stashed here
       // rather than re-parsed, since the file itself isn't kept around.
       importContextRef.current = { lines: importLines, columnIndexes, unchangedCount: unchanged, fileName: file.name };
+      setReviewLabel(importTarget ? describeTarget(importTarget) : null);
       setImportReview({ matchedRows, unmatchedRows, missingColumns: missingColumns.map((c) => c.label) });
     } catch (err) {
       setMessage(err instanceof Error ? `Import failed: ${err.message}` : "Import failed");
@@ -504,15 +606,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
     if (!context || !line) return;
 
     const currentRow = rows.find((r) => r.product.id === product.id);
-    const changes: Record<string, number> = {};
-    for (const { key, idx } of context.columnIndexes) {
-      const raw = line[idx];
-      if (raw === undefined || raw.trim() === "") continue;
-      const parsed = Number(raw);
-      if (Number.isNaN(parsed)) continue;
-      const current = Number(currentRow?.entry[key] ?? 0);
-      if (parsed !== current) changes[key] = parsed;
-    }
+    const changes = diffImportLine(line, context.columnIndexes, currentRow?.entry ?? {});
 
     setImportReview((prev) => {
       if (!prev) return prev;
@@ -570,7 +664,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
       const updated = importReview.matchedRows.length;
       const unchanged = importContextRef.current?.unchangedCount ?? 0;
       const stillUnmatched = importReview.unmatchedRows.length;
-      const parts = [`Imported ${updated} row${updated === 1 ? "" : "s"}`];
+      const parts = [`Imported ${updated} row${updated === 1 ? "" : "s"}${reviewLabel ? ` into ${reviewLabel}` : ""}`];
       if (unchanged) parts.push(`${unchanged} unchanged`);
       if (stillUnmatched) parts.push(`${stillUnmatched} still unmatched after review`);
       setMessage(`${parts.join(", ")}.`);
@@ -695,7 +789,10 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
               whileTap={{ scale: 0.94 }}
               type="button"
               className="ae-segment-btn"
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => {
+                if (importTarget) setTargetDraft({ ...importTarget });
+                else fileInputRef.current?.click();
+              }}
               disabled={disabled || busy}
               title={busy ? "Importing…" : "Import"}
             >
@@ -709,7 +806,13 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
               style={{ display: "none" }}
               onChange={(e) => {
                 const file = e.target.files?.[0];
-                if (file) void handleImportFile(file);
+                if (file) {
+                  if (disabled) {
+                    pendingFileRef.current = file;
+                    setMessage("Loading the selected sheet - the file will be read as soon as it is ready.");
+                    setMessageVariant("info");
+                  } else void handleImportFile(file);
+                }
                 e.target.value = "";
               }}
             />
@@ -726,8 +829,61 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
         duration={messageVariant === "error" ? null : 6000}
         action={showUndoImport && lastImportBatch ? { label: "Undo Import", onClick: () => void handleUndoImport() } : undefined}
       />
+      {targetDraft && importTarget && (
+        <Modal title="Import into which sheet?" onClose={() => setTargetDraft(null)} width={460}>
+          <p style={{ margin: "0 0 14px", fontSize: 13, color: colors.subtleInk }}>
+            Pick the date, location and shift this file belongs to. Nothing is changed until you review the import and press Save.
+          </p>
+          <div style={{ display: "grid", gap: 12 }}>
+            <label style={targetFieldStyle}>
+              <span>Date</span>
+              <DatePicker
+                aria-label="Import date"
+                value={targetDraft.date}
+                onChange={(date) => setTargetDraft((d) => (d ? { ...d, date } : d))}
+                todayValue={importTodayValue ?? getCurrentShiftAndDate().date}
+              />
+            </label>
+            <label style={targetFieldStyle}>
+              <span>Location</span>
+              <Dropdown
+                aria-label="Import location"
+                value={targetDraft.location}
+                onChange={(v) => setTargetDraft((d) => (d ? { ...d, location: v as StockLocation } : d))}
+                disabled={!importLocations || importLocations.length <= 1}
+                options={(importLocations && importLocations.length > 0 ? importLocations : [importTarget.location]).map((l) => ({ value: l, label: l }))}
+              />
+            </label>
+            <label style={targetFieldStyle}>
+              <span>Shift</span>
+              <ShiftFilter value={targetDraft.shift} onChange={(s) => s && setTargetDraft((d) => (d ? { ...d, shift: s } : d))} />
+            </label>
+          </div>
+          <ImportTargetBanner label={describeTarget(targetDraft)} />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+            <Button type="button" variant="secondary" size="sm" onClick={() => setTargetDraft(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                const t = targetDraft;
+                setTargetDraft(null);
+                if (t.date !== importTarget.date || t.shift !== importTarget.shift || t.location !== importTarget.location) onImportTargetChange?.(t);
+                // Still inside the click, so the browser allows the picker.
+                fileInputRef.current?.click();
+              }}
+              disabled={!targetDraft.date}
+            >
+              Choose file…
+            </Button>
+          </div>
+        </Modal>
+      )}
       {importReview && (
-        <Modal title="Review Import" onClose={() => setImportReview(null)} width={760}>
+        <Modal title={reviewLabel ? `Review Import - ${reviewLabel}` : "Review Import"} onClose={() => setImportReview(null)} width={760}>
+          {reviewLabel && <ImportTargetBanner label={reviewLabel} />}
           <PendingChangesPreview
             items={importReview.matchedRows.flatMap((row): PendingChangeDetail[] =>
               Object.entries(row.changes).map(([key, newValue]) => ({

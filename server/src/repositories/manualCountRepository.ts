@@ -29,6 +29,37 @@ export const manualCountRepository = {
     });
   },
 
+  /// The most recent saved count strictly before the given period (Morning <
+  /// Night within a date). A count is the starting point of the following
+  /// period's opening stock whether or not a daily row exists for the
+  /// counted period, so this is looked up on its own.
+  findLatestBefore(productId: number, entryDate: Date, shift: Shift, location: StockLocation, db: Db = prisma) {
+    return db.manualCount.findFirst({
+      where: {
+        productId,
+        location,
+        OR: shift === "NIGHT" ? [{ entryDate: { lt: entryDate } }, { entryDate, shift: "MORNING" }] : [{ entryDate: { lt: entryDate } }],
+      },
+      orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
+      select: { entryDate: true, shift: true, manualCount: true },
+    });
+  },
+
+  /// Batched findLatestBefore - one latest count per product.
+  findLatestBeforeForProducts(productIds: number[], entryDate: Date, shift: Shift, location: StockLocation) {
+    if (!productIds.length) return Promise.resolve([]);
+    return prisma.manualCount.findMany({
+      where: {
+        productId: { in: productIds },
+        location,
+        OR: shift === "NIGHT" ? [{ entryDate: { lt: entryDate } }, { entryDate, shift: "MORNING" }] : [{ entryDate: { lt: entryDate } }],
+      },
+      orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
+      distinct: ["productId"],
+      select: { productId: true, entryDate: true, shift: true, manualCount: true },
+    });
+  },
+
   findAllForDateAndLocation(entryDate: Date, shift: Shift, location: StockLocation) {
     return prisma.manualCount.findMany({ where: { entryDate, shift, location } });
   },

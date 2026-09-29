@@ -8,7 +8,6 @@ import {
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
 import type { ManualCountGridRow, StockLocation } from "../types";
 import { Button, NumberCellInput } from "../components/ui";
-import { Dropdown } from "../components/Dropdown";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
@@ -21,7 +20,7 @@ import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { ShiftFilter } from "../components/ShiftFilter";
-import { ChevronIcon, MapPinIcon, SaveIcon } from "../components/icons";
+import { ChevronIcon, SaveIcon } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
@@ -211,6 +210,38 @@ export function ManualCountPage() {
     if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
   }
 
+  // CSV import stages each row's Manual Count as a draft - identical to
+  // typing it - so the usual Save/confirm step still applies.
+  async function handleImportRow(
+    productId: number,
+    values: Record<string, number>,
+  ) {
+    if (values.manualCount === undefined) return;
+    setDrafts((d) => ({ ...d, [productId]: String(values.manualCount) }));
+  }
+
+  // Live figures per row: a staged draft overrides the saved count, and its
+  // variance is recomputed (System Remaining - Manual Count, same formula as
+  // the server) so subtotals/grand total update before anything is saved.
+  // Blank/absent entries count as 0.
+  function liveFigures(r: ManualCountGridRow) {
+    const draft = drafts[r.product.id];
+    const system = toNum(r.entry.systemRemainingStock);
+    if (draft !== undefined && draft !== "") {
+      const manual = Number(draft) || 0;
+      return { system, manual, variance: system - manual };
+    }
+    return {
+      system,
+      manual: toNum(r.entry.manualCount),
+      variance: toNum(r.entry.variance),
+    };
+  }
+  const sumLive = (
+    list: ManualCountGridRow[],
+    field: "system" | "manual" | "variance",
+  ) => list.reduce((sum, r) => sum + liveFigures(r)[field], 0);
+
   const pendingCount = Object.keys(drafts).length;
   // What the confirm modal lists - one row per staged (non-blank) draft,
   // resolved against the last-loaded rows for the product name/old count.
@@ -291,7 +322,7 @@ export function ManualCountPage() {
         title={
           <>
             Manual Counting &amp; Variance - {formatDateDisplay(date)} -{" "}
-            {SHIFT_SHORT_LABELS[shift]} Shift
+            {SHIFT_SHORT_LABELS[shift]} Shift - {location}
           </>
         }
         subtitle="Review and correct manual counts for the selected date."
@@ -313,13 +344,6 @@ export function ManualCountPage() {
               todayValue={getCurrentShiftAndDate().date}
             />
             <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-            <Dropdown
-              aria-label="Location"
-              icon={<MapPinIcon />}
-              value={location}
-              onChange={(v) => setLocation(v as StockLocation)}
-              options={LOCATIONS.map((l) => ({ value: l, label: l }))}
-            />
             <SearchInput
               value={query}
               onChange={setQuery}
@@ -363,20 +387,34 @@ export function ManualCountPage() {
                   : `Save${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
               </span>
             </Button>
-            {csvRows && (
+            {(
               <>
                 <CsvTools
                   filenamePrefix={`manual-count-${location.toLowerCase()}-${shift.toLowerCase()}`}
                   date={date}
-                  rows={csvRows}
+                  rows={csvRows ?? []}
+                  disabled={!csvRows}
+                  importTarget={{ date, shift, location }}
+                  onImportTargetChange={(t) => {
+                    setDateShift({ date: t.date, shift: t.shift });
+                    setLocation(t.location);
+                  }}
+                  importLocations={LOCATIONS}
+                  importTodayValue={getCurrentShiftAndDate().date}
                   columns={csvColumns}
-                  // Import lives on the Online/Offline Entry pages only - this
-                  // page just exports (Excel/PDF), same as Total Stocks.
-                  onImportRow={async () => {}}
-                  getPendingValue={() => undefined}
-                  canImport={false}
+                  // Import reads ONLY the file's Manual Count column (never
+                  // Remaining Stocks); blank cells count as 0. Imported values
+                  // are staged as drafts, same as typing - Save commits them.
+                  onImportRow={handleImportRow}
+                  getPendingValue={(productId) => {
+                    const d = drafts[productId];
+                    return d === undefined || d === "" ? undefined : Number(d);
+                  }}
+                  canImport
+                  importKeys={["manualCount"]}
+                  blankAsZero
+                  showExport={false}
                   pdfDisabled={pendingCount > 0}
-                  exportFormat="excel"
                   pdf={{
                     title: "Manual Counting & Variance",
                     subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift - ${location}`,
@@ -517,52 +555,36 @@ export function ManualCountPage() {
                               ...manualCountTint.Variance,
                               fontWeight: r.isFlagged ? 700 : 400,
                               color:
-                                Number(r.entry.variance) < 0
+                                liveFigures(r).variance < 0
                                   ? colors.danger
                                   : undefined,
                             }}
                           >
-                            {r.entry.variance ?? "—"}
+                            {drafts[r.product.id] !== undefined &&
+                            drafts[r.product.id] !== ""
+                              ? liveFigures(r).variance
+                              : (r.entry.variance ?? "—")}
                           </td>
                         </tr>
                       ))}
                       <tr style={subtotalRowStyle}>
                         <td colSpan={2}>Subtotal - {category}</td>
                         <td>
-                          {groupRows
-                            .reduce(
-                              (sum, r) =>
-                                sum + toNum(r.entry.systemRemainingStock),
-                              0,
-                            )
-                            .toLocaleString()}
+                          {sumLive(groupRows, "system").toLocaleString()}
                         </td>
                         <td style={manualCountTint["Manual Count"]}>
-                          {groupRows
-                            .reduce(
-                              (sum, r) => sum + toNum(r.entry.manualCount),
-                              0,
-                            )
-                            .toLocaleString()}
+                          {sumLive(groupRows, "manual").toLocaleString()}
                         </td>
                         <td
                           style={{
                             ...manualCountTint.Variance,
                             color:
-                              groupRows.reduce(
-                                (sum, r) => sum + toNum(r.entry.variance),
-                                0,
-                              ) < 0
+                              sumLive(groupRows, "variance") < 0
                                 ? colors.danger
                                 : undefined,
                           }}
                         >
-                          {groupRows
-                            .reduce(
-                              (sum, r) => sum + toNum(r.entry.variance),
-                              0,
-                            )
-                            .toLocaleString()}
+                          {sumLive(groupRows, "variance").toLocaleString()}
                         </td>
                       </tr>
                     </Fragment>
@@ -571,33 +593,21 @@ export function ManualCountPage() {
                 <tr style={grandTotalRowStyle}>
                   <td colSpan={2}>GRAND TOTAL</td>
                   <td>
-                    {(visibleRows ?? [])
-                      .reduce(
-                        (sum, r) => sum + toNum(r.entry.systemRemainingStock),
-                        0,
-                      )
-                      .toLocaleString()}
+                    {sumLive(visibleRows ?? [], "system").toLocaleString()}
                   </td>
                   <td style={manualCountTint["Manual Count"]}>
-                    {(visibleRows ?? [])
-                      .reduce((sum, r) => sum + toNum(r.entry.manualCount), 0)
-                      .toLocaleString()}
+                    {sumLive(visibleRows ?? [], "manual").toLocaleString()}
                   </td>
                   <td
                     style={{
                       ...manualCountTint.Variance,
                       color:
-                        (visibleRows ?? []).reduce(
-                          (sum, r) => sum + toNum(r.entry.variance),
-                          0,
-                        ) < 0
+                        sumLive(visibleRows ?? [], "variance") < 0
                           ? colors.danger
                           : undefined,
                     }}
                   >
-                    {(visibleRows ?? [])
-                      .reduce((sum, r) => sum + toNum(r.entry.variance), 0)
-                      .toLocaleString()}
+                    {sumLive(visibleRows ?? [], "variance").toLocaleString()}
                   </td>
                 </tr>
               </tbody>

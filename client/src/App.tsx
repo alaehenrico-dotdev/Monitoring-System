@@ -20,21 +20,65 @@ import { LoginPage } from "./pages/LoginPage";
 // route's bundle: those are dynamically imported
 // at the point of use, but that only pays off if the *page* that reaches
 // them isn't itself eagerly bundled into the same chunk as everything else.
-const OnlineEntryPage = lazy(() => import("./pages/OnlineEntryPage").then((m) => ({ default: m.OnlineEntryPage })));
-const OfflineEntryPage = lazy(() => import("./pages/OfflineEntryPage").then((m) => ({ default: m.OfflineEntryPage })));
-const TotalStocksPage = lazy(() => import("./pages/TotalStocksPage").then((m) => ({ default: m.TotalStocksPage })));
-const ManualCountPage = lazy(() => import("./pages/ManualCountPage").then((m) => ({ default: m.ManualCountPage })));
-const VarianceReportPage = lazy(() => import("./pages/VarianceReportPage").then((m) => ({ default: m.VarianceReportPage })));
-const DailyReportPage = lazy(() => import("./pages/DailyReportPage").then((m) => ({ default: m.DailyReportPage })));
-const ProductsAdminPage = lazy(() => import("./pages/ProductsAdminPage").then((m) => ({ default: m.ProductsAdminPage })));
-const DeliveryDestinationsAdminPage = lazy(() =>
-  import("./pages/DeliveryDestinationsAdminPage").then((m) => ({ default: m.DeliveryDestinationsAdminPage })),
+const OnlineEntryPage = lazy(() =>
+  import("./pages/OnlineEntryPage").then((m) => ({
+    default: m.OnlineEntryPage,
+  })),
 );
-const ChangeLogPage = lazy(() => import("./pages/ChangeLogPage").then((m) => ({ default: m.ChangeLogPage })));
-const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
-const DailyReportHistoryPage = lazy(() => import("./pages/DailyReportHistoryPage").then((m) => ({ default: m.DailyReportHistoryPage })));
-const VarianceReportHistoryPage = lazy(() => import("./pages/VarianceReportHistoryPage").then((m) => ({ default: m.VarianceReportHistoryPage })));
-const SettingsPage = lazy(() => import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })));
+const OfflineEntryPage = lazy(() =>
+  import("./pages/OfflineEntryPage").then((m) => ({
+    default: m.OfflineEntryPage,
+  })),
+);
+const TotalStocksPage = lazy(() =>
+  import("./pages/TotalStocksPage").then((m) => ({
+    default: m.TotalStocksPage,
+  })),
+);
+const ManualCountPage = lazy(() =>
+  import("./pages/ManualCountPage").then((m) => ({
+    default: m.ManualCountPage,
+  })),
+);
+const VarianceReportPage = lazy(() =>
+  import("./pages/VarianceReportPage").then((m) => ({
+    default: m.VarianceReportPage,
+  })),
+);
+const DailyReportPage = lazy(() =>
+  import("./pages/DailyReportPage").then((m) => ({
+    default: m.DailyReportPage,
+  })),
+);
+const ProductsAdminPage = lazy(() =>
+  import("./pages/ProductsAdminPage").then((m) => ({
+    default: m.ProductsAdminPage,
+  })),
+);
+const DeliveryDestinationsAdminPage = lazy(() =>
+  import("./pages/DeliveryDestinationsAdminPage").then((m) => ({
+    default: m.DeliveryDestinationsAdminPage,
+  })),
+);
+const ChangeLogPage = lazy(() =>
+  import("./pages/ChangeLogPage").then((m) => ({ default: m.ChangeLogPage })),
+);
+const DashboardPage = lazy(() =>
+  import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const DailyReportHistoryPage = lazy(() =>
+  import("./pages/DailyReportHistoryPage").then((m) => ({
+    default: m.DailyReportHistoryPage,
+  })),
+);
+const VarianceReportHistoryPage = lazy(() =>
+  import("./pages/VarianceReportHistoryPage").then((m) => ({
+    default: m.VarianceReportHistoryPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
+);
 
 export default function App() {
   return (
@@ -43,7 +87,11 @@ export default function App() {
         <RealtimeProvider>
           <TopProgressProvider>
             <TopProgressBar />
-            <Suspense fallback={<LoadingBlock label="Loading…" minHeight="100vh" size="lg" />}>
+            <Suspense
+              fallback={
+                <LoadingBlock label="Loading…" minHeight="100vh" size="lg" />
+              }
+            >
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
 
@@ -54,16 +102,31 @@ export default function App() {
                     <Route path="/offline" element={<OfflineEntryPage />} />
                     <Route path="/total-stocks" element={<TotalStocksPage />} />
                     <Route path="/manual-count" element={<ManualCountPage />} />
+                    {/* Every role can read the report (the server already allows it); the entry pages link here. */}
+                    <Route path="/daily-report" element={<DailyReportPage />} />
 
-                    <Route element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}>
+                    <Route
+                      element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}
+                    >
                       <Route path="/dashboard" element={<DashboardPage />} />
-                      <Route path="/daily-report-history" element={<DailyReportHistoryPage />} />
-                      <Route path="/variance-report-history" element={<VarianceReportHistoryPage />} />
-                      <Route path="/variance-report" element={<VarianceReportPage />} />
-                      <Route path="/daily-report" element={<DailyReportPage />} />
+                      <Route
+                        path="/daily-report-history"
+                        element={<DailyReportHistoryPage />}
+                      />
+                      <Route
+                        path="/variance-report-history"
+                        element={<VarianceReportHistoryPage />}
+                      />
+                      <Route
+                        path="/variance-report"
+                        element={<VarianceReportPage />}
+                      />
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
-                      <Route path="/delivery-destinations" element={<DeliveryDestinationsAdminPage />} />
+                      <Route
+                        path="/delivery-destinations"
+                        element={<DeliveryDestinationsAdminPage />}
+                      />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Route>
                   </Route>

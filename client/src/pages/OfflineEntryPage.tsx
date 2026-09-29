@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import {
   computeNewDeliveryOut,
@@ -17,6 +18,7 @@ import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
 import {
   ClearIcon,
   PrinterIcon,
+  ReportIcon,
   SaveIcon,
   UndoIcon,
 } from "../components/icons";
@@ -27,6 +29,13 @@ import { TableSkeleton } from "../components/Skeleton";
 import { LoadingOverlay } from "../components/Spinner";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { saveManualCount } from "../api/manualCounts";
+import {
+  MANUAL_COUNT_KEY,
+  manualCountColumn,
+  useEntryManualCounts,
+  useRowsWithManualCounts,
+} from "../hooks/useEntryManualCounts";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
@@ -95,6 +104,7 @@ function computeOfflineFigures(
 
 export function OfflineEntryPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const progress = useTopProgress();
   // Defaults to whatever shift+date an encoder opening this page right now
   // is almost certainly working on (see getCurrentShiftAndDate) - date and
@@ -159,6 +169,14 @@ export function OfflineEntryPage() {
       `ala-eh-pending:offline:${date}:${shift}`,
       computeOfflineFigures,
     );
+
+  // Import reads the file's MANUAL COUNTING column and saves it as this
+  // shift's manual count (Save below), the starting point of the next
+  // period's opening stock - same as importing on the Manual Count page.
+  const { counts: manualCounts, loaded: manualCountsLoaded } =
+    useEntryManualCounts(date, shift, "OFFLINE");
+  const csvRows = useRowsWithManualCounts(rows, manualCounts);
+  const csvColumns = useMemo(() => [...columns, manualCountColumn], [columns]);
 
   // Search and the category dropdown only affect what's displayed in the
   // grid - both are local filters over the same already-loaded rows, not a
@@ -291,13 +309,26 @@ export function OfflineEntryPage() {
       const priorRow = rows?.find((r) => r.product.id === productId);
       const oldValues: Record<string, number> = {};
       for (const key of Object.keys(changes))
-        oldValues[key] = Number(priorRow?.entry[key] ?? 0);
+        if (key !== MANUAL_COUNT_KEY)
+          oldValues[key] = Number(priorRow?.entry[key] ?? 0);
 
       try {
-        const saved = await saveOfflineEntry(productId, date, shift, changes);
-        mergeEntry(productId, saved);
+        const { [MANUAL_COUNT_KEY]: manualCount, ...entryChanges } = changes;
+        if (Object.keys(entryChanges).length > 0) {
+          const saved = await saveOfflineEntry(
+            productId,
+            date,
+            shift,
+            entryChanges,
+          );
+          mergeEntry(productId, saved);
+        }
+        // After the entry itself, so the count's variance is measured
+        // against the freshly saved Remaining Stock.
+        if (manualCount !== undefined)
+          await saveManualCount(productId, date, shift, "OFFLINE", manualCount);
         clear(productId);
-        revertTo[productId] = oldValues;
+        if (Object.keys(oldValues).length > 0) revertTo[productId] = oldValues;
       } catch (e) {
         const name = priorRow?.product.name ?? `#${productId}`;
         // The server's own message (e.g. the negative-stock guard's "would
@@ -355,7 +386,11 @@ export function OfflineEntryPage() {
   ) {
     const savedRow = rows?.find((r) => r.product.id === productId);
     for (const [key, value] of Object.entries(values)) {
-      stage(productId, key, value, Number(savedRow?.entry[key] ?? 0));
+      const savedValue =
+        key === MANUAL_COUNT_KEY
+          ? (manualCounts[productId] ?? Number.NaN)
+          : Number(savedRow?.entry[key] ?? 0);
+      stage(productId, key, value, savedValue);
     }
   }
 
@@ -452,7 +487,9 @@ export function OfflineEntryPage() {
   // by printing the page - so the layout is the same on every page and
   // always fits the paper. Disabled while edits are unsaved (see the button).
   async function handlePdf() {
-    if (!visibleRows) return;
+    // Same rule as the button's disabled state: any staged (green) edit locks
+    // the PDF again until it's saved or discarded.
+    if (!visibleRows || pendingCount > 0) return;
     try {
       await progress.track(() =>
         downloadTablePdf({
@@ -574,13 +611,38 @@ export function OfflineEntryPage() {
               <PrinterIcon />
               <span className="ae-toolbar-btn-label">PDF</span>
             </Button>
-            {canEdit && rows && (
+            <Button
+              className="ae-toolbar-save"
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(`/daily-report?date=${date}&auto=1`)}
+              disabled={pendingCount > 0}
+              title={
+                pendingCount > 0
+                  ? "Save your changes first - the report only reads saved data"
+                  : "Open the Daily Report for this date"
+              }
+            >
+              <ReportIcon />
+              <span className="ae-toolbar-btn-label">Report</span>
+            </Button>
+            {canEdit && (
               <CsvTools
                 ref={csvToolsRef}
                 filenamePrefix="offline-entry"
                 date={date}
-                rows={rows}
-                columns={columns}
+                rows={csvRows ?? []}
+                disabled={!rows || !manualCountsLoaded}
+                importTarget={{ date, shift, location: "OFFLINE" }}
+                onImportTargetChange={(t) =>
+                  setDateShift({ date: t.date, shift: t.shift })
+                }
+                importLocations={["OFFLINE"]}
+                importTodayValue={getCurrentShiftAndDate().date}
+                columns={csvColumns}
+                importKeys={[MANUAL_COUNT_KEY]}
+                blankAsZero
                 onImportRow={handleImportRow}
                 getPendingValue={(productId, key) => pending[productId]?.[key]}
                 validateImport={validateImportRow}
@@ -646,7 +708,7 @@ export function OfflineEntryPage() {
       {showPreview && (
         <Modal title="Unsaved changes" onClose={() => setShowPreview(false)}>
           <PendingChangesPreview
-            items={describePendingChanges(rows, pending, columns)}
+            items={describePendingChanges(rows, pending, csvColumns)}
           />
           <div
             style={{
@@ -681,7 +743,7 @@ export function OfflineEntryPage() {
           onClose={() => setShowClearConfirm(false)}
         >
           <PendingChangesPreview
-            items={describePendingChanges(rows, pending, columns)}
+            items={describePendingChanges(rows, pending, csvColumns)}
           />
           <p
             style={{

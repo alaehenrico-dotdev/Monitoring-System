@@ -3,6 +3,7 @@ import { z } from "zod";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
+import { healOpeningStocks } from "../services/manualCounts.service";
 import { getOfflineGrid, saveOfflineEntry } from "../services/dailyOfflineStock.service";
 
 const entrySchema = z.object({
@@ -23,6 +24,7 @@ const entrySchema = z.object({
 export async function getOfflineStockGrid(req: Request, res: Response) {
   const entryDate = parseDateOnly(req.query.date);
   const shift = parseShift(req.query.shift);
+  await healOpeningStocks("OFFLINE", entryDate, shift, req.user?.id);
   res.json(await getOfflineGrid(entryDate, shift));
 }
 

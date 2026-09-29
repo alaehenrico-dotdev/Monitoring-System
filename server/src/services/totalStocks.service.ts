@@ -53,10 +53,24 @@ export async function getTotalStocksGrid(entryDate: Date) {
     manualByProduct.set(mc.productId, list);
   }
 
+  // A product with nothing saved for this date isn't 0 - the Online/Offline
+  // entry pages show it at its carried-forward opening stock (previous
+  // period's remaining, or its manual count), so the dashboard/Total Stocks
+  // must too. Zero activity means remaining == opening. Skipped entirely
+  // when every product has a saved row.
+  const missingOnlineIds = products.filter((p) => !onlineByProduct.has(p.id)).map((p) => p.id);
+  const missingOfflineIds = products.filter((p) => !offlineByProduct.has(p.id)).map((p) => p.id);
+  const [carriedOnline, carriedOffline] = await Promise.all([
+    missingOnlineIds.length ? dailyOnlineStockRepository.getOpeningStocksForProducts(missingOnlineIds, entryDate, "NIGHT") : new Map<number, number>(),
+    missingOfflineIds.length ? dailyOfflineStockRepository.getOpeningStocksForProducts(missingOfflineIds, entryDate, "NIGHT") : new Map<number, number>(),
+  ]);
+
   return products.map((product) => {
     const online = onlineByProduct.get(product.id);
     const offline = offlineByProduct.get(product.id);
-    const totalRemainingStock = toNum(online?.remainingStock) + toNum(offline?.remainingStock);
+    const onlineRemainingStock = online ? toNum(online.remainingStock) : toNum(carriedOnline.get(product.id));
+    const offlineRemainingStock = offline ? toNum(offline.remainingStock) : toNum(carriedOffline.get(product.id));
+    const totalRemainingStock = onlineRemainingStock + offlineRemainingStock;
 
     const counts = manualByProduct.get(product.id) ?? [];
     const totalCount = counts.find((count) => count.location === "TOTAL");
@@ -73,8 +87,8 @@ export async function getTotalStocksGrid(entryDate: Date) {
 
     return {
       product,
-      onlineRemainingStock: toNum(online?.remainingStock),
-      offlineRemainingStock: toNum(offline?.remainingStock),
+      onlineRemainingStock,
+      offlineRemainingStock,
       totalRemainingStock,
       totalManualCount,
       totalVariance,

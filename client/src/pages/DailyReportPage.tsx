@@ -37,9 +37,16 @@ import {
 import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 import { useTopProgress } from "../hooks/useTopProgress";
+import { useAuth } from "../context/AuthContext";
+import { getCurrentShiftAndDate } from "../utils/shift";
 
+// The business date the entry pages are working on right now (local time, and
+// a Night shift after midnight still belongs to the previous day). The old
+// `new Date().toISOString()` was the UTC date, which can be a different day
+// from the one the entries were saved under - so a report generated for
+// "today" looked empty even though the entries existed.
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return getCurrentShiftAndDate().date;
 }
 
 type ReportSection = "all" | "online" | "offline" | "total";
@@ -119,6 +126,11 @@ export function DailyReportPage() {
   const [reportVersion, setReportVersion] = useState(0);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
   const realtimeVersion = useRealtimeVersion();
+  const { user } = useAuth();
+  const [generating, setGenerating] = useState(false);
+  // Only the newest request may update the page - a slow earlier response
+  // (older date, or a realtime refresh) must never overwrite a newer report.
+  const requestId = useRef(0);
   // Alert dialogs shown instead of generating: unsaved entry/count edits for
   // this date, or a date with nothing saved to report on.
   const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(
@@ -140,8 +152,10 @@ export function DailyReportPage() {
   }, []);
 
   useEffect(() => {
-    if (searchParams.get("history") === "1") load();
-    // History links intentionally generate the selected report once on open.
+    if (searchParams.get("history") === "1" || searchParams.get("auto") === "1")
+      load();
+    // History links and the entry pages' Report button intentionally
+    // generate the selected report once on open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -149,7 +163,7 @@ export function DailyReportPage() {
   // page's own toolbar button would, but only while a report is already on
   // screen, so realtime updates never auto-run a report nobody asked for.
   useEffect(() => {
-    if (report) load();
+    if (report) load({ silent: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realtimeVersion]);
 
@@ -162,29 +176,40 @@ export function DailyReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [report]);
 
-  function load() {
-    setError(null);
+  // `silent` is the realtime refresh of a report that's already on screen: it
+  // quietly swaps in the fresh numbers, and never pops a dialog, clears the
+  // report or shows an error just because someone else is mid-edit.
+  function load({ silent = false }: { silent?: boolean } = {}) {
+    if (!silent) setError(null);
 
     // A report only reads saved data - staged edits for this date would be
     // silently left out of it.
     const unsaved = findUnsavedWork({ from: date, to: date });
     if (unsaved.length > 0) {
-      setUnsavedWork(unsaved);
+      if (!silent) setUnsavedWork(unsaved);
       return;
     }
 
+    const id = ++requestId.current;
+    if (!silent) setGenerating(true);
     getDailyReport(date)
       .then((nextReport) => {
+        if (id !== requestId.current) return;
         if (!reportHasData(nextReport)) {
+          if (silent) return;
           // Clear any report still on screen from a different date, so it
           // isn't left sitting next to a date picker that now says otherwise.
           setReport(null);
-          setEmptyMessage(`No saved data for ${formatDateDisplay(date)}.`);
+          setEmptyMessage(
+            `No saved data for ${formatDateDisplay(date)}. Entries are filed under the shift's own date - a Night shift after midnight belongs to the previous day.`,
+          );
           return;
         }
         setReport(nextReport);
-        setReportVersion((v) => v + 1);
-        if (searchParams.get("history") !== "1") {
+        // Only a fresh Generate remounts the grids (every category expanded
+        // again); a silent refresh keeps whatever the person had collapsed.
+        if (!silent) setReportVersion((v) => v + 1);
+        if (!silent && searchParams.get("history") !== "1") {
           recordReportHistory({
             type: "Daily Report",
             scope: nextReport.date,
@@ -192,9 +217,13 @@ export function DailyReportPage() {
           });
         }
       })
-      .catch((e) =>
-        setError(e instanceof Error ? e.message : "Failed to build report"),
-      );
+      .catch((e) => {
+        if (id !== requestId.current || silent) return;
+        setError(e instanceof Error ? e.message : "Failed to build report");
+      })
+      .finally(() => {
+        if (id === requestId.current) setGenerating(false);
+      });
   }
 
   // Every category across all three sections (not just whichever section is
@@ -327,7 +356,12 @@ export function DailyReportPage() {
               minWidth: 0,
             }}
           >
-            <DatePicker aria-label="Date" value={date} onChange={setDate} />
+            <DatePicker
+              aria-label="Date"
+              value={date}
+              onChange={setDate}
+              todayValue={getCurrentShiftAndDate().date}
+            />
             <Dropdown
               aria-label="Report section"
               value={reportSection}
@@ -344,8 +378,8 @@ export function DailyReportPage() {
                 onChange={setCategoryFilter}
               />
             )}
-            <Button onClick={load}>
-              <PlayIcon /> Generate
+            <Button onClick={() => load()} disabled={generating}>
+              <PlayIcon /> {generating ? "Generating…" : "Generate"}
             </Button>
           </div>
           <ToolbarControls>
@@ -371,13 +405,15 @@ export function DailyReportPage() {
                 </Button>
               </>
             )}
-            <Link
-              to="/daily-report-history"
-              className="ae-btn ae-btn-secondary"
-              style={{ textDecoration: "none" }}
-            >
-              <HistoryIcon /> Daily History
-            </Link>
+            {user?.role === "SUPERVISOR_ADMIN" && (
+              <Link
+                to="/daily-report-history"
+                className="ae-btn ae-btn-secondary"
+                style={{ textDecoration: "none" }}
+              >
+                <HistoryIcon /> Daily History
+              </Link>
+            )}
           </ToolbarControls>
         </Toolbar>
       </PageHeader>
