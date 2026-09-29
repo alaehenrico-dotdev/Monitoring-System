@@ -34,12 +34,27 @@ export function Skeleton({
 /// A stack of text-line skeletons with varied widths (the last line shorter,
 /// like a real paragraph/label trailing off) rather than identical uniform
 /// bars, which reads more obviously as "text is coming" than a block would.
-export function SkeletonText({ lines = 1, lineHeight = 12, gap = 6 }: { lines?: number; lineHeight?: number; gap?: number }) {
+export function SkeletonText({
+  lines = 1,
+  lineHeight = 12,
+  gap = 6,
+}: {
+  lines?: number;
+  lineHeight?: number;
+  gap?: number;
+}) {
   const widths = ["92%", "78%", "85%", "64%"];
   return (
-    <span aria-hidden="true" style={{ display: "flex", flexDirection: "column", gap }}>
+    <span
+      aria-hidden="true"
+      style={{ display: "flex", flexDirection: "column", gap }}
+    >
       {Array.from({ length: lines }, (_, i) => (
-        <Skeleton key={i} height={lineHeight} width={widths[i % widths.length]} />
+        <Skeleton
+          key={i}
+          height={lineHeight}
+          width={widths[i % widths.length]}
+        />
       ))}
     </span>
   );
@@ -53,7 +68,15 @@ export function SkeletonCircle({ size = 32 }: { size?: number }) {
 /// needs (`role="status"`/`aria-busy` + one visually-hidden announcement) -
 /// the individual bars themselves stay `aria-hidden` (see Skeleton above)
 /// since they're purely decorative shape, not content.
-export function SkeletonRegion({ label = "Loading…", children, style }: { label?: string; children: ReactNode; style?: CSSProperties }) {
+export function SkeletonRegion({
+  label = "Loading…",
+  children,
+  style,
+}: {
+  label?: string;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
   return (
     <div role="status" aria-busy="true" aria-live="polite" style={style}>
       <span
@@ -103,26 +126,31 @@ export function TableSkeleton({
 
   return (
     <SkeletonRegion label={label}>
-      <table className="ae-table ae-table--left" style={{ minWidth }}>
-        <thead>
-          <tr>
-            {headers.map((h) => (
-              <th key={h}>{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {Array.from({ length: rows }, (_, r) => (
-            <tr key={r}>
-              {headers.map((h, c) => (
-                <td key={h} style={{ padding: cellPadding }}>
-                  <Skeleton height={12} width={`${widthCycle[(r + c) % widthCycle.length]}%`} />
-                </td>
+      <div className="ae-table-wrap">
+        <table className="ae-table ae-table--left" style={{ minWidth }}>
+          <thead>
+            <tr>
+              {headers.map((h) => (
+                <th key={h}>{h}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {Array.from({ length: rows }, (_, r) => (
+              <tr key={r}>
+                {headers.map((h, c) => (
+                  <td key={h} style={{ padding: cellPadding }}>
+                    <Skeleton
+                      height={12}
+                      width={`${widthCycle[(r + c) % widthCycle.length]}%`}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </SkeletonRegion>
   );
 }
@@ -132,8 +160,17 @@ export function TableSkeleton({
 /// tiles don't visibly resize once real numbers land.
 export function StatCardSkeleton() {
   return (
-    <div className="ae-dash-stat" aria-hidden="true" style={{ pointerEvents: "none" }}>
-      <Skeleton height={28} width="60%" radius={5} style={{ marginBottom: 10 }} />
+    <div
+      className="ae-dash-stat"
+      aria-hidden="true"
+      style={{ pointerEvents: "none" }}
+    >
+      <Skeleton
+        height={28}
+        width="60%"
+        radius={5}
+        style={{ marginBottom: 10 }}
+      />
       <Skeleton height={11} width="80%" />
     </div>
   );
@@ -155,11 +192,26 @@ export function StatCardsSkeleton({ count = 4 }: { count?: number }) {
 /// A handful of pill-shaped row placeholders - for card sections whose real
 /// content is a short list of action rows/links (DashboardPage's "Today")
 /// rather than a full data table.
-export function RowsSkeleton({ rows = 3, height = 20, label = "Loading…" }: { rows?: number; height?: number; label?: string }) {
+export function RowsSkeleton({
+  rows = 3,
+  height = 20,
+  label = "Loading…",
+}: {
+  rows?: number;
+  height?: number;
+  label?: string;
+}) {
   return (
-    <SkeletonRegion label={label} style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+    <SkeletonRegion
+      label={label}
+      style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}
+    >
       {Array.from({ length: rows }, (_, i) => (
-        <Skeleton key={i} height={height} width={i === rows - 1 ? "55%" : "100%"} />
+        <Skeleton
+          key={i}
+          height={height}
+          width={i === rows - 1 ? "55%" : "100%"}
+        />
       ))}
     </SkeletonRegion>
   );
@@ -169,15 +221,51 @@ export function RowsSkeleton({ rows = 3, height = 20, label = "Loading…" }: { 
 /// (deterministic, not random-per-render) heights plus a month-label bar
 /// under each, so the loading state occupies the exact footprint the real
 /// chart will fill in at rather than collapsing the section to nothing.
-export function BarsSkeleton({ count = 12, chartHeight = 130 }: { count?: number; chartHeight?: number }) {
+export function BarsSkeleton({
+  count = 12,
+  chartHeight = 130,
+}: {
+  count?: number;
+  chartHeight?: number;
+}) {
   const heightCycle = [40, 65, 50, 80, 55, 70, 45, 90, 60, 75, 50, 68];
   return (
-    <SkeletonRegion label="Loading monthly monitoring…" style={{ padding: "20px 20px 8px" }}>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: chartHeight }}>
+    <SkeletonRegion
+      label="Loading monthly monitoring…"
+      style={{ padding: "20px 20px 8px" }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: 6,
+          height: chartHeight,
+        }}
+      >
         {Array.from({ length: count }, (_, i) => (
-          <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%" }}>
-            <div style={{ flex: 1, display: "flex", alignItems: "flex-end", width: "100%" }}>
-              <Skeleton width="100%" height={`${heightCycle[i % heightCycle.length]}%`} style={{ maxWidth: 26, margin: "0 auto" }} />
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              height: "100%",
+            }}
+          >
+            <div
+              style={{
+                flex: 1,
+                display: "flex",
+                alignItems: "flex-end",
+                width: "100%",
+              }}
+            >
+              <Skeleton
+                width="100%"
+                height={`${heightCycle[i % heightCycle.length]}%`}
+                style={{ maxWidth: 26, margin: "0 auto" }}
+              />
             </div>
             <Skeleton height={9} width={22} style={{ marginTop: 6 }} />
           </div>

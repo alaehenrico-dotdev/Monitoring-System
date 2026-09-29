@@ -17,6 +17,16 @@ export function setToken(token: string | null) {
   else localStorage.removeItem("ala-eh-token");
 }
 
+// API_URL may be relative (e.g. "/api" from .env.local, so the browser only
+// ever talks to one origin through the Vite/preview proxy - see
+// NGROK_SETUP.md) or absolute - resolve it against the page's own origin
+// either way, then swap scheme+path for the realtime endpoint.
+export function getWsUrl(): string {
+  const apiOrigin = new URL(API_URL, window.location.href);
+  const wsProtocol = apiOrigin.protocol === "https:" ? "wss:" : "ws:";
+  return `${wsProtocol}//${apiOrigin.host}/ws`;
+}
+
 // http.ts sits outside React (AuthContext imports from here, not the other
 // way around), so a global 401 - "the session that was here a moment ago is
 // no longer valid" - can't call AuthContext's state setters directly. It

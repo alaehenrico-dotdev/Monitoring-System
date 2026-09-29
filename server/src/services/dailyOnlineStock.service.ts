@@ -3,6 +3,7 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
+import { broadcastRealtimeEvent } from "../lib/realtime";
 import { HttpError } from "../utils/HttpError";
 import {
   calculateOfflineRemaining,
@@ -131,6 +132,7 @@ export async function saveOnlineEntry(productId: number, entryDate: Date, shift:
     userId
   );
 
+  broadcastRealtimeEvent();
   return saved;
 }
 

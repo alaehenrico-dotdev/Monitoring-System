@@ -18,7 +18,11 @@ import react from "@vitejs/plugin-react";
  * stays as strict as the directive allows.
  */
 function cspPlugin(apiOrigin: string): Plugin {
-  const connectSrc = ["'self'", apiOrigin].filter(Boolean).join(" ");
+  // The realtime WebSocket connects to the same host as the API, just over
+  // ws(s):// instead of http(s):// - explicit here rather than relying on
+  // 'self' alone to also cover it.
+  const wsOrigin = apiOrigin.replace(/^http/, "ws");
+  const connectSrc = ["'self'", apiOrigin, wsOrigin].filter(Boolean).join(" ");
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
@@ -58,7 +62,23 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       host: true,
       allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
-      proxy: { "/api": { target: "http://localhost:4000", changeOrigin: true } },
+      proxy: {
+        "/api": { target: "http://localhost:4000", changeOrigin: true },
+        "/ws": { target: "http://localhost:4000", ws: true },
+      },
+    },
+    // `vite preview` serves the production build (see PRODUCTION.md) - same
+    // proxy shape as dev so it still fronts the API/realtime through one
+    // origin for the ngrok tunnel, just pointed at built assets instead of
+    // Vite's dev transform.
+    preview: {
+      port: 5173,
+      host: true,
+      allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
+      proxy: {
+        "/api": { target: "http://localhost:4000", changeOrigin: true },
+        "/ws": { target: "http://localhost:4000", ws: true },
+      },
     },
   };
 });

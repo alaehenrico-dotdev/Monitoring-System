@@ -38,6 +38,7 @@ function requiredSecret(name: string, fallback?: string): string {
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
+  nodeEnv: process.env.NODE_ENV ?? "development",
   databaseUrl: required("DATABASE_URL"),
   // No fallback for either of these two: a default here would mean
   // `required()` never actually throws, so every token this app has ever

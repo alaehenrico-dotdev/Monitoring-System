@@ -60,6 +60,7 @@ see `server/src/config/env.ts`.
 | `PORT` | server | optional (default `4000`) | API listen port |
 | `JWT_EXPIRES_IN` | server | optional (default `8h`) | Login session lifetime |
 | `CLIENT_ORIGIN` | server | optional (default `http://localhost:5173`) | Allowed CORS origin |
+| `NODE_ENV` | server | optional (default `development`) | `production` in a real deployment — see [`PRODUCTION.md`](PRODUCTION.md) |
 | `VITE_API_URL` | client | optional (default `http://localhost:4000/api`) | API base URL the client calls directly, in both dev and production (see the dev proxy note below) |
 
 ### 2. Install, migrate, seed
@@ -101,7 +102,13 @@ absolute URL, which the default setup above doesn't do — it's there for setups
 ngrok tunnel, see `allowedHosts` in the same config block) where hitting the API through the same
 origin as the client is preferable to a direct cross-origin call.
 
-### 4. Tests & linting
+### 4. Sharing over ngrok / production
+
+`NGROK_SETUP.md` covers tunneling this dev setup with ngrok. For a longer-running, pm2-managed
+deployment (production builds instead of dev-mode watchers, auto-restart, a reserved tunnel
+domain), see [`PRODUCTION.md`](PRODUCTION.md).
+
+### 5. Tests & linting
 
 ```bash
 npm run test    # runs both workspaces' Vitest suites
@@ -136,6 +143,9 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
   either side of the transfer, rather than silently persisted as a negative balance.
 - Server-calculated subtotal / Remaining Stock columns — never client-editable.
 - Manual Counting & system-calculated Variance (Section 4.4), flagged rows for non-zero variance.
+- Realtime sync: a shared WebSocket connection tells every open page to refresh the moment any
+  encoder saves an entry, manual count, or runs a data reset — no manual reload needed to see
+  another encoder's work.
 - Live Total Stocks view (Section 4.5). Online and Offline are separate stock pools that aren't
   expected to tally with each other — every report (Total Stocks, Daily Report, Dashboard, Monthly
   Monitoring) shows both channels separately, with a combined "Total" kept alongside them only as

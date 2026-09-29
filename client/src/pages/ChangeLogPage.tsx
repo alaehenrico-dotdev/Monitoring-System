@@ -11,6 +11,7 @@ import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 
 const TABLE_FILTERS = ["", ...Object.keys(TABLE_LABELS)];
 
@@ -28,13 +29,14 @@ export function ChangeLogPage() {
   const [tableFilter, setTableFilter] = useState("");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
+  const realtimeVersion = useRealtimeVersion();
 
   useResetOnKeyChange(tableFilter, () => setEntries(null));
   useEffect(() => {
     listChangeLog({ tableName: tableFilter || undefined })
       .then(setEntries)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load change log"));
-  }, [tableFilter]);
+  }, [tableFilter, realtimeVersion]);
 
   const filtered = entries?.filter((e) =>
     matchesSearch([TABLE_LABELS[e.tableName] ?? e.tableName, e.action, e.changedBy?.name, e.changedBy?.username, e.recordId], query)

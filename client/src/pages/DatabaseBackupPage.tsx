@@ -16,7 +16,9 @@ type Status = "idle" | "downloading" | "done" | "error";
 // dump's bar moving visibly through most of the transfer.
 const BYTES_SCALE = 2 * 1024 * 1024;
 function estimatePercent(bytes: number): number {
-  return motionTokens.progressHoldPercent * (1 - Math.exp(-bytes / BYTES_SCALE));
+  return (
+    motionTokens.progressHoldPercent * (1 - Math.exp(-bytes / BYTES_SCALE))
+  );
 }
 
 function formatBytes(bytes: number): string {
@@ -43,63 +45,119 @@ export function DatabaseBackupPage() {
       await downloadDatabaseBackup(setBytes);
       setStatus("done");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to download backup.");
+      setError(
+        err instanceof Error ? err.message : "Failed to download backup.",
+      );
       setStatus("error");
     }
   }
 
   const downloading = status === "downloading";
-  const percent = downloading ? estimatePercent(bytes) : status === "done" ? 100 : 0;
+  const percent = downloading
+    ? estimatePercent(bytes)
+    : status === "done"
+      ? 100
+      : 0;
 
   return (
     <div
       style={{
         maxWidth: 760,
-        background: colors.surface,
+        background: "var(--ae-surface-glass)",
+        backdropFilter: "var(--ae-glass-blur)",
+        WebkitBackdropFilter: "var(--ae-glass-blur)",
         border: `1px solid ${colors.border}`,
         borderRadius: 8,
         padding: "32px 36px",
       }}
     >
-      <h3 style={{ margin: "0 0 10px", fontSize: 19, fontWeight: 700, color: colors.ink }}>
+      <h3
+        style={{
+          margin: "0 0 10px",
+          fontSize: 19,
+          fontWeight: 700,
+          color: colors.ink,
+        }}
+      >
         Download a full database backup
       </h3>
-      <p style={{ margin: "0 0 24px", fontSize: 13.5, lineHeight: 1.6, color: colors.subtleInk, maxWidth: 560 }}>
-        Generates a complete SQL dump of the live database - every product, entry, count, receipt,
-        report, and account - as a single <code>.sql</code> file you can store off-site. Restoring
-        from it requires a developer to load it back into a MySQL server.
+      <p
+        style={{
+          margin: "0 0 24px",
+          fontSize: 13.5,
+          lineHeight: 1.6,
+          color: colors.subtleInk,
+          maxWidth: 560,
+        }}
+      >
+        Generates a complete SQL dump of the live database - every product,
+        entry, count, receipt, report, and account - as a single{" "}
+        <code>.sql</code> file you can store off-site. Restoring from it
+        requires a developer to load it back into a MySQL server.
       </p>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
+        }}
+      >
         <Button
           variant="primary"
           onClick={handleDownload}
           disabled={downloading}
-          style={{ padding: "10px 22px", display: "inline-flex", alignItems: "center", gap: 8, color: colors.yellow }}
+          style={{
+            padding: "10px 22px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            color: colors.yellow,
+          }}
         >
           {downloading && <Spinner size="sm" color={colors.cream} />}
           {downloading ? "Downloading…" : "Download Backup"}
         </Button>
 
         {downloading && (
-          <span role="status" aria-live="polite" style={{ fontSize: 12.5, color: colors.subtleInk }}>
+          <span
+            role="status"
+            aria-live="polite"
+            style={{ fontSize: 12.5, color: colors.subtleInk }}
+          >
             {formatBytes(bytes)} received
           </span>
         )}
         {status === "done" && (
-          <p style={{ margin: 0, fontSize: 12.5, color: colors.gold, fontWeight: 600 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 12.5,
+              color: colors.gold,
+              fontWeight: 600,
+            }}
+          >
             Backup downloaded ({formatBytes(bytes)}).
           </p>
         )}
         {status === "error" && error && (
-          <p style={{ margin: 0, fontSize: 12.5, color: colors.danger }}>{error}</p>
+          <p style={{ margin: 0, fontSize: 12.5, color: colors.danger }}>
+            {error}
+          </p>
         )}
       </div>
 
       {(downloading || status === "done") && (
         <div
           aria-hidden="true"
-          style={{ marginTop: 18, height: 4, borderRadius: 2, background: colors.paperAlt, overflow: "hidden" }}
+          style={{
+            marginTop: 18,
+            height: 4,
+            borderRadius: 2,
+            background: colors.paperAlt,
+            overflow: "hidden",
+          }}
         >
           <div
             style={{

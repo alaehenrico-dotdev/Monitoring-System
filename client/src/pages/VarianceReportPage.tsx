@@ -19,6 +19,7 @@ import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { useTopProgress } from "../hooks/useTopProgress";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 import {
   filterNotes,
   flatSection,
@@ -79,12 +80,20 @@ export function VarianceReportPage() {
     null,
   );
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
+  const realtimeVersion = useRealtimeVersion();
 
   useEffect(() => {
     if (searchParams.get("history") === "1") void runReport();
     // History links intentionally generate the selected report once on open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Keep an already-generated report live - same guarded re-run as
+  // DailyReportPage, only while a report is already on screen.
+  useEffect(() => {
+    if (rows) void runReport();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeVersion]);
 
   // Opened from the report history: build the PDF as soon as the report has
   // loaded (there's no DOM to wait for - the PDF is built from the data).

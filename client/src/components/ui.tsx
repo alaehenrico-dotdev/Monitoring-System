@@ -48,6 +48,7 @@ export function NumberCellInput({ value, onChange, onBlur, onKeyDown, step = 1, 
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) => e.currentTarget.select()}
         onBlur={onBlur}
         onKeyDown={onKeyDown}
         {...rest}

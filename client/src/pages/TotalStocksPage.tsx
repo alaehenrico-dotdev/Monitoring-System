@@ -14,6 +14,7 @@ import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { colors } from "../theme";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -35,6 +36,7 @@ export function TotalStocksPage() {
   const [zoom, setZoom] = useZoom("total-stocks");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const realtimeVersion = useRealtimeVersion();
 
   useResetOnKeyChange(date, () => {
     setRows(null);
@@ -44,7 +46,7 @@ export function TotalStocksPage() {
     getTotalStocks(date)
       .then(setRows)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load total stocks"));
-  }, [date]);
+  }, [date, realtimeVersion]);
 
   // CsvTools expects {product, entry} rows; nulls become "" (not 0) so an
   // uncounted product reads as blank in the export rather than implying a
