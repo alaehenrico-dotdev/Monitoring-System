@@ -10,6 +10,7 @@ import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
+import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 
 const TABLE_FILTERS = ["", ...Object.keys(TABLE_LABELS)];
 
@@ -28,8 +29,8 @@ export function ChangeLogPage() {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<number | null>(null);
 
+  useResetOnKeyChange(tableFilter, () => setEntries(null));
   useEffect(() => {
-    setEntries(null);
     listChangeLog({ tableName: tableFilter || undefined })
       .then(setEntries)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load change log"));

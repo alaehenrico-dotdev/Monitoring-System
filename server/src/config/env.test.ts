@@ -9,7 +9,6 @@ const REQUIRED_VARS = {
   DATABASE_URL: "mysql://root:pw@localhost:3306/test",
   JWT_SECRET: "a-real-random-secret-value",
   DATA_RESET_PASSCODE: "a-real-passcode-someone-chose",
-  RECEIPT_QR_SECRET: "another-real-random-secret-value",
 };
 
 // The exact placeholder each variable ships with in .env.example - the
@@ -17,7 +16,6 @@ const REQUIRED_VARS = {
 const EXAMPLE_PLACEHOLDERS: Record<string, string> = {
   JWT_SECRET: "change-this-to-a-long-random-string",
   DATA_RESET_PASSCODE: "000000",
-  RECEIPT_QR_SECRET: "change-this-to-a-long-random-string",
 };
 
 const ORIGINAL_ENV = process.env;
@@ -36,7 +34,6 @@ describe("env", () => {
     const { env } = await import("./env.js");
     expect(env.jwtSecret).toBe(REQUIRED_VARS.JWT_SECRET);
     expect(env.dataResetPasscode).toBe(REQUIRED_VARS.DATA_RESET_PASSCODE);
-    expect(env.receiptQrSecret).toBe(REQUIRED_VARS.RECEIPT_QR_SECRET);
   });
 
   it.each(Object.keys(EXAMPLE_PLACEHOLDERS))("rejects %s left at its .env.example placeholder", async (name) => {

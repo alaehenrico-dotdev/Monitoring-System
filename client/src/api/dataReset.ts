@@ -4,7 +4,6 @@ export interface ResetSummary {
   onlineStock: number;
   offlineStock: number;
   manualCounts: number;
-  receipts: number;
   changeLog: number;
 }
 
@@ -28,7 +27,7 @@ export async function verifyResetPasscode(passcode: string): Promise<string | nu
 }
 
 /**
- * Wipes all transactional data (entries, counts, receipts, change log) so
+ * Wipes all transactional data (entries, counts, change log) so
  * the system can be handed to a new period/site with a clean slate. Backed
  * by POST /data-reset/reset on the server, which independently requires
  * `resetToken` (from verifyResetPasscode) and re-checks SUPERVISOR_ADMIN -

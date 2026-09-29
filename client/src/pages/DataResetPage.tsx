@@ -18,19 +18,29 @@ type LockStatus = "locked" | "verifying" | "unlocked";
 // (sidebar, dashboard, login, table headers; see index.css) rather than
 // following the page's own light/dark mode, so a destructive admin action
 // reads as a distinct, serious zone of the UI regardless of theme.
-const PANEL_BG = "#14110d";
-const PANEL_BG_ALT = "#1d1812";
-const PANEL_BORDER = "#3a3020";
-const PANEL_TEXT = "#f1e9d0"; // cream/white
-const PANEL_TEXT_MUTED = "#a89a7d";
-const PANEL_GOLD = "#c99a2e";
+const PANEL_BG = "#1A1A1A";
+const PANEL_BG_ALT = "#232323";
+const PANEL_BORDER = "#3D3D3D"; // ink-500, same bump as --ae-border (index.css)
+const PANEL_TEXT = "#E5E5E5"; // cream/white
+const PANEL_TEXT_MUTED = "#A3A3A3";
+const PANEL_GOLD = "#D4A000";
 const PANEL_RED = "#e2555c";
 
-const WIPED_ITEMS = ["Online & offline stock entries", "Manual counts", "Receipts / sales orders", "Daily & variance reports", "Change log"];
-const PRESERVED_ITEMS = ["Products & categories", "Delivery destinations", "User accounts & roles", "System settings"];
+const WIPED_ITEMS = [
+  "Online & offline stock entries",
+  "Manual counts",
+  "Daily & variance reports",
+  "Change log",
+];
+const PRESERVED_ITEMS = [
+  "Products & categories",
+  "Delivery destinations",
+  "User accounts & roles",
+  "System settings",
+];
 
 /// Section: Admin - lets a supervisor wipe all transactional data (entries,
-/// counts, receipts, reports, change log) to hand the system a clean slate
+/// counts, reports, change log) to hand the system a clean slate
 /// for a new period or site, without needing a developer to touch the
 /// database directly. Destructive and irreversible, so the page itself sits
 /// behind a backend-verified passcode gate (nobody who merely navigates
@@ -65,7 +75,11 @@ export function DataResetPage() {
         setLockStatus("locked");
       }
     } catch (err) {
-      setLockError(err instanceof Error ? err.message : "Couldn't verify passcode. Try again.");
+      setLockError(
+        err instanceof Error
+          ? err.message
+          : "Couldn't verify passcode. Try again.",
+      );
       setLockStatus("locked");
     } finally {
       setPasscode("");
@@ -96,7 +110,8 @@ export function DataResetPage() {
   async function performReset() {
     setStatus("resetting");
     try {
-      if (!resetToken) throw new Error("Passcode session expired - unlock this page again.");
+      if (!resetToken)
+        throw new Error("Passcode session expired - unlock this page again.");
       await resetAllData(resetToken);
       // The Daily/Variance Report History pages list is browser-local
       // (localStorage, see utils/reportHistory.ts) - the server-side wipe
@@ -120,7 +135,10 @@ export function DataResetPage() {
       // The reset token is single-use-window (~5 min) - if it's expired or
       // was already spent, there's no point letting the admin just retry
       // with the same stale token, so drop back to the passcode screen.
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      if (
+        err instanceof ApiError &&
+        (err.status === 401 || err.status === 403)
+      ) {
         setResetToken(null);
         setLockStatus("locked");
       }
@@ -132,7 +150,14 @@ export function DataResetPage() {
   if (lockStatus !== "unlocked") {
     return (
       <div>
-        <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 20px", maxWidth: 620 }}>
+        <p
+          style={{
+            fontSize: 13,
+            color: colors.subtleInk,
+            margin: "0 0 20px",
+            maxWidth: 620,
+          }}
+        >
           This section is restricted. Enter the reset passcode to continue.
         </p>
 
@@ -141,22 +166,46 @@ export function DataResetPage() {
             maxWidth: 360,
             background: `linear-gradient(180deg, ${PANEL_BG_ALT}, ${PANEL_BG})`,
             border: `1px solid ${PANEL_BORDER}`,
-            borderRadius: 4,
+            // Same 8px radius as .ae-page-header/Modal/every other card.
+            borderRadius: 8,
             padding: "32px 32px",
-            boxShadow: "0 14px 34px rgba(20,17,13,0.28)",
+            boxShadow: "0 14px 34px rgba(12, 12, 12,0.28)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 18,
+            }}
+          >
             <span aria-hidden style={{ fontSize: 16, color: PANEL_GOLD }}>
               🔒
             </span>
-            <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 2.5, color: PANEL_GOLD, textTransform: "uppercase" }}>
+            <span
+              style={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                letterSpacing: 2.5,
+                color: PANEL_GOLD,
+                textTransform: "uppercase",
+              }}
+            >
               Restricted
             </span>
           </div>
 
           <form onSubmit={handleUnlock}>
-            <label style={{ display: "block", fontSize: 12.5, color: PANEL_TEXT_MUTED, marginBottom: 8 }} htmlFor="reset-passcode">
+            <label
+              style={{
+                display: "block",
+                fontSize: 12.5,
+                color: PANEL_TEXT_MUTED,
+                marginBottom: 8,
+              }}
+              htmlFor="reset-passcode"
+            >
               Passcode
             </label>
             <input
@@ -175,7 +224,8 @@ export function DataResetPage() {
                 fontSize: 15,
                 letterSpacing: 3,
                 padding: "10px 12px",
-                borderRadius: 4,
+                // Pill, matching every other text input in the app (.ae-input).
+                borderRadius: 999,
                 border: `1px solid ${PANEL_BORDER}`,
                 background: "rgba(255,255,255,0.05)",
                 color: PANEL_TEXT,
@@ -184,16 +234,28 @@ export function DataResetPage() {
             />
 
             {lockError && (
-              <p style={{ margin: "0 0 14px", fontSize: 12.5, color: PANEL_RED }}>{lockError}</p>
+              <p
+                style={{ margin: "0 0 14px", fontSize: 12.5, color: PANEL_RED }}
+              >
+                {lockError}
+              </p>
             )}
 
             <Button
               type="submit"
               variant="danger"
               disabled={lockStatus === "verifying" || !passcode}
-              style={{ width: "100%", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}
+              style={{
+                width: "100%",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+              }}
             >
-              {lockStatus === "verifying" && <Spinner size="sm" color={PANEL_RED} />}
+              {lockStatus === "verifying" && (
+                <Spinner size="sm" color={PANEL_RED} />
+              )}
               {lockStatus === "verifying" ? "Verifying…" : "Unlock"}
             </Button>
           </form>
@@ -204,9 +266,17 @@ export function DataResetPage() {
 
   return (
     <div>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 20px", maxWidth: 760 }}>
-        Use this to give the system a completely fresh start. This is meant for wiping test data or
-        starting a brand-new inventory period, and it cannot be undone once it runs.
+      <p
+        style={{
+          fontSize: 13,
+          color: colors.subtleInk,
+          margin: "0 0 20px",
+          maxWidth: 760,
+        }}
+      >
+        Use this to give the system a completely fresh start. This is meant for
+        wiping test data or starting a brand-new inventory period, and it cannot
+        be undone once it runs.
       </p>
 
       <div
@@ -214,12 +284,19 @@ export function DataResetPage() {
           maxWidth: 760,
           background: `linear-gradient(180deg, ${PANEL_BG_ALT}, ${PANEL_BG})`,
           border: `1px solid ${PANEL_BORDER}`,
-          borderRadius: 4,
+          borderRadius: 8,
           padding: "36px 40px",
-          boxShadow: "0 14px 34px rgba(20,17,13,0.28)",
+          boxShadow: "0 14px 34px rgba(12, 12, 12,0.28)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
           <span
             aria-hidden
             style={{
@@ -230,15 +307,41 @@ export function DataResetPage() {
               boxShadow: `0 0 0 3px color-mix(in srgb, ${PANEL_RED} 25%, transparent)`,
             }}
           />
-          <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 2.5, color: PANEL_RED, textTransform: "uppercase" }}>
+          <span
+            style={{
+              fontSize: 11.5,
+              fontWeight: 700,
+              letterSpacing: 2.5,
+              color: PANEL_RED,
+              textTransform: "uppercase",
+            }}
+          >
             Danger Zone
           </span>
         </div>
 
-        <h3 style={{ margin: "0 0 10px", fontSize: 21, fontWeight: 700, color: PANEL_TEXT }}>Reset all transactional data</h3>
-        <p style={{ margin: "0 0 28px", fontSize: 13.5, lineHeight: 1.6, color: PANEL_TEXT_MUTED, maxWidth: 560 }}>
-          All stock data below will be permanently deleted and cannot be recovered. Make sure any
-          reports you need have already been exported or printed before continuing.
+        <h3
+          style={{
+            margin: "0 0 10px",
+            fontSize: 21,
+            fontWeight: 700,
+            color: PANEL_TEXT,
+          }}
+        >
+          Reset all transactional data
+        </h3>
+        <p
+          style={{
+            margin: "0 0 28px",
+            fontSize: 13.5,
+            lineHeight: 1.6,
+            color: PANEL_TEXT_MUTED,
+            maxWidth: 560,
+          }}
+        >
+          All stock data below will be permanently deleted and cannot be
+          recovered. Make sure any reports you need have already been exported
+          or printed before continuing.
         </p>
 
         <div
@@ -249,17 +352,45 @@ export function DataResetPage() {
             padding: "22px 24px",
             background: "rgba(255,255,255,0.03)",
             border: `1px solid ${PANEL_BORDER}`,
-            borderRadius: 3,
+            // One step down from the outer panel's 8px - reads as nested inside it.
+            borderRadius: 6,
             marginBottom: 28,
           }}
         >
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: PANEL_RED, textTransform: "uppercase", marginBottom: 10 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 1.5,
+                color: PANEL_RED,
+                textTransform: "uppercase",
+                marginBottom: 10,
+              }}
+            >
               Will be erased
             </div>
-            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
+            <ul
+              style={{
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: 7,
+              }}
+            >
               {WIPED_ITEMS.map((item) => (
-                <li key={item} style={{ fontSize: 13, color: PANEL_TEXT, display: "flex", alignItems: "baseline", gap: 8 }}>
+                <li
+                  key={item}
+                  style={{
+                    fontSize: 13,
+                    color: PANEL_TEXT,
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 8,
+                  }}
+                >
                   <span style={{ color: PANEL_RED, fontSize: 11 }}>✕</span>
                   {item}
                 </li>
@@ -267,12 +398,39 @@ export function DataResetPage() {
             </ul>
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, color: PANEL_GOLD, textTransform: "uppercase", marginBottom: 10 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: 1.5,
+                color: PANEL_GOLD,
+                textTransform: "uppercase",
+                marginBottom: 10,
+              }}
+            >
               Left untouched
             </div>
-            <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 7 }}>
+            <ul
+              style={{
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                display: "flex",
+                flexDirection: "column",
+                gap: 7,
+              }}
+            >
               {PRESERVED_ITEMS.map((item) => (
-                <li key={item} style={{ fontSize: 13, color: PANEL_TEXT, display: "flex", alignItems: "baseline", gap: 8 }}>
+                <li
+                  key={item}
+                  style={{
+                    fontSize: 13,
+                    color: PANEL_TEXT,
+                    display: "flex",
+                    alignItems: "baseline",
+                    gap: 8,
+                  }}
+                >
                   <span style={{ color: PANEL_GOLD, fontSize: 11 }}>✓</span>
                   {item}
                 </li>
@@ -281,49 +439,82 @@ export function DataResetPage() {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-          <Button variant="danger" onClick={openConfirm} disabled={status === "resetting"} style={{ padding: "10px 22px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <Button
+            variant="danger"
+            onClick={openConfirm}
+            disabled={status === "resetting"}
+            style={{ padding: "10px 22px" }}
+          >
             Reset Data
           </Button>
 
           {status === "done" && (
-            <p style={{ margin: 0, fontSize: 12.5, color: PANEL_GOLD, fontWeight: 600 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12.5,
+                color: PANEL_GOLD,
+                fontWeight: 600,
+              }}
+            >
               All data has been reset. The system is now a clean slate.
             </p>
           )}
           {status === "error" && error && (
-            <p style={{ margin: 0, fontSize: 12.5, color: PANEL_RED }}>{error}</p>
+            <p style={{ margin: 0, fontSize: 12.5, color: PANEL_RED }}>
+              {error}
+            </p>
           )}
         </div>
       </div>
 
       {(status === "confirming" || status === "resetting") && (
-        <Modal title="Confirm data reset" onClose={status === "confirming" ? cancel : () => {}} width={440}>
+        <Modal
+          title="Confirm data reset"
+          onClose={status === "confirming" ? cancel : () => {}}
+          width={440}
+        >
           {status === "confirming" ? (
             <>
               <p style={{ margin: "0 0 12px", fontSize: 13.5 }}>
-                This will permanently delete <strong>all</strong> entries, counts, receipts, and
-                reports. This cannot be undone.
+                This will permanently delete <strong>all</strong> entries,
+                counts, and reports. This cannot be undone.
               </p>
               <p style={{ margin: "0 0 18px", fontSize: 13 }}>
                 {secondsLeft > 0 ? (
                   <>
                     "Reset Now" unlocks in{" "}
-                    <strong style={{ color: colors.danger, fontSize: 16 }}>{secondsLeft}</strong>{" "}
-                    second{secondsLeft === 1 ? "" : "s"}. Nothing happens until you click it.
+                    <strong style={{ color: colors.danger, fontSize: 16 }}>
+                      {secondsLeft}
+                    </strong>{" "}
+                    second{secondsLeft === 1 ? "" : "s"}. Nothing happens until
+                    you click it.
                   </>
                 ) : (
                   "You can now click “Reset Now” to proceed, or Cancel to back out."
                 )}
               </p>
-              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <div
+                style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
+              >
                 <Button variant="secondary" onClick={cancel}>
                   Cancel
                 </Button>
                 <Button
                   variant="danger"
                   disabled={secondsLeft > 0}
-                  title={secondsLeft > 0 ? `Available in ${secondsLeft}s` : undefined}
+                  title={
+                    secondsLeft > 0 ? `Available in ${secondsLeft}s` : undefined
+                  }
                   onClick={() => {
                     if (!firingRef.current) {
                       firingRef.current = true;

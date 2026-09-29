@@ -1,4 +1,5 @@
 import { Dropdown } from "./Dropdown";
+import { ClockIcon } from "./icons";
 import type { Shift } from "../types";
 import { SHIFTS, SHIFT_LABELS, SHIFT_SHORT_LABELS } from "../utils/shift";
 
@@ -27,11 +28,16 @@ export function ShiftFilter({
   return (
     <Dropdown
       aria-label="Shift"
+      icon={<ClockIcon />}
       value={value}
       onChange={(v) => onChange(v as Shift | "")}
       options={[
         ...(includeAll ? [{ value: "", label: "All shifts" }] : []),
-        ...SHIFTS.map((s) => ({ value: s, label: SHIFT_SHORT_LABELS[s], title: SHIFT_LABELS[s] })),
+        ...SHIFTS.map((s) => ({
+          value: s,
+          label: SHIFT_SHORT_LABELS[s],
+          title: SHIFT_LABELS[s],
+        })),
       ]}
     />
   );

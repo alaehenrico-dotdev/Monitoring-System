@@ -4,16 +4,12 @@ import { colors } from "../theme";
 
 /**
  * A single reusable centered-overlay modal - used by the Preview dialog on
- * the data entry pages (Section 3.1) and the receipt preview/print dialog
- * (Section 4.7) rather than each page rolling its own backdrop/positioning/
+ * the data entry pages (Section 3.1) and every other confirm/preview dialog
+ * in the app, rather than each page rolling its own backdrop/positioning/
  * Escape-to-close handling.
  *
- * Portaled straight onto `document.body` rather than rendered in place -
- * besides the usual stacking-context reasons, this is what lets print
- * scoping work for the receipt preview: `body.ae-printing-receipt
- * .app-shell { display: none }` (index.css) only has a chance of leaving
- * this dialog on the page if it isn't itself a descendant of `.app-shell`
- * to begin with.
+ * Portaled straight onto `document.body` rather than rendered in place, for
+ * the usual stacking-context reasons.
  */
 export function Modal({
   title,
@@ -43,7 +39,7 @@ export function Modal({
         position: "fixed",
         inset: 0,
         zIndex: 200,
-        background: "rgba(20, 17, 13, 0.45)",
+        background: "rgba(12, 12, 12, 0.45)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -60,8 +56,11 @@ export function Modal({
           position: "relative",
           background: colors.paper,
           color: colors.ink,
-          borderRadius: 0,
-          boxShadow: "0 12px 40px rgba(20, 17, 13, 0.3)",
+          // Same 8px radius as .ae-page-header/.ae-datepicker/.ae-dropdown -
+          // overflow: hidden clips the header/body's square corners to it.
+          borderRadius: 8,
+          overflow: "hidden",
+          boxShadow: "0 12px 40px rgba(12, 12, 12, 0.3)",
           width: "100%",
           maxWidth: width,
           maxHeight: "85vh",

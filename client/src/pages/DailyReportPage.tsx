@@ -8,17 +8,31 @@ import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
 import { CategoryFilter } from "../components/CategoryFilter";
-import { onlineStockColumns, buildOfflineStockColumns } from "../config/stockColumns";
+import {
+  onlineStockColumns,
+  buildOfflineStockColumns,
+} from "../config/stockColumns";
 import { listDeliveryDestinations } from "../api/deliveryDestinations";
 import type { DeliveryDestination } from "../types";
 import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
-import { filterNotes, pdfFileName, stockGridSection, totalStocksSection, type PdfSection } from "../utils/pdfTables";
+import {
+  filterNotes,
+  pdfFileName,
+  stockGridSection,
+  totalStocksSection,
+  type PdfSection,
+} from "../utils/pdfTables";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
-import { PrinterIcon } from "../components/icons";
+import {
+  DownloadIcon,
+  HistoryIcon,
+  PlayIcon,
+  PrinterIcon,
+} from "../components/icons";
 import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 import { useTopProgress } from "../hooks/useTopProgress";
@@ -44,7 +58,10 @@ const SECTION_LABELS: Record<ReportSection, string> = {
 const NON_STOCK_KEYS = new Set(["productId", "entryDate", "shift"]);
 function rowHasSavedData(row: { isSaved?: boolean; entry: object }): boolean {
   if (typeof row.isSaved === "boolean") return row.isSaved;
-  return Object.entries(row.entry).some(([k, v]) => !NON_STOCK_KEYS.has(k) && Number(v) !== 0 && !Number.isNaN(Number(v)));
+  return Object.entries(row.entry).some(
+    ([k, v]) =>
+      !NON_STOCK_KEYS.has(k) && Number(v) !== 0 && !Number.isNaN(Number(v)),
+  );
 }
 
 /// Whether there's actually a report to show for this date: at least one
@@ -54,7 +71,9 @@ function reportHasData(report: DailyReport): boolean {
   return (
     report.online.some(rowHasSavedData) ||
     report.offline.some(rowHasSavedData) ||
-    report.total.some((r) => r.totalManualCount !== null && r.totalManualCount !== undefined)
+    report.total.some(
+      (r) => r.totalManualCount !== null && r.totalManualCount !== undefined,
+    )
   );
 }
 
@@ -100,13 +119,18 @@ export function DailyReportPage() {
   const printAfterLoad = useRef(searchParams.get("history") === "1");
   // Alert dialogs shown instead of generating: unsaved entry/count edits for
   // this date, or a date with nothing saved to report on.
-  const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(null);
+  const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(
+    null,
+  );
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
   // Same best-effort, load-once-reuse-always fetch as OfflineEntryPage's own
   // destinations state - see its comment for why this starts empty rather
   // than null.
   const [destinations, setDestinations] = useState<DeliveryDestination[]>([]);
-  const offlineStockColumns = useMemo(() => buildOfflineStockColumns(destinations), [destinations]);
+  const offlineStockColumns = useMemo(
+    () => buildOfflineStockColumns(destinations),
+    [destinations],
+  );
   useEffect(() => {
     listDeliveryDestinations()
       .then(setDestinations)
@@ -151,25 +175,51 @@ export function DailyReportPage() {
         setReport(nextReport);
         setReportVersion((v) => v + 1);
         if (searchParams.get("history") !== "1") {
-          recordReportHistory({ type: "Daily Report", scope: nextReport.date, route: `/daily-report?history=1&date=${nextReport.date}` });
+          recordReportHistory({
+            type: "Daily Report",
+            scope: nextReport.date,
+            route: `/daily-report?history=1&date=${nextReport.date}`,
+          });
         }
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to build report"));
+      .catch((e) =>
+        setError(e instanceof Error ? e.message : "Failed to build report"),
+      );
   }
 
   // Every category across all three sections (not just whichever section is
   // currently selected) - so switching the section dropdown doesn't also
   // reset an already-picked category filter to "no such option".
   const categories = report
-    ? Array.from(new Set([...report.online, ...report.offline, ...report.total].map((r) => r.product.category))).sort()
+    ? Array.from(
+        new Set(
+          [...report.online, ...report.offline, ...report.total].map(
+            (r) => r.product.category,
+          ),
+        ),
+      ).sort()
     : [];
-  const byCategory = <T extends { product: { category: string } }>(rows: T[]): T[] =>
-    categoryFilter ? rows.filter((r) => r.product.category === categoryFilter) : rows;
+  const byCategory = <T extends { product: { category: string } }>(
+    rows: T[],
+  ): T[] =>
+    categoryFilter
+      ? rows.filter((r) => r.product.category === categoryFilter)
+      : rows;
 
   function handleExport() {
     if (!report) return;
-    const online = section("ONLINE STOCK MONITORING", report.date, byCategory(report.online) as unknown as CsvSectionRow[], onlineStockColumns);
-    const offline = section("OFFLINE STOCK MONITORING", report.date, byCategory(report.offline) as unknown as CsvSectionRow[], offlineStockColumns);
+    const online = section(
+      "ONLINE STOCK MONITORING",
+      report.date,
+      byCategory(report.online) as unknown as CsvSectionRow[],
+      onlineStockColumns,
+    );
+    const offline = section(
+      "OFFLINE STOCK MONITORING",
+      report.date,
+      byCategory(report.offline) as unknown as CsvSectionRow[],
+      offlineStockColumns,
+    );
     const total = totalSection(report.date, byCategory(report.total));
 
     // "Full Report" still combines every section into one file (previous,
@@ -181,11 +231,21 @@ export function DailyReportPage() {
     // when only e.g. the Online numbers are needed rather than the whole
     // thing.
     if (reportSection === "all") {
-      downloadExcel(`daily-report-${report.date}.xls`, [online, offline, total].join(""));
+      downloadExcel(
+        `daily-report-${report.date}.xls`,
+        [online, offline, total].join(""),
+      );
       return;
     }
-    const bySection: Record<Exclude<ReportSection, "all">, string> = { online, offline, total };
-    downloadExcel(`daily-report-${reportSection}-${report.date}.xls`, bySection[reportSection]);
+    const bySection: Record<Exclude<ReportSection, "all">, string> = {
+      online,
+      offline,
+      total,
+    };
+    downloadExcel(
+      `daily-report-${reportSection}-${report.date}.xls`,
+      bySection[reportSection],
+    );
   }
 
   // One PDF for whichever section(s) are selected, with the category filter
@@ -195,21 +255,44 @@ export function DailyReportPage() {
     if (!report) return;
     const sections: PdfSection[] = [];
     if (reportSection === "all" || reportSection === "online") {
-      sections.push(stockGridSection(byCategory(report.online) as unknown as GridRow[], onlineStockColumns, { title: `ONLINE STOCK MONITORING - ${report.date}` }));
+      sections.push(
+        stockGridSection(
+          byCategory(report.online) as unknown as GridRow[],
+          onlineStockColumns,
+          { title: `ONLINE STOCK MONITORING - ${report.date}` },
+        ),
+      );
     }
     if (reportSection === "all" || reportSection === "offline") {
-      sections.push(stockGridSection(byCategory(report.offline) as unknown as GridRow[], offlineStockColumns, { title: `OFFLINE STOCK MONITORING - ${report.date}` }));
+      sections.push(
+        stockGridSection(
+          byCategory(report.offline) as unknown as GridRow[],
+          offlineStockColumns,
+          { title: `OFFLINE STOCK MONITORING - ${report.date}` },
+        ),
+      );
     }
     if (reportSection === "all" || reportSection === "total") {
-      sections.push(totalStocksSection(byCategory(report.total), { title: `TOTAL STOCKS - ${report.date}` }));
+      sections.push(
+        totalStocksSection(byCategory(report.total), {
+          title: `TOTAL STOCKS - ${report.date}`,
+        }),
+      );
     }
     try {
       await progress.track(() =>
         downloadTablePdf({
-          filename: pdfFileName("daily-report", reportSection === "all" ? undefined : reportSection, report.date),
+          filename: pdfFileName(
+            "daily-report",
+            reportSection === "all" ? undefined : reportSection,
+            report.date,
+          ),
           title: "Daily Report",
           subtitle: formatDateDisplay(report.date),
-          notes: [...(reportSection === "all" ? [] : [SECTION_LABELS[reportSection]]), ...filterNotes({ category: categoryFilter })],
+          notes: [
+            ...(reportSection === "all" ? [] : [SECTION_LABELS[reportSection]]),
+            ...filterNotes({ category: categoryFilter }),
+          ],
           sections,
         }),
       );
@@ -225,31 +308,65 @@ export function DailyReportPage() {
         subtitle="Generate a printable snapshot of a given date's Online, Offline, and Total stock."
       >
         <Toolbar className="no-print">
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "nowrap",
+              minWidth: 0,
+            }}
+          >
             <DatePicker aria-label="Date" value={date} onChange={setDate} />
             <Dropdown
               aria-label="Report section"
               value={reportSection}
               onChange={(v) => setReportSection(v as ReportSection)}
               title="Which section to view/export"
-              options={(Object.keys(SECTION_LABELS) as ReportSection[]).map((s) => ({ value: s, label: SECTION_LABELS[s] }))}
+              options={(Object.keys(SECTION_LABELS) as ReportSection[]).map(
+                (s) => ({ value: s, label: SECTION_LABELS[s] }),
+              )}
             />
-            {report && <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />}
-            <Button onClick={load}>Generate</Button>
+            {report && (
+              <CategoryFilter
+                categories={categories}
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+              />
+            )}
+            <Button onClick={load}>
+              <PlayIcon /> Generate
+            </Button>
           </div>
           <ToolbarControls>
             {report && (
               <>
-                <Button variant="secondary" onClick={handleExport} title={reportSection === "all" ? "Export all sections as one Excel file" : `Export just the ${SECTION_LABELS[reportSection]} as an Excel file`}>
-                  Export Excel
+                <Button
+                  variant="secondary"
+                  onClick={handleExport}
+                  title={
+                    reportSection === "all"
+                      ? "Export all sections as one Excel file"
+                      : `Export just the ${SECTION_LABELS[reportSection]} as an Excel file`
+                  }
+                >
+                  <DownloadIcon /> Export Excel
                 </Button>
-                <Button variant="secondary" onClick={handlePdf} title="Download as PDF">
+                <Button
+                  variant="secondary"
+                  onClick={handlePdf}
+                  title="Download as PDF"
+                >
                   <PrinterIcon /> PDF
                 </Button>
               </>
             )}
-            <Link to="/daily-report-history" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
-              Daily History
+            <Link
+              to="/daily-report-history"
+              className="ae-btn ae-btn-secondary"
+              style={{ textDecoration: "none" }}
+            >
+              <HistoryIcon /> Daily History
             </Link>
           </ToolbarControls>
         </Toolbar>
@@ -263,7 +380,13 @@ export function DailyReportPage() {
             <>
               <h3 style={{ marginBottom: 8 }}>Online — {report.date}</h3>
               <div style={{ marginBottom: 32 }}>
-                <StockGrid key={`online-${reportVersion}`} rows={byCategory(report.online) as unknown as GridRow[]} columns={onlineStockColumns} onCommit={noop} readOnly />
+                <StockGrid
+                  key={`online-${reportVersion}`}
+                  rows={byCategory(report.online) as unknown as GridRow[]}
+                  columns={onlineStockColumns}
+                  onCommit={noop}
+                  readOnly
+                />
               </div>
             </>
           )}
@@ -272,7 +395,13 @@ export function DailyReportPage() {
             <>
               <h3 style={{ marginBottom: 8 }}>Offline — {report.date}</h3>
               <div style={{ marginBottom: 32 }}>
-                <StockGrid key={`offline-${reportVersion}`} rows={byCategory(report.offline) as unknown as GridRow[]} columns={offlineStockColumns} onCommit={noop} readOnly />
+                <StockGrid
+                  key={`offline-${reportVersion}`}
+                  rows={byCategory(report.offline) as unknown as GridRow[]}
+                  columns={offlineStockColumns}
+                  onCommit={noop}
+                  readOnly
+                />
               </div>
             </>
           )}
@@ -280,17 +409,32 @@ export function DailyReportPage() {
           {(reportSection === "all" || reportSection === "total") && (
             <>
               <h3 style={{ marginBottom: 8 }}>Total Stocks — {report.date}</h3>
-              <TotalStocksTable key={`total-${reportVersion}`} rows={byCategory(report.total)} />
+              <TotalStocksTable
+                key={`total-${reportVersion}`}
+                rows={byCategory(report.total)}
+              />
             </>
           )}
         </div>
       )}
 
-      {!report && <p style={{ fontSize: 13, color: colors.subtleInk }}>Pick a date and click Generate to build the report.</p>}
+      {!report && (
+        <p style={{ fontSize: 13, color: colors.subtleInk }}>
+          Pick a date and click Generate to build the report.
+        </p>
+      )}
 
-      {unsavedWork && <UnsavedWorkDialog items={unsavedWork} onClose={() => setUnsavedWork(null)} />}
+      {unsavedWork && (
+        <UnsavedWorkDialog
+          items={unsavedWork}
+          onClose={() => setUnsavedWork(null)}
+        />
+      )}
       {emptyMessage && (
-        <AlertDialog title="No report to generate" onClose={() => setEmptyMessage(null)}>
+        <AlertDialog
+          title="No report to generate"
+          onClose={() => setEmptyMessage(null)}
+        >
           {emptyMessage}
         </AlertDialog>
       )}
@@ -303,14 +447,38 @@ interface CsvSectionRow {
   entry: Record<string, unknown>;
 }
 
-function section(title: string, date: string, rows: CsvSectionRow[], columns: { key: string; label: string }[]): string {
-  const headers = ["Category", "SKU", "Product", ...columns.map((c) => c.label)];
-  const excelRows = rows.map((r) => [r.product.category, r.product.sku ?? "", r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
+function section(
+  title: string,
+  date: string,
+  rows: CsvSectionRow[],
+  columns: { key: string; label: string }[],
+): string {
+  const headers = [
+    "Category",
+    "SKU",
+    "Product",
+    ...columns.map((c) => c.label),
+  ];
+  const excelRows = rows.map((r) => [
+    r.product.category,
+    r.product.sku ?? "",
+    r.product.name,
+    ...columns.map((c) => String(r.entry[c.key] ?? 0)),
+  ]);
   return toExcelTable(headers, excelRows, `${title} - ${date}`);
 }
 
 function totalSection(date: string, rows: DailyReport["total"]): string {
-  const headers = ["Category", "SKU", "Product", "Online Remaining", "Offline Remaining", "Total Remaining", "Manual Count", "Variance"];
+  const headers = [
+    "Category",
+    "SKU",
+    "Product",
+    "Online Remaining",
+    "Offline Remaining",
+    "Total Remaining",
+    "Manual Count",
+    "Variance",
+  ];
   const excelRows = rows.map((r) => [
     r.product.category,
     r.product.sku ?? "",

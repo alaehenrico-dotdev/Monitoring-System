@@ -42,7 +42,7 @@ export function LiveClock() {
         borderRadius: 999,
         padding: "8px 14px",
         flexShrink: 0,
-        boxShadow: "0 1px 4px rgba(20,17,13,0.1)",
+        boxShadow: "0 1px 4px rgba(12, 12, 12,0.1)",
       }}
     >
       <CursorGlowOverlay gradientRef={gradientRef} spotlightRef={spotlightRef} borderWidth={0.5} spotlightRadius={50} />

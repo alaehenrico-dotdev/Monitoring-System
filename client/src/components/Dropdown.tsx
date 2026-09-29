@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronIcon } from "./icons";
@@ -49,9 +58,17 @@ interface DropdownProps {
   /// Hover tooltip for the trigger itself. Defaults to the selected
   /// option's own `title`.
   title?: string;
+  /// Optional leading icon shown inside the trigger (toolbar filters use it
+  /// to say what they filter). Hidden by CSS in the narrower toolbar tiers.
+  icon?: ReactNode;
 }
 
-type Position = { left: number; minWidth: number; top?: number; bottom?: number };
+type Position = {
+  left: number;
+  minWidth: number;
+  top?: number;
+  bottom?: number;
+};
 
 export function Dropdown({
   value,
@@ -62,13 +79,17 @@ export function Dropdown({
   style,
   disabled,
   title,
+  icon,
   "aria-label": ariaLabel,
 }: DropdownProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const focusRef = useRef(false);
-  const typeaheadRef = useRef<{ text: string; timer: ReturnType<typeof setTimeout> | null }>({ text: "", timer: null });
+  const typeaheadRef = useRef<{
+    text: string;
+    timer: ReturnType<typeof setTimeout> | null;
+  }>({ text: "", timer: null });
 
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<Position | null>(null);
@@ -87,7 +108,11 @@ export function Dropdown({
     const left = Math.max(8, Math.min(rect.left, vw - minWidth - 8));
     const spaceBelow = vh - rect.bottom - 8;
     const openUp = spaceBelow < PANEL_MAX_HEIGHT && rect.top - 8 > spaceBelow;
-    setPos(openUp ? { left, minWidth, bottom: vh - rect.top + 6 } : { left, minWidth, top: rect.bottom + 6 });
+    setPos(
+      openUp
+        ? { left, minWidth, bottom: vh - rect.top + 6 }
+        : { left, minWidth, top: rect.bottom + 6 },
+    );
   }, []);
 
   function openMenu() {
@@ -127,7 +152,11 @@ export function Dropdown({
     if (!open) return;
     function onPointerDown(e: PointerEvent) {
       const target = e.target as Node;
-      if (panelRef.current?.contains(target) || triggerRef.current?.contains(target)) return;
+      if (
+        panelRef.current?.contains(target) ||
+        triggerRef.current?.contains(target)
+      )
+        return;
       setOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
@@ -140,13 +169,22 @@ export function Dropdown({
   useEffect(() => {
     if (!open || !focusRef.current) return;
     focusRef.current = false;
-    listRef.current?.querySelector<HTMLElement>('[data-focus-target="true"]')?.scrollIntoView({ block: "nearest" });
-    listRef.current?.querySelector<HTMLElement>('[data-focus-target="true"]')?.focus();
+    listRef.current
+      ?.querySelector<HTMLElement>('[data-focus-target="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+    listRef.current
+      ?.querySelector<HTMLElement>('[data-focus-target="true"]')
+      ?.focus();
   }, [open, activeIndex]);
 
   function onTriggerKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
     if (disabled || open) return;
-    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+    if (
+      e.key === "ArrowDown" ||
+      e.key === "ArrowUp" ||
+      e.key === "Enter" ||
+      e.key === " "
+    ) {
       e.preventDefault();
       openMenu();
     }
@@ -155,7 +193,9 @@ export function Dropdown({
   function typeahead(key: string) {
     const state = typeaheadRef.current;
     if (state.timer) clearTimeout(state.timer);
-    const text = (state.text.length === 1 && state.text === key ? "" : state.text) + key.toLowerCase();
+    const text =
+      (state.text.length === 1 && state.text === key ? "" : state.text) +
+      key.toLowerCase();
     state.text = text;
     state.timer = setTimeout(() => {
       typeaheadRef.current.text = "";
@@ -218,7 +258,9 @@ export function Dropdown({
   }
 
   const triggerLabel = selected ? selected.label : placeholder;
-  const dialogLabel = ariaLabel ? `Choose ${ariaLabel.toLowerCase()}` : "Choose option";
+  const dialogLabel = ariaLabel
+    ? `Choose ${ariaLabel.toLowerCase()}`
+    : "Choose option";
 
   return (
     <>
@@ -235,6 +277,11 @@ export function Dropdown({
         onClick={() => (open ? closeMenu() : openMenu())}
         onKeyDown={onTriggerKeyDown}
       >
+        {icon && (
+          <span className="ae-select-trigger-lead" aria-hidden>
+            {icon}
+          </span>
+        )}
         <span className="ae-select-trigger-text">{triggerLabel}</span>
         <span className="ae-select-trigger-icon" aria-hidden>
           <ChevronIcon />
@@ -251,8 +298,18 @@ export function Dropdown({
               aria-label={dialogLabel}
               tabIndex={-1}
               className="ae-dropdown no-print"
-              style={{ left: pos.left, minWidth: pos.minWidth, maxWidth: PANEL_MAX_WIDTH, top: pos.top, bottom: pos.bottom }}
-              initial={{ opacity: 0, y: pos.bottom !== undefined ? 6 : -6, scale: 0.98 }}
+              style={{
+                left: pos.left,
+                minWidth: pos.minWidth,
+                maxWidth: PANEL_MAX_WIDTH,
+                top: pos.top,
+                bottom: pos.bottom,
+              }}
+              initial={{
+                opacity: 0,
+                y: pos.bottom !== undefined ? 6 : -6,
+                scale: 0.98,
+              }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.08 } }}
               transition={{ duration: 0.14, ease: "easeOut" }}
@@ -264,7 +321,11 @@ export function Dropdown({
               onMouseMove={(e) => e.stopPropagation()}
               onKeyDown={onPanelKeyDown}
             >
-              <div className="ae-dropdown-list" ref={listRef} role="presentation">
+              <div
+                className="ae-dropdown-list"
+                ref={listRef}
+                role="presentation"
+              >
                 {options.map((opt, i) => {
                   const isSelected = opt.value === value;
                   const isActive = i === activeIndex;

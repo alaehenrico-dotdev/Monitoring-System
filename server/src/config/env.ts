@@ -49,10 +49,5 @@ export const env = {
   jwtSecret: requiredSecret("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
-  receiptsAutoPostDefault: (process.env.RECEIPTS_AUTO_POST_DEFAULT ?? "true") === "true",
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
-  // Encrypts the receipt id that goes into the printed receipt's QR code
-  // (see utils/receiptQrToken.ts) - the one id in this app that actually
-  // leaves the authenticated app, onto a piece of paper anyone can scan.
-  receiptQrSecret: requiredSecret("RECEIPT_QR_SECRET"),
 };

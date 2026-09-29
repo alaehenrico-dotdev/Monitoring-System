@@ -123,41 +123,6 @@ export interface TotalStockRow {
   totalVariance: number | null;
 }
 
-export interface ReceiptItem {
-  id: number;
-  productId: number;
-  product: Product;
-  quantity: number;
-  /// Peso price for this line, fixed at the time the receipt was created
-  /// (Section 4.7) - null only for receipts logged before this field
-  /// existed, since there's no Product-level default price to backfill
-  /// from. Every new receipt's create form requires it per line.
-  unitPrice: number | null;
-}
-
-export interface Receipt {
-  id: number;
-  orderDate: string;
-  customer: string;
-  location: string;
-  /// Free text (Section 4.7) - not necessarily a system user.
-  salesRepName: string | null;
-  salesRepId: number | null;
-  salesRep: AuthUser | null;
-  /// Which stock pool this receipt posted into at creation (Section 4.7) -
-  /// set once server-side from the postToFulfillment/postToOfflineDelivery
-  /// flags on CreateReceiptInput (see api/receipts.ts) and never changed
-  /// after. See receiptPool() in utils/consolidatedReceipts.ts.
-  postedPool: "NONE" | "FULFILLMENT" | "OFFLINE_DELIVERY";
-  createdBy: AuthUser | null;
-  createdAt: string;
-  items: ReceiptItem[];
-  /// Server-encrypted (AES-256-GCM) receipt id, for the printed QR code -
-  /// see server/src/utils/receiptQrToken.ts. Opaque on this side; the
-  /// client never has the key to decode or produce one itself.
-  qrToken: string;
-}
-
 export interface ChangeLogEntry {
   id: number;
   tableName: string;

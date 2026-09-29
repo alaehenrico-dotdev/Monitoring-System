@@ -32,14 +32,14 @@ copy the server's env file:
 ```bash
 cd server
 cp .env.example .env
-# edit .env - set DATABASE_URL, JWT_SECRET, DATA_RESET_PASSCODE, and
-# RECEIPT_QR_SECRET (see below) - the server refuses to start if any of
-# these are missing, with no insecure fallback.
+# edit .env - set DATABASE_URL, JWT_SECRET, and DATA_RESET_PASSCODE - the
+# server refuses to start if any of these are missing, with no insecure
+# fallback.
 # XAMPP default: mysql://root:@localhost:3306/ala_eh_stocks (no password)
 ```
 
-`JWT_SECRET`, `DATA_RESET_PASSCODE`, and `RECEIPT_QR_SECRET` all need a real
-random value — generate one for each with:
+`JWT_SECRET` and `DATA_RESET_PASSCODE` both need a real random value —
+generate one for each with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -57,11 +57,9 @@ see `server/src/config/env.ts`.
 | `DATABASE_URL` | server | required | MySQL connection string |
 | `JWT_SECRET` | server | required, no placeholder | Signs/verifies login JWTs |
 | `DATA_RESET_PASSCODE` | server | required, no placeholder | Gates the Data Reset admin panel |
-| `RECEIPT_QR_SECRET` | server | required, no placeholder | Encrypts the id in a printed receipt's QR code |
 | `PORT` | server | optional (default `4000`) | API listen port |
 | `JWT_EXPIRES_IN` | server | optional (default `8h`) | Login session lifetime |
 | `CLIENT_ORIGIN` | server | optional (default `http://localhost:5173`) | Allowed CORS origin |
-| `RECEIPTS_AUTO_POST_DEFAULT` | server | optional (default `true`) | Whether saving a Receipt auto-posts into Online Fulfillment (Out) |
 | `VITE_API_URL` | client | optional (default `http://localhost:4000/api`) | API base URL the client calls directly, in both dev and production (see the dev proxy note below) |
 
 ### 2. Install, migrate, seed
@@ -142,23 +140,18 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
   expected to tally with each other — every report (Total Stocks, Daily Report, Dashboard, Monthly
   Monitoring) shows both channels separately, with a combined "Total" kept alongside them only as
   an explicitly-labeled figure, never the only number shown.
-- Receipt / Sales Order entry (Section 4.7): the entry form itself is styled as an editable
-  physical receipt, with a live preview beside it showing exactly what Save will produce, and can
-  post straight into that date's Fulfillment (Out). The printed receipt's QR code encodes an
-  AES-256-GCM-encrypted token, not the plain receipt id — the one id in the app that actually
-  leaves the authenticated app, onto paper anyone can scan.
 - Daily Report, Variance Report, and a Change Log page (Section 4.8) — every create/update/delete
   across the app, attributed and timestamped, with an expandable before/after diff per entry.
 - Dashboard with a today-at-a-glance stat row and a Monthly Monitoring section: a year-at-a-glance
-  Online/Offline trend chart plus receipts and variance-flag counts per month.
+  Online/Offline trend chart plus variance-flag counts per month.
 - Settings page (Supervisor-Admin): a full `mysqldump` database backup, streamed straight to a
   browser download with a live byte counter, and the passcode-gated Data Reset panel for wiping
   transactional data between test runs or a new rollout period.
 - Role-based access: Online Encoder / Offline Encoder / Supervisor-Admin (Section 3.2).
 
 **Data entry & reporting tools**
-- Excel-style zoom (25%–200%) on every grid page and the Receipts page — genuinely re-lays-out
-  text/cells/inputs at the new scale (CSS `zoom`, not a visual stretch).
+- Excel-style zoom (25%–200%) on every grid page — genuinely re-lays-out text/cells/inputs at the
+  new scale (CSS `zoom`, not a visual stretch).
 - CSV export on Online Entry, Offline Entry, Total Stocks, and Manual Count (Section 3.1). Import
   (Online/Offline Entry only) writes just Opening Stock, read from the file's Remaining Stock/
   ending-balance column (or its own Opening Stock column, for a day with no prior balance to carry
@@ -166,19 +159,18 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
   file's old Stock In/Out, Production, delivery, Upsell, or Backload figures onto a different day.
 - One-file, multi-section CSV export on the Daily Report (Online + Offline + Total in a single
   download).
-- Export as a real generated PDF (not the browser's print dialog) on every grid page and the
-  receipt review modal — one fixed page format, the same brand chrome (masthead, category bars,
-  page-X-of-Y footer) every time, built from the same row data the CSV/Excel export uses.
-- Smart multi-term search on every toolbar (product/category, or customer/location/product for
-  Receipts).
+- Export as a real generated PDF (not the browser's print dialog) on every grid page — one fixed
+  page format, the same brand chrome (masthead, category bars, page-X-of-Y footer) every time,
+  built from the same row data the CSV/Excel export uses.
+- Smart multi-term search on every toolbar (product/category).
 
 **Security**
 - `helmet` security headers on every API response; a strict Content-Security-Policy is injected
   into the client's production build only (never the dev server/HMR).
 - Rate limiting: a generous backstop across the whole API, plus a tight brute-force limit on login
   and the Data Reset passcode check specifically.
-- `JWT_SECRET` / `DATA_RESET_PASSCODE` / `RECEIPT_QR_SECRET` are all required env vars with no
-  insecure fallback — the server refuses to boot rather than running on a guessable default.
+- `JWT_SECRET` / `DATA_RESET_PASSCODE` are both required env vars with no insecure fallback — the
+  server refuses to boot rather than running on a guessable default.
 - zod request validation on every controller that takes user input; a top-level React error
   boundary so an uncaught render error never white-screens the whole app.
 
@@ -192,9 +184,9 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
   progress bar for exports/imports and the database backup download — bound to real progress
   (rows imported, bytes downloaded) where that data exists, an eased "still working" fallback
   where it doesn't.
-- Route-level code-splitting plus dynamically-imported PDF/QR libraries (only fetched when a PDF
-  is actually generated) — cut the client's main bundle from ~918KB to ~333KB.
+- Route-level code-splitting plus dynamically-imported PDF libraries (only fetched when a PDF is
+  actually generated) — cut the client's main bundle from ~918KB to ~333KB.
 - `eslint.config.mjs` (one shared flat config for both workspaces) + Vitest unit tests on the
-  highest logic-density modules (stock math, shift/date boundary logic, the receipt QR cipher).
+  highest logic-density modules (stock math, shift/date boundary logic).
 
 Phase 5 (encoder training / parallel run / cutover) is a rollout activity outside the codebase.

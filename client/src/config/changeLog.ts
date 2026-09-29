@@ -10,7 +10,6 @@ export const TABLE_LABELS: Record<string, string> = {
   daily_offline_stock: "Offline Stock",
   manual_counts: "Manual Count",
   products: "SKUs",
-  receipts: "Receipts",
 };
 
 export const ACTION_COLOR: Record<ChangeLogEntry["action"], string> = {

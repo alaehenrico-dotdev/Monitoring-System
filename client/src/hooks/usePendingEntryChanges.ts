@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { GridRow } from "../components/StockGrid";
-import { ENTRY_PREFIX, MANUAL_COUNT_PREFIX, RECEIPT_DRAFT_PREFIX } from "../utils/unsavedWork";
+import { ENTRY_PREFIX, MANUAL_COUNT_PREFIX } from "../utils/unsavedWork";
 
 /// productId -> { columnKey -> staged value }
 export type PendingByProduct = Record<number, Record<string, number>>;
@@ -69,10 +69,14 @@ export function usePendingEntryChanges(
 
   // Re-derives pending from storage only when the key itself changes (a
   // different date/shift/page) - the persistence effect below is what reacts
-  // to every actual edit.
-  useEffect(() => {
+  // to every actual edit. Done during render (not an effect) per React's
+  // "adjusting state when a prop changes" pattern, so switching storageKey
+  // never renders a stale frame with the previous key's pending set first.
+  const [loadedForKey, setLoadedForKey] = useState(storageKey);
+  if (storageKey !== loadedForKey) {
+    setLoadedForKey(storageKey);
     setPending(loadPending(storageKey));
-  }, [storageKey]);
+  }
 
   useEffect(() => {
     if (!storageKey) return;
@@ -154,7 +158,7 @@ export function clearAllPendingEntryState() {
     const keys: string[] = [];
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i);
-      if (k && (k.startsWith(ENTRY_PREFIX) || k.startsWith(MANUAL_COUNT_PREFIX) || k.startsWith(RECEIPT_DRAFT_PREFIX) || k.startsWith("ala-eh-focus:"))) keys.push(k);
+      if (k && (k.startsWith(ENTRY_PREFIX) || k.startsWith(MANUAL_COUNT_PREFIX) || k.startsWith("ala-eh-focus:"))) keys.push(k);
     }
     keys.forEach((k) => sessionStorage.removeItem(k));
   } catch {

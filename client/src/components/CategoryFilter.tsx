@@ -1,4 +1,5 @@
 import { Dropdown } from "./Dropdown";
+import { TagIcon } from "./icons";
 
 /// A toolbar dropdown that narrows the grid/table above it to one category
 /// at a time - sits beside SearchInput (see OnlineEntryPage, OfflineEntryPage,
@@ -16,9 +17,13 @@ export function CategoryFilter({
   return (
     <Dropdown
       aria-label="Filter by category"
+      icon={<TagIcon />}
       value={value}
       onChange={onChange}
-      options={[{ value: "", label: "All categories" }, ...categories.map((c) => ({ value: c, label: c }))]}
+      options={[
+        { value: "", label: "All categories" },
+        ...categories.map((c) => ({ value: c, label: c })),
+      ]}
     />
   );
 }

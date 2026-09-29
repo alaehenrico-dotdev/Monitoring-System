@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { colors } from "../theme";
 
-export type ToastVariant = "info" | "error";
+export type ToastVariant = "info" | "error" | "warning";
 
 interface ToastProps {
   message: string | null;
@@ -25,6 +25,7 @@ interface ToastProps {
 const ACCENT: Record<ToastVariant, string> = {
   info: colors.gold,
   error: colors.danger,
+  warning: colors.warningText,
 };
 
 /**
@@ -34,7 +35,13 @@ const ACCENT: Record<ToastVariant, string> = {
  * page instead of competing for space in an already-crowded toolbar row
  * (its original home, as an inline <span> next to CsvTools' Import button).
  */
-export function Toast({ message, onDismiss, variant = "info", duration = 6000, action }: ToastProps) {
+export function Toast({
+  message,
+  onDismiss,
+  variant = "info",
+  duration = 6000,
+  action,
+}: ToastProps) {
   useEffect(() => {
     if (!message || duration === null) return;
     const timer = setTimeout(onDismiss, duration);
@@ -74,7 +81,7 @@ export function Toast({ message, onDismiss, variant = "info", duration = 6000, a
               border: `1px solid ${colors.border}`,
               borderLeft: `3px solid ${ACCENT[variant]}`,
               borderRadius: 6,
-              boxShadow: "0 8px 28px rgba(20, 17, 13, 0.28)",
+              boxShadow: "0 8px 28px rgba(12, 12, 12, 0.28)",
               padding: "12px 14px",
               fontSize: 12.5,
               lineHeight: 1.45,

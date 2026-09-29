@@ -28,7 +28,7 @@ const CACHE_KEY_ALL = `${CACHE_PREFIX}all`;
 // without any risk of an admin's edit going unnoticed for long.
 const TTL_MS = 60_000;
 
-const ORDER_BY = [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }] as const;
+const ORDER_BY = [{ sortOrder: "asc" }, { name: "asc" }] as const;
 
 /// Section 5.1 - products: the master list every other table reads from.
 export const productRepository = {

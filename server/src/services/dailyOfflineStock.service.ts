@@ -242,25 +242,6 @@ export async function saveOfflineEntry(
   return saved;
 }
 
-/// Section 4.7 - posting a Receipt's item quantities onto Delivery (Out),
-/// mirroring addFulfillmentFromReceipt (dailyOnlineStock.service.ts) for the
-/// Offline pool. Always a flat increment onto the deliveryOut column - never
-/// split across destinations, regardless of whatever OfflineEntryDelivery
-/// breakdown rows the entry already has (see resolveDeliveryOut: a plain
-/// `deliveryOut` in the input takes the flat, no-breakdown path).
-export async function addDeliveryFromReceipt(
-  productId: number,
-  entryDate: Date,
-  shift: Shift,
-  additionalQty: number,
-  userId?: number,
-  db: Db = prisma,
-) {
-  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
-  const currentDeliveryOut = toNum(existing?.deliveryOut);
-  await saveOfflineEntry(productId, entryDate, shift, { deliveryOut: currentDeliveryOut + additionalQty }, userId, db);
-}
-
 async function mirrorTransferToOnline(
   productId: number,
   entryDate: Date,

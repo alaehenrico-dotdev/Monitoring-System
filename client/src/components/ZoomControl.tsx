@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { Dropdown } from "./Dropdown";
+import { ZoomIcon } from "./icons";
 
 const MIN = 50;
 const MAX = 200;
@@ -64,6 +65,7 @@ export function ZoomControl({
       className="ae-zoom-control"
       aria-label="Zoom level"
       title="Zoom"
+      icon={<ZoomIcon />}
       value={String(zoom)}
       onChange={(v) => onChange(Number(v))}
       options={PRESETS.map((p) => ({ value: String(p), label: `${p}%` }))}

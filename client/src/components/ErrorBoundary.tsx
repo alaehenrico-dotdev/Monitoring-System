@@ -31,7 +31,6 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // eslint-disable-next-line no-console
     console.error("Unhandled UI error:", error, info.componentStack);
   }
 
@@ -76,7 +75,8 @@ export class ErrorBoundary extends Component<Props, State> {
             color: colors.black,
             background: colors.yellow,
             border: "none",
-            borderRadius: 4,
+            // Pill, matching .ae-btn - every button in the app is this shape.
+            borderRadius: 999,
             cursor: "pointer",
           }}
         >

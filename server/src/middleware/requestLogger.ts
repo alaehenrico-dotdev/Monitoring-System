@@ -11,6 +11,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
   res.on("finish", () => {
     const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+    // eslint-disable-next-line no-console -- structured access log, not a stray debug statement
     console.log(
       JSON.stringify({
         method: req.method,

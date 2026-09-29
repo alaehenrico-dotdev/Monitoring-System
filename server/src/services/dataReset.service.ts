@@ -46,8 +46,8 @@ function assertValidResetToken(token: string, user: AuthUser) {
 }
 
 /**
- * Wipes all transactional data (stock entries, manual counts, receipts) and
- * the change log itself, leaving products/users/settings untouched. Runs as
+ * Wipes all transactional data (stock entries, manual counts) and the
+ * change log itself, leaving products/users/settings untouched. Runs as
  * one transaction so a failure partway through can't leave the system
  * half-wiped, and closes by writing a single new change-log entry recording
  * that the reset happened (who, when) - otherwise the very audit trail this
@@ -67,9 +67,6 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     const offlineEntryDeliveries = await tx.offlineEntryDelivery.deleteMany();
     const offlineStock = await tx.dailyOfflineStock.deleteMany();
     const manualCounts = await tx.manualCount.deleteMany();
-    // Deleting a receipt cascades to its items (schema.prisma ReceiptItem
-    // onDelete: Cascade) - no separate receiptItem.deleteMany() needed.
-    const receipts = await tx.receipt.deleteMany();
     const changeLog = await tx.changeLog.deleteMany();
 
     const deleted = {
@@ -77,7 +74,6 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
       offlineStock: offlineStock.count,
       offlineEntryDeliveries: offlineEntryDeliveries.count,
       manualCounts: manualCounts.count,
-      receipts: receipts.count,
       changeLog: changeLog.count,
     };
 

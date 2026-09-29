@@ -24,19 +24,41 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
     heading: "Data Entry",
     links: [
       { to: "/dashboard", label: "Dashboard", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/online", label: "Online Entry", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/offline", label: "Offline Entry", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/manual-count", label: "Audit", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/total-stocks", label: "Total Stocks", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/receipts", label: "Receipts", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
+      {
+        to: "/online",
+        label: "Online Entry",
+        roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/offline",
+        label: "Offline Entry",
+        roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/manual-count",
+        label: "Audit",
+        roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/total-stocks",
+        label: "Total Stocks",
+        roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"],
+      },
     ],
   },
   {
     heading: "Reports",
     links: [
-      { to: "/consolidated-receipts", label: "Consolidated Receipt", roles: ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"] },
-      { to: "/variance-report", label: "Variance Report", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/daily-report", label: "Daily Report", roles: ["SUPERVISOR_ADMIN"] },
+      {
+        to: "/variance-report",
+        label: "Variance Report",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
+      {
+        to: "/daily-report",
+        label: "Daily Report",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
     ],
   },
   {
@@ -44,12 +66,18 @@ const sections: { heading: string; links: NavLinkDef[] }[] = [
     links: [
       { to: "/change-log", label: "Change Log", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/products", label: "SKUs", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/delivery-destinations", label: "Delivery Destinations", roles: ["SUPERVISOR_ADMIN"] },
+      {
+        to: "/delivery-destinations",
+        label: "Delivery Destinations",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
     ],
   },
   {
     heading: "Settings",
-    links: [{ to: "/settings", label: "Settings", roles: ["SUPERVISOR_ADMIN"] }],
+    links: [
+      { to: "/settings", label: "Settings", roles: ["SUPERVISOR_ADMIN"] },
+    ],
   },
 ];
 
@@ -81,8 +109,14 @@ export function Sidebar() {
     const el = e.currentTarget;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) return;
-    el.style.setProperty("--mx", `${((e.clientX - rect.left) / rect.width) * 100}%`);
-    el.style.setProperty("--my", `${((e.clientY - rect.top) / rect.height) * 100}%`);
+    el.style.setProperty(
+      "--mx",
+      `${((e.clientX - rect.left) / rect.width) * 100}%`,
+    );
+    el.style.setProperty(
+      "--my",
+      `${((e.clientY - rect.top) / rect.height) * 100}%`,
+    );
     el.style.setProperty("--spotlight-opacity", "1");
   }
 
@@ -100,7 +134,11 @@ export function Sidebar() {
         // popover like this (unlike the old full drawer) shouldn't darken
         // everything behind it, just close when something outside it is
         // clicked.
-        <div className="no-print" onClick={close} style={{ position: "fixed", inset: 0, zIndex: 49 }} />
+        <div
+          className="no-print"
+          onClick={close}
+          style={{ position: "fixed", inset: 0, zIndex: 49 }}
+        />
       )}
 
       <motion.div
@@ -124,34 +162,30 @@ export function Sidebar() {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          borderRadius: 14,
+          borderRadius: 8, // matches .ae-page-header
           // Glass panel: notably more transparent + a stronger blur than
           // the old edge-to-edge drawer had, so it reads as floating glass
           // over the page rather than an opaque card.
-          background: `color-mix(in srgb, ${colors.black} 66%, transparent)`,
+          // Same themed glass tokens as .ae-page-header (index.css), so the
+          // drawer and the header always match - frosted cream in light
+          // mode, dark glass in dark mode. The sheen is a background layer.
+          background: "var(--ae-glass-sheen), var(--ae-glass-bg)",
           backdropFilter: "blur(24px) saturate(150%)",
           WebkitBackdropFilter: "blur(24px) saturate(150%)",
-          // Same thin solid gold border as .ae-page-header (index.css),
-          // rather than the old animated rainbow gradient sweep - so the
-          // floating panel and the header it pops out of read as one
-          // matching set of brand chrome.
-          border: `1px solid ${colors.gold}`,
-          color: colors.cream,
-          boxShadow: "0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3)",
+          // No static border: the 1px animated gradient sweep
+          // (.ae-modal-border-sweep at 0.5px, rendered as the first child below)
+          // draws the edge instead.
+          color: "var(--ae-glass-text)",
+          boxShadow: "var(--ae-glass-panel-shadow)",
         }}
       >
-        {/* Soft diagonal sheen - the actual "glass" highlight, on top of
-            the blur/transparency above. */}
+        {/* Extra-thin (0.5px) animated border sweep - same gradient as
+            Modal, but the inline padding overrides the class's 1px. */}
         <div
           aria-hidden
-          style={{
-            position: "absolute",
-            inset: 0,
-            pointerEvents: "none",
-            background: "linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 45%)",
-          }}
+          className="ae-modal-border-sweep"
+          style={{ padding: 0.5 }}
         />
-
         <div
           className="ae-sidebar-nav"
           style={{
@@ -167,7 +201,9 @@ export function Sidebar() {
         >
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {sections.map((section) => {
-              const visible = section.links.filter((l) => !user || l.roles.includes(user.role));
+              const visible = section.links.filter(
+                (l) => !user || l.roles.includes(user.role),
+              );
               if (visible.length === 0) return null;
 
               return (
@@ -180,14 +216,21 @@ export function Sidebar() {
                       fontWeight: 700,
                       letterSpacing: 0.6,
                       textTransform: "uppercase",
-                      color: colors.gold,
-                      opacity: 0.8,
+                      color: "var(--ae-glass-accent)",
+                      opacity: 0.9,
                     }}
                   >
                     {section.heading}
                   </p>
 
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, padding: "0 10px" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                      padding: "0 10px",
+                    }}
+                  >
                     {visible.map((l) => (
                       <NavLink
                         key={l.to}
@@ -210,28 +253,20 @@ export function Sidebar() {
                           margin: 0,
                           padding: "10px 8px 10px 14px",
                           textDecoration: "none",
-                          borderRadius: 6,
-                          color: isActive ? colors.black : colors.cream,
+                          borderRadius: 8,
+                          color: isActive
+                            ? colors.black
+                            : "var(--ae-glass-text)",
                           background: isActive ? colors.yellow : "transparent",
                           fontWeight: isActive ? 700 : 500,
                           fontSize: 13.5,
                           fontFamily: "inherit",
                           whiteSpace: "nowrap",
-                          transition: "background-color 0.15s ease, color 0.15s ease",
+                          transition:
+                            "background-color 0.15s ease, color 0.15s ease",
                         })}
                       >
-                        <div
-                          aria-hidden
-                          className="ae-sidebar-tab-spotlight"
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            pointerEvents: "none",
-                            mixBlendMode: "screen",
-                            background:
-                              "radial-gradient(circle 90px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.3), rgba(255,255,255,0.06) 55%, transparent 75%)",
-                          }}
-                        />
+                        <div aria-hidden className="ae-sidebar-tab-spotlight" />
                         {l.label}
                       </NavLink>
                     ))}
@@ -245,16 +280,18 @@ export function Sidebar() {
             <div
               style={{
                 fontSize: 12,
-                color: colors.cream,
+                color: "var(--ae-glass-text)",
                 opacity: 0.85,
                 padding: "12px 14px 4px",
-                borderTop: `1px solid color-mix(in srgb, ${colors.cream} 18%, transparent)`,
+                borderTop: "1px solid var(--ae-glass-divider)",
                 flexShrink: 0,
               }}
             >
               <div style={{ overflow: "hidden", whiteSpace: "nowrap" }}>
                 <div style={{ fontWeight: 600 }}>{user.name}</div>
-                <div style={{ opacity: 0.75, marginBottom: 8 }}>{user.role.replace(/_/g, " ")}</div>
+                <div style={{ opacity: 0.75, marginBottom: 8 }}>
+                  {user.role.replace(/_/g, " ")}
+                </div>
               </div>
 
               <button
@@ -266,9 +303,11 @@ export function Sidebar() {
                   fontFamily: "inherit",
                   cursor: "pointer",
                   background: "transparent",
-                  color: colors.gold,
-                  border: `1px solid color-mix(in srgb, ${colors.gold} 55%, transparent)`,
-                  borderRadius: 0,
+                  color: "var(--ae-glass-accent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--ae-glass-accent) 55%, transparent)",
+                  // Matches the nav tabs directly above it, not a leftover square corner.
+                  borderRadius: 8,
                   padding: "4px 10px",
                 }}
               >

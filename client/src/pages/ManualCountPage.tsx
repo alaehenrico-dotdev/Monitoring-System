@@ -15,7 +15,7 @@ import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { ShiftFilter } from "../components/ShiftFilter";
-import { ChevronIcon, SaveIcon } from "../components/icons";
+import { ChevronIcon, MapPinIcon, SaveIcon } from "../components/icons";
 import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
@@ -24,6 +24,7 @@ import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
 import type { Shift } from "../types";
+import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 
 const LOCATIONS: StockLocation[] = ["ONLINE", "OFFLINE", "TOTAL"];
 
@@ -101,23 +102,21 @@ export function ManualCountPage() {
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  function load() {
-    setRows(null);
+  useResetOnKeyChange(`${date}:${shift}:${location}`, () => setRows(null));
+  useEffect(() => {
     getManualCountGrid(date, shift, location)
       .then(setRows)
       .catch((e) => setError(e.message));
-  }
-
-  useEffect(load, [date, shift, location]);
+  }, [date, shift, location]);
 
   // Re-derives drafts from storage whenever the key itself changes (a
   // different date/shift/location) - not cleared here the way `setRows(null)`
   // above is, so whichever combination is being left keeps what it had
   // staged (still there if switched back to) and the one being loaded picks
   // up whatever it already had staged.
-  useEffect(() => {
-    setDrafts(loadDrafts(draftsStorageKey));
-  }, [draftsStorageKey]);
+  useResetOnKeyChange(draftsStorageKey, () =>
+    setDrafts(loadDrafts(draftsStorageKey)),
+  );
 
   useEffect(() => {
     try {
@@ -263,98 +262,99 @@ export function ManualCountPage() {
         }
         subtitle="Review and correct manual counts for the selected date."
       >
-      <Toolbar className="no-print">
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            flexWrap: "nowrap",
-            minWidth: 0,
-          }}
-        >
-          <DatePicker
-            aria-label="Date"
-            value={date}
-            onChange={setDate}
-            todayValue={getCurrentShiftAndDate().date}
-          />
-          <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-          <Dropdown
-            aria-label="Location"
-            value={location}
-            onChange={(v) => setLocation(v as StockLocation)}
-            options={LOCATIONS.map((l) => ({ value: l, label: l }))}
-          />
-          <SearchInput
-            value={query}
-            onChange={setQuery}
-            placeholder="Search SKU or category…"
-          />
-          <CategoryFilter
-            categories={categories}
-            value={categoryFilter}
-            onChange={setCategoryFilter}
-          />
-          {flaggedCount > 0 && (
-            <span
-              style={{
-                color: colors.warningText,
-                fontSize: 13,
-                fontWeight: 600,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-              title={`${flaggedCount} product(s) with a non-zero variance`}
-            >
-              ⚠ {flaggedCount}
-              <span className="ae-toolbar-btn-label"> flagged</span>
-            </span>
-          )}
-        </div>
-        <ToolbarControls>
-          <Button
-            className="ae-toolbar-save"
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={() => setShowConfirm(true)}
-            disabled={pendingCount === 0 || saving}
-            title="Review and save changes"
+        <Toolbar className="no-print">
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "nowrap",
+              minWidth: 0,
+            }}
           >
-            <SaveIcon />
-            <span className="ae-toolbar-btn-label">
-              {saving
-                ? "Saving…"
-                : `Save${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
-            </span>
-          </Button>
-          {csvRows && (
-            <>
-              <CsvTools
-                filenamePrefix={`manual-count-${location.toLowerCase()}-${shift.toLowerCase()}`}
-                date={date}
-                rows={csvRows}
-                columns={csvColumns}
-                // Import lives on the Online/Offline Entry pages only - this
-                // page just exports (Excel/PDF), same as Total Stocks.
-                onImportRow={async () => {}}
-                getPendingValue={() => undefined}
-                canImport={false}
-                pdfDisabled={pendingCount > 0}
-                exportFormat="excel"
-                pdf={{
-                  title: "Manual Counting & Variance",
-                  subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift - ${location}`,
-                  flagKey: "variance",
+            <DatePicker
+              aria-label="Date"
+              value={date}
+              onChange={setDate}
+              todayValue={getCurrentShiftAndDate().date}
+            />
+            <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
+            <Dropdown
+              aria-label="Location"
+              icon={<MapPinIcon />}
+              value={location}
+              onChange={(v) => setLocation(v as StockLocation)}
+              options={LOCATIONS.map((l) => ({ value: l, label: l }))}
+            />
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Search SKU or category…"
+            />
+            <CategoryFilter
+              categories={categories}
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+            />
+            {flaggedCount > 0 && (
+              <span
+                style={{
+                  color: colors.warningText,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                 }}
-              />
-              <ToolbarDivider />
-            </>
-          )}
-          <ZoomControl zoom={zoom} onChange={setZoom} />
-        </ToolbarControls>
-      </Toolbar>
+                title={`${flaggedCount} product(s) with a non-zero variance`}
+              >
+                ⚠ {flaggedCount}
+                <span className="ae-toolbar-btn-label"> flagged</span>
+              </span>
+            )}
+          </div>
+          <ToolbarControls>
+            <Button
+              className="ae-toolbar-save ae-toolbar-primary"
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowConfirm(true)}
+              disabled={pendingCount === 0 || saving}
+              title="Review and save changes"
+            >
+              <SaveIcon />
+              <span className="ae-toolbar-btn-label">
+                {saving
+                  ? "Saving…"
+                  : `Save${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
+              </span>
+            </Button>
+            {csvRows && (
+              <>
+                <CsvTools
+                  filenamePrefix={`manual-count-${location.toLowerCase()}-${shift.toLowerCase()}`}
+                  date={date}
+                  rows={csvRows}
+                  columns={csvColumns}
+                  // Import lives on the Online/Offline Entry pages only - this
+                  // page just exports (Excel/PDF), same as Total Stocks.
+                  onImportRow={async () => {}}
+                  getPendingValue={() => undefined}
+                  canImport={false}
+                  pdfDisabled={pendingCount > 0}
+                  exportFormat="excel"
+                  pdf={{
+                    title: "Manual Counting & Variance",
+                    subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift - ${location}`,
+                    flagKey: "variance",
+                  }}
+                />
+                <ToolbarDivider />
+              </>
+            )}
+            <ZoomControl zoom={zoom} onChange={setZoom} />
+          </ToolbarControls>
+        </Toolbar>
       </PageHeader>
       {error && <p style={{ color: colors.danger }}>{error}</p>}
       {!rows ? (
@@ -378,10 +378,7 @@ export function ManualCountPage() {
           <RowGlowScroll
             focusStorageKey={`ala-eh-focus:manual-count:${date}:${shift}:${location}`}
           >
-            <table
-              className="ae-table ae-table--center-head"
-              style={{ minWidth: 640 }}
-            >
+            <table className="ae-table ae-table--center-head ae-table--compact">
               <thead>
                 <tr>
                   {[
@@ -391,7 +388,9 @@ export function ManualCountPage() {
                     "Manual Count",
                     "Variance",
                   ].map((h) => (
-                    <th key={h}>{h}</th>
+                    <th key={h} style={manualCountHeadStyle[h]}>
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
@@ -462,7 +461,7 @@ export function ManualCountPage() {
                               r.entry.systemRemainingStock,
                             ).toLocaleString()}
                           </td>
-                          <td>
+                          <td style={manualCountTint["Manual Count"]}>
                             <NumberCellInput
                               value={String(
                                 drafts[r.product.id] ??
@@ -479,7 +478,16 @@ export function ManualCountPage() {
                               style={{ width: 64, textAlign: "center" }}
                             />
                           </td>
-                          <td style={{ fontWeight: r.isFlagged ? 700 : 400 }}>
+                          <td
+                            style={{
+                              ...manualCountTint.Variance,
+                              fontWeight: r.isFlagged ? 700 : 400,
+                              color:
+                                Number(r.entry.variance) < 0
+                                  ? colors.danger
+                                  : undefined,
+                            }}
+                          >
                             {r.entry.variance ?? "—"}
                           </td>
                         </tr>
@@ -495,7 +503,7 @@ export function ManualCountPage() {
                             )
                             .toLocaleString()}
                         </td>
-                        <td>
+                        <td style={manualCountTint["Manual Count"]}>
                           {groupRows
                             .reduce(
                               (sum, r) => sum + toNum(r.entry.manualCount),
@@ -503,7 +511,18 @@ export function ManualCountPage() {
                             )
                             .toLocaleString()}
                         </td>
-                        <td>
+                        <td
+                          style={{
+                            ...manualCountTint.Variance,
+                            color:
+                              groupRows.reduce(
+                                (sum, r) => sum + toNum(r.entry.variance),
+                                0,
+                              ) < 0
+                                ? colors.danger
+                                : undefined,
+                          }}
+                        >
                           {groupRows
                             .reduce(
                               (sum, r) => sum + toNum(r.entry.variance),
@@ -525,12 +544,23 @@ export function ManualCountPage() {
                       )
                       .toLocaleString()}
                   </td>
-                  <td>
+                  <td style={manualCountTint["Manual Count"]}>
                     {(visibleRows ?? [])
                       .reduce((sum, r) => sum + toNum(r.entry.manualCount), 0)
                       .toLocaleString()}
                   </td>
-                  <td>
+                  <td
+                    style={{
+                      ...manualCountTint.Variance,
+                      color:
+                        (visibleRows ?? []).reduce(
+                          (sum, r) => sum + toNum(r.entry.variance),
+                          0,
+                        ) < 0
+                          ? colors.danger
+                          : undefined,
+                    }}
+                  >
                     {(visibleRows ?? [])
                       .reduce((sum, r) => sum + toNum(r.entry.variance), 0)
                       .toLocaleString()}
@@ -641,4 +671,25 @@ const grandTotalRowStyle: CSSProperties = {
   fontWeight: 700,
   background: colors.warningBg,
   borderTop: `2px solid ${colors.black}`,
+};
+
+// Column color coding for the count grid: Manual Count in blue, Variance in
+// teal (a cool color that sits next to the blue without being mistaken for
+// it). Header-only, fixed fills with brand-ink / white labels so they read
+// the same in light and dark mode.
+const manualCountHeadStyle: Record<string, CSSProperties | undefined> = {
+  "Manual Count": { background: "#3B82F6", color: "#FFFFFF" },
+  Variance: { background: "#2DB7A8", color: "#0C0C0C" },
+};
+
+// Body-cell tint for the same two columns (whole column, not just the header).
+// A translucent background-IMAGE layer, so the table's row-hover fill (a
+// background-color) still shows through and the hover effect is unchanged.
+function tintLayer(color: string): CSSProperties {
+  const tint = `color-mix(in srgb, ${color} 22%, transparent)`;
+  return { backgroundImage: `linear-gradient(${tint}, ${tint})` };
+}
+const manualCountTint: Record<"Manual Count" | "Variance", CSSProperties> = {
+  "Manual Count": tintLayer("#3B82F6"),
+  Variance: tintLayer("#2DB7A8"),
 };

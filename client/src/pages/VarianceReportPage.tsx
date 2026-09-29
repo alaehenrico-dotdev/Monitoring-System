@@ -13,7 +13,7 @@ import { PageHeader } from "../components/PageHeader";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
-import { PrinterIcon } from "../components/icons";
+import { HistoryIcon, PlayIcon, PrinterIcon } from "../components/icons";
 import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 import { RowGlowScroll } from "../components/RowGlowScroll";
@@ -75,7 +75,9 @@ export function VarianceReportPage() {
   const printAfterLoad = useRef(searchParams.get("history") === "1");
   // Alert dialogs shown instead of generating: unsaved entry/count edits
   // inside the date range, or a range with nothing to report on.
-  const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(null);
+  const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(
+    null,
+  );
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -138,7 +140,12 @@ export function VarianceReportPage() {
     try {
       await progress.track(() =>
         downloadTablePdf({
-          filename: pdfFileName("variance-report", startDate, endDate, category),
+          filename: pdfFileName(
+            "variance-report",
+            startDate,
+            endDate,
+            category,
+          ),
           title: "Variance Report",
           subtitle: `${startDate} to ${endDate}`,
           notes: [
@@ -177,48 +184,63 @@ export function VarianceReportPage() {
 
   return (
     <div>
-      <PageHeader title="Variance Report" subtitle="Review differences between recorded stock and manual counts.">
-      <Toolbar className="no-print">
-        <form
-          onSubmit={runReport}
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            flexWrap: "nowrap",
-            minWidth: 0,
-          }}
-        >
-          <DatePicker aria-label="From" value={startDate} onChange={setStartDate} style={{ maxWidth: 160 }} />
-          <DatePicker aria-label="To" value={endDate} onChange={setEndDate} style={{ maxWidth: 160 }} />
-          <TextInput
-            aria-label="Category (optional)"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="e.g. Premium (Liter)"
-            style={{ maxWidth: 200 }}
-          />
-          <Button type="submit">Run report</Button>
-        </form>
-        <ToolbarControls>
-          {rows && (
-            <Button
-              variant="secondary"
-              onClick={handlePdf}
-              title="Download as PDF"
-            >
-              <PrinterIcon /> PDF
-            </Button>
-          )}
-          <Link
-            to="/variance-report-history"
-            className="ae-btn ae-btn-secondary"
-            style={{ textDecoration: "none" }}
+      <PageHeader
+        title="Variance Report"
+        subtitle="Review differences between recorded stock and manual counts."
+      >
+        <Toolbar className="no-print">
+          <form
+            onSubmit={runReport}
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "nowrap",
+              minWidth: 0,
+            }}
           >
-            Variance History
-          </Link>
-        </ToolbarControls>
-      </Toolbar>
+            <DatePicker
+              aria-label="From"
+              value={startDate}
+              onChange={setStartDate}
+              style={{ maxWidth: 160 }}
+            />
+            <DatePicker
+              aria-label="To"
+              value={endDate}
+              onChange={setEndDate}
+              style={{ maxWidth: 160 }}
+            />
+            <TextInput
+              aria-label="Category (optional)"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="e.g. Premium (Liter)"
+              style={{ maxWidth: 200 }}
+            />
+            <Button type="submit">
+              <PlayIcon /> Run report
+            </Button>
+          </form>
+          <ToolbarControls>
+            {rows && (
+              <Button
+                variant="secondary"
+                onClick={handlePdf}
+                title="Download as PDF"
+              >
+                <PrinterIcon /> PDF
+              </Button>
+            )}
+            <Link
+              to="/variance-report-history"
+              className="ae-btn ae-btn-secondary"
+              style={{ textDecoration: "none" }}
+            >
+              <HistoryIcon /> Variance History
+            </Link>
+          </ToolbarControls>
+        </Toolbar>
       </PageHeader>
 
       {error && <p style={{ color: colors.danger }}>{error}</p>}
@@ -302,9 +324,17 @@ export function VarianceReportPage() {
         </p>
       )}
 
-      {unsavedWork && <UnsavedWorkDialog items={unsavedWork} onClose={() => setUnsavedWork(null)} />}
+      {unsavedWork && (
+        <UnsavedWorkDialog
+          items={unsavedWork}
+          onClose={() => setUnsavedWork(null)}
+        />
+      )}
       {emptyMessage && (
-        <AlertDialog title="No report to generate" onClose={() => setEmptyMessage(null)}>
+        <AlertDialog
+          title="No report to generate"
+          onClose={() => setEmptyMessage(null)}
+        >
           {emptyMessage}
         </AlertDialog>
       )}

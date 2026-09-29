@@ -17,7 +17,6 @@ jobs:
       DATABASE_URL: "mysql://root:root@localhost:3306/ala_eh_stocks_ci"
       JWT_SECRET: "ci-only-jwt-secret-not-used-anywhere-real"
       DATA_RESET_PASSCODE: "ci-only-passcode-not-used-anywhere-real"
-      RECEIPT_QR_SECRET: "ci-only-receipt-qr-secret-not-used-anywhere-real"
       CLIENT_ORIGIN: "http://localhost:5173"
     steps:
       - uses: actions/checkout@v4

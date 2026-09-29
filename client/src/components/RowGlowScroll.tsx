@@ -17,7 +17,7 @@ interface RingRect {
 // Must match .ae-row-ring's `height` in index.css - the bottom bar is
 // pinned this far up from the row's own bottom edge so it sits flush
 // against it instead of hanging half a row below.
-const RING_THICKNESS = 1.5;
+const RING_THICKNESS = 1;
 
 /**
  * Drop-in replacement for the plain `<div className="ae-table-scroll

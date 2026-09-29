@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/http";
 import { LogoMark } from "../components/LogoMark";
 import { TopBar } from "../components/TopBar";
+import { LoadingOverlay } from "../components/Spinner";
 import { Button, Field, TextInput } from "../components/ui";
 import { colors, fonts } from "../theme";
 
@@ -37,6 +38,7 @@ export function LoginPage() {
           (see HeaderExtras, used everywhere past this screen), so it keeps
           the old fixed top-right chrome. */}
       <TopBar />
+      {submitting && <LoadingOverlay label="Signing in…" />}
       <div
         style={{
           display: "flex",
@@ -47,49 +49,99 @@ export function LoginPage() {
           padding: "24px 16px",
           boxSizing: "border-box",
           fontFamily: fonts.body,
-          background: colors.black,
-          backgroundImage: `radial-gradient(circle at 50% -10%, ${colors.blackSoft}, ${colors.black} 70%)`,
+          background: colors.charcoal,
+          backgroundImage: `radial-gradient(circle at 50% -10%, ${colors.charcoalSoft}, ${colors.charcoal} 70%)`,
         }}
       >
-      <LogoMark size={104} />
-      <h1 style={{ fontFamily: fonts.wordmark, fontSize: 26, fontWeight: 800, color: colors.yellow, margin: "12px 0 2px" }}>Ala Eh!</h1>
-      <p style={{ fontSize: 12.5, color: colors.cream, opacity: 0.8, margin: "0 0 24px", letterSpacing: 0.4 }}>
-        Online &amp; Offline Stocks Monitoring System
-      </p>
+        <LogoMark size={104} />
+        <h1
+          style={{
+            fontFamily: fonts.wordmark,
+            fontSize: 26,
+            fontWeight: 800,
+            color: colors.yellow,
+            margin: "12px 0 2px",
+          }}
+        >
+          Ala Eh!
+        </h1>
+        <p
+          style={{
+            fontSize: 12.5,
+            color: colors.cream,
+            opacity: 0.8,
+            margin: "0 0 24px",
+            letterSpacing: 0.4,
+          }}
+        >
+          Online &amp; Offline Stocks Monitoring System
+        </p>
 
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          width: "100%",
-          maxWidth: 320,
-          boxSizing: "border-box",
-          background: colors.paper,
-          borderRadius: 10,
-          padding: 24,
-          border: `1px solid ${colors.goldDark}`,
-          boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-        }}
-      >
-        <Field label="Username" style={{ marginBottom: 12 }}>
-          <TextInput value={username} onChange={(e) => setUsername(e.target.value)} style={{ width: "100%" }} autoFocus />
-        </Field>
+        <form
+          onSubmit={handleSubmit}
+          style={{
+            width: "100%",
+            maxWidth: 320,
+            boxSizing: "border-box",
+            background: colors.paper,
+            // Same 8px radius as .ae-page-header/Modal/every other card - one
+            // family of rounded brand chrome across the app.
+            borderRadius: 8,
+            padding: 24,
+            // Positioning context for the 1px animated border sweep below
+            // (replaces the old static gold border).
+            position: "relative",
+            boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
+          }}
+        >
+          <div
+            aria-hidden
+            className="ae-modal-border-sweep"
+            style={{ padding: 0.5 }}
+          />
+          <Field label="Username" style={{ marginBottom: 12 }}>
+            <TextInput
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              style={{ width: "100%" }}
+              autoFocus
+            />
+          </Field>
 
-        <Field label="Password" style={{ marginBottom: 16 }}>
-          <TextInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%" }} />
-        </Field>
+          <Field label="Password" style={{ marginBottom: 16 }}>
+            <TextInput
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </Field>
 
-        {/* A submit error takes precedence once the user has actually tried
+          {/* A submit error takes precedence once the user has actually tried
             signing in; sessionError (the initial session check failing for a
             reason other than "not logged in") is what explains why they
             landed here in the first place, if that's what happened. */}
-        {(error ?? sessionError) && (
-          <p style={{ color: colors.danger, fontSize: 13, marginTop: -8, marginBottom: 12 }}>{error ?? sessionError}</p>
-        )}
+          {(error ?? sessionError) && (
+            <p
+              style={{
+                color: colors.danger,
+                fontSize: 13,
+                marginTop: -8,
+                marginBottom: 12,
+              }}
+            >
+              {error ?? sessionError}
+            </p>
+          )}
 
-        <Button type="submit" disabled={submitting} style={{ width: "100%", padding: 10 }}>
-          {submitting ? "Signing in…" : "Sign in"}
-        </Button>
-      </form>
+          <Button
+            type="submit"
+            disabled={submitting}
+            style={{ width: "100%", padding: 10 }}
+          >
+            {submitting ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
       </div>
     </>
   );

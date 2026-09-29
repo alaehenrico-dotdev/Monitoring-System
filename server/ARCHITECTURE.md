@@ -90,9 +90,8 @@ still no cycle:
 
 | Caller | Calls | Why |
 |---|---|---|
-| `receipts.service.ts` | `dailyOnlineStock.service.ts` (`addFulfillmentFromReceipt`) | Section 4.7: a saved receipt can post into that date's Fulfillment (Out). |
 | `reports.service.ts` | `dailyOnlineStock`, `dailyOfflineStock`, `totalStocks`, `manualCounts` services | Section 4.8: the Daily/Variance Report is a read-only composition of the other grids - it holds no calculation logic of its own. |
-| `products.service.ts`, `dailyOnlineStock.service.ts`, `dailyOfflineStock.service.ts`, `manualCounts.service.ts`, `receipts.service.ts` | `changeLog.service.ts` | Section 4.8: every create/update is logged. `changeLog.service.ts` itself depends on nothing but its own repository, so it can never be part of a cycle. |
+| `products.service.ts`, `dailyOnlineStock.service.ts`, `dailyOfflineStock.service.ts`, `manualCounts.service.ts` | `changeLog.service.ts` | Section 4.8: every create/update is logged. `changeLog.service.ts` itself depends on nothing but its own repository, so it can never be part of a cycle. |
 
 `totalStocks.service.ts` calls no other service at all - it reads three
 repositories directly and combines the results, matching Section 4.5's "not a

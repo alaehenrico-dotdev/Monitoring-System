@@ -203,11 +203,3 @@ async function mirrorTransferToOffline(
     newValue: saved,
   });
 }
-
-/// Section 4.7 - a saved Receipt can post its quantities straight into that
-/// shift's Online Fulfillment (Out).
-export async function addFulfillmentFromReceipt(productId: number, entryDate: Date, shift: Shift, additionalQty: number, userId?: number) {
-  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
-  const currentFulfillment = toNum(existing?.fulfillmentOut);
-  await saveOnlineEntry(productId, entryDate, shift, { fulfillmentOut: currentFulfillment + additionalQty }, userId);
-}

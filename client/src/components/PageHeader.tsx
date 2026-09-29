@@ -1,10 +1,15 @@
-import { useRef, useState, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import { HeaderExtras } from "./HeaderExtras";
 import { ChevronIcon } from "./icons";
 import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
 
-const LOGO_SIZE = 36;
+const LOGO_SIZE = 56;
 // Same hover-triggered spin cooldown the logo had inside the sidebar
 // itself - so hovering back and forth doesn't restart the animation
 // mid-spin.
@@ -21,7 +26,8 @@ interface PageHeaderProps {
   children?: ReactNode;
 }
 
-/// The black, gold-bordered card every page opens with. Title always stays
+/// The glass, gold-bordered card every page opens with (frosted cream in
+/// light mode, dark glass in dark mode - see --ae-glass-* in index.css). Title always stays
 /// visible; the subtitle + Toolbar collapse away to give the page below
 /// more room - animated via a grid-rows transition on the wrapper (see
 /// .ae-page-header-collapsible in index.css), so collapsing eases the
@@ -47,18 +53,49 @@ interface PageHeaderProps {
 /// top-left beside the title/subtitle and opens the floating nav drawer
 /// (Sidebar.tsx, via NavDrawerContext) instead of toggling the sidebar's
 /// own long-gone docked/collapsed states.
-export function PageHeader({ title, subtitle, subtitleClassName, children }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  subtitle,
+  subtitleClassName,
+  children,
+}: PageHeaderProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { open, toggle } = useNavDrawer();
   const [logoSpin, setLogoSpin] = useState(0);
   const lastSpinAtRef = useRef(0);
   const logoRef = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
 
   function spinLogo() {
     const now = performance.now();
     if (now - lastSpinAtRef.current < LOGO_SPIN_MS) return;
     lastSpinAtRef.current = now;
     setLogoSpin((n) => n + 1);
+  }
+
+  // Cursor position as a percentage of the card, written straight to CSS
+  // custom properties - same trick as Toolbar.tsx/Sidebar.tsx, so the glow
+  // tracks the pointer without a re-render on every mousemove.
+  // `.ae-page-header::before` reads them to place the glow.
+  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>) {
+    const el = headerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    el.style.setProperty(
+      "--mx",
+      `${((e.clientX - rect.left) / rect.width) * 100}%`,
+    );
+    el.style.setProperty(
+      "--my",
+      `${((e.clientY - rect.top) / rect.height) * 100}%`,
+    );
+    el.style.setProperty("--spotlight-opacity", "1");
+  }
+
+  // Fade the glow back out (the opacity transition lives in CSS).
+  function handlePointerLeave() {
+    headerRef.current?.style.setProperty("--spotlight-opacity", "0");
   }
 
   function handleLogoClick() {
@@ -71,7 +108,12 @@ export function PageHeader({ title, subtitle, subtitleClassName, children }: Pag
   }
 
   return (
-    <div className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}`}>
+    <div
+      ref={headerRef}
+      className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}`}
+      onMouseMove={handlePointerMove}
+      onMouseLeave={handlePointerLeave}
+    >
       <HeaderExtras />
       <div className="ae-page-header-top">
         <button
@@ -88,14 +130,25 @@ export function PageHeader({ title, subtitle, subtitleClassName, children }: Pag
         </button>
         <div className="ae-page-header-titles">
           <h2>{title}</h2>
-          <div className="ae-page-header-collapsible">
-            <div className="ae-page-header-collapsible-inner">
-              {subtitle && <p className={subtitleClassName}>{subtitle}</p>}
-              <div className="ae-page-header-toolbar-slot">{children}</div>
+          {subtitle && (
+            <div className="ae-page-header-collapsible">
+              <div className="ae-page-header-collapsible-inner">
+                <p className={subtitleClassName}>{subtitle}</p>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
+      {/* The Toolbar is its own full-width row below the logo/title row (not
+          inside the titles column beside the logo), so it starts at the
+          card's left end under the logo. It collapses with the subtitle. */}
+      {children && (
+        <div className="ae-page-header-collapsible ae-page-header-collapsible--toolbar">
+          <div className="ae-page-header-collapsible-inner">
+            <div className="ae-page-header-toolbar-slot">{children}</div>
+          </div>
+        </div>
+      )}
       <button
         type="button"
         className="ae-page-header-collapse-btn no-print"
