@@ -43,6 +43,32 @@ export interface GridColumn {
    * see columnToneStyle below; unused by CSV/PDF/Excel exports.
    */
   tone?: "in" | "out" | "delivery";
+  /**
+   * Adds an arrow to this column's header that shows/hides these input columns
+   * directly to its right. They are real, saved fields that belong to this
+   * column only (Delivery (Out) is the total of its five Delivery columns) -
+   * nothing else reads them. Ignored on read-only grids, where only the
+   * parent column's total is shown.
+   */
+  subColumns?: { key: string; label: string }[];
+}
+
+// Grid lines for the sub-columns, header cell through the totals row (see
+// .ae-extra-col in index.css); the first one also gets the left edge.
+function extraCellClass(i: number): string {
+  return i === 0 ? "ae-extra-col ae-extra-col--first" : "ae-extra-col";
+}
+
+// Names typed into the sub-columns' header inputs are a per-browser label
+// only (the saved data is keyed by the column, not by its name).
+const NAMES_STORAGE_KEY = "ala-eh-grid-subcolumn-names";
+function loadNames(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(NAMES_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+  } catch {
+    return {};
+  }
 }
 
 // Header fills for the color-coded columns. Pastel fills on purpose, with the
@@ -211,6 +237,11 @@ export function StockGrid({
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
+  // Whether the sub-columns after the `subColumns` column (Delivery (Out))
+  // are showing. Not persisted - it's a view toggle, like the category
+  // collapse above.
+  const [extrasOpen, setExtrasOpen] = useState(false);
+  const [extraNames, setExtraNames] = useState<Record<string, string>>(loadNames);
 
   const groups = new Map<string, GridRow[]>();
   for (const row of rows) {
@@ -219,8 +250,18 @@ export function StockGrid({
     groups.set(row.product.category, list);
   }
 
+  const showExtras = extrasOpen && !readOnly;
+  const extraCount = showExtras
+    ? columns.reduce((n, c) => n + (c.subColumns?.length ?? 0), 0)
+    : 0;
+
   const allProductIds = rows.map((r) => r.product.id);
-  const editableColKeys = columns.filter((c) => c.editable).map((c) => c.key);
+  // Arrow-key navigation order: the sub-columns sit right after the
+  // column that owns them, so they're stepped through like any other cell.
+  const editableColKeys = columns.flatMap((c) => [
+    ...(c.editable ? [c.key] : []),
+    ...(showExtras && c.subColumns ? c.subColumns.map((sc) => sc.key) : []),
+  ]);
 
   // The page hands over a fresh `onCommit` (and this render a fresh id/column
   // list) every render. Reading them through refs keeps the callbacks passed
@@ -274,12 +315,92 @@ export function StockGrid({
             <th>SKU</th>
             <th>Product</th>
             {columns.map((c) => (
-              <th
-                key={c.key}
-                style={c.tone ? columnToneStyle[c.tone] : undefined}
-              >
-                {c.label}
-              </th>
+              <Fragment key={c.key}>
+                <th
+                  style={{
+                    ...(c.tone ? columnToneStyle[c.tone] : undefined),
+                    // The arrow straddles this cell's right border, so this
+                    // header sits above its neighbour (which would otherwise
+                    // paint over the half of the arrow that overhangs it) and
+                    // keeps its label clear of the arrow's inner half.
+                    ...(c.subColumns && !readOnly
+                      ? { zIndex: 2, paddingRight: 14 }
+                      : undefined),
+                  }}
+                >
+                  {c.label}
+                  {c.subColumns && !readOnly && (
+                    <button
+                      type="button"
+                      onClick={() => setExtrasOpen((o) => !o)}
+                      aria-expanded={extrasOpen}
+                      title={
+                        extrasOpen
+                          ? `Hide the ${c.label} columns`
+                          : `Show the ${c.label} columns`
+                      }
+                      aria-label={
+                        extrasOpen
+                          ? `Hide the columns behind ${c.label}`
+                          : `Show the columns behind ${c.label}`
+                      }
+                      style={headerArrowStyle}
+                    >
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          // Chevron points down by default: right when
+                          // closed (expands sideways), left when open.
+                          transform: extrasOpen
+                            ? "rotate(90deg)"
+                            : "rotate(-90deg)",
+                          transition:
+                            "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                        }}
+                      >
+                        <ChevronIcon />
+                      </span>
+                    </button>
+                  )}
+                </th>
+                {showExtras &&
+                  c.subColumns?.map((sc, i) => (
+                    <th
+                      key={sc.key}
+                      className={extraCellClass(i)}
+                      aria-label={sc.label}
+                      style={{
+                        ...(c.tone ? columnToneStyle[c.tone] : undefined),
+                        minWidth: 96,
+                        padding: 0,
+                      }}
+                    >
+                      {/* Full-cell text input: the header cell's own padding
+                          is dropped so the input fills it edge to edge. */}
+                      <input
+                        type="text"
+                        className="ae-extra-head-input"
+                        value={extraNames[sc.key] ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setExtraNames((n) => {
+                            const next = { ...n, [sc.key]: value };
+                            try {
+                              localStorage.setItem(NAMES_STORAGE_KEY, JSON.stringify(next));
+                            } catch {
+                              // label only - fine to lose
+                            }
+                            return next;
+                          });
+                        }}
+                        placeholder={sc.label}
+                        aria-label={`${sc.label} name`}
+                        spellCheck={false}
+                        autoComplete="off"
+                      />
+                    </th>
+                  ))}
+              </Fragment>
             ))}
           </tr>
         </thead>
@@ -301,7 +422,7 @@ export function StockGrid({
                       fixed per page, so only the vertical stick is needed
                       here. */}
                   <td
-                    colSpan={columns.length + 2}
+                    colSpan={columns.length + 2 + extraCount}
                     style={{
                       padding: 0,
                       position: "sticky",
@@ -363,8 +484,8 @@ export function StockGrid({
                     <td style={nameCellStyle}>{row.product.name}</td>
                     {columns.map((col) => {
                       const raw = row.entry[col.key];
-                      if (!col.editable || readOnly) {
-                        return (
+                      const cell =
+                        !col.editable || readOnly ? (
                           <td
                             key={col.key}
                             style={{
@@ -376,21 +497,45 @@ export function StockGrid({
                               ? "—"
                               : Number(raw).toLocaleString()}
                           </td>
+                        ) : (
+                          <td key={col.key} style={tintFor(col)}>
+                            <DraftCell
+                              productId={row.product.id}
+                              colKey={col.key}
+                              raw={raw}
+                              edited={
+                                pending?.[row.product.id]?.[col.key] !==
+                                undefined
+                              }
+                              onCommit={commitCell}
+                              onKeyDown={handleKeyDown}
+                            />
+                          </td>
                         );
-                      }
+                      if (!showExtras || !col.subColumns) return cell;
                       return (
-                        <td key={col.key} style={tintFor(col)}>
-                          <DraftCell
-                            productId={row.product.id}
-                            colKey={col.key}
-                            raw={raw}
-                            edited={
-                              pending?.[row.product.id]?.[col.key] !== undefined
-                            }
-                            onCommit={commitCell}
-                            onKeyDown={handleKeyDown}
-                          />
-                        </td>
+                        <Fragment key={col.key}>
+                          {cell}
+                          {col.subColumns.map((sc, i) => (
+                            <td
+                              key={sc.key}
+                              className={extraCellClass(i)}
+                              style={tintFor(col)}
+                            >
+                              <DraftCell
+                                productId={row.product.id}
+                                colKey={sc.key}
+                                raw={row.entry[sc.key]}
+                                edited={
+                                  pending?.[row.product.id]?.[sc.key] !==
+                                  undefined
+                                }
+                                onCommit={commitCell}
+                                onKeyDown={handleKeyDown}
+                              />
+                            </td>
+                          ))}
+                        </Fragment>
                       );
                     })}
                   </tr>
@@ -398,11 +543,25 @@ export function StockGrid({
                 <tr key={`${category}-subtotal`} style={subtotalRowStyle}>
                   <td colSpan={2}>Subtotal - {category}</td>
                   {columns.map((col) => (
-                    <td key={col.key} style={tintFor(col)}>
-                      {groupRows
-                        .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
-                        .toLocaleString()}
-                    </td>
+                    <Fragment key={col.key}>
+                      <td style={tintFor(col)}>
+                        {groupRows
+                          .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
+                          .toLocaleString()}
+                      </td>
+                      {showExtras &&
+                        col.subColumns?.map((sc, i) => (
+                          <td
+                            key={sc.key}
+                            className={extraCellClass(i)}
+                            style={tintFor(col)}
+                          >
+                            {groupRows
+                              .reduce((sum, r) => sum + toNum(r.entry[sc.key]), 0)
+                              .toLocaleString()}
+                          </td>
+                        ))}
+                    </Fragment>
                   ))}
                 </tr>
               </Fragment>
@@ -411,11 +570,25 @@ export function StockGrid({
           <tr style={grandTotalRowStyle}>
             <td colSpan={2}>GRAND TOTAL</td>
             {columns.map((col) => (
-              <td key={col.key} style={tintFor(col)}>
-                {rows
-                  .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
-                  .toLocaleString()}
-              </td>
+              <Fragment key={col.key}>
+                <td style={tintFor(col)}>
+                  {rows
+                    .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
+                    .toLocaleString()}
+                </td>
+                {showExtras &&
+                  col.subColumns?.map((sc, i) => (
+                    <td
+                      key={sc.key}
+                      className={extraCellClass(i)}
+                      style={tintFor(col)}
+                    >
+                      {rows
+                        .reduce((sum, r) => sum + toNum(r.entry[sc.key]), 0)
+                        .toLocaleString()}
+                    </td>
+                  ))}
+              </Fragment>
             ))}
           </tr>
         </tbody>
@@ -464,6 +637,27 @@ const categoryToggleStyle: CSSProperties = {
   background: "var(--ae-category-bg)",
   color: colors.yellow,
   cursor: "pointer",
+};
+// The expand arrow: a small dark tab centered on the Delivery header's right
+// border (half inside the cell, half over the next one). The header cell is
+// position: sticky, so it is the containing block for this absolute button.
+const headerArrowStyle: CSSProperties = {
+  position: "absolute",
+  top: "50%",
+  right: -9,
+  transform: "translateY(-50%)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 18,
+  height: 18,
+  padding: 0,
+  border: "none",
+  borderRadius: 4,
+  background: colors.black,
+  color: colors.yellow,
+  cursor: "pointer",
+  lineHeight: 0,
 };
 const subtotalRowStyle: CSSProperties = {
   fontWeight: 600,

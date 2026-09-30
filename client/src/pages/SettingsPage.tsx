@@ -7,7 +7,7 @@ import { colors } from "../theme";
 type Tab = "backup" | "reset";
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: "backup", label: "Database Backup" },
+  { key: "backup", label: "Backup & Restore" },
   { key: "reset", label: "Data Reset" },
 ];
 
@@ -23,7 +23,7 @@ export function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="System-level tools for administrators - back up the database or wipe it for a fresh start."
+        subtitle="System-level tools for administrators - back up, restore or wipe the database for a fresh start."
       />
 
       <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${colors.border}`, marginBottom: 24 }}>

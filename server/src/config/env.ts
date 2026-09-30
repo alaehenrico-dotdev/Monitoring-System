@@ -51,4 +51,12 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
+  // Full path to the mysqldump binary, for hosts (notably Windows) where the
+  // MySQL client tools aren't on PATH. Defaults to plain "mysqldump".
+  mysqldumpPath: process.env.MYSQLDUMP_PATH?.trim() || "mysqldump",
+  // The `mysql` client used by Settings > Database Restore. Defaults to the
+  // binary sitting next to mysqldump (same install), else plain "mysql".
+  mysqlPath:
+    process.env.MYSQL_PATH?.trim() ||
+    (process.env.MYSQLDUMP_PATH ? process.env.MYSQLDUMP_PATH.trim().replace(/mysqldump(\.exe)?$/i, "mysql$1") : "mysql"),
 };

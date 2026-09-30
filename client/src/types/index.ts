@@ -20,6 +20,10 @@ export interface Product {
   unit: string;
   isActive: boolean;
   sortOrder: number;
+  // Section 4.1/4.5 - Low Stock. Null = no alert configured for this SKU;
+  // Total Stocks flags a product only once this is set, against its
+  // remainingStock (same unit as `unit`).
+  lowStockThreshold: number | null;
 }
 
 export interface OnlineEntry {
@@ -42,21 +46,6 @@ export interface OnlineGridRow {
   isSaved: boolean;
 }
 
-/// A named Offline delivery route/destination (e.g. "Western", "Cavite") -
-/// Section 4.3. Admin-managed (see DeliveryDestinationsAdminPage), the same
-/// way Products are, so the set of destinations can change over time
-/// without a code change: the monthly report this app re-imports (Section
-/// 8.1) has used a different destination lineup from one period to the
-/// next, each getting its own column ("SLOT 1", "SLOT 2", ... in the
-/// sheet's own generic sub-header, with the real name - "WESTERN UPSELL",
-/// "CAVITE" - as that column's actual header).
-export interface DeliveryDestination {
-  id: number;
-  name: string;
-  isActive: boolean;
-  sortOrder: number;
-}
-
 export interface OfflineEntry {
   productId: number;
   entryDate: string;
@@ -66,15 +55,14 @@ export interface OfflineEntry {
   stockOutOffToOl: number;
   offlineStock: number;
   productionIn: number;
-  /// Delivery (Out) broken down by destination - keyed by DeliveryDestination
-  /// id, one entry per active destination that's ever had a value here.
-  /// This is what an encoder actually fills in; deliveryOut below is
-  /// computed as its sum, the same way offlineStock/remainingStock are
-  /// computed rather than typed directly - the live grid shows one locked
-  /// "Delivery (Out)" column, not this map, plus one editable column per
-  /// destination (see buildOfflineStockColumns in config/stockColumns.ts).
-  deliveryByDestination: Record<number, number>;
+  /// Delivery (Out) is the sum of these five slots - the grid's expandable
+  /// Delivery columns.
   deliveryOut: number;
+  delivery1: number;
+  delivery2: number;
+  delivery3: number;
+  delivery4: number;
+  delivery5: number;
   /// A distinct Out figure from Delivery (Out) - e.g. free/upsell samples
   /// handed out rather than delivered against a route. Its own column on
   /// the monthly report ("UPSELL (OUT)"), usually 0.

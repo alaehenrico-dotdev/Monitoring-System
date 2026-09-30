@@ -9,10 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   dailyOnlineStock: [] as Record<string, unknown>[],
   dailyOfflineStock: [] as Record<string, unknown>[],
-  offlineEntryDelivery: [] as Record<string, unknown>[],
   manualCount: [] as Record<string, unknown>[],
   changeLog: [] as Record<string, unknown>[],
-  deliveryDestination: [] as Record<string, unknown>[],
 }));
 
 function makeModel(table: Record<string, unknown>[]) {
@@ -36,14 +34,8 @@ vi.mock("../lib/prisma", () => ({
       cb({
         dailyOnlineStock: makeModel(db.dailyOnlineStock),
         dailyOfflineStock: makeModel(db.dailyOfflineStock),
-        offlineEntryDelivery: makeModel(db.offlineEntryDelivery),
         manualCount: makeModel(db.manualCount),
         changeLog: makeModel(db.changeLog),
-        // Present on tx (like every other model) purely so a future change
-        // that mistakenly starts calling deleteMany on it would still show
-        // up as a genuine row disappearing in the assertions below - never
-        // called by resetAllData itself.
-        deliveryDestination: makeModel(db.deliveryDestination),
       }),
   },
 }));
@@ -59,20 +51,10 @@ beforeEach(() => {
 });
 
 describe("resetAllData", () => {
-  it("wipes an Offline entry and its OfflineEntryDelivery breakdown, leaving the DeliveryDestination it referenced untouched", async () => {
-    const destination = {
-      id: 1,
-      name: "West",
-      isActive: true,
-      sortOrder: 0,
-      createdAt: new Date("2026-01-01"),
-      updatedAt: new Date("2026-01-01"),
-    };
-    db.deliveryDestination.push({ ...destination });
+  it("wipes an Offline entry, leaving nothing behind", async () => {
     // upsellOut lives directly on the Offline entry row - deleting the row
     // is all that's needed to reset it too, nothing separate to assert.
     db.dailyOfflineStock.push({ id: 10, productId: 1, entryDate: new Date("2026-06-01"), shift: "NIGHT", deliveryOut: 12, upsellOut: 5 });
-    db.offlineEntryDelivery.push({ id: 100, offlineEntryId: 10, destinationId: 1, quantity: 12 });
 
     const token = verifyPasscode(env.dataResetPasscode, USER);
     if (!token) throw new Error("test setup: passcode didn't verify against env.dataResetPasscode");
@@ -80,9 +62,5 @@ describe("resetAllData", () => {
     await resetAllData(token, USER);
 
     expect(db.dailyOfflineStock).toHaveLength(0);
-    expect(db.offlineEntryDelivery).toHaveLength(0);
-    // Not just "still present" - unchanged, so the reset can't have
-    // silently touched it either (e.g. an accidental isActive flip).
-    expect(db.deliveryDestination).toEqual([destination]);
   });
 });

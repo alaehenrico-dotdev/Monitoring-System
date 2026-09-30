@@ -10,6 +10,7 @@ import { Button, TextInput } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
+import { Toast } from "../components/Toast";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
 import { recordReportHistory } from "../utils/reportHistory";
@@ -52,10 +53,16 @@ const VARIANCE_PDF_COLUMNS: PdfColumn[] = [
   { header: "Counted By" },
 ];
 
-function daysAgo(n: number): string {
+// Built from local date parts (never `.toISOString()`, which reads the UTC
+// calendar date - a different, earlier day than the local one for roughly
+// the first 8 hours of every local day in this app's own Asia/Manila
+// timezone) - same reasoning as utils/dateFormat.ts and utils/shift.ts's
+// getCurrentShiftAndDate.
+export function daysAgo(n: number): string {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  const pad = (v: number) => String(v).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /// Section 4.8 - all flagged variances across a date range, filterable by
@@ -72,6 +79,7 @@ export function VarianceReportPage() {
   );
   const [category, setCategory] = useState(searchParams.get("category") ?? "");
   const [rows, setRows] = useState<VarianceRow[] | null>(null);
+  const requestId = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
   // Alert dialogs shown instead of generating: unsaved entry/count edits
@@ -81,6 +89,25 @@ export function VarianceReportPage() {
   );
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
   const realtimeVersion = useRealtimeVersion();
+
+  function changeDateRange(nextStart: string, nextEnd: string) {
+    if (nextStart === startDate && nextEnd === endDate) return;
+    requestId.current++;
+    setRows(null);
+    setError(null);
+    setEmptyMessage(null);
+    setStartDate(nextStart);
+    setEndDate(nextEnd);
+  }
+
+  function changeCategory(nextCategory: string) {
+    if (nextCategory === category) return;
+    requestId.current++;
+    setRows(null);
+    setError(null);
+    setEmptyMessage(null);
+    setCategory(nextCategory);
+  }
 
   useEffect(() => {
     if (searchParams.get("history") === "1") void runReport();
@@ -107,10 +134,16 @@ export function VarianceReportPage() {
   async function runReport(e?: FormEvent) {
     e?.preventDefault();
     setError(null);
+    const id = ++requestId.current;
+    const requestedStartDate = startDate;
+    const requestedEndDate = endDate;
 
     // Variance is System - Manual Count, and both sides come from saved data -
     // staged edits inside this range would be silently left out of it.
-    const unsaved = findUnsavedWork({ from: startDate, to: endDate });
+    const unsaved = findUnsavedWork({
+      from: requestedStartDate,
+      to: requestedEndDate,
+    });
     if (unsaved.length > 0) {
       setUnsavedWork(unsaved);
       return;
@@ -119,25 +152,40 @@ export function VarianceReportPage() {
     setRows(null);
     try {
       const data = (await getVarianceReport({
-        startDate,
-        endDate,
+        startDate: requestedStartDate,
+        endDate: requestedEndDate,
         category: category || undefined,
       })) as VarianceRow[];
+      if (id !== requestId.current) return;
+      const outOfRange = data.some((row) => {
+        const rowDate = row.entryDate.slice(0, 10);
+        return rowDate < requestedStartDate || rowDate > requestedEndDate;
+      });
+      if (outOfRange) {
+        throw new Error(
+          "The server returned a variance outside the selected date range.",
+        );
+      }
       if (data.length === 0) {
         setEmptyMessage("No variances found for this date range.");
         return;
       }
       setRows(data);
-      const params = new URLSearchParams({ history: "1", startDate, endDate });
+      const params = new URLSearchParams({
+        history: "1",
+        startDate: requestedStartDate,
+        endDate: requestedEndDate,
+      });
       if (category) params.set("category", category);
       if (searchParams.get("history") !== "1") {
         recordReportHistory({
           type: "Variance Report",
-          scope: `${startDate} to ${endDate}`,
+          scope: `${requestedStartDate} to ${requestedEndDate}`,
           route: `/variance-report?${params}`,
         });
       }
     } catch (err) {
+      if (id !== requestId.current) return;
       setError(err instanceof Error ? err.message : "Failed to load report");
     }
   }
@@ -211,19 +259,19 @@ export function VarianceReportPage() {
             <DatePicker
               aria-label="From"
               value={startDate}
-              onChange={setStartDate}
+              onChange={(value) => changeDateRange(value, endDate)}
               style={{ maxWidth: 160 }}
             />
             <DatePicker
               aria-label="To"
               value={endDate}
-              onChange={setEndDate}
+              onChange={(value) => changeDateRange(startDate, value)}
               style={{ maxWidth: 160 }}
             />
             <TextInput
               aria-label="Category (optional)"
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => changeCategory(e.target.value)}
               placeholder="e.g. Premium (Liter)"
               style={{ maxWidth: 200 }}
             />
@@ -252,7 +300,7 @@ export function VarianceReportPage() {
         </Toolbar>
       </PageHeader>
 
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
 
       {rows && (
         <>

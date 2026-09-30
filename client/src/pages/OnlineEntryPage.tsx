@@ -33,8 +33,11 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
+import { ConflictResolution } from "../components/ConflictResolution";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   describePendingChanges,
+  detectConflicts,
   usePendingEntryChanges,
   type PendingByProduct,
 } from "../hooks/usePendingEntryChanges";
@@ -124,6 +127,7 @@ export function OnlineEntryPage() {
   const canEdit =
     user?.role === "ONLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
+  const { online, reconnects } = useOnlineStatus();
   // So handleSaveAll (below) can tell CsvTools its own last import batch is
   // no longer just "pending" once a real Save has committed it - see
   // CsvTools' notifyCommitted doc comment.
@@ -135,12 +139,20 @@ export function OnlineEntryPage() {
   // sessionStorage under this date+shift's own key, so navigating to another
   // page and back - or just switching shift/date and back - doesn't lose an
   // edit still in progress.
-  const { pending, displayRows, stage, clear, clearAll, pendingCount } =
+  const { pending, baselines, displayRows, stage, clear, clearAll, resolveConflict, pendingCount } =
     usePendingEntryChanges(
       rows,
       `ala-eh-pending:online:${date}:${shift}`,
       computeOnlineFigures,
     );
+
+  // Edits staged against values the server has since changed (typically made
+  // offline, or before another user saved) - surfaced for side-by-side
+  // resolution and blocking Save until decided.
+  const conflicts = useMemo(
+    () => detectConflicts(rows, pending, baselines, [...columns, manualCountColumn]),
+    [rows, pending, baselines],
+  );
 
   // Import reads the file's MANUAL COUNTING column and saves it as this
   // shift's manual count (Save below), the starting point of the next
@@ -178,7 +190,7 @@ export function OnlineEntryPage() {
     getOnlineGrid(date, shift)
       .then((data) => setRows(data as unknown as GridRow[]))
       .catch((e) => setError(e.message));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Best-effort check of whether the *other* shift already has saved
   // entries for this date - surfaced as a banner below, so switching (or
@@ -198,7 +210,7 @@ export function OnlineEntryPage() {
         ),
       )
       .catch(() => setOtherShiftCount(null));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Best-effort - CSV import's advisory negative-stock pre-check
   // (validateImportRow, below) needs the CURRENT shift's Offline rows to
@@ -217,7 +229,7 @@ export function OnlineEntryPage() {
         setOfflineRowsForImportCheck(data as unknown as GridRow[]),
       )
       .catch(() => setOfflineRowsForImportCheck(null));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
   // easy to forget Save is a separate step now that cells no longer commit
@@ -265,6 +277,28 @@ export function OnlineEntryPage() {
   // whether it's safe to let a "Save & Print" through.
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
+    if (!online) {
+      setError("You're offline - your changes are kept on this device. Save again once you're back online.");
+      return false;
+    }
+    if (conflicts.length > 0) {
+      setShowPreview(false);
+      return false;
+    }
+    // Re-read the sheet right before saving so an edit made against stale
+    // (or offline-cached) data is caught as a conflict instead of silently
+    // overwriting someone else's newer value.
+    try {
+      const fresh = (await getOnlineGrid(date, shift)) as unknown as GridRow[];
+      setRows(fresh);
+      if (detectConflicts(fresh, pending, baselines).length > 0) {
+        setShowPreview(false);
+        return false;
+      }
+    } catch (e) {
+      setError(e instanceof Error ? `Couldn't check for newer changes: ${e.message}` : "Couldn't check for newer changes.");
+      return false;
+    }
     setSaving(true);
     // Real per-item progress (Section: Loading system) - same pattern
     // CsvTools' own import Save already uses. Particularly worth it here:
@@ -636,7 +670,16 @@ export function OnlineEntryPage() {
           ⚠ {otherShiftWarning}
         </p>
       )}
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      {/* offset stacks this above the shift-warning Toast right below it,
+          rather than both portaling to the same bottom-right spot. */}
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+        offset={96}
+      />
+      <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
       {!rows ? (
         <TableSkeleton
           headers={["SKU", "Product", ...columns.map((c) => c.label)]}

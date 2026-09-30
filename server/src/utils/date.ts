@@ -7,7 +7,9 @@ export function parseDateOnly(value: unknown): Date {
     throw HttpError.badRequest('Expected a date in "YYYY-MM-DD" format');
   }
   const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) throw HttpError.badRequest("Invalid date");
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    throw HttpError.badRequest("Invalid date");
+  }
   return date;
 }
 

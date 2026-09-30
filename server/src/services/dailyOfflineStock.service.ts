@@ -2,8 +2,6 @@ import { Shift } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
-import { deliveryDestinationRepository } from "../repositories/deliveryDestinationRepository";
-import { offlineEntryDeliveryRepository } from "../repositories/offlineEntryDeliveryRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
@@ -24,14 +22,14 @@ export interface OfflineEntryInput {
   stockInOlToOff?: number;
   stockOutOffToOl?: number;
   productionIn?: number;
-  /// Flat total, kept for CSV imports that only carry one Delivery (Out)
-  /// number - ignored whenever deliveryByDestination is also given (see
-  /// resolveDeliveryOut).
+  /// Flat total (CSV import). Delivery (Out) is really the sum of the five
+  /// slots below; a flat figure with no slots given lands in slot 1.
   deliveryOut?: number;
-  /// Partial update: only the destination(s) actually being changed on this
-  /// save, not the full breakdown - see resolveDeliveryOut for how this
-  /// merges with whatever destinations were already on file.
-  deliveryByDestination?: Record<string, number>;
+  delivery1?: number;
+  delivery2?: number;
+  delivery3?: number;
+  delivery4?: number;
+  delivery5?: number;
   backloads?: number;
   upsellOut?: number;
   /// See OnlineEntryInput's own doc comment (dailyOnlineStock.service.ts) -
@@ -39,11 +37,23 @@ export interface OfflineEntryInput {
   openingStock?: number;
 }
 
-interface DestinationChange {
-  destinationId: number;
-  destinationName: string;
-  oldQuantity: number;
-  newQuantity: number;
+const DELIVERY_SLOTS = ["delivery1", "delivery2", "delivery3", "delivery4", "delivery5"] as const;
+
+/// Delivery (Out) is always the sum of the five slots - typed in the grid's
+/// expandable Delivery columns - never entered on its own.
+function resolveDelivery(existing: Record<string, unknown> | null, input: OfflineEntryInput) {
+  const slots = {} as Record<(typeof DELIVERY_SLOTS)[number], number>;
+  if (DELIVERY_SLOTS.some((k) => input[k] !== undefined)) {
+    for (const k of DELIVERY_SLOTS) slots[k] = input[k] ?? toNum(existing?.[k] as never);
+  } else if (input.deliveryOut !== undefined) {
+    for (const k of DELIVERY_SLOTS) slots[k] = k === "delivery1" ? input.deliveryOut : 0;
+  } else {
+    for (const k of DELIVERY_SLOTS) slots[k] = toNum(existing?.[k] as never);
+    // A row saved before the slots existed has only its flat total.
+    if (DELIVERY_SLOTS.every((k) => slots[k] === 0) && existing) slots.delivery1 = toNum(existing.deliveryOut as never);
+  }
+  const deliveryOut = DELIVERY_SLOTS.reduce((sum, k) => sum + slots[k], 0);
+  return { ...slots, deliveryOut };
 }
 
 /// Section 4.6 - same shift-aware carry-forward principle as the Online table.
@@ -51,25 +61,14 @@ export function computeOpeningStock(productId: number, entryDate: Date, shift: S
   return dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 }
 
-function calculate(opening: number, input: Required<Omit<OfflineEntryInput, "openingStock" | "deliveryByDestination">>) {
+function calculate(opening: number, input: Required<Omit<OfflineEntryInput, "openingStock">>) {
   const offlineStock = calculateOfflineStock(opening, input.stockInOlToOff, input.stockOutOffToOl);
   const remainingStock = calculateOfflineRemaining(offlineStock, input.productionIn, input.deliveryOut, input.backloads, input.upsellOut);
   return { offlineStock, remainingStock };
 }
 
-function toDeliveryMap(rows?: { destinationId: number; quantity: number }[]): Record<number, number> {
-  const map: Record<number, number> = {};
-  for (const row of rows ?? []) map[row.destinationId] = row.quantity;
-  return map;
-}
-
-function sumDeliveryMap(map: Record<number, number>): number {
-  return Object.values(map).reduce((sum, quantity) => sum + quantity, 0);
-}
-
-/// Same N+1 avoidance as getOnlineGrid - opening stocks (and, here, the
-/// per-destination delivery breakdown) for every row are fetched in one
-/// batched call instead of one query per product.
+/// Same N+1 avoidance as getOnlineGrid - opening stocks for every row are
+/// fetched in one batched call instead of one query per product.
 export async function getOfflineGrid(entryDate: Date, shift: Shift) {
   const products = await productRepository.findActive();
   const rows = await dailyOfflineStockRepository.findAllForDate(entryDate, shift);
@@ -77,83 +76,32 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
 
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
   const openingStockByProduct = await dailyOfflineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
-  const deliveriesByEntryId = await offlineEntryDeliveryRepository.findByEntryIds(rows.map((r) => r.id));
 
   return products.map((product) => {
     const existing = rowByProduct.get(product.id);
-    if (existing) {
-      // Whichever mode this entry was last saved in stays authoritative on
-      // read, mirroring resolveDeliveryOut's write-side rule: an entry with
-      // breakdown rows on file has those summed (they're the source of
-      // truth once destinations are in play - the column is just a
-      // write-through cache of their sum); an entry saved as a flat figure
-      // (no destinations configured, or Delivery (Out) typed directly) has
-      // none, so the column itself - the only place that value was ever
-      // written - is used as-is instead of collapsing to a false 0.
-      const deliveryByDestination = toDeliveryMap(deliveriesByEntryId.get(existing.id));
-      const deliveryOut = Object.keys(deliveryByDestination).length > 0 ? sumDeliveryMap(deliveryByDestination) : toNum(existing.deliveryOut);
-      return { product, entry: { ...existing, deliveryOut, deliveryByDestination }, isSaved: true };
-    }
+    if (existing) return { product, entry: { ...existing, ...resolveDelivery(existing, {}) }, isSaved: true };
 
     const openingStock = openingStockByProduct.get(product.id) ?? 0;
-    const zero: Required<Omit<OfflineEntryInput, "openingStock" | "deliveryByDestination">> = {
+    const zero: Required<Omit<OfflineEntryInput, "openingStock">> = {
       stockInOlToOff: 0,
       stockOutOffToOl: 0,
       productionIn: 0,
       deliveryOut: 0,
+      delivery1: 0,
+      delivery2: 0,
+      delivery3: 0,
+      delivery4: 0,
+      delivery5: 0,
       backloads: 0,
       upsellOut: 0,
     };
     const { offlineStock, remainingStock } = calculate(openingStock, zero);
     return {
       product,
-      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, offlineStock, remainingStock, deliveryByDestination: {} },
+      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, offlineStock, remainingStock },
       isSaved: false,
     };
   });
-}
-
-/// Resolves the deliveryOut figure to persist for this save, plus the
-/// per-destination changes to fold into the Change Log:
-/// - deliveryByDestination given: this entry's Delivery (Out) is managed as
-///   a breakdown from here on. Only the given destination(s) change - every
-///   other destination already on file is carried forward untouched - and
-///   the new deliveryOut is the sum across ALL destinations, not just the
-///   ones in this request.
-/// - otherwise: the flat `deliveryOut` (or the existing column value) is
-///   used as-is, e.g. a CSV import that only ever carries one flat total
-///   and was never broken down by destination.
-async function resolveDeliveryOut(
-  existing: { id: number; deliveryOut: unknown } | null,
-  input: OfflineEntryInput
-): Promise<{ deliveryOut: number; destinationChanges: DestinationChange[] }> {
-  if (!input.deliveryByDestination || Object.keys(input.deliveryByDestination).length === 0) {
-    return { deliveryOut: input.deliveryOut ?? toNum(existing?.deliveryOut), destinationChanges: [] };
-  }
-
-  const destinationIds = Object.keys(input.deliveryByDestination).map(Number);
-  const destinations = await deliveryDestinationRepository.findByIds(destinationIds);
-  const destinationById = new Map(destinations.map((d) => [d.id, d]));
-  const missing = destinationIds.filter((id) => !destinationById.has(id));
-  if (missing.length) throw HttpError.badRequest(`Unknown delivery destination id(s): ${missing.join(", ")}`);
-
-  const existingDeliveries = existing ? await offlineEntryDeliveryRepository.findByEntryId(existing.id) : [];
-  const quantityByDestination = new Map(existingDeliveries.map((d) => [d.destinationId, d.quantity]));
-
-  const destinationChanges: DestinationChange[] = destinationIds.map((id) => {
-    const newQuantity = input.deliveryByDestination![id];
-    const change: DestinationChange = {
-      destinationId: id,
-      destinationName: destinationById.get(id)!.name,
-      oldQuantity: quantityByDestination.get(id) ?? 0,
-      newQuantity,
-    };
-    quantityByDestination.set(id, newQuantity); // fold the change into the running total below
-    return change;
-  });
-
-  const deliveryOut = [...quantityByDestination.values()].reduce((sum, quantity) => sum + quantity, 0);
-  return { deliveryOut, destinationChanges };
 }
 
 /// Encoder-facing upsert for one product/date/shift cell row (Section 4.3).
@@ -171,12 +119,11 @@ export async function saveOfflineEntry(
 
   const openingStock =
     input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift, db));
-  const { deliveryOut, destinationChanges } = await resolveDeliveryOut(existing, input);
-  const merged: Required<Omit<OfflineEntryInput, "openingStock" | "deliveryByDestination">> = {
+  const merged: Required<Omit<OfflineEntryInput, "openingStock">> = {
     stockInOlToOff: input.stockInOlToOff ?? toNum(existing?.stockInOlToOff),
     stockOutOffToOl: input.stockOutOffToOl ?? toNum(existing?.stockOutOffToOl),
     productionIn: input.productionIn ?? toNum(existing?.productionIn),
-    deliveryOut,
+    ...resolveDelivery(existing, input),
     backloads: input.backloads ?? toNum(existing?.backloads),
     upsellOut: input.upsellOut ?? toNum(existing?.upsellOut),
   };
@@ -193,36 +140,14 @@ export async function saveOfflineEntry(
   const data = { productId, entryDate, shift, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOfflineStockRepository.upsert(existing?.id, data, db);
 
-  // Only now that the entry definitely has an id do we persist the
-  // breakdown rows themselves - resolveDeliveryOut only computed the totals.
-  if (input.deliveryByDestination) {
-    for (const change of destinationChanges) {
-      await offlineEntryDeliveryRepository.upsert(saved.id, change.destinationId, change.newQuantity);
-    }
-  }
-
-  // Same whole-row before/after snapshot every other Offline save logs,
-  // plus one synthetic "deliveryOut:<destination name>" field per changed
-  // destination - the join rows aren't part of the row snapshot itself, so
-  // without this a destination-only edit would show no field-level diff at
-  // all in the Change Log UI (see diffFields in ChangeLogPage.tsx, which
-  // diffs oldValue/newValue purely by object key).
-  const oldValue: Record<string, unknown> | null = existing ? { ...existing } : destinationChanges.length ? {} : null;
-  const newValue: Record<string, unknown> = { ...saved };
-  for (const change of destinationChanges) {
-    const key = `deliveryOut:${change.destinationName}`;
-    if (oldValue) oldValue[key] = change.oldQuantity;
-    newValue[key] = change.newQuantity;
-  }
-
   await recordChange(
     {
       tableName: TABLE,
       recordId: saved.id,
       action: existing ? "UPDATE" : "CREATE",
       changedById: userId,
-      oldValue,
-      newValue,
+      oldValue: existing,
+      newValue: saved,
     },
     db,
   );

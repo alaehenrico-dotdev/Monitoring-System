@@ -901,13 +901,15 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
           />
           {importReview.matchedRows.some((r) => r.warning) && (
             <div style={{ marginTop: 14 }}>
-              <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.danger }}>
-                ⚠ May fail to save
-              </h4>
               {/* Advisory only (see validateImport's own doc comment) -
                   these rows are still staged and still counted in
                   "Save (N)" below; this is a heads-up before Save is
-                  clicked, not a second gate. */}
+                  clicked, not a second gate. colors.warningText (not
+                  colors.danger - reserved for an actual failure) so the
+                  header doesn't read as more alarming than it is. */}
+              <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.warningText }}>
+                ⚠ May fail to save
+              </h4>
               <ul style={{ margin: 0, padding: "0 0 0 18px", fontSize: 12.5, color: colors.subtleInk }}>
                 {importReview.matchedRows
                   .filter((r) => r.warning)

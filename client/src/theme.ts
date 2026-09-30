@@ -36,6 +36,7 @@ export const colors = {
   danger: "var(--ae-danger-text)", // error/variance text - flips to a lighter tint in dark mode (unlike `red` below) so it stays readable on the dark surface
   warningBg: "var(--ae-warning-bg)", // flagged-row tint
   warningText: "var(--ae-warning-text)",
+  dangerBg: "var(--ae-danger-bg)", // low-stock row tint (TotalStocksTable)
   // Fixed light-surface text colors, for content that always renders on a
   // static white/paper background regardless of theme (the printed-receipt
   // look in ReceiptCard.tsx) - unlike `ink`/`subtleInk` above, these must

@@ -26,9 +26,17 @@ export async function downloadDatabaseBackup(onProgress?: (bytesReceived: number
   }
 
   const disposition = res.headers.get("Content-Disposition") ?? "";
-  const filename = /filename="?([^"]+)"?/.exec(disposition)?.[1] ?? `backup-${Date.now()}.sql`;
+  // Same kebab-case date-time style as the server's real filename (see
+  // backup.controller.ts's backupFileName) - this fallback should now only
+  // ever fire for a genuinely non-CORS-exposed deployment, not the normal
+  // case (see app.ts's `exposedHeaders`).
+  const fallbackStamp = new Date().toISOString().slice(0, 16).replace("T", "-").replace(":", "");
+  const filename = /filename="?([^"]+)"?/.exec(disposition)?.[1] ?? `ala-eh-backup-${fallbackStamp}.sql`;
 
   const blob = await readWithProgress(res, onProgress);
+  // A dump is never legitimately empty - saving a 0-byte "backup" (and, for
+  // Data Reset, going on to wipe the data after it) would be worse than failing.
+  if (blob.size === 0) throw new Error("The server returned an empty backup.");
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -37,7 +45,10 @@ export async function downloadDatabaseBackup(onProgress?: (bytesReceived: number
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  // Revoking straight away can cancel the save in some browsers (the download
+  // starts asynchronously after click()) - which for a large dump meant a
+  // missing or empty file. Give it time to be picked up first.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 async function readWithProgress(res: Response, onProgress?: (bytesReceived: number) => void): Promise<Blob> {
@@ -56,4 +67,37 @@ async function readWithProgress(res: Response, onProgress?: (bytesReceived: numb
     onProgress?.(received);
   }
   return new Blob(chunks);
+}
+
+/**
+ * Database Restore - uploads a `.sql` file made by downloadDatabaseBackup to
+ * POST /backup/restore, which replaces the live database with it. The body is
+ * the raw file (not JSON), so this uses XMLHttpRequest for real upload
+ * progress. `resetToken` is the same short-lived passcode token Data Reset
+ * uses (verifyResetPasscode in api/dataReset.ts) - enforced server-side.
+ */
+export function restoreDatabaseBackup(file: File, resetToken: string, onProgress?: (fraction: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_URL}/backup/restore`);
+    const token = getToken();
+    if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    xhr.setRequestHeader("X-Reset-Token", resetToken);
+    xhr.setRequestHeader("Content-Type", "application/sql");
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress?.(e.loaded / e.total);
+    };
+    xhr.onerror = () => reject(new Error("Network error - the restore did not complete."));
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) return resolve();
+      let message = "Failed to restore backup";
+      try {
+        message = JSON.parse(xhr.responseText).error ?? message;
+      } catch {
+        // non-JSON error body - keep the generic message
+      }
+      reject(new ApiError(xhr.status, message));
+    };
+    xhr.send(file);
+  });
 }

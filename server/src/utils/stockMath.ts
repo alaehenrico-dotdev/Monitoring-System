@@ -9,6 +9,17 @@ export function toNum(value: unknown): number {
   return value === null || value === undefined ? 0 : Number(value);
 }
 
+/// Every stock figure here is stored in a Decimal(14,2) column, but the
+/// arithmetic itself runs in plain JS floats first - `0.7 + 0.1 - 0.8` is
+/// `-1.1102230246251565e-16`, not exactly 0, purely from IEEE-754 binary
+/// representation, not a real fractional cent. Rounding every calculated
+/// figure to 2dp (matching the column) before it's returned - in particular
+/// before isNegativeStock ever sees it - keeps that noise from being
+/// mistaken for a real (if tiny) over-issue.
+function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 /// Section 4.4/4.6 - a manual count logged for a period supersedes that
 /// period's own system-computed Remaining Stock as the opening balance the
 /// next period carries forward (see dailyOnlineStockRepository/
@@ -27,17 +38,17 @@ export function periodRank(entryDate: Date, shift: string): number {
 
 /// Section 4.2 - Online Stocks (subtotal) = opening + Stocks In - Stocks Out.
 export function calculateOnlineStock(opening: number, stockIn: number, stockOut: number): number {
-  return opening + stockIn - stockOut;
+  return round2(opening + stockIn - stockOut);
 }
 
 /// Section 4.2 - Remaining Stocks = Online Stocks + Production (In) - Fulfillment (Out) + RTS.
 export function calculateOnlineRemaining(onlineStock: number, productionIn: number, fulfillmentOut: number, rts: number): number {
-  return onlineStock + productionIn - fulfillmentOut + rts;
+  return round2(onlineStock + productionIn - fulfillmentOut + rts);
 }
 
 /// Section 4.3 - Offline Stocks (subtotal) = opening + Stocks In - Stocks Out.
 export function calculateOfflineStock(opening: number, stockIn: number, stockOut: number): number {
-  return opening + stockIn - stockOut;
+  return round2(opening + stockIn - stockOut);
 }
 
 /// Section 4.3 - Remaining Stocks = Offline Stocks + Production (In) - Delivery
@@ -52,12 +63,12 @@ export function calculateOfflineRemaining(
   backloads: number,
   upsellOut: number
 ): number {
-  return offlineStock + productionIn - deliveryOut - upsellOut + backloads;
+  return round2(offlineStock + productionIn - deliveryOut - upsellOut + backloads);
 }
 
 /// Section 4.4 - Variance = System Remaining Stock - Manual Count.
 export function calculateVariance(systemRemainingStock: number, manualCount: number): number {
-  return systemRemainingStock - manualCount;
+  return round2(systemRemainingStock - manualCount);
 }
 
 /// Negative-stock guard - a channel's own Remaining Stock is the actual

@@ -67,6 +67,11 @@ model Product {
   unit      String
   isActive  Boolean  @default(true)
   sortOrder Int      @default(0)
+  // Section 4.1/4.5 - Low Stock. Null means "no alert configured" for this
+  // SKU (most products, until an admin sets one) rather than "alert at
+  // zero" - Total Stocks/Dashboard only flag a product once this is set.
+  // Compared against Total Stocks' remainingStock, same unit as `unit`.
+  lowStockThreshold Decimal? @db.Decimal(14, 2)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -119,7 +124,12 @@ model DailyOfflineStock {
   stockOutOffToOl   Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockInOffToOl
   offlineStock      Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
   productionIn      Decimal  @default(0) @db.Decimal(14, 2)
-  deliveryOut       Decimal  @default(0) @db.Decimal(14, 2)
+  deliveryOut       Decimal  @default(0) @db.Decimal(14, 2) // calc: sum of delivery1..delivery5
+  delivery1         Decimal  @default(0) @db.Decimal(14, 2)
+  delivery2         Decimal  @default(0) @db.Decimal(14, 2)
+  delivery3         Decimal  @default(0) @db.Decimal(14, 2)
+  delivery4         Decimal  @default(0) @db.Decimal(14, 2)
+  delivery5         Decimal  @default(0) @db.Decimal(14, 2)
   backloads         Decimal  @default(0) @db.Decimal(14, 2)
   upsellOut         Int      @default(0)
   remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
@@ -128,38 +138,10 @@ model DailyOfflineStock {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  deliveries        OfflineEntryDelivery[]
-
   @@unique([productId, entryDate, shift])
   // See the matching index on DailyOnlineStock above - same reasoning.
   @@index([entryDate, shift])
   @@map("daily_offline_stock")
-}
-
-/// Per-destination breakdown of an offline entry's deliveries.
-model DeliveryDestination {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  deliveries OfflineEntryDelivery[]
-
-  @@map("delivery_destinations")
-}
-
-model OfflineEntryDelivery {
-  id              Int              @id @default(autoincrement())
-  offlineEntryId  Int
-  offlineEntry    DailyOfflineStock    @relation(fields: [offlineEntryId], references: [id])
-  destinationId   Int
-  destination     DeliveryDestination @relation(fields: [destinationId], references: [id])
-  quantity        Int                  @default(0)
-
-  @@unique([offlineEntryId, destinationId])
-  @@map("offline_entry_deliveries")
 }
 
 /// 5.4 manual_counts - physical count capture; variance is always derived

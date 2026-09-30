@@ -56,6 +56,9 @@
   --ae-header-rule: #0c0c0c;
   --ae-num-text: var(--ae-text);
   --ae-danger-text: #c1272d;
+  /* Low Stock row tint (TotalStocksTable) - same relationship to
+     --ae-danger-text as --ae-warning-bg has to --ae-warning-text. */
+  --ae-danger-bg: #f7d9da;
   /* Category group-header bar inside data tables (StockGrid,
      TotalStocksTable, ManualCountPage) - green (theme.ts's `colors.green`)
      so the category bar reads distinctly from the red/gold/yellow used
@@ -163,6 +166,9 @@
      background (charcoal #1A1A1A) to read as error text. Same pattern as
      --ae-warning-text above: a lighter tint of the same hue for dark mode. */
   --ae-danger-text: #e5626a;
+  /* Same reasoning as --ae-danger-bg (light mode) - a low-luminance tint of
+     the dark-mode danger hue rather than light mode's tint verbatim. */
+  --ae-danger-bg: #3a1518;
   /* A darker, lower-luminance green than light mode's --ae-category-bg -
      same relationship as --ae-warning-bg/--ae-danger-text above, so the
      bar stays green but doesn't glow against the near-black page. */
@@ -196,8 +202,8 @@
     0 0 28px rgba(245, 192, 0, 0.12);
   --ae-glass-panel-shadow:
     0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
-  --ae-glow-a: rgba(255, 255, 255, 0.3);
-  --ae-glow-b: rgba(255, 255, 255, 0.07);
+  --ae-glow-a: rgba(245, 192, 0, 0.3);
+  --ae-glow-b: rgba(245, 192, 0, 0.08);
   --ae-glow-blend: screen;
 
   --ae-tb-bg: rgba(255, 255, 255, 0.035);
@@ -290,6 +296,44 @@ table input[type="number"] {
 .ae-table--left td {
   text-align: left;
 }
+/* Spare input columns after Delivery (Out) (StockGrid's `expandable`
+   columns): vertical grid lines on every cell of them, from the header
+   down through the subtotal/grand total rows. Drawn with a border, in a
+   line color derived from the theme text so it shows on the pink tint in
+   both light and dark mode. */
+.ae-table .ae-extra-col {
+  border-right: 1px solid color-mix(in srgb, var(--ae-text) 30%, transparent);
+}
+.ae-table .ae-extra-col--first {
+  border-left: 1px solid color-mix(in srgb, var(--ae-text) 30%, transparent);
+}
+/* Text input filling a spare column's whole header cell (StockGrid). No box
+   of its own - the pink header shows through, so it reads as the header
+   itself being editable; a dark inset ring marks focus. */
+.ae-extra-head-input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #0c0c0c;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+}
+.ae-extra-head-input::placeholder {
+  color: rgba(12, 12, 12, 0.45);
+  font-weight: 500;
+}
+.ae-extra-head-input:focus {
+  box-shadow: inset 0 0 0 2px #0c0c0c;
+}
 /* Manual Count and Total Stocks grids: header labels centered over their
    column instead of stuck flush-left, regardless of how that column's own
    cells are aligned (left for SKU/Product, right for numeric columns). */
@@ -332,7 +376,7 @@ table input[type="number"] {
     #0c0c0c,
     #d4a000,
     #0c0c0c,
-    #e5e5e5,
+    #fdd023,
     #0c0c0c,
     #d4a000,
     #0c0c0c,
@@ -363,7 +407,7 @@ table input[type="number"] {
     #0c0c0c,
     #d4a000,
     #0c0c0c,
-    #e5e5e5,
+    #fdd023,
     #0c0c0c,
     #d4a000,
     #0c0c0c,
@@ -383,15 +427,14 @@ table input[type="number"] {
   position: absolute;
   z-index: 0;
   pointer-events: none;
-  mix-blend-mode: screen;
-  /* Same white cursor-follow glow as the sidebar tabs/toolbar
-     (.ae-sidebar-tab-spotlight, .ae-toolbar::before) - same radius and
-     opacity as the sidebar's, so a row's hover reads as the same effect
-     used everywhere else instead of a smaller, table-specific one. */
+  mix-blend-mode: var(--ae-glow-blend);
+  /* Same yellow cursor-follow glow as the header/toolbar
+     (.ae-toolbar::before) - same tokens, so a row's hover reads as the same
+     effect used everywhere else instead of a table-specific one. */
   background: radial-gradient(
     circle 90px at var(--mx, 50%) var(--my, 50%),
-    rgba(255, 255, 255, 0.3),
-    rgba(255, 255, 255, 0.06) 55%,
+    var(--ae-glow-a),
+    var(--ae-glow-b) 55%,
     transparent 75%
   );
 }
@@ -418,17 +461,18 @@ table input[type="number"] {
   position: relative;
   min-width: 0;
   overflow-x: auto;
-  border: 1px solid var(--ae-border);
+  /* Full border all the way round, same edge + radius as the page header
+     card above it: the side/bottom margins match .ae-page-header's -18px
+     (a 6px gap to the viewport edge) instead of bleeding off-screen, so
+     the border is actually visible. */
+  border: 1px solid var(--ae-toolbar-border);
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border-radius: 0;
+  border-radius: 8px;
   flex: 1;
   min-height: 0;
-  margin: 0 calc(-24px / var(--ae-zoom, 1)) calc(-24px / var(--ae-zoom, 1));
-  border-left: 0;
-  border-right: 0;
-  border-bottom: 0;
+  margin: 0 calc(-18px / var(--ae-zoom, 1)) calc(-18px / var(--ae-zoom, 1));
 }
 
 .ae-table-wrap {
@@ -490,6 +534,30 @@ table input[type="number"] {
 .table-scroll::-webkit-scrollbar-corner,
 .ae-modal-body::-webkit-scrollbar-corner {
   background: var(--ae-bg-alt);
+}
+/* Main table container: it has rounded corners now, and a full-length
+   scrollbar track ran straight over them. Chromium ignores the ::-webkit-
+   scrollbar rules whenever the standard scrollbar-width/-color above are
+   set, so hand those back to the webkit rules for this container only, then
+   inset the track's ends by the corner radius so the bar stops short of the
+   corners (Firefox keeps the thin standard bar). */
+@supports selector(::-webkit-scrollbar) {
+  .ae-table-scroll {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .ae-table-scroll::-webkit-scrollbar-track:vertical {
+    margin-block: 8px;
+  }
+  .ae-table-scroll::-webkit-scrollbar-track:horizontal {
+    margin-inline: 8px;
+  }
+  .ae-table-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ae-table-scroll::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 }
 
 .ae-input,
@@ -1681,32 +1749,85 @@ table input[type="number"] {
 .ae-sidebar-nav::-webkit-scrollbar {
   display: none;
 }
-/* Nav drawer link hover + the cursor-follow spotlight inside each one -
-   moved here from Sidebar.tsx's own runtime-injected <style> tag (gone
-   now that the drawer is a single, static-width overlay - no more
-   per-tier/hover-state styling that needed recomputing against live
-   `colors.*` values). */
-.ae-sidebar-tab:hover:not([aria-current="page"]) {
-  background: color-mix(in srgb, #f5c000 16%, transparent) !important;
-  color: var(--ae-glass-hover-text, #f5c000) !important;
+/* Header tab row (HeaderTabs.tsx) - Office-style text tabs in a strip on
+   top of the header card, outside it, sitting directly on the page
+   background (so text uses the page text color, not the glass card's).
+   Side/top margins mirror .ae-page-header's so the strip spans the same
+   width; the card below loses its own top margin (sibling rule below).
+   Plain text, no boxes and no hover/active background: the
+   label color never changes, only a thin gold line under the tab shows the
+   active page (and hover/keyboard focus). Overflows sideways (scrollbar
+   hidden) instead of wrapping. */
+.ae-header-tabs {
+  display: flex;
+  /* Pages are column flex containers (.ae-main > div) with min-height: 0,
+     and this strip clips its overflow, so without this it gets squeezed
+     whenever the page content is taller than the viewport (Dashboard). */
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  margin: -18px -18px 0;
+  /* Breathing room above and below the tab labels. */
+  padding: 8px 14px 8px 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
-:root:not([data-theme="dark"])
-  .ae-sidebar-tab:hover:not([aria-current="page"]) {
-  --ae-glass-hover-text: #6b5000;
+.ae-header-tabs::-webkit-scrollbar {
+  display: none;
 }
-.ae-sidebar-tab-spotlight {
+.ae-header-tabs-group {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.ae-header-tabs-divider {
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: var(--ae-glass-divider);
+  flex-shrink: 0;
+}
+.ae-header-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 6px 10px 7px;
+  text-decoration: none;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ae-text);
+  background: none;
+  outline: none;
+}
+/* The gold line under a tab - the only state indicator. */
+.ae-header-tab::after {
+  content: "";
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  mix-blend-mode: var(--ae-glow-blend);
-  background: radial-gradient(
-    circle 90px at var(--mx, 50%) var(--my, 50%),
-    var(--ae-glow-a),
-    var(--ae-glow-b) 55%,
-    transparent 75%
-  );
-  opacity: var(--spotlight-opacity, 0);
-  transition: opacity 220ms ease;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+/* Card directly under the strip: the strip already took the negative top
+   margin that pulls the pair to the page's top edge. */
+.ae-header-tabs + .ae-page-header {
+  margin-top: 0;
+}
+.ae-header-tab[aria-current="page"]::after,
+.ae-header-tab:hover::after,
+.ae-header-tab:focus-visible::after {
+  transform: scaleX(1);
 }
 
 .ae-segment-group {
@@ -1854,7 +1975,7 @@ table input[type="number"] {
   box-shadow: var(--ae-glass-shadow);
 }
 /* Cursor-follow spotlight, same trick as .ae-toolbar::before /
-   .ae-sidebar-tab-spotlight: --mx/--my/--spotlight-opacity are written by
+   .ae-toolbar::before: --mx/--my/--spotlight-opacity are written by
    PageHeader.tsx on mousemove/mouseleave, no React state involved. A
    pseudo-element (not a child) so it paints behind everything else in the
    card - the title, logo, toolbar, and HeaderExtras - purely by DOM order,
@@ -2137,7 +2258,7 @@ table input[type="number"] {
     padding: 16px;
   }
   .ae-table-scroll {
-    margin: 0 calc(-16px / var(--ae-zoom, 1)) calc(-16px / var(--ae-zoom, 1));
+    margin: 0 calc(-10px / var(--ae-zoom, 1)) calc(-10px / var(--ae-zoom, 1));
   }
   /* .ae-page-header's own -18px margin assumes .ae-main's default 24px
      padding (see its own comment) - rescale to this breakpoint's 16px so
@@ -2146,6 +2267,12 @@ table input[type="number"] {
   .ae-page-header {
     margin: -10px -10px 8px;
   }
+  .ae-header-tabs {
+    margin: -10px -10px 0;
+  }
+  .ae-header-tabs + .ae-page-header {
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 520px) {
@@ -2153,10 +2280,16 @@ table input[type="number"] {
     padding: 12px;
   }
   .ae-table-scroll {
-    margin: 0 calc(-12px / var(--ae-zoom, 1)) calc(-12px / var(--ae-zoom, 1));
+    margin: 0 calc(-6px / var(--ae-zoom, 1)) calc(-6px / var(--ae-zoom, 1));
   }
   .ae-page-header {
     margin: -6px -6px 8px;
+  }
+  .ae-header-tabs {
+    margin: -6px -6px 0;
+  }
+  .ae-header-tabs + .ae-page-header {
+    margin-top: 0;
   }
 }
 

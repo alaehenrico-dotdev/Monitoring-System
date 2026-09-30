@@ -120,4 +120,16 @@ describe("isNegativeStock", () => {
     expect(isNegativeStock(0)).toBe(false);
     expect(isNegativeStock(1)).toBe(false);
   });
+
+  it("does not flag binary-floating-point noise from an exact-zero result as negative", () => {
+    // 0.7 + 0.1 - 0.8 is -1.1102230246251565e-16 in raw IEEE-754 floats, not
+    // exactly 0 - a real, allowed "fully depleted" balance that must not be
+    // rejected as an over-issue. The calculate* functions round to 2dp
+    // (matching the Decimal(14,2) columns these figures are stored in)
+    // before this check ever sees them.
+    expect(calculateOnlineRemaining(0.7, 0.1, 0.8, 0)).toBe(0);
+    expect(isNegativeStock(calculateOnlineRemaining(0.7, 0.1, 0.8, 0))).toBe(false);
+    expect(calculateOfflineRemaining(0.7, 0.1, 0.8, 0, 0)).toBe(0);
+    expect(isNegativeStock(calculateOfflineRemaining(0.7, 0.1, 0.8, 0, 0))).toBe(false);
+  });
 });

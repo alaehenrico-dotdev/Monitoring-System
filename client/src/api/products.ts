@@ -9,11 +9,11 @@ export function listProducts(options: { includeInactive?: boolean } = {}) {
   return http.get<Product[]>(options.includeInactive ? "/products?includeInactive=true" : "/products");
 }
 
-export function createProduct(data: { sku?: string; name: string; category: string; unit: string }) {
+export function createProduct(data: { sku?: string; name: string; category: string; unit: string; lowStockThreshold?: number | null }) {
   return http.post<Product>("/products", data);
 }
 
-export function updateProduct(id: number, data: Partial<Pick<Product, "sku" | "name" | "category" | "unit" | "isActive">>) {
+export function updateProduct(id: number, data: Partial<Pick<Product, "sku" | "name" | "category" | "unit" | "isActive" | "lowStockThreshold">>) {
   return http.patch<Product>(`/products/${id}`, data);
 }
 

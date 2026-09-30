@@ -5,6 +5,71 @@ import { ENTRY_PREFIX, MANUAL_COUNT_PREFIX } from "../utils/unsavedWork";
 /// productId -> { columnKey -> staged value }
 export type PendingByProduct = Record<number, Record<string, number>>;
 
+/// Same shape as PendingByProduct, but holding the last-saved (server) value
+/// each staged edit was made against - what lets a later refresh tell "the
+/// server still has what I started from" apart from "someone else changed it
+/// while I was editing (or offline)".
+export type BaselineByProduct = Record<number, Record<string, number>>;
+
+/// Baselines live under their own prefix (not ENTRY_PREFIX) so
+/// utils/unsavedWork.ts, which counts every ENTRY_PREFIX key as a page's
+/// staged edits, never mistakes one for a second pending set.
+const BASELINE_PREFIX = "ala-eh-baseline:";
+const baselineKeyFor = (storageKey: string | undefined) => (storageKey ? BASELINE_PREFIX + storageKey : undefined);
+
+export interface PendingConflict {
+  productId: number;
+  key: string;
+  name: string;
+  category: string;
+  label: string;
+  /// The saved value when this edit was first staged.
+  baseValue: number;
+  /// What the server has now.
+  serverValue: number;
+  /// What this device wants to save.
+  myValue: number;
+}
+
+/// A staged edit conflicts when the server's value has moved off the
+/// baseline the edit was made against AND isn't already the value being
+/// staged (in which case saving is a harmless no-op, not a conflict).
+/// Edits with no recorded baseline (staged before baselines existed) and keys
+/// the grid row doesn't carry (e.g. the manual-count pseudo-column) are never
+/// flagged.
+export function detectConflicts(
+  rows: GridRow[] | null,
+  pending: PendingByProduct,
+  baselines: BaselineByProduct,
+  columns: { key: string; label: string }[] = [],
+): PendingConflict[] {
+  if (!rows) return [];
+  const out: PendingConflict[] = [];
+  for (const [productIdStr, changes] of Object.entries(pending)) {
+    const productId = Number(productIdStr);
+    const row = rows.find((r) => r.product.id === productId);
+    if (!row) continue;
+    for (const [key, myValue] of Object.entries(changes)) {
+      const base = baselines[productId]?.[key];
+      const raw = row.entry[key];
+      if (base === undefined || raw === undefined || raw === null) continue;
+      const serverValue = Number(raw);
+      if (serverValue === base || serverValue === myValue) continue;
+      out.push({
+        productId,
+        key,
+        name: row.product.name,
+        category: row.product.category,
+        label: columns.find((c) => c.key === key)?.label ?? key,
+        baseValue: base,
+        serverValue,
+        myValue,
+      });
+    }
+  }
+  return out;
+}
+
 /// sessionStorage (not localStorage - this is in-progress work for the
 /// current browser session, not a durable per-viewer preference like zoom)
 /// so navigating to another page and back - or closing/reopening the Save
@@ -17,6 +82,17 @@ function loadPending(storageKey: string | undefined): PendingByProduct {
   try {
     const raw = sessionStorage.getItem(storageKey);
     return raw ? (JSON.parse(raw) as PendingByProduct) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadBaselines(storageKey: string | undefined): BaselineByProduct {
+  const key = baselineKeyFor(storageKey);
+  if (!key) return {};
+  try {
+    const raw = sessionStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as BaselineByProduct) : {};
   } catch {
     return {};
   }
@@ -66,6 +142,7 @@ export function usePendingEntryChanges(
   recompute?: (entry: Record<string, unknown>, changes: Record<string, number>) => Record<string, unknown>,
 ) {
   const [pending, setPending] = useState<PendingByProduct>(() => loadPending(storageKey));
+  const [baselines, setBaselines] = useState<BaselineByProduct>(() => loadBaselines(storageKey));
 
   // Re-derives pending from storage only when the key itself changes (a
   // different date/shift/page) - the persistence effect below is what reacts
@@ -76,6 +153,7 @@ export function usePendingEntryChanges(
   if (storageKey !== loadedForKey) {
     setLoadedForKey(storageKey);
     setPending(loadPending(storageKey));
+    setBaselines(loadBaselines(storageKey));
   }
 
   useEffect(() => {
@@ -89,6 +167,17 @@ export function usePendingEntryChanges(
       // Best effort, per the note above - editing still works either way.
     }
   }, [pending, storageKey]);
+
+  useEffect(() => {
+    const key = baselineKeyFor(storageKey);
+    if (!key) return;
+    try {
+      if (Object.keys(baselines).length === 0) sessionStorage.removeItem(key);
+      else sessionStorage.setItem(key, JSON.stringify(baselines));
+    } catch {
+      // Best effort, same as above.
+    }
+  }, [baselines, storageKey]);
 
   // What the grid should actually render - the last-saved rows with any
   // staged-but-not-yet-saved edits overlaid on top, so typing a value shows
@@ -122,6 +211,18 @@ export function usePendingEntryChanges(
       else next[productId] = productPending;
       return next;
     });
+    setBaselines((prev) => {
+      const productBase = { ...(prev[productId] ?? {}) };
+      // Only the first stage of a key records its baseline - re-editing an
+      // already-staged cell must keep the value it originally started from.
+      if (value === savedValue) delete productBase[key];
+      else if (productBase[key] === undefined && Number.isFinite(savedValue)) productBase[key] = savedValue;
+      else return prev;
+      const next = { ...prev };
+      if (Object.keys(productBase).length === 0) delete next[productId];
+      else next[productId] = productBase;
+      return next;
+    });
   }
 
   /// Drops one product's pending changes once they've been saved (or the
@@ -134,13 +235,41 @@ export function usePendingEntryChanges(
       delete next[productId];
       return next;
     });
+    setBaselines((prev) => {
+      if (!(productId in prev)) return prev;
+      const next = { ...prev };
+      delete next[productId];
+      return next;
+    });
   }
 
   function clearAll() {
     setPending({});
+    setBaselines({});
   }
 
-  return { pending, displayRows, stage, clear, clearAll, pendingCount: Object.keys(pending).length };
+  /// Conflict resolution for one staged edit (see detectConflicts):
+  /// "mine" re-bases it onto what the server has now (keeping the staged
+  /// value, which then saves over the newer one); "server" discards the
+  /// staged edit and keeps the server's value.
+  function resolveConflict(c: Pick<PendingConflict, "productId" | "key" | "serverValue">, choice: "mine" | "server") {
+    if (choice === "mine") {
+      setBaselines((prev) => ({ ...prev, [c.productId]: { ...(prev[c.productId] ?? {}), [c.key]: c.serverValue } }));
+      return;
+    }
+    for (const setter of [setPending, setBaselines]) {
+      setter((prev) => {
+        const productMap = { ...(prev[c.productId] ?? {}) };
+        delete productMap[c.key];
+        const next = { ...prev };
+        if (Object.keys(productMap).length === 0) delete next[c.productId];
+        else next[c.productId] = productMap;
+        return next;
+      });
+    }
+  }
+
+  return { pending, baselines, displayRows, stage, clear, clearAll, resolveConflict, pendingCount: Object.keys(pending).length };
 }
 
 /// Called by Data Reset (DataResetPage.tsx) right after the server-side wipe
@@ -158,7 +287,7 @@ export function clearAllPendingEntryState() {
     const keys: string[] = [];
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i);
-      if (k && (k.startsWith(ENTRY_PREFIX) || k.startsWith(MANUAL_COUNT_PREFIX) || k.startsWith("ala-eh-focus:"))) keys.push(k);
+      if (k && (k.startsWith(ENTRY_PREFIX) || k.startsWith(MANUAL_COUNT_PREFIX) || k.startsWith(BASELINE_PREFIX) || k.startsWith("ala-eh-focus:"))) keys.push(k);
     }
     keys.forEach((k) => sessionStorage.removeItem(k));
   } catch {

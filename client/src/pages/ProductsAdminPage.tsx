@@ -4,6 +4,7 @@ import type { Product } from "../types";
 import { Button, Field, TextInput } from "../components/ui";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { PageHeader } from "../components/PageHeader";
+import { Toast } from "../components/Toast";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
@@ -16,7 +17,12 @@ export function ProductsAdminPage() {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [unit, setUnit] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("");
   const [error, setError] = useState<string | null>(null);
+  // Which row's Low Stock Alert cell is mid-edit (its draft text) - saved on
+  // blur/Enter, same "click cell, type, commit" pattern as the stock grids.
+  const [thresholdDrafts, setThresholdDrafts] = useState<Record<number, string>>({});
+  const [thresholdBusyId, setThresholdBusyId] = useState<number | null>(null);
   // The SKU the confirm dialog is currently asking about, and which row (if
   // any) has a request in flight.
   const [pendingDeactivate, setPendingDeactivate] = useState<Product | null>(null);
@@ -39,15 +45,61 @@ export function ProductsAdminPage() {
       return;
     }
     try {
-      const created = await createProduct({ sku: sku || undefined, name, category, unit });
+      const created = await createProduct({
+        sku: sku || undefined,
+        name,
+        category,
+        unit,
+        lowStockThreshold: lowStockThreshold.trim() === "" ? undefined : Number(lowStockThreshold),
+      });
       setSku("");
       setName("");
       setCategory("");
       setUnit("");
+      setLowStockThreshold("");
       // Append locally instead of re-fetching the whole (60+ product) list.
       setProducts((prev) => (prev ? [...prev, created] : [created]));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add SKU");
+    }
+  }
+
+  // Low Stock Alert - saved on blur, same as any other admin edit here.
+  // Blank clears the threshold (null = no alert configured), otherwise the
+  // typed number is sent as-is; a non-numeric or negative draft is dropped
+  // without a request rather than sent to the server to reject.
+  async function commitThreshold(p: Product) {
+    const draft = thresholdDrafts[p.id];
+    if (draft === undefined) return;
+    const trimmed = draft.trim();
+    const next = trimmed === "" ? null : Number(trimmed);
+    if (next !== null && (!Number.isFinite(next) || next < 0)) {
+      setThresholdDrafts((d) => {
+        const { [p.id]: _drop, ...rest } = d;
+        return rest;
+      });
+      return;
+    }
+    if (next === (p.lowStockThreshold ?? null)) {
+      setThresholdDrafts((d) => {
+        const { [p.id]: _drop, ...rest } = d;
+        return rest;
+      });
+      return;
+    }
+    setThresholdBusyId(p.id);
+    setError(null);
+    try {
+      const updated = await updateProduct(p.id, { lowStockThreshold: next });
+      setProducts((prev) => prev?.map((row) => (row.id === p.id ? updated : row)) ?? prev);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update low stock alert");
+    } finally {
+      setThresholdBusyId(null);
+      setThresholdDrafts((d) => {
+        const { [p.id]: _drop, ...rest } = d;
+        return rest;
+      });
     }
   }
 
@@ -106,18 +158,27 @@ export function ProductsAdminPage() {
         <Field label="Unit">
           <TextInput value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="e.g. Gallon" />
         </Field>
+        <Field label="Low stock alert">
+          <TextInput
+            value={lowStockThreshold}
+            onChange={(e) => setLowStockThreshold(e.target.value)}
+            placeholder="Optional"
+            inputMode="decimal"
+            style={{ width: 90 }}
+          />
+        </Field>
         <Button type="submit" style={{ color: colors.yellow }}>Add SKU</Button>
       </form>
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
 
       {!products ? (
-        <TableSkeleton headers={["Category", "SKU", "Product", "Unit", ""]} minWidth={560} label="Loading SKUs…" />
+        <TableSkeleton headers={["Category", "SKU", "Product", "Unit", "Low Stock Alert", ""]} minWidth={560} label="Loading SKUs…" />
       ) : (
         <RowGlowScroll>
           <table className="ae-table ae-table--left" style={{ minWidth: 560 }}>
             <thead>
               <tr>
-                {["Category", "SKU", "Product", "Unit", ""].map((h) => (
+                {["Category", "SKU", "Product", "Unit", "Low Stock Alert", ""].map((h) => (
                   <th key={h}>{h}</th>
                 ))}
               </tr>
@@ -148,6 +209,20 @@ export function ProductsAdminPage() {
                     )}
                   </td>
                   <td>{p.unit}</td>
+                  <td>
+                    <TextInput
+                      value={thresholdDrafts[p.id] ?? (p.lowStockThreshold === null ? "" : String(p.lowStockThreshold))}
+                      onChange={(e) => setThresholdDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                      onBlur={() => commitThreshold(p)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
+                      disabled={thresholdBusyId === p.id}
+                      placeholder="None"
+                      inputMode="decimal"
+                      style={{ width: 80 }}
+                    />
+                  </td>
                   <td>
                     {p.isActive ? (
                       <Button variant="danger" size="sm" disabled={busyId === p.id} onClick={() => setPendingDeactivate(p)} style={{ color: colors.yellow }}>

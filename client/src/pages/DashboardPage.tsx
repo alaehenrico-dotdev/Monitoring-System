@@ -16,6 +16,7 @@ import { formatRelativeTime } from "../utils/dateFormat";
 import { StatCardsSkeleton, TableSkeleton } from "../components/Skeleton";
 import { MonthlyMonitoring } from "../components/MonthlyMonitoring";
 import { PageHeader } from "../components/PageHeader";
+import { Toast } from "../components/Toast";
 import {
   TagIcon,
   BoxIcon,
@@ -142,6 +143,27 @@ export function DashboardPage() {
   const today = getCurrentShiftAndDate().date;
   const realtimeVersion = useRealtimeVersion();
 
+  // `today` (above) is recomputed on every render, so it's never itself
+  // stale - but nothing otherwise re-renders this page as time passes. Left
+  // open with no other user's realtime activity to trigger a re-render
+  // (quiet overnight hours, or a supervisor who just leaves the tab open),
+  // it would keep showing whatever business date was current the last time
+  // something else re-rendered it, straight through the actual midnight/
+  // shift rollover. This checks every minute - cheap, and only ever forces
+  // a re-render on the one tick where the business date has genuinely
+  // changed, not on every tick.
+  const todayRef = useRef(today);
+  useEffect(() => {
+    todayRef.current = today;
+  });
+  const [, forceRerenderOnDateChange] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      if (getCurrentShiftAndDate().date !== todayRef.current) forceRerenderOnDateChange((n) => n + 1);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   useResetOnKeyChange(today, () => setRecentActivityError(false));
   useEffect(() => {
     Promise.all([listProducts(), getTotalStocks(today)])
@@ -189,7 +211,7 @@ export function DashboardPage() {
         subtitleClassName="ae-dash-subtitle"
       />
 
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
 
       <div className="ae-dash-quicklinks">
         {QUICK_LINKS.map((l) => (

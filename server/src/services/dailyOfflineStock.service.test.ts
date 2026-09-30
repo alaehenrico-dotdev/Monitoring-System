@@ -20,25 +20,12 @@ vi.mock("../repositories/productRepository", () => ({
     findActiveById: vi.fn(),
   },
 }));
-vi.mock("../repositories/deliveryDestinationRepository", () => ({
-  deliveryDestinationRepository: {
-    findByIds: vi.fn(),
-  },
-}));
-vi.mock("../repositories/offlineEntryDeliveryRepository", () => ({
-  offlineEntryDeliveryRepository: {
-    findByEntryId: vi.fn(),
-    upsert: vi.fn(),
-  },
-}));
 vi.mock("./changeLog.service", () => ({
   recordChange: vi.fn(),
 }));
 
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
-import { deliveryDestinationRepository } from "../repositories/deliveryDestinationRepository";
-import { offlineEntryDeliveryRepository } from "../repositories/offlineEntryDeliveryRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
 import { saveOfflineEntry } from "./dailyOfflineStock.service";
@@ -60,8 +47,6 @@ beforeEach(() => {
     Promise.resolve({ id: id ?? 99, ...data })) as never);
   vi.mocked(dailyOnlineStockRepository.upsert).mockImplementation(((_id: number | undefined, data: object) =>
     Promise.resolve({ id: 98, ...data })) as never);
-  vi.mocked(offlineEntryDeliveryRepository.findByEntryId).mockResolvedValue([]);
-  vi.mocked(offlineEntryDeliveryRepository.upsert).mockResolvedValue({} as never);
 });
 
 describe("saveOfflineEntry - Stock In/Out per channel", () => {
@@ -109,72 +94,49 @@ describe("saveOfflineEntry - Stock In/Out per channel", () => {
   });
 });
 
-describe("saveOfflineEntry - per-destination Delivery (Out) breakdown", () => {
-  it("sums ALL destinations (not just the one in this request) into deliveryOut/remainingStock", async () => {
+describe("saveOfflineEntry - Delivery (Out) is the sum of the five delivery slots", () => {
+  it("sums ALL slots (not just the ones in this request) into deliveryOut and remainingStock", async () => {
     vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(100);
     vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue({
       id: 7,
       openingStock: 100,
-      deliveryOut: 999, // stale column value - must be ignored in favor of the breakdown sum
+      delivery1: 20,
+      delivery2: 5,
+      deliveryOut: 25,
     } as never);
-    vi.mocked(deliveryDestinationRepository.findByIds).mockResolvedValue([{ id: 2, name: "East" }] as never);
-    // East already has 5 on file from a previous save; this request only changes destination 2.
-    vi.mocked(offlineEntryDeliveryRepository.findByEntryId).mockResolvedValue([
-      { destinationId: 1, quantity: 20 },
-      { destinationId: 2, quantity: 5 },
-    ] as never);
 
-    await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryByDestination: { "2": 8 } });
+    await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { delivery2: 8 });
 
-    // 20 (untouched West) + 8 (new East) = 28, not 999 and not just 8.
     expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
       7,
-      expect.objectContaining({ deliveryOut: 28, remainingStock: 72 }),
-      expect.anything(),
-    );
-    expect(offlineEntryDeliveryRepository.upsert).toHaveBeenCalledWith(7, 2, 8);
-    expect(offlineEntryDeliveryRepository.upsert).toHaveBeenCalledTimes(1);
-  });
-
-  it("logs a synthetic deliveryOut:<destination name> field, old -> new, for each changed destination", async () => {
-    vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(100);
-    vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue({ id: 7, openingStock: 100, deliveryOut: 5 } as never);
-    vi.mocked(deliveryDestinationRepository.findByIds).mockResolvedValue([{ id: 2, name: "East" }] as never);
-    vi.mocked(offlineEntryDeliveryRepository.findByEntryId).mockResolvedValue([{ destinationId: 2, quantity: 5 }] as never);
-
-    await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryByDestination: { "2": 8 } });
-
-    expect(recordChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        oldValue: expect.objectContaining({ "deliveryOut:East": 5 }),
-        newValue: expect.objectContaining({ "deliveryOut:East": 8 }),
-      }),
+      expect.objectContaining({ delivery1: 20, delivery2: 8, deliveryOut: 28, remainingStock: 72 }),
       expect.anything(),
     );
   });
 
-  it("rejects an unknown destination id without persisting anything", async () => {
+  it("puts a flat deliveryOut (CSV import) into slot 1 and zeroes the rest", async () => {
     vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(100);
-    vi.mocked(deliveryDestinationRepository.findByIds).mockResolvedValue([]);
-
-    await expect(saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryByDestination: { "999": 3 } })).rejects.toThrow(
-      /Unknown delivery destination/,
-    );
-    expect(dailyOfflineStockRepository.upsert).not.toHaveBeenCalled();
-    expect(offlineEntryDeliveryRepository.upsert).not.toHaveBeenCalled();
-  });
-
-  it("a flat deliveryOut (no breakdown) never touches OfflineEntryDelivery rows - CSV-import backward compat", async () => {
-    vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(100);
+    vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue({ id: 7, openingStock: 100, delivery3: 9, deliveryOut: 9 } as never);
 
     await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryOut: 15 });
 
     expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
-      undefined,
-      expect.objectContaining({ deliveryOut: 15 }),
+      7,
+      expect.objectContaining({ delivery1: 15, delivery2: 0, delivery3: 0, deliveryOut: 15 }),
       expect.anything(),
     );
-    expect(offlineEntryDeliveryRepository.upsert).not.toHaveBeenCalled();
-    expect(deliveryDestinationRepository.findByIds).not.toHaveBeenCalled();
+  });
+
+  it("keeps a legacy row's flat total (no slots yet) when another field is saved", async () => {
+    vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(100);
+    vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue({ id: 7, openingStock: 100, deliveryOut: 12 } as never);
+
+    await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { productionIn: 5 });
+
+    expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ delivery1: 12, deliveryOut: 12 }),
+      expect.anything(),
+    );
   });
 });

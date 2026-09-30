@@ -1,5 +1,5 @@
 import { Fragment, useState, type CSSProperties } from "react";
-import type { TotalStockRow } from "../types";
+import type { StockLocation, TotalStockRow } from "../types";
 import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { ChevronIcon } from "./icons";
@@ -16,7 +16,26 @@ import { ChevronIcon } from "./icons";
 // it sits right under the header rather than overlapping it.
 const HEADER_ROW_HEIGHT = 29;
 
-export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
+/// A product is "low stock" only once an admin has configured a threshold
+/// for it (ProductsAdminPage) - null means no alert is configured, not an
+/// alert at zero, so it never fires for the majority of SKUs that have
+/// never had one set.
+function isLowStock(row: TotalStockRow): boolean {
+  return row.product.lowStockThreshold !== null && row.totalRemainingStock <= row.product.lowStockThreshold;
+}
+
+export function TotalStocksTable({
+  rows,
+  source = "TOTAL",
+}: {
+  rows: TotalStockRow[];
+  // Which remaining-stock column(s) to show - "TOTAL" (default) keeps the
+  // original Online + Offline + Total layout so DailyReportPage's existing
+  // call (which never passes this) is unaffected. "ONLINE"/"OFFLINE" narrow
+  // the grid to just that channel's column, from StockSourceFilter on
+  // TotalStocksPage.
+  source?: StockLocation;
+}) {
   // See StockGrid's identical `expandedOverride` state - categories start
   // collapsed (absent from this map) and only expand once explicitly
   // clicked open; kept per-table-instance rather than shared, so expanding a
@@ -35,6 +54,15 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
 
   const grandTotal = rows.reduce((sum, r) => sum + r.totalRemainingStock, 0);
 
+  // Which remaining-stock column(s) are visible for the current source
+  // filter - "TOTAL" shows all three (the original layout), "ONLINE"/
+  // "OFFLINE" narrow the grid down to just that one channel.
+  const showOnline = source !== "OFFLINE";
+  const showOffline = source !== "ONLINE";
+  const showTotal = source === "TOTAL";
+  const columnCount =
+    2 + Number(showOnline) + Number(showOffline) + Number(showTotal);
+
   return (
     <RowGlowScroll>
       <table className="ae-table ae-table--center-head ae-table--compact">
@@ -43,9 +71,9 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
             {[
               "SKU",
               "Product",
-              "Online Remaining",
-              "Offline Remaining",
-              "Total Remaining",
+              ...(showOnline ? ["Online Remaining"] : []),
+              ...(showOffline ? ["Offline Remaining"] : []),
+              ...(showTotal ? ["Total Remaining"] : []),
             ].map((h) => (
               <th key={h}>{h}</th>
             ))}
@@ -62,11 +90,11 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                       scroll past, the next category's own row reaches the
                       same top offset and, being later in the DOM (painted
                       after), simply covers this one - the standard sticky-
-                      header handoff. This table's fixed 5-column layout
-                      never scrolls horizontally, so only the vertical
-                      stick is needed here. */}
+                      header handoff. This table's column count varies with
+                      `source`, so it never scrolls horizontally either way -
+                      only the vertical stick is needed here. */}
                   <td
-                    colSpan={5}
+                    colSpan={columnCount}
                     style={{
                       padding: 0,
                       position: "sticky",
@@ -107,7 +135,9 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                     </button>
                   </td>
                 </tr>
-                {groupRows.map((r) => (
+                {groupRows.map((r) => {
+                  const lowStock = isLowStock(r);
+                  return (
                   <tr
                     key={r.product.id}
                     id={`ae-totalstocks-row-${r.product.id}`}
@@ -115,39 +145,77 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
                       isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"
                     }
                     style={
-                      r.totalVariance
-                        ? { background: colors.warningBg }
-                        : undefined
+                      // Low Stock takes priority over the variance tint - a
+                      // product actually running low matters more right now
+                      // than a manual-count mismatch.
+                      lowStock
+                        ? { background: colors.dangerBg }
+                        : r.totalVariance
+                          ? { background: colors.warningBg }
+                          : undefined
                     }
                   >
                     <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
-                    <td style={nameCellStyle}>{r.product.name}</td>
-                    <td>{r.onlineRemainingStock.toLocaleString()}</td>
-                    <td>{r.offlineRemainingStock.toLocaleString()}</td>
-                    <td style={{ fontWeight: 600 }}>
-                      {r.totalRemainingStock.toLocaleString()}
+                    <td style={nameCellStyle}>
+                      {r.product.name}
+                      {lowStock && (
+                        <span
+                          title={`At or below the low stock alert (${r.product.lowStockThreshold} ${r.product.unit})`}
+                          style={{
+                            marginLeft: 8,
+                            padding: "1px 7px",
+                            border: `1px solid ${colors.danger}`,
+                            borderRadius: 999,
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            letterSpacing: "0.04em",
+                            textTransform: "uppercase",
+                            color: colors.danger,
+                          }}
+                        >
+                          Low Stock
+                        </span>
+                      )}
                     </td>
+                    {showOnline && (
+                      <td>{r.onlineRemainingStock.toLocaleString()}</td>
+                    )}
+                    {showOffline && (
+                      <td>{r.offlineRemainingStock.toLocaleString()}</td>
+                    )}
+                    {showTotal && (
+                      <td style={{ fontWeight: 600 }}>
+                        {r.totalRemainingStock.toLocaleString()}
+                      </td>
+                    )}
                   </tr>
-                ))}
+                  );
+                })}
                 <tr style={subtotalRowStyle}>
                   <td colSpan={2} style={nameCellStyle}>
                     Subtotal - {category}
                   </td>
-                  <td>
-                    {groupRows
-                      .reduce((s, r) => s + r.onlineRemainingStock, 0)
-                      .toLocaleString()}
-                  </td>
-                  <td>
-                    {groupRows
-                      .reduce((s, r) => s + r.offlineRemainingStock, 0)
-                      .toLocaleString()}
-                  </td>
-                  <td>
-                    {groupRows
-                      .reduce((s, r) => s + r.totalRemainingStock, 0)
-                      .toLocaleString()}
-                  </td>
+                  {showOnline && (
+                    <td>
+                      {groupRows
+                        .reduce((s, r) => s + r.onlineRemainingStock, 0)
+                        .toLocaleString()}
+                    </td>
+                  )}
+                  {showOffline && (
+                    <td>
+                      {groupRows
+                        .reduce((s, r) => s + r.offlineRemainingStock, 0)
+                        .toLocaleString()}
+                    </td>
+                  )}
+                  {showTotal && (
+                    <td>
+                      {groupRows
+                        .reduce((s, r) => s + r.totalRemainingStock, 0)
+                        .toLocaleString()}
+                    </td>
+                  )}
                 </tr>
               </Fragment>
             );
@@ -156,17 +224,21 @@ export function TotalStocksTable({ rows }: { rows: TotalStockRow[] }) {
             <td colSpan={2} style={nameCellStyle}>
               GRAND TOTAL
             </td>
-            <td>
-              {rows
-                .reduce((s, r) => s + r.onlineRemainingStock, 0)
-                .toLocaleString()}
-            </td>
-            <td>
-              {rows
-                .reduce((s, r) => s + r.offlineRemainingStock, 0)
-                .toLocaleString()}
-            </td>
-            <td>{grandTotal.toLocaleString()}</td>
+            {showOnline && (
+              <td>
+                {rows
+                  .reduce((s, r) => s + r.onlineRemainingStock, 0)
+                  .toLocaleString()}
+              </td>
+            )}
+            {showOffline && (
+              <td>
+                {rows
+                  .reduce((s, r) => s + r.offlineRemainingStock, 0)
+                  .toLocaleString()}
+              </td>
+            )}
+            {showTotal && <td>{grandTotal.toLocaleString()}</td>}
           </tr>
         </tbody>
       </table>

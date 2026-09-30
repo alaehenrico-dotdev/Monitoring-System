@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "../api/http";
 import { resetAllData, verifyResetPasscode } from "../api/dataReset";
+import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { colors } from "../theme";
@@ -10,7 +11,7 @@ import { InlineLoading, Spinner } from "../components/Spinner";
 
 const COUNTDOWN_SECONDS = 10;
 
-type Status = "idle" | "confirming" | "resetting" | "done" | "error";
+type Status = "idle" | "confirming" | "backing-up" | "resetting" | "done" | "error";
 type LockStatus = "locked" | "verifying" | "unlocked";
 
 // Fixed brand colors, not the light/dark theme tokens (--ae-*) - this panel
@@ -34,7 +35,6 @@ const WIPED_ITEMS = [
 ];
 const PRESERVED_ITEMS = [
   "Products & categories",
-  "Delivery destinations",
   "User accounts & roles",
   "System settings",
 ];
@@ -108,10 +108,30 @@ export function DataResetPage() {
   }, [status, secondsLeft]);
 
   async function performReset() {
-    setStatus("resetting");
+    if (!resetToken) {
+      setError("Passcode session expired - unlock this page again.");
+      setStatus("error");
+      return;
+    }
+    setStatus("backing-up");
     try {
-      if (!resetToken)
-        throw new Error("Passcode session expired - unlock this page again.");
+      // Section: Admin - Database Backup. A reset is irreversible, so every
+      // reset first pulls a full mysqldump to the admin's own machine -
+      // the same file DatabaseBackupPage's "Download Backup" button
+      // produces - before anything is wiped server-side. If the backup
+      // itself fails (e.g. mysqldump isn't installed), the reset is
+      // aborted rather than proceeding without a safety copy.
+      try {
+        await downloadDatabaseBackup();
+      } catch (err) {
+        throw Object.assign(
+          new Error(
+            `Reset was cancelled - the safety backup failed: ${err instanceof Error ? err.message : "unknown error"}`,
+          ),
+          { cause: err },
+        );
+      }
+      setStatus("resetting");
       await resetAllData(resetToken);
       // The Daily/Variance Report History pages list is browser-local
       // (localStorage, see utils/reportHistory.ts) - the server-side wipe
@@ -340,8 +360,9 @@ export function DataResetPage() {
           }}
         >
           All stock data below will be permanently deleted and cannot be
-          recovered. Make sure any reports you need have already been exported
-          or printed before continuing.
+          recovered. Clicking "Reset Now" will first save a full database
+          backup to your downloads, then perform the wipe - make sure your
+          browser lets it download that file.
         </p>
 
         <div
@@ -451,7 +472,7 @@ export function DataResetPage() {
           <Button
             variant="danger"
             onClick={openConfirm}
-            disabled={status === "resetting"}
+            disabled={status === "backing-up" || status === "resetting"}
             style={{ padding: "10px 22px" }}
           >
             Reset Data
@@ -466,7 +487,7 @@ export function DataResetPage() {
                 fontWeight: 600,
               }}
             >
-              All data has been reset. The system is now a clean slate.
+              A full backup was saved to your downloads, then all data was reset. The system is now a clean slate.
             </p>
           )}
           {status === "error" && error && (
@@ -477,7 +498,7 @@ export function DataResetPage() {
         </div>
       </div>
 
-      {(status === "confirming" || status === "resetting") && (
+      {(status === "confirming" || status === "backing-up" || status === "resetting") && (
         <Modal
           title="Confirm data reset"
           onClose={status === "confirming" ? cancel : () => {}}
@@ -487,7 +508,8 @@ export function DataResetPage() {
             <>
               <p style={{ margin: "0 0 12px", fontSize: 13.5 }}>
                 This will permanently delete <strong>all</strong> entries,
-                counts, and reports. This cannot be undone.
+                counts, and reports. This cannot be undone. A full backup
+                will be downloaded to this device first.
               </p>
               <p style={{ margin: "0 0 18px", fontSize: 13 }}>
                 {secondsLeft > 0 ? (
@@ -526,6 +548,8 @@ export function DataResetPage() {
                 </Button>
               </div>
             </>
+          ) : status === "backing-up" ? (
+            <InlineLoading label="Saving a full backup before resetting…" />
           ) : (
             <InlineLoading label="Resetting data…" />
           )}

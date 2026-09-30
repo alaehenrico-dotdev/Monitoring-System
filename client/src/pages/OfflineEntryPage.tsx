@@ -2,12 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import {
-  computeNewDeliveryOut,
+  computeDeliverySlots,
   getOfflineGrid,
   saveOfflineEntry,
 } from "../api/offlineStock";
 import { getOnlineGrid } from "../api/onlineStock";
-import { listDeliveryDestinations } from "../api/deliveryDestinations";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
@@ -40,13 +39,18 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
+import { ConflictResolution } from "../components/ConflictResolution";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   describePendingChanges,
+  detectConflicts,
   usePendingEntryChanges,
   type PendingByProduct,
 } from "../hooks/usePendingEntryChanges";
-import { buildOfflineStockColumns } from "../config/stockColumns";
-import type { DeliveryDestination } from "../types";
+import {
+  deliverySlotColumns,
+  offlineStockColumns as columns,
+} from "../config/stockColumns";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
@@ -68,7 +72,7 @@ import { colors } from "../theme";
 import type { Shift } from "../types";
 
 /// Re-derives Offline Stocks + Remaining Stock (+ Delivery (Out), which is
-/// itself derived from the per-destination columns) from a last-saved entry
+/// itself the sum of the five delivery columns) from a last-saved entry
 /// plus a staged (not-yet-saved) diff on top of it - shared by the live grid
 /// preview (usePendingEntryChanges' `recompute`, below) and validateImportRow's
 /// advisory negative-stock pre-check, so the two never drift apart on what
@@ -85,7 +89,10 @@ function computeOfflineFigures(
   const productionIn = changes.productionIn ?? Number(entry.productionIn ?? 0);
   const backloads = changes.backloads ?? Number(entry.backloads ?? 0);
   const upsellOut = changes.upsellOut ?? Number(entry.upsellOut ?? 0);
-  const deliveryOut = computeNewDeliveryOut(entry, changes);
+  const { deliveryOut, ...deliverySlots } = computeDeliverySlots(
+    entry,
+    changes,
+  );
 
   const offlineStock = calculateOfflineStock(
     openingStock,
@@ -99,7 +106,7 @@ function computeOfflineFigures(
     backloads,
     upsellOut,
   );
-  return { deliveryOut, offlineStock, remainingStock };
+  return { ...deliverySlots, deliveryOut, offlineStock, remainingStock };
 }
 
 export function OfflineEntryPage() {
@@ -115,22 +122,17 @@ export function OfflineEntryPage() {
   const setShift = (s: Shift) =>
     setDateShift((prev) => ({ ...prev, shift: s }));
   const [rows, setRows] = useState<GridRow[] | null>(null);
-  // Destinations aren't date/shift-scoped (unlike rows above) - loaded once
-  // and reused across every date/shift this page is switched to. Starts
-  // empty rather than null so the grid never blocks on this fetch: it just
-  // renders without any destination columns until they arrive, the same
-  // graceful-degradation the "otherShiftCount" banner below already uses for
-  // its own best-effort fetch.
-  const [destinations, setDestinations] = useState<DeliveryDestination[]>([]);
-  const columns = useMemo(
-    () => buildOfflineStockColumns(destinations),
-    [destinations],
-  );
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("offline-entry");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
+  // Real per-item percent (see handleSaveAll) for LoadingOverlay's ring -
+  // kept local to this page rather than routed through the shared top
+  // progress bar, so Save shows exactly one animation instead of stacking
+  // the overlay's spinner on top of the top bar on top of the still-open
+  // Preview dialog's animated border.
+  const [savePercent, setSavePercent] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   // One level of Undo for the most recent Save - the pre-save value of
@@ -146,16 +148,11 @@ export function OfflineEntryPage() {
   const canEdit =
     user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
+  const { online, reconnects } = useOnlineStatus();
   // So handleSaveAll (below) can tell CsvTools its own last import batch is
   // no longer just "pending" once a real Save has committed it - see
   // CsvTools' notifyCommitted doc comment.
   const csvToolsRef = useRef<CsvToolsHandle>(null);
-
-  useEffect(() => {
-    listDeliveryDestinations()
-      .then(setDestinations)
-      .catch(() => setDestinations([])); // best-effort - see the state comment above
-  }, []);
 
   // Cell edits are staged here instead of hitting the save endpoint
   // immediately - Save (below) flushes them all at once, and Preview shows
@@ -163,12 +160,33 @@ export function OfflineEntryPage() {
   // sessionStorage under this date+shift's own key, so navigating to another
   // page and back - or just switching shift/date and back - doesn't lose an
   // edit still in progress.
-  const { pending, displayRows, stage, clear, clearAll, pendingCount } =
-    usePendingEntryChanges(
-      rows,
-      `ala-eh-pending:offline:${date}:${shift}`,
-      computeOfflineFigures,
-    );
+  const {
+    pending,
+    baselines,
+    displayRows,
+    stage,
+    clear,
+    clearAll,
+    resolveConflict,
+    pendingCount,
+  } = usePendingEntryChanges(
+    rows,
+    `ala-eh-pending:offline:${date}:${shift}`,
+    computeOfflineFigures,
+  );
+
+  // Edits staged against values the server has since changed (typically made
+  // offline, or before another user saved) - surfaced for side-by-side
+  // resolution and blocking Save until decided.
+  const conflicts = useMemo(
+    () =>
+      detectConflicts(rows, pending, baselines, [
+        ...columns,
+        ...deliverySlotColumns,
+        manualCountColumn,
+      ]),
+    [rows, pending, baselines],
+  );
 
   // Import reads the file's MANUAL COUNTING column and saves it as this
   // shift's manual count (Save below), the starting point of the next
@@ -176,7 +194,7 @@ export function OfflineEntryPage() {
   const { counts: manualCounts, loaded: manualCountsLoaded } =
     useEntryManualCounts(date, shift, "OFFLINE");
   const csvRows = useRowsWithManualCounts(rows, manualCounts);
-  const csvColumns = useMemo(() => [...columns, manualCountColumn], [columns]);
+  const csvColumns = useMemo(() => [...columns, manualCountColumn], []);
 
   // Search and the category dropdown only affect what's displayed in the
   // grid - both are local filters over the same already-loaded rows, not a
@@ -206,7 +224,7 @@ export function OfflineEntryPage() {
     getOfflineGrid(date, shift)
       .then((data) => setRows(data as unknown as GridRow[]))
       .catch((e) => setError(e.message));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Best-effort check of whether the *other* shift already has saved
   // entries for this date - surfaced as a banner below, so switching (or
@@ -226,7 +244,7 @@ export function OfflineEntryPage() {
         ),
       )
       .catch(() => setOtherShiftCount(null));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Best-effort - CSV import's advisory negative-stock pre-check
   // (validateImportRow, below) needs the CURRENT shift's Online rows to
@@ -243,7 +261,7 @@ export function OfflineEntryPage() {
     getOnlineGrid(date, shift)
       .then((data) => setOnlineRowsForImportCheck(data as unknown as GridRow[]))
       .catch(() => setOnlineRowsForImportCheck(null));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
   // easy to forget Save is a separate step now that cells no longer commit
@@ -289,13 +307,43 @@ export function OfflineEntryPage() {
   // whether it's safe to let a "Save & Print" through.
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
+    if (!online) {
+      setError(
+        "You're offline - your changes are kept on this device. Save again once you're back online.",
+      );
+      return false;
+    }
+    if (conflicts.length > 0) {
+      setShowPreview(false);
+      return false;
+    }
+    // Re-read the sheet right before saving so an edit made against stale
+    // (or offline-cached) data is caught as a conflict instead of silently
+    // overwriting someone else's newer value.
+    try {
+      const fresh = (await getOfflineGrid(date, shift)) as unknown as GridRow[];
+      setRows(fresh);
+      if (detectConflicts(fresh, pending, baselines).length > 0) {
+        setShowPreview(false);
+        return false;
+      }
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? `Couldn't check for newer changes: ${e.message}`
+          : "Couldn't check for newer changes.",
+      );
+      return false;
+    }
     setSaving(true);
-    // Real per-item progress (Section: Loading system) - same pattern
-    // CsvTools' own import Save already uses. Particularly worth it here:
-    // a bulk CSV import can stage dozens of products at once, so this can be
-    // a genuinely long sequential save, not the near-instant single-cell
-    // edit this button started out handling.
-    progress.start();
+    setSavePercent(0);
+    // Close the Preview dialog now rather than after the loop below: it's
+    // built on Modal, whose border keeps sweeping the whole time it's
+    // mounted (Modal.tsx's ae-modal-border-sweep), so leaving it open for
+    // the duration of the save stacked a second animation behind
+    // LoadingOverlay's ring for no reason - nothing in it needs to stay
+    // visible once Save has actually started.
+    setShowPreview(false);
     const failed: string[] = [];
     const revertTo: PendingByProduct = {};
     const entries = Object.entries(pending);
@@ -338,16 +386,12 @@ export function OfflineEntryPage() {
         const reason = e instanceof Error ? e.message : "unknown error";
         failed.push(`${name} (${reason})`);
       }
-      progress.set(Math.round(((i + 1) / entries.length) * 100));
+      setSavePercent(Math.round(((i + 1) / entries.length) * 100));
     }
     setSaving(false);
-    setShowPreview(false);
     if (Object.keys(revertTo).length > 0) setLastSavedBatch(revertTo);
     if (failed.length) {
       setError(`Failed to save: ${failed.join("; ")}`);
-      progress.fail();
-    } else {
-      progress.done();
     }
     // Whatever CsvTools' own "Undo Import" batch might still reference is no
     // longer just staged - some or all of it just got committed for real by
@@ -672,7 +716,16 @@ export function OfflineEntryPage() {
           ⚠ {otherShiftWarning}
         </p>
       )}
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      {/* offset stacks this above the shift-warning Toast right below it,
+          rather than both portaling to the same bottom-right spot. */}
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+        offset={96}
+      />
+      <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
       {!rows ? (
         <TableSkeleton
           headers={["SKU", "Product", ...columns.map((c) => c.label)]}
@@ -708,7 +761,10 @@ export function OfflineEntryPage() {
       {showPreview && (
         <Modal title="Unsaved changes" onClose={() => setShowPreview(false)}>
           <PendingChangesPreview
-            items={describePendingChanges(rows, pending, csvColumns)}
+            items={describePendingChanges(rows, pending, [
+              ...csvColumns,
+              ...deliverySlotColumns,
+            ])}
           />
           <div
             style={{
@@ -743,7 +799,10 @@ export function OfflineEntryPage() {
           onClose={() => setShowClearConfirm(false)}
         >
           <PendingChangesPreview
-            items={describePendingChanges(rows, pending, csvColumns)}
+            items={describePendingChanges(rows, pending, [
+              ...csvColumns,
+              ...deliverySlotColumns,
+            ])}
           />
           <p
             style={{
@@ -782,7 +841,9 @@ export function OfflineEntryPage() {
           </div>
         </Modal>
       )}
-      {saving && <LoadingOverlay label="Saving changes…" />}
+      {saving && (
+        <LoadingOverlay label="Saving changes…" percent={savePercent} />
+      )}
     </div>
   );
 }

@@ -34,7 +34,7 @@ export function verifyPasscode(passcode: string, user: AuthUser): string | null 
   return jwt.sign({ scope: RESET_TOKEN_SCOPE, sub: String(user.id) }, env.jwtSecret, { expiresIn: RESET_TOKEN_TTL });
 }
 
-function assertValidResetToken(token: string, user: AuthUser) {
+export function assertValidResetToken(token: string, user: AuthUser) {
   let payload: ResetTokenPayload;
   try {
     payload = jwt.verify(token, env.jwtSecret) as ResetTokenPayload;
@@ -60,12 +60,6 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
 
   const result = await prisma.$transaction(async (tx) => {
     const onlineStock = await tx.dailyOnlineStock.deleteMany();
-    // OfflineEntryDelivery has an ON DELETE RESTRICT FK onto
-    // daily_offline_stock (schema.prisma), so its rows have to go first or
-    // the offlineStock delete below would fail on any entry with a
-    // destination breakdown. DeliveryDestination itself is untouched - it's
-    // admin-managed master data, same as Product.
-    const offlineEntryDeliveries = await tx.offlineEntryDelivery.deleteMany();
     const offlineStock = await tx.dailyOfflineStock.deleteMany();
     const manualCounts = await tx.manualCount.deleteMany();
     const changeLog = await tx.changeLog.deleteMany();
@@ -73,7 +67,6 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     const deleted = {
       onlineStock: onlineStock.count,
       offlineStock: offlineStock.count,
-      offlineEntryDeliveries: offlineEntryDeliveries.count,
       manualCounts: manualCounts.count,
       changeLog: changeLog.count,
     };
