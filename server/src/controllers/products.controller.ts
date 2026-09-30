@@ -9,6 +9,7 @@ const createSchema = z.object({
   category: z.string().min(1),
   unit: z.string().min(1),
   sortOrder: z.number().optional(),
+  lowStockThreshold: z.number().nonnegative().nullable().optional(),
 });
 
 const updateSchema = createSchema.partial().extend({ isActive: z.boolean().optional(), sku: z.string().min(1).nullable().optional() });

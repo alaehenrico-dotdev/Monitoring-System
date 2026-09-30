@@ -17,7 +17,14 @@ export function createApp() {
   // never serves, but the rest of helmet's defaults (nosniff, no
   // `X-Powered-By`, HSTS, etc.) still harden every JSON response.
   app.use(helmet({ contentSecurityPolicy: false }));
-  app.use(cors({ origin: env.clientOrigin, credentials: true }));
+  // `exposedHeaders` for Content-Disposition - without this, a cross-origin
+  // fetch() (client and server are separate origins by default, see
+  // env.clientOrigin) can read the response body but the Headers object
+  // silently withholds Content-Disposition, which is how api/backup.ts
+  // (and any other streamed-download endpoint) recovers the real filename.
+  // Missing this doesn't break the download itself - only its filename,
+  // which then silently falls back to a generic one.
+  app.use(cors({ origin: env.clientOrigin, credentials: true, exposedHeaders: ["Content-Disposition"] }));
   app.use(express.json());
   app.use(requestLogger);
 

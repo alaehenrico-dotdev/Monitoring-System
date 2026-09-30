@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOnlineGrid, saveOnlineEntry } from "../api/onlineStock";
 import { getOfflineGrid } from "../api/offlineStock";
@@ -13,7 +12,6 @@ import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
 import {
   ClearIcon,
   PrinterIcon,
-  ReportIcon,
   SaveIcon,
   UndoIcon,
 } from "../components/icons";
@@ -35,8 +33,11 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
+import { ConflictResolution } from "../components/ConflictResolution";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   describePendingChanges,
+  detectConflicts,
   usePendingEntryChanges,
   type PendingByProduct,
 } from "../hooks/usePendingEntryChanges";
@@ -96,7 +97,6 @@ function computeOnlineFigures(
 
 export function OnlineEntryPage() {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const progress = useTopProgress();
   // Defaults to whatever shift+date an encoder opening this page right now
   // is almost certainly working on (see getCurrentShiftAndDate) - date and
@@ -112,6 +112,12 @@ export function OnlineEntryPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
+  // Real per-item percent (see handleSaveAll) for LoadingOverlay's ring -
+  // kept local to this page rather than routed through the shared top
+  // progress bar, so Save shows exactly one animation instead of stacking
+  // the overlay's spinner on top of the top bar on top of the still-open
+  // Preview dialog's animated border.
+  const [savePercent, setSavePercent] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   // One level of Undo for the most recent Save - the pre-save value of
@@ -127,6 +133,7 @@ export function OnlineEntryPage() {
   const canEdit =
     user?.role === "ONLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
+  const { online, reconnects } = useOnlineStatus();
   // So handleSaveAll (below) can tell CsvTools its own last import batch is
   // no longer just "pending" once a real Save has committed it - see
   // CsvTools' notifyCommitted doc comment.
@@ -138,12 +145,32 @@ export function OnlineEntryPage() {
   // sessionStorage under this date+shift's own key, so navigating to another
   // page and back - or just switching shift/date and back - doesn't lose an
   // edit still in progress.
-  const { pending, displayRows, stage, clear, clearAll, pendingCount } =
-    usePendingEntryChanges(
-      rows,
-      `ala-eh-pending:online:${date}:${shift}`,
-      computeOnlineFigures,
-    );
+  const {
+    pending,
+    baselines,
+    displayRows,
+    stage,
+    clear,
+    clearAll,
+    resolveConflict,
+    pendingCount,
+  } = usePendingEntryChanges(
+    rows,
+    `ala-eh-pending:online:${date}:${shift}`,
+    computeOnlineFigures,
+  );
+
+  // Edits staged against values the server has since changed (typically made
+  // offline, or before another user saved) - surfaced for side-by-side
+  // resolution and blocking Save until decided.
+  const conflicts = useMemo(
+    () =>
+      detectConflicts(rows, pending, baselines, [
+        ...columns,
+        manualCountColumn,
+      ]),
+    [rows, pending, baselines],
+  );
 
   // Import reads the file's MANUAL COUNTING column and saves it as this
   // shift's manual count (Save below), the starting point of the next
@@ -181,7 +208,7 @@ export function OnlineEntryPage() {
     getOnlineGrid(date, shift)
       .then((data) => setRows(data as unknown as GridRow[]))
       .catch((e) => setError(e.message));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Best-effort check of whether the *other* shift already has saved
   // entries for this date - surfaced as a banner below, so switching (or
@@ -201,7 +228,7 @@ export function OnlineEntryPage() {
         ),
       )
       .catch(() => setOtherShiftCount(null));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Best-effort - CSV import's advisory negative-stock pre-check
   // (validateImportRow, below) needs the CURRENT shift's Offline rows to
@@ -220,7 +247,7 @@ export function OnlineEntryPage() {
         setOfflineRowsForImportCheck(data as unknown as GridRow[]),
       )
       .catch(() => setOfflineRowsForImportCheck(null));
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, reconnects]);
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
   // easy to forget Save is a separate step now that cells no longer commit
@@ -268,13 +295,43 @@ export function OnlineEntryPage() {
   // whether it's safe to let a "Save & Print" through.
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
+    if (!online) {
+      setError(
+        "You're offline - your changes are kept on this device. Save again once you're back online.",
+      );
+      return false;
+    }
+    if (conflicts.length > 0) {
+      setShowPreview(false);
+      return false;
+    }
+    // Re-read the sheet right before saving so an edit made against stale
+    // (or offline-cached) data is caught as a conflict instead of silently
+    // overwriting someone else's newer value.
+    try {
+      const fresh = (await getOnlineGrid(date, shift)) as unknown as GridRow[];
+      setRows(fresh);
+      if (detectConflicts(fresh, pending, baselines).length > 0) {
+        setShowPreview(false);
+        return false;
+      }
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? `Couldn't check for newer changes: ${e.message}`
+          : "Couldn't check for newer changes.",
+      );
+      return false;
+    }
     setSaving(true);
-    // Real per-item progress (Section: Loading system) - same pattern
-    // CsvTools' own import Save already uses. Particularly worth it here:
-    // a bulk CSV import can stage dozens of products at once, so this can be
-    // a genuinely long sequential save, not the near-instant single-cell
-    // edit this button started out handling.
-    progress.start();
+    setSavePercent(0);
+    // Close the Preview dialog now rather than after the loop below: it's
+    // built on Modal, whose border keeps sweeping the whole time it's
+    // mounted (Modal.tsx's ae-modal-border-sweep), so leaving it open for
+    // the duration of the save stacked a second animation behind
+    // LoadingOverlay's ring for no reason - nothing in it needs to stay
+    // visible once Save has actually started.
+    setShowPreview(false);
     const failed: string[] = [];
     const revertTo: PendingByProduct = {};
     const entries = Object.entries(pending);
@@ -317,16 +374,12 @@ export function OnlineEntryPage() {
         const reason = e instanceof Error ? e.message : "unknown error";
         failed.push(`${name} (${reason})`);
       }
-      progress.set(Math.round(((i + 1) / entries.length) * 100));
+      setSavePercent(Math.round(((i + 1) / entries.length) * 100));
     }
     setSaving(false);
-    setShowPreview(false);
     if (Object.keys(revertTo).length > 0) setLastSavedBatch(revertTo);
     if (failed.length) {
       setError(`Failed to save: ${failed.join("; ")}`);
-      progress.fail();
-    } else {
-      progress.done();
     }
     // Whatever CsvTools' own "Undo Import" batch might still reference is no
     // longer just staged - some or all of it just got committed for real by
@@ -594,22 +647,6 @@ export function OnlineEntryPage() {
               <PrinterIcon />
               <span className="ae-toolbar-btn-label">PDF</span>
             </Button>
-            <Button
-              className="ae-toolbar-save"
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/daily-report?date=${date}&auto=1`)}
-              disabled={pendingCount > 0}
-              title={
-                pendingCount > 0
-                  ? "Save your changes first - the report only reads saved data"
-                  : "Open the Daily Report for this date"
-              }
-            >
-              <ReportIcon />
-              <span className="ae-toolbar-btn-label">Report</span>
-            </Button>
             {canEdit && (
               <CsvTools
                 ref={csvToolsRef}
@@ -655,7 +692,16 @@ export function OnlineEntryPage() {
           ⚠ {otherShiftWarning}
         </p>
       )}
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      {/* offset stacks this above the shift-warning Toast right below it,
+          rather than both portaling to the same bottom-right spot. */}
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+        offset={96}
+      />
+      <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
       {!rows ? (
         <TableSkeleton
           headers={["SKU", "Product", ...columns.map((c) => c.label)]}
@@ -765,7 +811,9 @@ export function OnlineEntryPage() {
           </div>
         </Modal>
       )}
-      {saving && <LoadingOverlay label="Saving changes…" />}
+      {saving && (
+        <LoadingOverlay label="Saving changes…" percent={savePercent} />
+      )}
     </div>
   );
 }

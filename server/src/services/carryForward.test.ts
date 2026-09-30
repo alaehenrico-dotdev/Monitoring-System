@@ -67,10 +67,6 @@ vi.mock("../repositories/dailyOnlineStockRepository", () => ({ dailyOnlineStockR
 vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(async (id: number) => ({ id, name: `Product #${id}` })) },
 }));
-vi.mock("../repositories/deliveryDestinationRepository", () => ({ deliveryDestinationRepository: { findByIds: vi.fn() } }));
-vi.mock("../repositories/offlineEntryDeliveryRepository", () => ({
-  offlineEntryDeliveryRepository: { findByEntryId: vi.fn().mockResolvedValue([]), upsert: vi.fn() },
-}));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 
 import { saveOfflineEntry } from "./dailyOfflineStock.service";

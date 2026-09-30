@@ -7,6 +7,7 @@ export interface ProductCreateData {
   category: string;
   unit: string;
   sortOrder: number;
+  lowStockThreshold?: number | null;
 }
 
 export interface ProductUpdateData {
@@ -16,6 +17,7 @@ export interface ProductUpdateData {
   unit?: string;
   sortOrder?: number;
   isActive?: boolean;
+  lowStockThreshold?: number | null;
 }
 
 const CACHE_PREFIX = "products:";

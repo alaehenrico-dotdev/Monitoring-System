@@ -1,5 +1,8 @@
 import { defineConfig, loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join, relative } from "node:path";
 
 /**
  * Injects a Content-Security-Policy `<meta>` tag into the built index.html -
@@ -43,6 +46,41 @@ function cspPlugin(apiOrigin: string): Plugin {
   };
 }
 
+/**
+ * Fills the service worker's precache list (public/sw.js is copied to dist
+ * as-is) with every file the build actually emitted, so the whole app - lazy
+ * page chunks included - is available offline after the first load. The
+ * cache version is a hash of that file list, so a new deploy (new hashed
+ * asset names) replaces the old cache instead of serving stale code.
+ */
+function pwaPrecachePlugin(): Plugin {
+  let outDir = "dist";
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((f) => {
+      const full = join(dir, f);
+      return statSync(full).isDirectory() ? walk(full) : [full];
+    });
+  return {
+    name: "pwa-precache",
+    apply: "build",
+    configResolved(config) {
+      outDir = join(config.root, config.build.outDir);
+    },
+    closeBundle() {
+      const files = walk(outDir)
+        .map((f) => "/" + relative(outDir, f).split("\\").join("/"))
+        .filter((f) => f !== "/sw.js" && !f.endsWith(".map") && !/\.(webm|mp4)$/.test(f))
+        .sort();
+      const version = createHash("sha1").update(files.join(",")).digest("hex").slice(0, 10);
+      const swPath = join(outDir, "sw.js");
+      const sw = readFileSync(swPath, "utf8")
+        .replace("__SW_VERSION__", version)
+        .replace("self.__PRECACHE__ || []", JSON.stringify(files));
+      writeFileSync(swPath, sw);
+    },
+  };
+}
+
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
   // VITE_API_URL is normally an absolute URL when the API is on its own
@@ -57,7 +95,7 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [react(), cspPlugin(apiOrigin)],
+    plugins: [react(), cspPlugin(apiOrigin), pwaPrecachePlugin()],
     server: {
       port: 5173,
       host: true,

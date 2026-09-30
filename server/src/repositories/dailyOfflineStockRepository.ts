@@ -13,6 +13,13 @@ export interface OfflineStockData {
   offlineStock: number;
   productionIn: number;
   deliveryOut: number;
+  /// The five delivery slots deliveryOut is the sum of. Optional so callers that
+  /// only re-derive stock figures (carry-forward) leave the slots untouched.
+  delivery1?: number;
+  delivery2?: number;
+  delivery3?: number;
+  delivery4?: number;
+  delivery5?: number;
   backloads: number;
   upsellOut: number;
   remainingStock: number;

@@ -1,3 +1,4 @@
+import { clearOfflineApiCache } from "../pwa";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { getMe, login as loginRequest } from "../api/auth";
 import { ApiError, getToken, setToken, setUnauthorizedHandler } from "../api/http";
@@ -67,6 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    clearOfflineApiCache();
     setToken(null);
     setUser(null);
   }

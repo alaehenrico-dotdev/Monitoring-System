@@ -9,6 +9,7 @@ import { listChangeLog } from "../api/changeLog";
 import type { ChangeLogEntry } from "../types";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
+import { Toast } from "../components/Toast";
 import { SearchInput } from "../components/SearchInput";
 import { Dropdown } from "../components/Dropdown";
 import { matchesSearch } from "../utils/search";
@@ -118,7 +119,7 @@ export function ChangeLogPage() {
         </Toolbar>
       </PageHeader>
 
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
       {!entries ? (
         <TableSkeleton
           headers={["When", "Record", "Action", "Changed By", ""]}

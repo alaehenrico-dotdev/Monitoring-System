@@ -55,11 +55,6 @@ const ProductsAdminPage = lazy(() =>
     default: m.ProductsAdminPage,
   })),
 );
-const DeliveryDestinationsAdminPage = lazy(() =>
-  import("./pages/DeliveryDestinationsAdminPage").then((m) => ({
-    default: m.DeliveryDestinationsAdminPage,
-  })),
-);
 const ChangeLogPage = lazy(() =>
   import("./pages/ChangeLogPage").then((m) => ({ default: m.ChangeLogPage })),
 );
@@ -123,10 +118,6 @@ export default function App() {
                       />
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
-                      <Route
-                        path="/delivery-destinations"
-                        element={<DeliveryDestinationsAdminPage />}
-                      />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Route>
                   </Route>

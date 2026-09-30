@@ -1,4 +1,10 @@
-import { useEffect, useRef, type MouseEvent as ReactMouseEvent, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type RefObject,
+} from "react";
 import { colors } from "../theme";
 
 /**
@@ -14,8 +20,8 @@ import { colors } from "../theme";
  * composited down to just the ring. At rest the gradient auto-sweeps; on
  * hover it recenters on the pointer (via `--mx`/`--my` custom properties
  * written directly to the DOM, not React state, so hovering never causes
- * a re-render). A second overlay - a soft white radial glow, blended with
- * `mixBlendMode: "screen"` - fades in under the cursor on the same
+ * a re-render). A second overlay - a soft yellow radial glow (the shared
+ * --ae-glow-* tokens) - fades in under the cursor on the same
  * coordinates.
  */
 
@@ -71,15 +77,25 @@ export function useCursorGlow<T extends HTMLElement = HTMLDivElement>() {
     host.style.setProperty("--mx", `${x}%`);
     host.style.setProperty("--my", `${y}%`);
     host.style.setProperty("--spotlight-opacity", "1");
-    gradientRef.current?.classList.add("ae-cursor-glow-gradient-sweep--tracking");
+    gradientRef.current?.classList.add(
+      "ae-cursor-glow-gradient-sweep--tracking",
+    );
   }
 
   function handlePointerLeave() {
-    gradientRef.current?.classList.remove("ae-cursor-glow-gradient-sweep--tracking");
+    gradientRef.current?.classList.remove(
+      "ae-cursor-glow-gradient-sweep--tracking",
+    );
     hostRef.current?.style.setProperty("--spotlight-opacity", "0");
   }
 
-  return { hostRef, gradientRef, spotlightRef, handlePointerMove, handlePointerLeave };
+  return {
+    hostRef,
+    gradientRef,
+    spotlightRef,
+    handlePointerMove,
+    handlePointerLeave,
+  };
 }
 
 /**
@@ -112,8 +128,8 @@ export function CursorGlowOverlay({
           inset: 0,
           borderRadius: "inherit",
           pointerEvents: "none",
-          mixBlendMode: "screen",
-          background: `radial-gradient(circle ${spotlightRadius}px at var(--mx, 50%) var(--my, 50%), rgba(255,255,255,0.35), rgba(255,255,255,0.08) 55%, transparent 75%)`,
+          mixBlendMode: "var(--ae-glow-blend)" as CSSProperties["mixBlendMode"],
+          background: `radial-gradient(circle ${spotlightRadius}px at var(--mx, 50%) var(--my, 50%), var(--ae-glow-a), var(--ae-glow-b) 55%, transparent 75%)`,
         }}
       />
       <div
@@ -126,9 +142,10 @@ export function CursorGlowOverlay({
           borderRadius: "inherit",
           padding: borderWidth,
           pointerEvents: "none",
-          backgroundImage: `linear-gradient(115deg, ${colors.black}, ${colors.yellow}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.cream}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.yellow}, ${colors.black})`,
+          backgroundImage: `linear-gradient(115deg, ${colors.black}, ${colors.yellow}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.goldLight}, ${colors.black}, ${colors.gold}, ${colors.black}, ${colors.yellow}, ${colors.black})`,
           backgroundSize: "400% 400%",
-          WebkitMask: "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
+          WebkitMask:
+            "linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)",
           WebkitMaskComposite: "xor",
           maskComposite: "exclude",
         }}

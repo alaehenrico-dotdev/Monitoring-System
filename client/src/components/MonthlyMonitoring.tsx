@@ -30,7 +30,15 @@ const CHART_HEIGHT = 220;
 // this is only the floor it won't shrink below, so on a narrow screen the
 // row scrolls sideways instead of squeezing every month unreadably thin.
 const MONTH_MIN_WIDTH = 40;
-const CURRENT_YEAR = new Date().getFullYear();
+
+// A function, not a module-level constant - this chunk, once loaded, stays
+// in memory for as long as the tab is open (no re-import to re-evaluate a
+// `const` against), so a `const CURRENT_YEAR = new Date().getFullYear()`
+// would freeze at whatever year the Dashboard first happened to load in and
+// never notice a real New Year's rollover for a tab left open that long.
+function currentYear(): number {
+  return new Date().getFullYear();
+}
 
 const ONLINE_COLOR = colors.yellow;
 const OFFLINE_COLOR = colors.gold;
@@ -51,7 +59,7 @@ const compactNumber = new Intl.NumberFormat(undefined, {
  * entry (see services/dashboardAnalytics.service.ts).
  */
 export function MonthlyMonitoring() {
-  const [year, setYear] = useState(CURRENT_YEAR);
+  const [year, setYear] = useState(currentYear);
   const [data, setData] = useState<MonthlyOverviewEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,7 +126,7 @@ export function MonthlyMonitoring() {
               variant="ghost"
               size="sm"
               onClick={() => setYear((y) => y + 1)}
-              disabled={year >= CURRENT_YEAR}
+              disabled={year >= currentYear()}
               aria-label="Next year"
             >
               ›

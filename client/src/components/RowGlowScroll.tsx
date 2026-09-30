@@ -98,8 +98,19 @@ export function RowGlowScroll({
       ? scrollRect.width / scrollEl.offsetWidth
       : 1;
     return {
-      top: (rowRect.top - scrollRect.top) / zoomFactor + scrollEl.scrollTop,
-      left: (rowRect.left - scrollRect.left) / zoomFactor + scrollEl.scrollLeft,
+      // Absolute children are positioned from the container's padding box,
+      // i.e. inside its border - so the border width (clientTop/clientLeft)
+      // comes off. Without it the ring/spotlight sat 1px too far right,
+      // stuck out past the table's right edge and made a horizontal
+      // scrollbar appear on a table that already fits.
+      top:
+        (rowRect.top - scrollRect.top) / zoomFactor -
+        scrollEl.clientTop +
+        scrollEl.scrollTop,
+      left:
+        (rowRect.left - scrollRect.left) / zoomFactor -
+        scrollEl.clientLeft +
+        scrollEl.scrollLeft,
       width: rowRect.width / zoomFactor,
       height: rowRect.height / zoomFactor,
     };

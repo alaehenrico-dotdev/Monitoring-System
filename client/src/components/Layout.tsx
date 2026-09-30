@@ -3,10 +3,12 @@ import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
 import { NavDrawerProvider } from "../context/NavDrawerContext";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { colors, fonts } from "../theme";
 
 export function Layout() {
   const mainRef = useRef<HTMLElement>(null);
+  const { online } = useOnlineStatus();
 
   return (
     // Sidebar is now a floating overlay only (no docked width to reserve),
@@ -41,6 +43,28 @@ export function Layout() {
         >
           <Outlet />
         </main>
+        {!online && (
+          <div
+            role="status"
+            style={{
+              position: "fixed",
+              bottom: 16,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 150,
+              padding: "8px 16px",
+              borderRadius: 999,
+              fontSize: 12.5,
+              fontWeight: 600,
+              background: colors.charcoalRaised,
+              color: colors.cream,
+              border: `1px solid ${colors.gold}`,
+              boxShadow: "0 6px 20px rgba(12, 12, 12, 0.35)",
+            }}
+          >
+            Offline - showing saved data. Edits stay on this device until you reconnect.
+          </div>
+        )}
         <BackToTop containerRef={mainRef} />
       </div>
     </NavDrawerProvider>

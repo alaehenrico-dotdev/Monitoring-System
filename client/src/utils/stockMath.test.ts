@@ -35,4 +35,13 @@ describe("isNegativeStock", () => {
     expect(isNegativeStock(-0.01)).toBe(true);
     expect(isNegativeStock(0)).toBe(false);
   });
+
+  it("does not flag binary-floating-point noise from an exact-zero result as negative", () => {
+    // Same pinned case as server/src/utils/stockMath.test.ts - see its
+    // comment for why 0.7 + 0.1 - 0.8 isn't exactly 0 in raw IEEE-754 floats.
+    expect(calculateOnlineRemaining(0.7, 0.1, 0.8, 0)).toBe(0);
+    expect(isNegativeStock(calculateOnlineRemaining(0.7, 0.1, 0.8, 0))).toBe(false);
+    expect(calculateOfflineRemaining(0.7, 0.1, 0.8, 0, 0)).toBe(0);
+    expect(isNegativeStock(calculateOfflineRemaining(0.7, 0.1, 0.8, 0, 0))).toBe(false);
+  });
 });

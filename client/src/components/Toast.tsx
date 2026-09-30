@@ -20,6 +20,11 @@ interface ToastProps {
   /// specific toast it belongs to - this component doesn't try to guess
   /// that on its own.
   action?: { label: string; onClick: () => void };
+  /// Distance from the bottom edge, in px - lets a page stack a second Toast
+  /// above one that's already anchored at the default 20 (e.g. a save-error
+  /// toast above a persistent shift-mismatch warning) instead of both
+  /// portaling to the exact same spot and overlapping. Default 20.
+  offset?: number;
 }
 
 const ACCENT: Record<ToastVariant, string> = {
@@ -41,6 +46,7 @@ export function Toast({
   variant = "info",
   duration = 6000,
   action,
+  offset = 20,
 }: ToastProps) {
   useEffect(() => {
     if (!message || duration === null) return;
@@ -55,7 +61,7 @@ export function Toast({
       style={{
         position: "fixed",
         right: 20,
-        bottom: 20,
+        bottom: offset,
         zIndex: 300,
         display: "flex",
         flexDirection: "column",

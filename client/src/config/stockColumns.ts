@@ -1,6 +1,4 @@
 import type { GridColumn } from "../components/StockGrid";
-import type { DeliveryDestination } from "../types";
-import { deliveryColumnKey } from "../api/offlineStock";
 
 /**
  * Single source of truth for the Online/Offline grid columns (Section 4.2 /
@@ -68,37 +66,12 @@ export const onlineStockColumns: GridColumn[] = [
   { key: "remainingStock", label: "Remaining Stocks", editable: false },
 ];
 
-/**
- * The Offline grid's columns depend on the current set of delivery
- * destinations (Section 4.3, admin-managed - see DeliveryDestinationsAdminPage
- * and api/deliveryDestinations.ts), so - unlike onlineStockColumns above -
- * this is a function, not a static list. Callers (OfflineEntryPage,
- * DailyReportPage) fetch the active destinations once and pass them in;
- * everything downstream (StockGrid, CsvTools, the PDF/Excel builders,
- * usePendingEntryChanges) already takes `columns: GridColumn[]` as a plain
- * prop, so none of it needs to know these particular columns are dynamic.
- *
- * One editable column per active destination sits between Production (In)
- * and the (also directly editable) Delivery (Out) total - each destination's
- * `label` is its own name (e.g. "Western", "Cavite"), matching that
- * destination's column header verbatim on the monthly report this
- * re-imports (Section 8.1), so a renamed or newly-added destination there is
- * recognized on import with no code change, the same way a newly-added
- * Product SKU already is.
- */
-export function buildOfflineStockColumns(
-  destinations: DeliveryDestination[],
-): GridColumn[] {
-  const deliveryColumns: GridColumn[] = [...destinations]
-    .filter((d) => d.isActive)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-    .map((d) => ({
-      key: deliveryColumnKey(d.id),
-      label: d.name,
-      editable: true,
-    }));
+/// The five input columns behind Delivery (Out) - shown when its header arrow
+/// is opened. Delivery (Out) is their sum and nothing else reads them.
+export const deliverySlotColumns = [1, 2, 3, 4, 5].map((n) => ({ key: `delivery${n}`, label: `Delivery ${n}` }));
 
-  return [
+/// Offline grid columns (Section 4.3).
+export const offlineStockColumns: GridColumn[] = [
     // Not editable in the live grid (Section 4.6 auto-carries it forward from
     // the prior day's Remaining Stock) but still importable - see
     // onlineStockColumns' own copy of this comment for why the Remaining/
@@ -133,23 +106,16 @@ export function buildOfflineStockColumns(
     },
     { key: "offlineStock", label: "Offline Stocks", editable: false },
     { key: "productionIn", label: "Production (In)", editable: true },
-    ...deliveryColumns,
-    // Directly editable, same as any other flat figure (e.g. Backloads) -
-    // typing here bypasses the per-destination breakdown entirely (the
-    // server's resolveDeliveryOut already treats a flat `deliveryOut` and a
-    // `deliveryByDestination` breakdown as mutually exclusive - whichever
-    // one this save's changes actually touch wins), so a shift with no
-    // destinations configured (or one that just doesn't need the breakdown)
-    // still has a normal way to enter this figure. Still importable, same
-    // reasoning as openingStock: a plain file with only a flat
-    // "Delivery(Out)" total and no per-destination breakdown (an older
-    // export, or a report from before a destination existed) still imports
-    // a usable number instead of silently dropping it.
+    // Directly editable, same as any other flat figure (e.g. Backloads).
+    // Also importable, same reasoning as openingStock above.
     {
       key: "deliveryOut",
       label: "Delivery (Out)",
-      editable: true,
+      // Locked: it is the total of the five Delivery columns the header arrow
+      // reveals (StockGrid `subColumns`), which belong to this column only.
+      editable: false,
       tone: "delivery",
+      subColumns: deliverySlotColumns,
       importable: true,
       aliases: ["Delivery(Out)"],
     },
@@ -165,5 +131,4 @@ export function buildOfflineStockColumns(
       aliases: ["Backload"],
     },
     { key: "remainingStock", label: "Remaining Stocks", editable: false },
-  ];
-}
+];

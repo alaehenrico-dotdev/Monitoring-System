@@ -1,28 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { computeNewDeliveryOut, deliveryColumnKey } from "./offlineStock";
+import { computeDeliverySlots } from "./offlineStock";
 
-describe("computeNewDeliveryOut", () => {
-  const entry = {
-    deliveryOut: 20,
-    [deliveryColumnKey(1)]: 12,
-    [deliveryColumnKey(2)]: 8,
-  };
+describe("computeDeliverySlots", () => {
+  const entry = { delivery1: 20, delivery2: 5, delivery3: 0, delivery4: 0, delivery5: 0, deliveryOut: 25 };
 
-  it("folds only the changed destination(s) into the existing per-destination total", () => {
-    // Only destination 1 changes (12 -> 15); destination 2's 8 carries
-    // forward untouched - same partial-update rule the server enforces.
-    expect(computeNewDeliveryOut(entry, { [deliveryColumnKey(1)]: 15 })).toBe(23); // 15 + 8
+  it("folds only the changed slot(s) into the saved ones and sums all five", () => {
+    expect(computeDeliverySlots(entry, { delivery2: 8 })).toMatchObject({ delivery1: 20, delivery2: 8, deliveryOut: 28 });
   });
 
-  it("sums every destination when more than one changes", () => {
-    expect(computeNewDeliveryOut(entry, { [deliveryColumnKey(1)]: 15, [deliveryColumnKey(2)]: 5 })).toBe(20); // 15 + 5
+  it("sums every slot when more than one changes", () => {
+    expect(computeDeliverySlots(entry, { delivery1: 1, delivery5: 4 }).deliveryOut).toBe(10); // 1 + 5 + 4
   });
 
-  it("uses a flat deliveryOut directly when no destination sub-key is present (CSV backward compat)", () => {
-    expect(computeNewDeliveryOut(entry, { deliveryOut: 99 })).toBe(99);
+  it("puts a flat deliveryOut (CSV import) in slot 1 and zeroes the rest", () => {
+    expect(computeDeliverySlots(entry, { deliveryOut: 99 })).toMatchObject({ delivery1: 99, delivery2: 0, deliveryOut: 99 });
   });
 
-  it("falls back to the entry's existing flat deliveryOut when nothing changed at all", () => {
-    expect(computeNewDeliveryOut(entry, {})).toBe(20);
+  it("keeps the saved total when nothing delivery-related changed", () => {
+    expect(computeDeliverySlots(entry, { backloads: 3 }).deliveryOut).toBe(25);
   });
 });

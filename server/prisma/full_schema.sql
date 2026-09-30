@@ -4,8 +4,6 @@ DROP TABLE IF EXISTS `receipt_items`;
 DROP TABLE IF EXISTS `receipts`;
 DROP TABLE IF EXISTS `change_log`;
 DROP TABLE IF EXISTS `manual_counts`;
-DROP TABLE IF EXISTS `offline_entry_deliveries`;
-DROP TABLE IF EXISTS `delivery_destinations`;
 DROP TABLE IF EXISTS `daily_offline_stock`;
 DROP TABLE IF EXISTS `daily_online_stock`;
 DROP TABLE IF EXISTS `products`;
@@ -34,6 +32,7 @@ CREATE TABLE `products` (
     `unit` VARCHAR(191) NOT NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT true,
     `sortOrder` INTEGER NOT NULL DEFAULT 0,
+    `lowStockThreshold` DECIMAL(14, 2) NULL,
     `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `updatedAt` DATETIME(3) NOT NULL,
 
@@ -76,6 +75,11 @@ CREATE TABLE `daily_offline_stock` (
     `offlineStock` DECIMAL(14, 2) NOT NULL DEFAULT 0,
     `productionIn` DECIMAL(14, 2) NOT NULL DEFAULT 0,
     `deliveryOut` DECIMAL(14, 2) NOT NULL DEFAULT 0,
+    `delivery1` DECIMAL(14, 2) NOT NULL DEFAULT 0,
+    `delivery2` DECIMAL(14, 2) NOT NULL DEFAULT 0,
+    `delivery3` DECIMAL(14, 2) NOT NULL DEFAULT 0,
+    `delivery4` DECIMAL(14, 2) NOT NULL DEFAULT 0,
+    `delivery5` DECIMAL(14, 2) NOT NULL DEFAULT 0,
     `backloads` DECIMAL(14, 2) NOT NULL DEFAULT 0,
     `upsellOut` INTEGER NOT NULL DEFAULT 0,
     `remainingStock` DECIMAL(14, 2) NOT NULL DEFAULT 0,
@@ -85,30 +89,6 @@ CREATE TABLE `daily_offline_stock` (
 
     INDEX `daily_offline_stock_entryDate_shift_idx`(`entryDate`, `shift`),
     UNIQUE INDEX `daily_offline_stock_productId_entryDate_shift_key`(`productId`, `entryDate`, `shift`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `delivery_destinations` (
-    `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `name` VARCHAR(191) NOT NULL,
-    `isActive` BOOLEAN NOT NULL DEFAULT true,
-    `sortOrder` INTEGER NOT NULL DEFAULT 0,
-    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
-    `updatedAt` DATETIME(3) NOT NULL,
-
-    UNIQUE INDEX `delivery_destinations_name_key`(`name`),
-    PRIMARY KEY (`id`)
-) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
--- CreateTable
-CREATE TABLE `offline_entry_deliveries` (
-    `id` INTEGER NOT NULL AUTO_INCREMENT,
-    `offlineEntryId` INTEGER NOT NULL,
-    `destinationId` INTEGER NOT NULL,
-    `quantity` INTEGER NOT NULL DEFAULT 0,
-
-    UNIQUE INDEX `offline_entry_deliveries_offlineEntryId_destinationId_key`(`offlineEntryId`, `destinationId`),
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
@@ -156,12 +136,6 @@ ALTER TABLE `daily_offline_stock` ADD CONSTRAINT `daily_offline_stock_productId_
 
 -- AddForeignKey
 ALTER TABLE `daily_offline_stock` ADD CONSTRAINT `daily_offline_stock_encodedById_fkey` FOREIGN KEY (`encodedById`) REFERENCES `users`(`id`) ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `offline_entry_deliveries` ADD CONSTRAINT `offline_entry_deliveries_offlineEntryId_fkey` FOREIGN KEY (`offlineEntryId`) REFERENCES `daily_offline_stock`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE `offline_entry_deliveries` ADD CONSTRAINT `offline_entry_deliveries_destinationId_fkey` FOREIGN KEY (`destinationId`) REFERENCES `delivery_destinations`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE `manual_counts` ADD CONSTRAINT `manual_counts_productId_fkey` FOREIGN KEY (`productId`) REFERENCES `products`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

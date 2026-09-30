@@ -32,6 +32,7 @@ const product: Product = {
   unit: "Liter",
   isActive: true,
   sortOrder: 0,
+  lowStockThreshold: 0,
 };
 
 const rows = [{ product, entry: { openingStock: 20, stockInOlToOff: 5, productionIn: 10, deliveryOut: 3 } }];

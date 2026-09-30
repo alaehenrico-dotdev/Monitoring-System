@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { HeaderExtras } from "./HeaderExtras";
+import { HeaderTabs } from "./HeaderTabs";
 import { ChevronIcon } from "./icons";
 import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
@@ -52,10 +53,10 @@ interface PageHeaderProps {
 /// hidden, instead of just chrome.
 ///
 /// The header is the app's main container for controls and navigation now:
-/// the brand logo (formerly the sidebar's own clickable header) sits at the
-/// top-left beside the title/subtitle and opens the floating nav drawer
-/// (Sidebar.tsx, via NavDrawerContext) instead of toggling the sidebar's
-/// own long-gone docked/collapsed states.
+/// the brand logo sits at the top-left beside the title/subtitle and opens
+/// the floating account panel (Sidebar.tsx, via NavDrawerContext), while the
+/// page tabs (HeaderTabs.tsx) run horizontally under the h2 + subtitle, like
+/// the tab strip on MS Office apps.
 export function PageHeader({
   title,
   subtitle,
@@ -111,62 +112,69 @@ export function PageHeader({
   }
 
   return (
-    <div
-      ref={headerRef}
-      className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}`}
-      onMouseMove={handlePointerMove}
-      onMouseLeave={handlePointerLeave}
-    >
-      <div className="ae-page-header-top">
-        <button
-          ref={logoRef}
-          type="button"
-          className="ae-page-header-logo no-print"
-          onMouseEnter={spinLogo}
-          onClick={handleLogoClick}
-          aria-expanded={open}
-          aria-label={open ? "Close navigation" : "Open navigation"}
-          title={open ? "Close navigation" : "Open navigation"}
-        >
-          <LogoMark
-            size={collapsed ? LOGO_SIZE_COLLAPSED : LOGO_SIZE}
-            spin={logoSpin}
-          />
-        </button>
-        <div className="ae-page-header-titles">
-          <div className="ae-page-header-title-row">
-            <h2>{title}</h2>
-            <HeaderExtras />
-          </div>
-          {subtitle && (
-            <div className="ae-page-header-collapsible">
-              <div className="ae-page-header-collapsible-inner">
-                <p className={subtitleClassName}>{subtitle}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* The Toolbar is its own full-width row below the logo/title row (not
-          inside the titles column beside the logo), so it starts at the
-          card's left end under the logo. It collapses with the subtitle. */}
-      {children && (
-        <div className="ae-page-header-collapsible ae-page-header-collapsible--toolbar">
-          <div className="ae-page-header-collapsible-inner">
-            <div className="ae-page-header-toolbar-slot">{children}</div>
-          </div>
-        </div>
-      )}
-      <button
-        type="button"
-        className="ae-page-header-collapse-btn no-print"
-        onClick={() => setCollapsed((c) => !c)}
-        aria-expanded={!collapsed}
-        aria-label={collapsed ? "Expand header" : "Collapse header"}
-        title={collapsed ? "Expand header" : "Collapse header"}
+    <>
+      {/* Office-style tab strip sitting on top of the header card, outside
+          it (like the tab row above a ribbon). Not part of the card's
+          collapsible content, so navigation stays reachable when the
+          header is collapsed. */}
+      <HeaderTabs />
+      <div
+        ref={headerRef}
+        className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}`}
+        onMouseMove={handlePointerMove}
+        onMouseLeave={handlePointerLeave}
       >
-        <ChevronIcon />
-      </button>
-    </div>
+        <div className="ae-page-header-top">
+          <button
+            ref={logoRef}
+            type="button"
+            className="ae-page-header-logo no-print"
+            onMouseEnter={spinLogo}
+            onClick={handleLogoClick}
+            aria-expanded={open}
+            aria-label={open ? "Close navigation" : "Open navigation"}
+            title={open ? "Close navigation" : "Open navigation"}
+          >
+            <LogoMark
+              size={collapsed ? LOGO_SIZE_COLLAPSED : LOGO_SIZE}
+              spin={logoSpin}
+            />
+          </button>
+          <div className="ae-page-header-titles">
+            <div className="ae-page-header-title-row">
+              <h2>{title}</h2>
+              <HeaderExtras />
+            </div>
+            {subtitle && (
+              <div className="ae-page-header-collapsible">
+                <div className="ae-page-header-collapsible-inner">
+                  <p className={subtitleClassName}>{subtitle}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        {/* The Toolbar is its own full-width row below the logo/title row (not
+            inside the titles column beside the logo), so it starts at the
+            card's left end under the logo. It collapses with the subtitle. */}
+        {children && (
+          <div className="ae-page-header-collapsible ae-page-header-collapsible--toolbar">
+            <div className="ae-page-header-collapsible-inner">
+              <div className="ae-page-header-toolbar-slot">{children}</div>
+            </div>
+          </div>
+        )}
+        <button
+          type="button"
+          className="ae-page-header-collapse-btn no-print"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? "Expand header" : "Collapse header"}
+          title={collapsed ? "Expand header" : "Collapse header"}
+        >
+          <ChevronIcon />
+        </button>
+      </div>
+    </>
   );
 }

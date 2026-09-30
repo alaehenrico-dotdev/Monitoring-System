@@ -1,9 +1,9 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { GridRow } from "../components/StockGrid";
-import { usePendingEntryChanges } from "./usePendingEntryChanges";
+import { detectConflicts, usePendingEntryChanges } from "./usePendingEntryChanges";
 
-const product = { id: 1, sku: "AFP001", name: "Sweet A", category: "Class A (Liter)", unit: "Liter", isActive: true, sortOrder: 0 };
+const product = { id: 1, sku: "AFP001", name: "Sweet A", category: "Class A (Liter)", unit: "Liter", isActive: true, sortOrder: 0, lowStockThreshold: 0 };
 
 const rows: GridRow[] = [
   { product, entry: { openingStock: 100, stockInOlToOff: 0, stockOutOffToOl: 0, offlineStock: 100, productionIn: 0, deliveryOut: 0, remainingStock: 100 }, isSaved: true },
@@ -61,5 +61,36 @@ describe("usePendingEntryChanges - displayRows WITH a recompute callback (Sectio
     // the plain last-saved rows untouched, not a stale recomputed value.
     expect(result.current.pendingCount).toBe(0);
     expect(result.current.displayRows).toBe(rows);
+  });
+});
+
+describe("conflict detection on resync", () => {
+  it("flags a staged edit whose server value changed since it was made, and resolves both ways", () => {
+    const { result, rerender } = renderHook(({ r }) => usePendingEntryChanges(r, "ala-eh-pending:online:2026-01-01:MORNING"), {
+      initialProps: { r: rows },
+    });
+    act(() => result.current.stage(1, "openingStock", 50, 100));
+    expect(detectConflicts(rows, result.current.pending, result.current.baselines)).toEqual([]);
+
+    // Someone else saved 120 while this device was offline.
+    const newer: GridRow[] = [{ ...rows[0], entry: { ...rows[0].entry, openingStock: 120 } }];
+    rerender({ r: newer });
+    const conflicts = detectConflicts(newer, result.current.pending, result.current.baselines);
+    expect(conflicts).toMatchObject([{ productId: 1, key: "openingStock", baseValue: 100, serverValue: 120, myValue: 50 }]);
+
+    // Keep mine: re-based on the server value, no longer a conflict, still staged.
+    act(() => result.current.resolveConflict(conflicts[0], "mine"));
+    expect(detectConflicts(newer, result.current.pending, result.current.baselines)).toEqual([]);
+    expect(result.current.pending[1].openingStock).toBe(50);
+
+    // Keep server: staged edit dropped.
+    act(() => result.current.stage(1, "openingStock", 60, 120));
+    act(() => result.current.resolveConflict({ productId: 1, key: "openingStock", serverValue: 120 }, "server"));
+    expect(result.current.pendingCount).toBe(0);
+  });
+
+  it("does not flag an edit whose server value already equals the staged value", () => {
+    const newer: GridRow[] = [{ ...rows[0], entry: { ...rows[0].entry, openingStock: 50 } }];
+    expect(detectConflicts(newer, { 1: { openingStock: 50 } }, { 1: { openingStock: 100 } })).toEqual([]);
   });
 });

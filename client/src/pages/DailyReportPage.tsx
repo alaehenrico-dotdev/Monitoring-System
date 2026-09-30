@@ -7,13 +7,12 @@ import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
+import { Toast } from "../components/Toast";
 import { CategoryFilter } from "../components/CategoryFilter";
 import {
   onlineStockColumns,
-  buildOfflineStockColumns,
+  offlineStockColumns,
 } from "../config/stockColumns";
-import { listDeliveryDestinations } from "../api/deliveryDestinations";
-import type { DeliveryDestination } from "../types";
 import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
@@ -137,20 +136,17 @@ export function DailyReportPage() {
     null,
   );
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
-  // Same best-effort, load-once-reuse-always fetch as OfflineEntryPage's own
-  // destinations state - see its comment for why this starts empty rather
-  // than null.
-  const [destinations, setDestinations] = useState<DeliveryDestination[]>([]);
-  const offlineStockColumns = useMemo(
-    () => buildOfflineStockColumns(destinations),
-    [destinations],
-  );
-  useEffect(() => {
-    listDeliveryDestinations()
-      .then(setDestinations)
-      .catch(() => setDestinations([]));
-  }, []);
-
+  function changeDate(nextDate: string) {
+    if (nextDate === date) return;
+    // Invalidate in-flight loads and remove the old snapshot immediately so
+    // the heading and any exports can never refer to a different date.
+    requestId.current++;
+    setGenerating(false);
+    setReport(null);
+    setError(null);
+    setEmptyMessage(null);
+    setDate(nextDate);
+  }
   useEffect(() => {
     if (searchParams.get("history") === "1" || searchParams.get("auto") === "1")
       load();
@@ -191,10 +187,18 @@ export function DailyReportPage() {
     }
 
     const id = ++requestId.current;
+    const requestedDate = date;
     if (!silent) setGenerating(true);
-    getDailyReport(date)
+    getDailyReport(requestedDate)
       .then((nextReport) => {
         if (id !== requestId.current) return;
+        if (nextReport.date !== requestedDate) {
+          if (!silent) {
+            setReport(null);
+            setError("The server returned a report for a different date. Please generate it again.");
+          }
+          return;
+        }
         if (!reportHasData(nextReport)) {
           if (silent) return;
           // Clear any report still on screen from a different date, so it
@@ -359,7 +363,7 @@ export function DailyReportPage() {
             <DatePicker
               aria-label="Date"
               value={date}
-              onChange={setDate}
+              onChange={changeDate}
               todayValue={getCurrentShiftAndDate().date}
             />
             <Dropdown
@@ -418,7 +422,7 @@ export function DailyReportPage() {
         </Toolbar>
       </PageHeader>
 
-      {error && <p style={{ color: colors.danger }}>{error}</p>}
+      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
 
       {report && (
         <div>

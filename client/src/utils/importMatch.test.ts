@@ -8,9 +8,9 @@ import {
   type ImportableColumn,
 } from "./importMatch";
 
-// The static (non-destination) part of buildOfflineStockColumns/onlineStockColumns
-// from config/stockColumns.ts, duplicated here rather than imported so this test
-// doesn't need a DeliveryDestination[] just to exercise the column-matching logic.
+// The static column definitions from config/stockColumns.ts (offlineStockColumns /
+// onlineStockColumns), duplicated here rather than imported so this test stays
+// independent of that config.
 const openingStockAliases = ["Remaining Stocks", "Reaining Stocks", "Total Remaining Stock", "Total Remaining Stocks", "Total Stocks", "Stocks"];
 
 const offlineColumns: ImportableColumn[] = [

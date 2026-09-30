@@ -2,6 +2,8 @@ import { useState } from "react";
 import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Spinner } from "../components/Spinner";
+import { Toast } from "../components/Toast";
+import { DatabaseRestoreCard } from "./DatabaseRestoreCard";
 import { colors, motionTokens } from "../theme";
 
 type Status = "idle" | "downloading" | "done" | "error";
@@ -60,6 +62,7 @@ export function DatabaseBackupPage() {
       : 0;
 
   return (
+    <div>
     <div
       style={{
         maxWidth: 760,
@@ -141,11 +144,7 @@ export function DatabaseBackupPage() {
             Backup downloaded ({formatBytes(bytes)}).
           </p>
         )}
-        {status === "error" && error && (
-          <p style={{ margin: 0, fontSize: 12.5, color: colors.danger }}>
-            {error}
-          </p>
-        )}
+        <Toast message={status === "error" ? error : null} onDismiss={() => setError(null)} variant="error" duration={null} />
       </div>
 
       {(downloading || status === "done") && (
@@ -171,6 +170,8 @@ export function DatabaseBackupPage() {
           />
         </div>
       )}
+    </div>
+    <DatabaseRestoreCard />
     </div>
   );
 }
