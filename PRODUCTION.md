@@ -13,11 +13,12 @@ folder under `server/prisma/migrations`. `prisma migrate deploy` is the
 production-safe command: it applies only migrations that are not already
 recorded in the database and does not create or rewrite migrations.
 
-Take a backup before applying a migration, especially when the migration drops
-or changes columns/tables:
+`db:migrate:deploy` always takes a snapshot backup first (`backup:snapshot`,
+same command as below) and aborts without touching the schema if that backup
+fails for any reason - disk space, `mysqldump` missing, etc. - so a migration
+can never run without a fresh backup to fall back to:
 
 ```bash
-npm run backup:snapshot
 npm run db:migrate:deploy
 ```
 

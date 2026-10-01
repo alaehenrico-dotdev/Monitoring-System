@@ -1,7 +1,15 @@
+import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+// 12 URL-safe characters (~71 bits of entropy) - plenty for a one-time
+// initial password an admin is expected to rotate on first login, and short
+// enough to type/read back without transcription errors.
+function randomPassword(): string {
+  return randomBytes(9).toString("base64url");
+}
 
 // Section 4.1 - Product and Category Master List, taken directly from the
 // business's actual monthly Online/Offline Stocks Monitoring reports
@@ -186,32 +194,53 @@ async function seedProducts() {
   }
 }
 
+// No hardcoded default passwords on purpose (this file is committed, and -
+// since this repo is public - readable by anyone): each account's initial
+// password is either a real value from its env var, or a freshly generated
+// one-time random password printed to the console below. Either way, only
+// ever applies to an account that doesn't exist yet (see `if (existing)
+// continue` below) - re-running this against a DB that already has these
+// users is always a no-op for them, so it can never silently reset an
+// already-rotated production password.
 async function seedUsers() {
   const defaultUsers = [
-    { name: "System Administrator", username: "admin", password: "admin123", role: "SUPERVISOR_ADMIN" as const },
-    { name: "Online Encoder", username: "online.encoder", password: "online123", role: "ONLINE_ENCODER" as const },
-    { name: "Offline Encoder", username: "offline.encoder", password: "offline123", role: "OFFLINE_ENCODER" as const },
+    { name: "System Administrator", username: "admin", role: "SUPERVISOR_ADMIN" as const, envVar: "SEED_ADMIN_PASSWORD" },
+    { name: "Online Encoder", username: "online.encoder", role: "ONLINE_ENCODER" as const, envVar: "SEED_ONLINE_ENCODER_PASSWORD" },
+    { name: "Offline Encoder", username: "offline.encoder", role: "OFFLINE_ENCODER" as const, envVar: "SEED_OFFLINE_ENCODER_PASSWORD" },
   ];
+
+  const generated: { username: string; password: string }[] = [];
 
   for (const u of defaultUsers) {
     const existing = await prisma.user.findUnique({ where: { username: u.username } });
     if (existing) continue;
-    const passwordHash = await bcrypt.hash(u.password, 10);
+
+    const fromEnv = process.env[u.envVar]?.trim();
+    const password = fromEnv || randomPassword();
+    if (!fromEnv) generated.push({ username: u.username, password });
+
+    const passwordHash = await bcrypt.hash(password, 10);
     await prisma.user.create({
       data: { name: u.name, username: u.username, passwordHash, role: u.role },
     });
   }
+
+  return generated;
 }
 
 async function main() {
   await seedProducts();
-  await seedUsers();
+  const generated = await seedUsers();
   // eslint-disable-next-line no-console
   console.log("Seed complete: product master list + default users loaded.");
-  // eslint-disable-next-line no-console
-  console.log("Default logins -> admin/admin123, online.encoder/online123, offline.encoder/offline123");
-  // eslint-disable-next-line no-console
-  console.log("Change these passwords before going live.");
+  if (generated.length > 0) {
+    // eslint-disable-next-line no-console
+    console.log("Generated one-time passwords for new accounts - shown only this once, write them down now:");
+    for (const g of generated) {
+      // eslint-disable-next-line no-console
+      console.log(`  ${g.username} / ${g.password}`);
+    }
+  }
 }
 
 main()

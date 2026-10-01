@@ -20,12 +20,12 @@ import { join, relative } from "node:path";
  * injects `<script>` tags or uses `eval`/`dangerouslySetInnerHTML`, so it
  * stays as strict as the directive allows.
  */
-function cspPlugin(apiOrigin: string): Plugin {
+function cspPlugin(apiOrigin: string, extraConnectSrc: string[] = []): Plugin {
   // The realtime WebSocket connects to the same host as the API, just over
   // ws(s):// instead of http(s):// - explicit here rather than relying on
   // 'self' alone to also cover it.
   const wsOrigin = apiOrigin.replace(/^http/, "ws");
-  const connectSrc = ["'self'", apiOrigin, wsOrigin].filter(Boolean).join(" ");
+  const connectSrc = ["'self'", apiOrigin, wsOrigin, ...extraConnectSrc].filter(Boolean).join(" ");
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
@@ -94,8 +94,17 @@ export default defineConfig(({ mode }) => {
     // Relative VITE_API_URL (e.g. "/api") - same-origin, nothing to add.
   }
 
+  // The Tauri build serves the app from a custom-scheme origin rather than
+  // http(s) - 'self' covers same-origin fetches there too, but WebView2 on
+  // Windows surfaces that origin as https://tauri.localhost (desktop Linux/
+  // macOS webviews use tauri://localhost), so both are listed explicitly
+  // rather than assuming which one a given OS/webview reports.
+  const isTauri = mode === "tauri";
+  const extraConnectSrc = isTauri ? ["tauri://localhost", "https://tauri.localhost"] : [];
+
   return {
-    plugins: [react(), cspPlugin(apiOrigin), pwaPrecachePlugin()],
+    base: "./",
+    plugins: [react(), cspPlugin(apiOrigin, extraConnectSrc), pwaPrecachePlugin()],
     server: {
       port: 5173,
       host: true,
