@@ -163,6 +163,52 @@ verify-then-trust a differently-signed update).
    release until you publish it. This is your chance to catch a bad build
    before every installed copy of the app offers it as an update.
 
+## Offline support
+
+The desktop app tolerates the server/network dropping - it does NOT work as
+a fully standalone app with its own independent data (the central MySQL
+database is still the single source of truth; see `server/`).
+
+- **While offline:** grids/reports already opened before the drop stay
+  viewable (served from a local cache instead of going blank), and Save
+  still works - failed writes are queued locally instead of erroring.
+- **On reconnect:** queued writes replay automatically, in the order they
+  were made. A small badge in the bottom corner shows how many are still
+  waiting.
+
+How it's built (`client/src/api/http.ts`, `client/src/tauri/offlineStore.ts`,
+`client/src/tauri/OfflineSyncBadge.tsx`, `client/src-tauri/src/dpapi.rs`):
+
+- A local SQLite database (`@tauri-apps/plugin-sql`) holds two tables: a
+  read cache (last-known response per GET path) and a write outbox (queued
+  POST/PUT/PATCH/DELETE bodies, replayed in order).
+- Every value stored in either table is encrypted first via Windows DPAPI
+  (`CryptProtectData`/`CryptUnprotectData`, `Scope::User`) - tied to the
+  current Windows user account, no password to set or lose. This protects
+  the database file's contents if it's copied off the machine or opened
+  under a different Windows account; it does **not** protect against
+  someone already logged into the same Windows account this app runs under
+  - same trust boundary the rest of that Windows login already has.
+- `http.ts`'s `request()` only triggers this for an actual connectivity
+  failure (`fetch()` throwing before any response, e.g. DNS/connection
+  refused/timeout) - a real 4xx/5xx from a reachable server is never cached
+  or queued, since retrying it wouldn't help.
+- A queued write the server later actively rejects (not a connectivity
+  failure - the server was reachable and said no, most likely because
+  whatever it was staged against has since changed) is dropped from the
+  queue rather than retried forever, and logged to the console. There's no
+  conflict-resolution UI for this yet - the original typed value is still
+  wherever the user entered it (`usePendingEntryChanges` keeps staged edits
+  in `sessionStorage` until a save actually succeeds), so nothing is
+  silently lost, but it does need a human to notice and redo it. A real
+  conflict UI (reusing `detectConflicts`/`PendingConflict`, already built
+  for the web app's offline-ish staging) is the natural next step if this
+  turns out to happen often.
+- None of this touches the plain web build - `offlineStore.ts` and
+  `OfflineSyncBadge.tsx` are only ever reached through a dynamic `import()`
+  gated on `import.meta.env.MODE === "tauri"`, so their SQLite/DPAPI
+  dependency never ends up in that bundle.
+
 ## npm scripts (added in `client/package.json`)
 
 - `npm run tauri:dev` - run the desktop app in dev mode (start the server

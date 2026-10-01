@@ -1,10 +1,19 @@
-import { useRef } from "react";
+import { lazy, Suspense, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
 import { NavDrawerProvider } from "../context/NavDrawerContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { colors, fonts } from "../theme";
+
+// Lazy + mode-gated so this (and its SQLite/DPAPI-backed offlineStore
+// import) is only ever requested in the Tauri build - the web build's
+// bundler never even emits the chunk, since isTauri is a build-time
+// constant and the import() call site is unreachable when it's false.
+const OfflineSyncBadge = lazy(() =>
+  import("../tauri/OfflineSyncBadge").then((m) => ({ default: m.OfflineSyncBadge })),
+);
+const isTauri = import.meta.env.MODE === "tauri";
 
 export function Layout() {
   const mainRef = useRef<HTMLElement>(null);
@@ -64,6 +73,11 @@ export function Layout() {
           >
             Offline - showing saved data. Edits stay on this device until you reconnect.
           </div>
+        )}
+        {isTauri && (
+          <Suspense fallback={null}>
+            <OfflineSyncBadge />
+          </Suspense>
         )}
         <BackToTop containerRef={mainRef} />
       </div>
