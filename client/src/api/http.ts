@@ -8,6 +8,17 @@ export class ApiError extends Error {
   }
 }
 
+/// Thrown instead of a network error for a mutating request (POST/PUT/PATCH/
+/// DELETE) made while offline in the Tauri desktop build - the write has
+/// been queued (see src/tauri/offlineStore.ts) rather than lost, so callers
+/// should treat this as "saved, will sync later" rather than a hard failure.
+/// Never thrown in the web build.
+export class QueuedOfflineError extends Error {
+  constructor() {
+    super("Saved offline - will sync once the connection is back.");
+  }
+}
+
 export function getToken(): string | null {
   return localStorage.getItem("ala-eh-token");
 }
@@ -41,7 +52,24 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorized = fn;
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+// Offline support (src/tauri/offlineStore.ts) only exists for the Tauri
+// desktop build - dynamically imported so its SQLite/DPAPI dependency never
+// reaches the plain web build's bundle. isNetworkError() distinguishes a
+// fetch() that never got a response at all (offline/unreachable) from one
+// that did (ApiError below) - only the former is cacheable/queueable, since
+// retrying a real 4xx/5xx from a reachable server would just fail again.
+const isTauri = import.meta.env.MODE === "tauri";
+function isNetworkError(err: unknown): boolean {
+  return err instanceof TypeError;
+}
+
+// The actual HTTP call plus auth header/401/ApiError handling - no offline
+// interception. Used directly by sendQueuedWrite() (replaying the outbox
+// must NOT re-trigger request()'s own catch-and-requeue behavior below, or a
+// still-offline replay would duplicate the entry it was trying to flush and
+// report it to flushPendingWrites as a server rejection instead of "still
+// offline, try again later").
+async function coreRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -60,7 +88,33 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(res.status, body.error ?? "Request failed");
   }
   if (res.status === 204) return undefined as T;
-  return res.json() as Promise<T>;
+  return (await res.json()) as T;
+}
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const method = options.method ?? "GET";
+
+  let data: T;
+  try {
+    data = await coreRequest<T>(path, options);
+  } catch (err) {
+    if (!isTauri || !isNetworkError(err)) throw err;
+    if (method !== "GET") {
+      const { queueWrite } = await import("../tauri/offlineStore");
+      await queueWrite(method, path, options.body as string | undefined);
+      throw new QueuedOfflineError();
+    }
+    const { getCachedResponse } = await import("../tauri/offlineStore");
+    const cached = await getCachedResponse<T>(path);
+    if (cached === null) throw err;
+    return cached;
+  }
+
+  if (isTauri && method === "GET") {
+    const { cacheResponse } = await import("../tauri/offlineStore");
+    void cacheResponse(path, data);
+  }
+  return data;
 }
 
 export const http = {
@@ -70,3 +124,12 @@ export const http = {
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body: JSON.stringify(body) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
+
+// Replays one outbox entry against the real API (see offlineStore.ts's
+// flushPendingWrites). Goes through coreRequest, not request() - a replay
+// that's still offline must surface as a plain network error so
+// flushPendingWrites' own isNetworkError check can stop and retry later,
+// not get caught and re-queued as a brand new (duplicate) pending write.
+export async function sendQueuedWrite(method: string, path: string, body: string | undefined): Promise<void> {
+  await coreRequest(path, { method, body });
+}

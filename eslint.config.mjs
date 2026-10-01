@@ -26,6 +26,10 @@ export default tseslint.config(
       "**/*.tsbuildinfo",
       "client/vite.config.js",
       "client/vite.config.d.ts",
+      // Rust build output (gitignored, but exists locally on any machine
+      // that's run `tauri dev`/`tauri build`) - full of generated JS/codegen
+      // assets that were never meant to be linted as this project's source.
+      "client/src-tauri/target/**",
     ],
   },
   js.configs.recommended,
