@@ -43,7 +43,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4NjIwMzc5MzhDMTNFRjUKUldUMVBzRTRlUU5pU0xJZGtKQ3F6SFJxblNLN0FYbEd6WXBQS3prL29icDhIWU11aFVHS2o0Y3YK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA2RkY4ODU4RDIyQ0E3QTIKUldTaXB5elNXSWovQmsxbkdhUzlqYUdqUDFmcUxGTFhFTGNpRVJwbmFPcjRQRUV4T2srRjExTzgK",
       "endpoints": [
         "https://github.com/alaehenrico-dotdev/Monitoring-System/releases/latest/download/latest.json"
       ]
