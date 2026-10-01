@@ -95,12 +95,18 @@ export default defineConfig(({ mode }) => {
   }
 
   // The Tauri build serves the app from a custom-scheme origin rather than
-  // http(s) - 'self' covers same-origin fetches there too, but WebView2 on
-  // Windows surfaces that origin as https://tauri.localhost (desktop Linux/
-  // macOS webviews use tauri://localhost), so both are listed explicitly
-  // rather than assuming which one a given OS/webview reports.
+  // http(s) - confirmed from an actual DevTools CSP violation to be
+  // http://tauri.localhost on Windows WebView2, not https:// as Tauri's own
+  // docs suggest - tauri://localhost covers other platforms. 'self' already
+  // covers same-origin fetches to whichever of these is the page's own
+  // origin, but Tauri's internal IPC bridge calls a DIFFERENT origin
+  // (http://ipc.localhost) for plugin invokes (e.g. the updater's check()),
+  // which needs its own entry or Tauri silently falls back to a slower
+  // postMessage transport instead of erroring outright.
   const isTauri = mode === "tauri";
-  const extraConnectSrc = isTauri ? ["tauri://localhost", "https://tauri.localhost"] : [];
+  const extraConnectSrc = isTauri
+    ? ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://ipc.localhost"]
+    : [];
 
   return {
     base: "./",

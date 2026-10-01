@@ -17,13 +17,15 @@ export function createApp() {
   // never serves, but the rest of helmet's defaults (nosniff, no
   // `X-Powered-By`, HSTS, etc.) still harden every JSON response.
   app.use(helmet({ contentSecurityPolicy: false }));
-  // The Tauri desktop client (see client/src-tauri) is always these two
-  // origins - tauri://localhost on most platforms, https://tauri.localhost
-  // on Windows/WebView2 - regardless of which server it's pointed at, so
-  // they're allowed unconditionally rather than needing their own env var.
-  // Every other origin still has to match the single configured
-  // env.clientOrigin, same as before this existed.
-  const allowedOrigins = [env.clientOrigin, "tauri://localhost", "https://tauri.localhost"];
+  // The Tauri desktop client (see client/src-tauri) always reports one of
+  // these fixed origins - confirmed from an actual DevTools error rather
+  // than assumed, since the real one (http://tauri.localhost on Windows
+  // WebView2) turned out to differ from what Tauri's own docs/examples
+  // suggest (https://tauri.localhost) - regardless of which server it's
+  // pointed at, so they're allowed unconditionally rather than needing their
+  // own env var. Every other origin still has to match the single
+  // configured env.clientOrigin, same as before this existed.
+  const allowedOrigins = [env.clientOrigin, "tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"];
   // `exposedHeaders` for Content-Disposition - without this, a cross-origin
   // fetch() (client and server are separate origins by default, see
   // env.clientOrigin) can read the response body but the Headers object
