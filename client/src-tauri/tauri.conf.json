@@ -18,7 +18,8 @@
         "minWidth": 1024,
         "minHeight": 640,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --unsafely-treat-insecure-origin-as-secure=http://192.168.0.178:4000"
       }
     ],
     "security": {

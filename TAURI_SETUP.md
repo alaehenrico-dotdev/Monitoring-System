@@ -59,6 +59,21 @@ in-app "change server" screen.
 - `.env.tauri` is gitignored, same as `.env`/`.env.local` - copy
   `.env.tauri.example` and fill in the real value for a local build. The
   release workflow (below) writes it from a GitHub secret instead.
+- **Two other places have to match this same origin, or the app builds fine
+  but can't actually log in:**
+  - `server/src/app.ts`'s CORS allowlist needs `CLIENT_ORIGIN` (or the
+    always-allowed `tauri://localhost` / `https://tauri.localhost` origins)
+    to match where requests are actually coming from - a mismatch here fails
+    silently as a generic "Login failed", not a CORS error you'd notice
+    without DevTools open.
+  - `client/src-tauri/tauri.conf.json`'s `app.windows[].additionalBrowserArgs`
+    hardcodes `--unsafely-treat-insecure-origin-as-secure=<origin>` for the
+    plain-http LAN origin, since WebView2 treats the app's own page
+    (`https://tauri.localhost`) as a secure context and otherwise blocks
+    "mixed content" requests to a non-https API. **This origin is a literal
+    string, not derived from `.env.tauri`** - if you ever change the server's
+    address, update this value too, or the desktop build will go back to
+    silently failing to log in exactly like this.
 
 If this ever becomes a real pain point (e.g. the LAN IP changes often), the
 fix is a small settings screen that persists a chosen server URL (via
