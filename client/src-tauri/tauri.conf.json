@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Ala Eh Stocks Monitoring System",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "identifier": "com.alaeh.monitoring",
   "build": {
     "frontendDist": "../dist",
