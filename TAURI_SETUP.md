@@ -62,18 +62,30 @@ in-app "change server" screen.
 - **Two other places have to match this same origin, or the app builds fine
   but can't actually log in:**
   - `server/src/app.ts`'s CORS allowlist needs `CLIENT_ORIGIN` (or the
-    always-allowed `tauri://localhost` / `https://tauri.localhost` origins)
-    to match where requests are actually coming from - a mismatch here fails
-    silently as a generic "Login failed", not a CORS error you'd notice
-    without DevTools open.
+    always-allowed Tauri origins) to match where requests are actually coming
+    from - a mismatch here fails silently as a generic "Login failed", not a
+    CORS error you'd notice without DevTools open. The Tauri app's real
+    origin on Windows WebView2 is **`http://tauri.localhost`** - confirmed
+    from an actual DevTools CORS error, not from Tauri's own docs, which
+    suggest `https://tauri.localhost` instead (wrong, at least for the
+    WebView2 version this was tested against). All three variants
+    (`tauri://localhost`, `http://tauri.localhost`, `https://tauri.localhost`)
+    are allowlisted defensively in case this differs by platform or WebView2
+    version.
   - `client/src-tauri/tauri.conf.json`'s `app.windows[].additionalBrowserArgs`
     hardcodes `--unsafely-treat-insecure-origin-as-secure=<origin>` for the
-    plain-http LAN origin, since WebView2 treats the app's own page
-    (`https://tauri.localhost`) as a secure context and otherwise blocks
-    "mixed content" requests to a non-https API. **This origin is a literal
-    string, not derived from `.env.tauri`** - if you ever change the server's
-    address, update this value too, or the desktop build will go back to
-    silently failing to log in exactly like this.
+    plain-http LAN origin, since WebView2 treats the app's own page as a
+    secure context and otherwise blocks "mixed content" requests to a
+    non-https API. **This origin is a literal string, not derived from
+    `.env.tauri`** - if you ever change the server's address, update this
+    value too, or the desktop build will go back to silently failing to log
+    in exactly like this.
+  - `client/vite.config.ts`'s CSP (`extraConnectSrc` in `cspPlugin`) needs
+    the same origins as the server's CORS allowlist above, plus
+    `http://ipc.localhost` - Tauri's internal IPC bridge for plugin calls
+    (e.g. the updater's `check()`) uses that as a separate origin from the
+    page's own, and without it in `connect-src`, those calls get silently
+    downgraded to a slower fallback transport instead of erroring.
 
 If this ever becomes a real pain point (e.g. the LAN IP changes often), the
 fix is a small settings screen that persists a chosen server URL (via
