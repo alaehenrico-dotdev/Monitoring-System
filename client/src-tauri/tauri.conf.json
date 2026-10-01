@@ -1,0 +1,52 @@
+{
+  "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Ala Eh Stocks Monitoring System",
+  "version": "1.1.0",
+  "identifier": "com.alaeh.monitoring",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build:tauri"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Ala Eh Stocks Monitoring System",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 640,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis", "msi"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDQ4NjIwMzc5MzhDMTNFRjUKUldUMVBzRTRlUU5pU0xJZGtKQ3F6SFJxblNLN0FYbEd6WXBQS3prL29icDhIWU11aFVHS2o0Y3YK",
+      "endpoints": [
+        "https://github.com/alaehenrico-dotdev/Monitoring-System/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

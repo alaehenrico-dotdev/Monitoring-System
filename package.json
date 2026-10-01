@@ -12,7 +12,7 @@
     "dev:server": "npm run dev --workspace server",
     "dev:client": "npm run dev --workspace client",
     "build": "npm run build --workspace server && npm run build --workspace client",
-    "db:migrate:deploy": "npm run prisma:migrate:deploy --workspace server",
+    "db:migrate:deploy": "npm run backup:snapshot && npm run prisma:migrate:deploy --workspace server",
     "seed": "npm run seed --workspace server",
     "backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup.ps1",
     "backup:snapshot": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup.ps1 -Mode snapshot -Label pre-migration",

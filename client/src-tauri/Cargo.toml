@@ -1,0 +1,27 @@
+[package]
+name = "ala-eh-monitoring"
+version = "0.1.0"
+description = "Ala Eh Stocks Monitoring System - desktop client"
+authors = ["Ala Eh Food Products"]
+license = ""
+repository = "https://github.com/alaehenrico-dotdev/Monitoring-System"
+edition = "2024"
+rust-version = "1.90"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.1", features = [] }
+
+[dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2.12.1", features = [] }
+tauri-plugin-log = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
