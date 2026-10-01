@@ -31,6 +31,7 @@ async function main() {
 
   const passwordHash = await bcrypt.hash(password, 10);
   await prisma.user.update({ where: { username }, data: { passwordHash } });
+  // eslint-disable-next-line no-console
   console.log(`Password updated for "${username}".`);
 }
 
