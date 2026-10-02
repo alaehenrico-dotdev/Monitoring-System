@@ -26,7 +26,7 @@ import {
 import { colors } from "../theme";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Link, useSearchParams } from "react-router-dom";
-import { recordReportHistory } from "../utils/reportHistory";
+import { recordReportHistory } from "../api/reportHistory";
 import {
   DownloadIcon,
   HistoryIcon,
@@ -214,11 +214,13 @@ export function DailyReportPage() {
         // again); a silent refresh keeps whatever the person had collapsed.
         if (!silent) setReportVersion((v) => v + 1);
         if (!silent && searchParams.get("history") !== "1") {
+          // Best effort - a failed history write should never surface as a
+          // report-generation failure (see api/reportHistory.ts).
           recordReportHistory({
             type: "Daily Report",
             scope: nextReport.date,
             route: `/daily-report?history=1&date=${nextReport.date}`,
-          });
+          }).catch(() => {});
         }
       })
       .catch((e) => {

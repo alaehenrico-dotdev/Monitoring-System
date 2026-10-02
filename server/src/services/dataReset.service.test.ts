@@ -10,7 +10,9 @@ const db = vi.hoisted(() => ({
   dailyOnlineStock: [] as Record<string, unknown>[],
   dailyOfflineStock: [] as Record<string, unknown>[],
   manualCount: [] as Record<string, unknown>[],
+  importBatch: [] as Record<string, unknown>[],
   changeLog: [] as Record<string, unknown>[],
+  reportHistoryEntry: [] as Record<string, unknown>[],
 }));
 
 function makeModel(table: Record<string, unknown>[]) {
@@ -35,7 +37,9 @@ vi.mock("../lib/prisma", () => ({
         dailyOnlineStock: makeModel(db.dailyOnlineStock),
         dailyOfflineStock: makeModel(db.dailyOfflineStock),
         manualCount: makeModel(db.manualCount),
+        importBatch: makeModel(db.importBatch),
         changeLog: makeModel(db.changeLog),
+        reportHistoryEntry: makeModel(db.reportHistoryEntry),
       }),
   },
 }));

@@ -13,7 +13,7 @@ import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { colors } from "../theme";
 import { Link, useSearchParams } from "react-router-dom";
-import { recordReportHistory } from "../utils/reportHistory";
+import { recordReportHistory } from "../api/reportHistory";
 import { HistoryIcon, PlayIcon, PrinterIcon } from "../components/icons";
 import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
@@ -178,11 +178,12 @@ export function VarianceReportPage() {
       });
       if (category) params.set("category", category);
       if (searchParams.get("history") !== "1") {
+        // Best effort - see api/reportHistory.ts.
         recordReportHistory({
           type: "Variance Report",
           scope: `${requestedStartDate} to ${requestedEndDate}`,
           route: `/variance-report?${params}`,
-        });
+        }).catch(() => {});
       }
     } catch (err) {
       if (id !== requestId.current) return;

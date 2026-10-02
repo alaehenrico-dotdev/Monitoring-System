@@ -58,6 +58,9 @@ const ProductsAdminPage = lazy(() =>
 const ChangeLogPage = lazy(() =>
   import("./pages/ChangeLogPage").then((m) => ({ default: m.ChangeLogPage })),
 );
+const SystemLogPage = lazy(() =>
+  import("./pages/SystemLogPage").then((m) => ({ default: m.SystemLogPage })),
+);
 const DashboardPage = lazy(() =>
   import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
 );
@@ -125,6 +128,7 @@ export default function App() {
                         element={<VarianceReportPage />}
                       />
                       <Route path="/change-log" element={<ChangeLogPage />} />
+                      <Route path="/system-log" element={<SystemLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Route>

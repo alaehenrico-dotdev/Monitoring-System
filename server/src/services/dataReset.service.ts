@@ -62,13 +62,28 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     const onlineStock = await tx.dailyOnlineStock.deleteMany();
     const offlineStock = await tx.dailyOfflineStock.deleteMany();
     const manualCounts = await tx.manualCount.deleteMany();
+    // Import History (Section: CSV import into Manual Count) - deleted
+    // before change_log below, since its own rows reference change_log
+    // entries (ChangeLog.importBatchId) that are about to disappear too; a
+    // batch left over after this reset would otherwise find zero matching
+    // entries if anyone ever tried to revert it, pointing at data that's
+    // already gone.
+    const importBatches = await tx.importBatch.deleteMany();
     const changeLog = await tx.changeLog.deleteMany();
+    // Report History (Daily/Variance) - same "clean slate" reasoning the old
+    // client-only localStorage version had (see reportHistory.ts's own
+    // history in version control): a reopened entry here just re-fetches
+    // live data for its date, so leaving one around after a reset would let
+    // an admin "reopen" a report that's now empty.
+    const reportHistory = await tx.reportHistoryEntry.deleteMany();
 
     const deleted = {
       onlineStock: onlineStock.count,
       offlineStock: offlineStock.count,
       manualCounts: manualCounts.count,
+      importBatches: importBatches.count,
       changeLog: changeLog.count,
+      reportHistory: reportHistory.count,
     };
 
     await tx.changeLog.create({

@@ -3,6 +3,16 @@ import react from "@vitejs/plugin-react";
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
+// This file runs as ESM (client/package.json's "type": "module"), so there's
+// no __dirname - derived the same way Node's own docs recommend.
+const rootDir = fileURLToPath(new URL(".", import.meta.url));
+
+// Single source of truth for every "what version is this" display in the app
+// (Sidebar account popover, Tauri window title) - read once at build time
+// rather than bundling package.json itself or hand-duplicating the number.
+const appVersion = (JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")) as { version: string }).version;
 
 /**
  * Injects a Content-Security-Policy `<meta>` tag into the built index.html -
@@ -110,6 +120,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     base: "./",
+    define: { __APP_VERSION__: JSON.stringify(appVersion) },
     plugins: [react(), cspPlugin(apiOrigin, extraConnectSrc), pwaPrecachePlugin()],
     server: {
       port: 5173,

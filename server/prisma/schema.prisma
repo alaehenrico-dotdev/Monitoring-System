@@ -51,6 +51,9 @@ model User {
   offlineEntries   DailyOfflineStock[] @relation("OfflineEncodedBy")
   manualCounts     ManualCount[]       @relation("CountedBy")
   changeLogEntries ChangeLog[]         @relation("ChangedBy")
+  importBatches    ImportBatch[]       @relation("ImportedBy")
+  reportHistory    ReportHistoryEntry[] @relation("GeneratedBy")
+  systemLogEntries SystemLogEntry[]    @relation("UpdatedOn")
 
   @@map("users")
 }
@@ -181,15 +184,99 @@ model ManualCount {
 
 /// 5.8 change_log - change history for accountability and variance tracing
 model ChangeLog {
-  id          Int          @id @default(autoincrement())
-  tableName   String
-  recordId    Int
-  action      ChangeAction
-  changedById Int?
-  changedBy   User?        @relation("ChangedBy", fields: [changedById], references: [id])
-  changedAt   DateTime     @default(now())
-  oldValue    Json?
-  newValue    Json?
+  id            Int          @id @default(autoincrement())
+  tableName     String
+  recordId      Int
+  action        ChangeAction
+  changedById   Int?
+  changedBy     User?        @relation("ChangedBy", fields: [changedById], references: [id])
+  changedAt     DateTime     @default(now())
+  oldValue      Json?
+  newValue      Json?
+  // Set only on the write a CSV import itself produced (see
+  // importBatch.service.ts's revertImportBatch) - lets "delete this import"
+  // find exactly the rows it touched and undo them, without having to guess
+  // from timestamps which change_log rows belong to which import. SetNull
+  // (not Cascade) on the batch's own deletion - revertImportBatch deletes the
+  // ImportBatch row once it's done reverting, but the change_log rows for the
+  // original import (and for the revert itself) stay as the permanent audit
+  // trail Section 5.8 exists for.
+  importBatchId Int?
+  importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
 
+  @@index([importBatchId])
   @@map("change_log")
+}
+
+/// Import History (CSV import into Manual Count - see CsvTools.tsx) - one row
+/// per confirmed "Save" in the Review Import modal, so an import can later be
+/// found and, if needed, cleanly undone (see revertImportBatch). Deleting a
+/// batch here reverts the data it changed (change_log rows tagged with this
+/// id - see ChangeLog.importBatchId) and then removes this summary row;
+/// never the other way around (see importBatch.service.ts).
+model ImportBatch {
+  id           Int           @id @default(autoincrement())
+  location     StockLocation
+  entryDate    DateTime      @db.Date
+  shift        Shift
+  fileName     String
+  rowCount     Int           @default(0)
+  importedById Int?
+  importedBy   User?         @relation("ImportedBy", fields: [importedById], references: [id])
+  importedAt   DateTime      @default(now())
+
+  changeLogEntries ChangeLog[]
+
+  @@index([location, entryDate, shift])
+  @@map("import_batches")
+}
+
+/// Server-backed Report History (Daily Report / Variance Report) - replaces
+/// the old client-only localStorage list (utils/reportHistory.ts) so what's
+/// been generated is durable and the same for every device/tester, not just
+/// whichever browser happened to generate it. Never stores the report's own
+/// data (that's always re-read live when an entry is reopened - see
+/// `route`'s own doc comment) - just that it was generated, by whom, and
+/// covering what.
+model ReportHistoryEntry {
+  id            Int      @id @default(autoincrement())
+  // "Daily Report" / "Variance Report" - kept as the same free-text label the
+  // UI already uses (ReportHistoryPage.tsx), rather than a new enum, since
+  // nothing else needs to query across types.
+  type          String
+  // Human-readable coverage - a single date ("2026-09-27") or a range
+  // ("2026-09-01 to 2026-09-07"), exactly as the report page already built it.
+  scope         String
+  // Where reopening this entry navigates to (e.g.
+  // "/daily-report?history=1&date=2026-09-27") - the report page then
+  // re-fetches fresh data for that date/range itself; this is never a frozen
+  // snapshot, so a reopened report always reflects the current numbers
+  // (including anything corrected since it was first generated).
+  route         String
+  generatedById Int?
+  generatedBy   User?    @relation("GeneratedBy", fields: [generatedById], references: [id])
+  generatedAt   DateTime @default(now())
+
+  @@index([type, generatedAt])
+  @@map("report_history_entries")
+}
+
+/// System Log (app version/release events) - separate from ChangeLog (which
+/// tracks edits to business records): this tracks the app itself changing
+/// version, starting with the Tauri desktop auto-updater (see
+/// client/src/tauri/updater.ts). `userId` is whoever's desktop app performed
+/// the update, not an admin acting on someone else's behalf.
+model SystemLogEntry {
+  id            Int      @id @default(autoincrement())
+  // "DESKTOP_UPDATE" today; a plain string (not an enum) so a future event
+  // kind (e.g. a server deploy hook) doesn't need a migration to add.
+  event         String
+  fromVersion   String
+  toVersion     String
+  userId        Int?
+  user          User?    @relation("UpdatedOn", fields: [userId], references: [id])
+  occurredAt    DateTime @default(now())
+
+  @@index([occurredAt])
+  @@map("system_log_entries")
 }

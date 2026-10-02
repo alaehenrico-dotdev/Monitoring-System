@@ -15,6 +15,18 @@ export async function checkForUpdates(): Promise<void> {
 
     await update.downloadAndInstall();
 
+    // System Log (Section: "system update on system log") - recorded right
+    // after the files are actually replaced on disk, regardless of whether
+    // relaunch() below fires immediately or is deferred by the unsaved-work
+    // check - downloadAndInstall() having succeeded is what makes this a real
+    // update, not relaunch() itself. Best effort: a server that's briefly
+    // unreachable (or this device being offline) must never block the update
+    // that already succeeded locally.
+    const { recordSystemLog } = await import("../api/systemLog");
+    recordSystemLog({ event: "DESKTOP_UPDATE", fromVersion: __APP_VERSION__, toVersion: update.version }).catch((err) =>
+      console.error("Failed to record system log entry", err),
+    );
+
     // downloadAndInstall() only replaces the files on disk - the running
     // process keeps going until relaunch() actually exits it. The download
     // itself can take a while on a slow connection, and the grid stays fully

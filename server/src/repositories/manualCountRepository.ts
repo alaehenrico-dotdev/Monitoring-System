@@ -94,6 +94,13 @@ export const manualCountRepository = {
       : prisma.manualCount.create({ data });
   },
 
+  /// Undoes a CSV import that created a count which didn't exist before (see
+  /// manualCounts.service.ts's deleteManualCount) - a plain delete, not an
+  /// upsert, since there's no "old value" to restore it to.
+  delete(id: number) {
+    return prisma.manualCount.delete({ where: { id } });
+  },
+
   /// Section 4.8 - Variance Report query, filterable by product/category/
   /// location/shift.
   findForVarianceReport(filters: VarianceReportFilters) {

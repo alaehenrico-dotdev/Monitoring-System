@@ -159,6 +159,18 @@ export function ManualCountPage() {
   const [drafts, setDrafts] = useState<Drafts>(() =>
     loadDrafts(date, shift),
   );
+  // location -> productId -> the Import History batch its still-staged draft
+  // came from - threaded into saveManualCount at Save time so that write can
+  // later be found and reverted. Not persisted (unlike drafts) - losing this
+  // on reload just means a revived draft after a refresh saves as a plain
+  // edit instead of staying attributed to the import, same trade-off
+  // CsvTools' own in-memory "Undo Import" already makes. Cleared for a
+  // product/location the moment its draft is set WITHOUT a batch id (see
+  // setDraft) - a hand-edit after import must never let a later "delete this
+  // import" clobber it.
+  const [importedBatchByProduct, setImportedBatchByProduct] = useState<
+    Record<CountLocation, Record<number, number>>
+  >({ ONLINE: {}, OFFLINE: {} });
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("manual-count");
   const [query, setQuery] = useState("");
@@ -212,8 +224,14 @@ export function ManualCountPage() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [pendingCount]);
 
-  function setDraft(loc: CountLocation, productId: number, value: string) {
+  function setDraft(loc: CountLocation, productId: number, value: string, batchId?: number) {
     setDrafts((d) => ({ ...d, [loc]: { ...d[loc], [productId]: value } }));
+    setImportedBatchByProduct((prev) => {
+      const locMap = { ...prev[loc] };
+      if (batchId !== undefined) locMap[productId] = batchId;
+      else delete locMap[productId];
+      return { ...prev, [loc]: locMap };
+    });
   }
 
   // Typing a count only stages a local draft (see the input's onChange
@@ -242,6 +260,7 @@ export function ManualCountPage() {
             shift,
             loc,
             Number(draft),
+            importedBatchByProduct[loc][productId],
           );
           // Merge the recalculated row (system remaining stock + variance) in
           // directly instead of re-fetching the whole grid for one edit.
@@ -279,6 +298,11 @@ export function ManualCountPage() {
       for (const s of succeeded) delete next[s.loc][s.productId];
       return next;
     });
+    setImportedBatchByProduct((prev) => {
+      const next = { ONLINE: { ...prev.ONLINE }, OFFLINE: { ...prev.OFFLINE } };
+      for (const s of succeeded) delete next[s.loc][s.productId];
+      return next;
+    });
     setSaving(false);
     setShowConfirm(false);
     if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
@@ -290,9 +314,10 @@ export function ManualCountPage() {
   async function handleImportRow(
     productId: number,
     values: Record<string, number>,
+    batchId?: number,
   ) {
     if (values.manualCount === undefined) return;
-    setDraft(csvLocation, productId, String(values.manualCount));
+    setDraft(csvLocation, productId, String(values.manualCount), batchId);
   }
 
   // One merged row per product, holding both locations' entries.
