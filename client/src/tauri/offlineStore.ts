@@ -1,5 +1,7 @@
-// Offline support for the Tauri desktop build only (see src/tauri/ - never
-// imported by the plain web build). Two jobs:
+// Generic offline support for the Tauri desktop build only (see src/tauri/ -
+// never imported by the plain web build). Two jobs, for endpoints that don't
+// have their own structured sync (see sync/ for the ones that do - Product,
+// DailyOnlineStock, DailyOfflineStock, ManualCount):
 //
 // 1. Read cache - the last successful response for a GET path, so a grid or
 //    report that's already been opened stays viewable if the server becomes
@@ -8,41 +10,14 @@
 //    queued here (in order) instead of just failing, and is replayed once
 //    the app detects the server is reachable again.
 //
-// Both tables live in a local SQLite database (via @tauri-apps/plugin-sql),
-// with every payload encrypted at rest via Windows DPAPI (src-tauri/src/
-// dpapi.rs, Scope::User) before it touches disk - this is what "encrypted
-// local database" means here: protects the file's contents if it's copied
-// off this machine or read by a different Windows account, not against
-// someone already logged into this same Windows account.
+// Both tables live in the shared local SQLite database (db.ts), with every
+// payload encrypted at rest via Windows DPAPI (src-tauri/src/dpapi.rs,
+// Scope::User) before it touches disk - this is what "encrypted local
+// database" means here: protects the file's contents if it's copied off
+// this machine or read by a different Windows account, not against someone
+// already logged into this same Windows account.
 import { invoke } from "@tauri-apps/api/core";
-import Database from "@tauri-apps/plugin-sql";
-
-let dbPromise: Promise<Database> | null = null;
-
-function getDb(): Promise<Database> {
-  if (!dbPromise) {
-    dbPromise = Database.load("sqlite:offline.db").then(async (db) => {
-      await db.execute(
-        `CREATE TABLE IF NOT EXISTS cached_responses (
-           path TEXT PRIMARY KEY,
-           data TEXT NOT NULL,
-           cached_at TEXT NOT NULL
-         )`,
-      );
-      await db.execute(
-        `CREATE TABLE IF NOT EXISTS pending_writes (
-           id INTEGER PRIMARY KEY AUTOINCREMENT,
-           method TEXT NOT NULL,
-           path TEXT NOT NULL,
-           body TEXT,
-           created_at TEXT NOT NULL
-         )`,
-      );
-      return db;
-    });
-  }
-  return dbPromise;
-}
+import { getDb } from "./db";
 
 async function encrypt(plaintext: string): Promise<string> {
   return invoke<string>("encrypt_dpapi", { plaintext });

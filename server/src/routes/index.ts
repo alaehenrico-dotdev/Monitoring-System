@@ -12,6 +12,7 @@ import changeLogRoutes from "./changeLog.routes";
 import dataResetRoutes from "./dataReset.routes";
 import backupRoutes from "./backup.routes";
 import dashboardRoutes from "./dashboard.routes";
+import syncRoutes from "./sync.routes";
 
 /// Single mount point for every feature's router (Section 3 - the app is
 /// organized around Daily Online Entry, Daily Offline Entry, Manual Count &
@@ -31,5 +32,6 @@ router.use("/change-log", changeLogRoutes);
 router.use("/data-reset", dataResetRoutes);
 router.use("/backup", backupRoutes);
 router.use("/dashboard", dashboardRoutes);
+router.use("/sync", syncRoutes);
 
 export default router;

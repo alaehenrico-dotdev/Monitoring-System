@@ -1,23 +1,31 @@
 // Only ever reached via Layout.tsx's React.lazy() import, gated on
-// import.meta.env.MODE === "tauri" - so this file (and its offlineStore/http
+// import.meta.env.MODE === "tauri" - so this file (and its offlineStore/sync
 // imports) never ends up in the plain web build's bundle, same reasoning as
 // every other file under src/tauri/.
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { sendQueuedWrite } from "../api/http";
 import { flushPendingWrites, getPendingWriteCount } from "./offlineStore";
+import { useSyncEngine } from "./sync/useSyncEngine";
 import { colors } from "../theme";
 
-/// Shows how many offline-queued writes are waiting to sync, and flushes the
-/// outbox whenever useOnlineStatus reports a reconnect. Renders nothing once
-/// the queue is empty - the plain "Offline - showing saved data" banner in
-/// Layout.tsx already covers the no-pending-writes case for both builds.
+/// Shows pending/conflict status for BOTH offline systems:
+/// - the generic outbox (offlineStore.ts - unmirrored endpoints like
+///   dashboard/reports), flushed on the browser's own reconnect event
+/// - the structured sync engine (sync/ - Product/DailyOnlineStock/
+///   DailyOfflineStock/ManualCount), which drives its own push+pull on
+///   launch, reconnect, and a periodic idle interval (see useSyncEngine)
+///
+/// Renders nothing once both are empty - the plain "Offline - showing saved
+/// data" banner in Layout.tsx already covers the no-pending-changes case.
 export function OfflineSyncBadge() {
   const { reconnects } = useOnlineStatus();
-  const [pendingCount, setPendingCount] = useState(0);
+  const [genericPendingCount, setGenericPendingCount] = useState(0);
+  const { pendingCount: syncPendingCount, conflictCount } = useSyncEngine();
 
   useEffect(() => {
-    getPendingWriteCount().then(setPendingCount);
+    getPendingWriteCount().then(setGenericPendingCount);
   }, []);
 
   useEffect(() => {
@@ -26,17 +34,19 @@ export function OfflineSyncBadge() {
       if (result.rejected.length > 0) {
         // These were actively rejected by a reachable server (not a
         // connectivity failure) - most likely because whatever they were
-        // staged against has since changed. Logged for now rather than a
-        // full conflict-resolution UI, which is a larger follow-up; the
-        // user's original entry is still visible wherever they typed it
-        // (see usePendingEntryChanges), so nothing is silently lost.
+        // staged against has since changed. This is the generic outbox
+        // (unmirrored endpoints only) - it has no conflict-review UI of its
+        // own the way the structured sync tables do, so this is logged
+        // rather than silently dropped. The user's original entry is still
+        // visible wherever they typed it (see usePendingEntryChanges).
         console.error("Some offline-queued writes were rejected and dropped:", result.rejected);
       }
-      getPendingWriteCount().then(setPendingCount);
+      getPendingWriteCount().then(setGenericPendingCount);
     });
   }, [reconnects]);
 
-  if (pendingCount === 0) return null;
+  const totalPending = genericPendingCount + syncPendingCount;
+  if (totalPending === 0 && conflictCount === 0) return null;
 
   return (
     <div
@@ -47,6 +57,9 @@ export function OfflineSyncBadge() {
         left: "50%",
         transform: "translateX(-50%)",
         zIndex: 150,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
         padding: "6px 14px",
         borderRadius: 999,
         fontSize: 12,
@@ -57,7 +70,16 @@ export function OfflineSyncBadge() {
         boxShadow: "0 6px 20px rgba(12, 12, 12, 0.35)",
       }}
     >
-      {pendingCount} change{pendingCount === 1 ? "" : "s"} waiting to sync
+      {totalPending > 0 && (
+        <span>
+          {totalPending} change{totalPending === 1 ? "" : "s"} waiting to sync
+        </span>
+      )}
+      {conflictCount > 0 && (
+        <Link to="/sync-conflicts" style={{ color: colors.danger, textDecoration: "underline" }}>
+          {conflictCount} conflict{conflictCount === 1 ? "" : "s"} need review
+        </Link>
+      )}
     </div>
   );
 }

@@ -42,6 +42,7 @@ import {
   type PendingByProduct,
 } from "../hooks/usePendingEntryChanges";
 import { onlineStockColumns as columns } from "../config/stockColumns";
+import { ONLINE_TRANSFER_FIELDS } from "../tauri/sync/offlineFields";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
@@ -61,6 +62,8 @@ import {
 } from "../utils/stockMath";
 import { colors } from "../theme";
 import type { Shift } from "../types";
+
+const isTauri = import.meta.env.MODE === "tauri";
 
 /// Re-derives Online Stocks + Remaining Stock from a last-saved entry plus a
 /// staged (not-yet-saved) diff on top of it - shared by the live grid
@@ -128,6 +131,11 @@ export function OnlineEntryPage() {
     user?.role === "ONLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
   const { online, reconnects } = useOnlineStatus();
+  // Only the Tauri build can actually save while offline (staged locally,
+  // synced later - see api/onlineStock.ts's saveOnlineEntry) - the plain web
+  // build has no local store to fall back to, so it keeps blocking Save
+  // outright while offline (handleSaveAll, below).
+  const isTauriOffline = isTauri && !online;
   // So handleSaveAll (below) can tell CsvTools its own last import batch is
   // no longer just "pending" once a real Save has committed it - see
   // CsvTools' notifyCommitted doc comment.
@@ -161,6 +169,19 @@ export function OnlineEntryPage() {
     useEntryManualCounts(date, shift, "ONLINE");
   const csvRows = useRowsWithManualCounts(rows, manualCounts);
   const csvColumns = useMemo(() => [...columns, manualCountColumn], []);
+  // Transfers can't be saved offline (see isTauriOffline/handleSaveAll) -
+  // locking these two cells in the live grid means an encoder sees it can't
+  // be entered right now, rather than typing it and only finding out at
+  // Save time. CSV import still uses the unmodified `columns`/`csvColumns`
+  // deliberately - see validateImportRow's own transfer-field check below
+  // for why an imported transfer is caught there instead.
+  const gridColumns = useMemo(
+    () =>
+      isTauriOffline
+        ? columns.map((c) => (ONLINE_TRANSFER_FIELDS.includes(c.key as (typeof ONLINE_TRANSFER_FIELDS)[number]) ? { ...c, editable: false } : c))
+        : columns,
+    [isTauriOffline],
+  );
 
   // Search and the category dropdown only affect what's displayed in the
   // grid - both are local filters over the same already-loaded rows, not a
@@ -277,7 +298,12 @@ export function OnlineEntryPage() {
   // whether it's safe to let a "Save & Print" through.
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
-    if (!online) {
+    // The plain web build has no local store to fall back to, so it still
+    // blocks Save outright while offline. The Tauri build actually saves
+    // offline (staged locally, synced later) - see api/onlineStock.ts's
+    // saveOnlineEntry - so it's allowed to proceed past this point even
+    // when !online.
+    if (!online && !isTauri) {
       setError("You're offline - your changes are kept on this device. Save again once you're back online.");
       return false;
     }
@@ -699,7 +725,7 @@ export function OnlineEntryPage() {
           <StockGrid
             key={`${date}-${shift}`}
             rows={visibleRows ?? []}
-            columns={columns}
+            columns={gridColumns}
             onCommit={handleCommit}
             readOnly={!canEdit}
             pending={pending}

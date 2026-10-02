@@ -79,6 +79,11 @@ model Product {
   offlineStocks DailyOfflineStock[]
   manualCounts  ManualCount[]
 
+  // Desktop app offline sync (Tauri client/src/tauri/sync) - GET /sync/pull
+  // queries "what's changed since my last sync" via updatedAt on every
+  // mirrored table, not via ChangeLog (which stores full-row snapshots for
+  // the audit trail, not a cursor-queryable change feed).
+  @@index([updatedAt])
   @@map("products")
 }
 
@@ -109,6 +114,8 @@ model DailyOnlineStock {
   // column. Confirmed via EXPLAIN against a seeded ~116k-row table: this
   // turns a full table scan into a ref/range lookup.
   @@index([entryDate, shift])
+  // Desktop app offline sync - see Product's matching index.
+  @@index([updatedAt])
   @@map("daily_online_stock")
 }
 
@@ -141,6 +148,8 @@ model DailyOfflineStock {
   @@unique([productId, entryDate, shift])
   // See the matching index on DailyOnlineStock above - same reasoning.
   @@index([entryDate, shift])
+  // Desktop app offline sync - see Product's matching index.
+  @@index([updatedAt])
   @@map("daily_offline_stock")
 }
 
@@ -165,6 +174,8 @@ model ManualCount {
   // all of which filter or range-scan entryDate across products (see the
   // DailyOnlineStock index above for why the unique key doesn't help).
   @@index([entryDate])
+  // Desktop app offline sync - see Product's matching index.
+  @@index([updatedAt])
   @@map("manual_counts")
 }
 
