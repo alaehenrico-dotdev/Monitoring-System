@@ -74,6 +74,12 @@ const VarianceReportHistoryPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
+// Desktop-only (offline sync conflicts) - lives under src/tauri/ like
+// everything else that's Tauri-specific, still lazy-chunked the same as
+// every other page so this never ends up in the web build's main bundle.
+const ConflictsPage = lazy(() =>
+  import("./tauri/sync/ConflictsPage").then((m) => ({ default: m.ConflictsPage })),
+);
 
 export default function App() {
   return (
@@ -99,6 +105,8 @@ export default function App() {
                     <Route path="/manual-count" element={<ManualCountPage />} />
                     {/* Every role can read the report (the server already allows it); the entry pages link here. */}
                     <Route path="/daily-report" element={<DailyReportPage />} />
+                    {/* Any role's own offline edits can end up here - not admin-only. */}
+                    <Route path="/sync-conflicts" element={<ConflictsPage />} />
 
                     <Route
                       element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}

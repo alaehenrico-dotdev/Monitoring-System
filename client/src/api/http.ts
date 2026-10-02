@@ -64,12 +64,13 @@ function isNetworkError(err: unknown): boolean {
 }
 
 // The actual HTTP call plus auth header/401/ApiError handling - no offline
-// interception. Used directly by sendQueuedWrite() (replaying the outbox
-// must NOT re-trigger request()'s own catch-and-requeue behavior below, or a
-// still-offline replay would duplicate the entry it was trying to flush and
-// report it to flushPendingWrites as a server rejection instead of "still
-// offline, try again later").
-async function coreRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+// interception. Used directly by sendQueuedWrite() and the structured sync
+// engine (src/tauri/sync/engine.ts) - both need a real network error to
+// surface as-is rather than be caught and funneled into the GENERIC
+// cache/outbox below, which would create a confusing second, untracked copy
+// of something the structured sync tables (or the outbox replay itself)
+// already own.
+export async function coreRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
