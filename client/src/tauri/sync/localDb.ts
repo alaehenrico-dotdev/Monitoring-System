@@ -161,7 +161,7 @@ function rank(entryDate: string, shift: Shift): number {
   return new Date(entryDate).getTime() * 2 + (shift === "NIGHT" ? 1 : 0);
 }
 
-async function getLocalOpeningStockOnline(productId: number, entryDate: string, shift: Shift): Promise<number> {
+export async function getLocalOpeningStockOnline(productId: number, entryDate: string, shift: Shift): Promise<number> {
   const db = await getDb();
   const priorRows = await db.select<{ remaining_stock: number; entry_date: string; shift: Shift }[]>(
     `SELECT remaining_stock, entry_date, shift FROM daily_online_stock_cache
@@ -359,7 +359,7 @@ export async function listOfflineStockCacheForDate(entryDate: string, shift: Shi
   return rows.map(rowToOffline);
 }
 
-async function getLocalOpeningStockOffline(productId: number, entryDate: string, shift: Shift): Promise<number> {
+export async function getLocalOpeningStockOffline(productId: number, entryDate: string, shift: Shift): Promise<number> {
   const db = await getDb();
   const priorRows = await db.select<{ remaining_stock: number; entry_date: string; shift: Shift }[]>(
     `SELECT remaining_stock, entry_date, shift FROM daily_offline_stock_cache
@@ -551,6 +551,17 @@ export async function getManualCountCacheByLocalId(localId: string): Promise<Man
   const db = await getDb();
   const rows = await db.select<Record<string, unknown>[]>("SELECT * FROM manual_counts_cache WHERE local_id = $1", [localId]);
   return rows.length ? rowToManualCount(rows[0]) : null;
+}
+
+/// Used by the offline Manual Count grid fallback (sync/localGrid.ts) - same
+/// shape as the server's findAllForDateAndLocation.
+export async function listManualCountsCacheForDate(entryDate: string, shift: Shift, location: StockLocation): Promise<ManualCountCache[]> {
+  const db = await getDb();
+  const rows = await db.select<Record<string, unknown>[]>(
+    "SELECT * FROM manual_counts_cache WHERE entry_date = $1 AND shift = $2 AND location = $3",
+    [entryDate, shift, location],
+  );
+  return rows.map(rowToManualCount);
 }
 
 export async function upsertManualCountFromServer(row: ManualCountCache): Promise<void> {

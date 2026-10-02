@@ -2,7 +2,10 @@ import { clearOfflineApiCache } from "../pwa";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { getMe, login as loginRequest } from "../api/auth";
 import { ApiError, getToken, setToken, setUnauthorizedHandler } from "../api/http";
+import { decodeJwtPayload } from "../utils/jwt";
 import type { AuthUser } from "../types";
+
+const isTauri = import.meta.env.MODE === "tauri";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -37,12 +40,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // really is invalid/expired - both are the ordinary, expected path
           // to the login screen, nothing to explain.
           setToken(null);
-        } else {
-          // A token existed and the request still failed for some other
-          // reason (network down, server error) - don't wipe out what might
-          // still be a perfectly valid session over a transient failure.
-          setSessionError(e instanceof Error ? e.message : "Couldn't reach the server - check your connection and try again.");
+          return;
         }
+        // A token existed and the request still failed for some other reason
+        // - don't wipe out what might still be a perfectly valid session over
+        // a transient failure.
+        //
+        // Desktop build only: let it straight into the app on local data
+        // (grid pages fall back to the structured SQLite mirror - see
+        // tauri/sync/localGrid.ts) rather than blocking on a server that
+        // might not even be started yet. The identity shown comes from the
+        // token's own payload, decoded without verifying its signature -
+        // that's not a trust decision, since every real request from here
+        // still carries this exact token and the server verifies it for
+        // real; this only ever affects what name/role this client DISPLAYS
+        // while it can't ask the server to confirm. Falls through to the
+        // ordinary sessionError screen below if that decode fails too (a
+        // corrupted token is not something to silently paper over).
+        if (isTauri && e instanceof TypeError) {
+          const token = getToken();
+          const payload = token && decodeJwtPayload<AuthUser>(token);
+          if (payload) {
+            setUser(payload);
+            return;
+          }
+        }
+        setSessionError(e instanceof Error ? e.message : "Couldn't reach the server - check your connection and try again.");
       })
       .finally(() => {
         setLoading(false);

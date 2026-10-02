@@ -2,8 +2,21 @@ import { http } from "./http";
 import type { OnlineEntry, OnlineGridRow, Shift } from "../types";
 import { ONLINE_TRANSFER_FIELDS } from "../tauri/sync/offlineFields";
 
-export function getOnlineGrid(date: string, shift: Shift) {
-  return http.get<OnlineGridRow[]>(`/online-stock?date=${date}&shift=${shift}`);
+/// Falls back to the structured local SQLite mirror (see
+/// tauri/sync/localGrid.ts) when this is a genuine connectivity failure and
+/// the generic exact-URL cache (http.ts's own offline fallback) has nothing
+/// for this exact date/shift either - e.g. the server hasn't been started
+/// yet and this is the first time today's grid has ever been opened on this
+/// device. Never trusted as authoritative - the server remains the one
+/// source of truth, recomputed fresh on every real request and every sync.
+export async function getOnlineGrid(date: string, shift: Shift): Promise<OnlineGridRow[]> {
+  try {
+    return await http.get<OnlineGridRow[]>(`/online-stock?date=${date}&shift=${shift}`);
+  } catch (err) {
+    if (!isTauri || !(err instanceof TypeError)) throw err;
+    const { getLocalOnlineGrid } = await import("../tauri/sync/localGrid");
+    return getLocalOnlineGrid(date, shift);
+  }
 }
 
 export interface OnlineEntryInput {
