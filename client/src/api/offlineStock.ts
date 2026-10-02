@@ -22,8 +22,16 @@ export function computeDeliverySlots(entry: Record<string, unknown>, changes: Re
   return { ...slots, deliveryOut };
 }
 
-export function getOfflineGrid(date: string, shift: Shift) {
-  return http.get<OfflineGridRow[]>(`/offline-stock?date=${date}&shift=${shift}`);
+/// Offline fallback - see api/onlineStock.ts's matching getOnlineGrid for the
+/// full reasoning (same structured-mirror fallback, tauri/sync/localGrid.ts).
+export async function getOfflineGrid(date: string, shift: Shift): Promise<OfflineGridRow[]> {
+  try {
+    return await http.get<OfflineGridRow[]>(`/offline-stock?date=${date}&shift=${shift}`);
+  } catch (err) {
+    if (!isTauri || !(err instanceof TypeError)) throw err;
+    const { getLocalOfflineGrid } = await import("../tauri/sync/localGrid");
+    return getLocalOfflineGrid(date, shift);
+  }
 }
 
 export interface OfflineEntryInput {

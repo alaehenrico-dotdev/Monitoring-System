@@ -1,8 +1,16 @@
 import { http } from "./http";
 import type { ManualCountEntry, ManualCountGridRow, Shift, StockLocation } from "../types";
 
-export function getManualCountGrid(date: string, shift: Shift, location: StockLocation) {
-  return http.get<ManualCountGridRow[]>(`/manual-counts?date=${date}&shift=${shift}&location=${location}`);
+/// Offline fallback - see api/onlineStock.ts's matching getOnlineGrid for the
+/// full reasoning (same structured-mirror fallback, tauri/sync/localGrid.ts).
+export async function getManualCountGrid(date: string, shift: Shift, location: StockLocation): Promise<ManualCountGridRow[]> {
+  try {
+    return await http.get<ManualCountGridRow[]>(`/manual-counts?date=${date}&shift=${shift}&location=${location}`);
+  } catch (err) {
+    if (!isTauri || !(err instanceof TypeError)) throw err;
+    const { getLocalManualCountGrid } = await import("../tauri/sync/localGrid");
+    return getLocalManualCountGrid(date, shift, location);
+  }
 }
 
 const isTauri = import.meta.env.MODE === "tauri";
