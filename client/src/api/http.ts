@@ -63,6 +63,19 @@ function isNetworkError(err: unknown): boolean {
   return err instanceof TypeError;
 }
 
+// A plain fetch() has no timeout of its own - against a server that's
+// genuinely unreachable (the machine is off, not just the process), the
+// underlying OS TCP connect attempt is what eventually fails, which can take
+// 20-60+ seconds. That's fine for a server that might just be slow to
+// respond, but every offline-fallback path in this file (and api/onlineStock
+// .ts, offlineStock.ts, manualCounts.ts, AuthContext.tsx's session check)
+// only kicks in once this call actually fails - so "detect offline and show
+// local data" was waiting out that same OS timeout first. Aborting well
+// before that (see connectivity.ts's own, separate 5s health-check timeout
+// for the same reasoning) is what actually makes the fallback feel instant
+// instead of stalled.
+const REQUEST_TIMEOUT_MS = 8_000;
+
 // The actual HTTP call plus auth header/401/ApiError handling - no offline
 // interception. Used directly by sendQueuedWrite() and the structured sync
 // engine (src/tauri/sync/engine.ts) - both need a real network error to
@@ -78,7 +91,31 @@ export async function coreRequest<T>(path: string, options: RequestInit = {}): P
   };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
+  } catch (err) {
+    // A timed-out fetch throws a DOMException("AbortError"), not the
+    // TypeError every "couldn't reach it" check in this codebase looks for
+    // (isNetworkError here and in offlineStore.ts, plus direct `instanceof
+    // TypeError` checks in the api/* modules and AuthContext.tsx) -
+    // normalized here so a timeout is indistinguishable from any other
+    // connectivity failure to every one of those, rather than teaching each
+    // of them a second error shape to recognize.
+    if (err instanceof DOMException && err.name === "AbortError") {
+      // `new TypeError(message, { cause })` needs an ES2022 lib - this
+      // project targets ES2020 (tsconfig.json), so cause is set as a plain
+      // property instead. Same runtime behavior either way.
+      const timeoutError = new TypeError("Request timed out");
+      (timeoutError as TypeError & { cause?: unknown }).cause = err;
+      throw timeoutError;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
