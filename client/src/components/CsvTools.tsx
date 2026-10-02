@@ -14,14 +14,15 @@ import {
 import { downloadExcel, toExcelTable } from "../utils/excel";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
-import { formatDateDisplay } from "../utils/dateFormat";
+import { formatDateDisplay, formatRelativeTime } from "../utils/dateFormat";
 import type { Product, Shift, StockLocation } from "../types";
 import { DatePicker } from "./DatePicker";
 import { Dropdown } from "./Dropdown";
 import { ShiftFilter } from "./ShiftFilter";
 import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { toolbarLayoutTransition } from "../motion";
-import { DownloadIcon, PrinterIcon, UploadIcon } from "./icons";
+import { ClearIcon, DownloadIcon, HistoryIcon, PrinterIcon, UploadIcon } from "./icons";
+import { createImportBatch, deleteImportBatch, finalizeImportBatch, listImportBatches, type ImportBatchSummary } from "../api/importBatches";
 import { Toast, type ToastVariant } from "./Toast";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { Modal } from "./Modal";
@@ -171,8 +172,18 @@ interface CsvToolsProps {
   /// productId) - the caller owns saving it and merging the result into
   /// local state, exactly like a manual cell edit would. "Undo Import"
   /// reuses this same callback (see handleUndoImport) - reverting a cell is
-  /// just staging its old value back through the normal path.
-  onImportRow: (productId: number, values: Record<string, number>) => Promise<void>;
+  /// just staging its old value back through the normal path (and omits
+  /// batchId, below - an in-progress Undo has nothing to do with Import
+  /// History, which only tracks what's actually been Saved to the server).
+  ///
+  /// `batchId` is this Review modal's Import History entry (see
+  /// handleConfirmImport) - the caller threads it through to whatever it
+  /// eventually saves with, so a row that's still only staged, not yet
+  /// Saved for real, stays attributed to the import that proposed it until
+  /// either Save commits it (tagging the server write) or something else
+  /// changes that exact cell first (which un-attributes it - see each
+  /// page's own handleCommit/onChange).
+  onImportRow: (productId: number, values: Record<string, number>, batchId?: number) => Promise<void>;
   /// Whatever the caller's own pending-changes state currently has staged
   /// for this exact cell, or undefined if nothing is - CsvTools has no
   /// direct access to that state itself. Used only by "Undo Import" to
@@ -370,6 +381,15 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
   // current review/import belongs to.
   const [targetDraft, setTargetDraft] = useState<ImportTarget | null>(null);
   const [reviewLabel, setReviewLabel] = useState<string | null>(null);
+  // Import History (Section: CSV import into Manual Count) - a lightweight
+  // modal next to Import itself, not a separate page, since it's purely an
+  // accessory to the Import button it sits beside. null batches = either not
+  // opened yet or still loading (distinguished from historyError below).
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyBatches, setHistoryBatches] = useState<ImportBatchSummary[] | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   // A file picked while the grid is still loading the newly chosen sheet is
   // held here and parsed as soon as that data is ready (see effect below).
   const pendingFileRef = useRef<File | null>(null);
@@ -642,11 +662,32 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
     setSavingImport(true);
     progress.start();
     try {
+      // Import History (Section: CSV import into Manual Count) - registered
+      // up front so every row below can be tagged with it. Best-effort: a
+      // batch that fails to register just means this import won't show up
+      // in Import History (or be revertible from there), not that the
+      // import itself should be blocked on it.
+      let historyBatchId: number | undefined;
+      if (importTarget) {
+        try {
+          const batch = await createImportBatch({
+            location: importTarget.location,
+            date: importTarget.date,
+            shift: importTarget.shift,
+            fileName: importContextRef.current?.fileName ?? "import.csv",
+          });
+          historyBatchId = batch.id;
+        } catch {
+          // See the comment above - proceed without one.
+        }
+      }
+
       const total = importReview.matchedRows.length;
       const batchEntries: ImportBatch["entries"] = {};
       for (let i = 0; i < importReview.matchedRows.length; i++) {
         const row = importReview.matchedRows[i];
-        await onImportRow(row.productId, row.changes);
+        if (historyBatchId !== undefined) await onImportRow(row.productId, row.changes, historyBatchId);
+        else await onImportRow(row.productId, row.changes);
 
         const priorRow = rows.find((r) => r.product.id === row.productId);
         const fields: Record<string, { oldValue: number; newValue: number }> = {};
@@ -657,6 +698,8 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
 
         progress.set(Math.round(((i + 1) / total) * 100));
       }
+
+      if (historyBatchId !== undefined) void finalizeImportBatch(historyBatchId, importReview.matchedRows.length);
 
       setLastImportBatch({ fileName: importContextRef.current?.fileName ?? "import", importedAt: Date.now(), entries: batchEntries });
       setShowUndoImport(true);
@@ -728,6 +771,38 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
       progress.fail();
     } finally {
       undoInFlightRef.current = false;
+    }
+  }
+
+  function openHistory() {
+    setShowHistory(true);
+    setHistoryError(null);
+    setHistoryBatches(null);
+    listImportBatches(importTarget?.location)
+      .then(setHistoryBatches)
+      .catch((err) => setHistoryError(err instanceof Error ? err.message : "Failed to load import history"));
+  }
+
+  /// Deleting an entry reverts exactly the cells that import changed (unless
+  /// something else has touched them since - see the server's
+  /// revertImportBatch) and then removes it from the list. Whatever it
+  /// reverted shows up via realtime, same as any other save - this never
+  /// needs to tell a page to refresh itself directly.
+  async function handleDeleteBatch(id: number) {
+    setDeletingId(id);
+    try {
+      const result = await deleteImportBatch(id);
+      setHistoryBatches((prev) => prev?.filter((b) => b.id !== id) ?? prev);
+      setConfirmDeleteId(null);
+      const parts = [`Reverted ${result.reverted} cell${result.reverted === 1 ? "" : "s"}`];
+      if (result.skipped) parts.push(`${result.skipped} skipped - already changed since`);
+      setMessage(`${parts.join(", ")}.`);
+      setMessageVariant(result.skipped ? "error" : "info");
+      setShowUndoImport(false);
+    } catch (err) {
+      setHistoryError(err instanceof Error ? err.message : "Failed to delete import");
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -819,6 +894,21 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
           </>
         )}
       </motion.div>
+      {canImport && (
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={openHistory}
+          disabled={disabled}
+          aria-label="Import History"
+          title="Import History"
+          className="ae-tap-target ae-toolbar-icon-btn"
+          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <HistoryIcon />
+        </Button>
+      )}
       <Toast
         message={message}
         onDismiss={() => {
@@ -956,6 +1046,72 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTo
               {savingImport ? "Saving…" : `Save (${importReview.matchedRows.length})`}
             </Button>
           </div>
+        </Modal>
+      )}
+      {showHistory && (
+        <Modal title="Import History" onClose={() => setShowHistory(false)} width={620}>
+          {historyError && (
+            <p style={{ margin: "0 0 12px", fontSize: 13, color: colors.danger }}>{historyError}</p>
+          )}
+          {!historyBatches && !historyError && (
+            <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>Loading…</p>
+          )}
+          {historyBatches && historyBatches.length === 0 && (
+            <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>No imports recorded yet.</p>
+          )}
+          {historyBatches && historyBatches.length > 0 && (
+            <div className="table-scroll" style={{ maxHeight: 420, overflowY: "auto" }}>
+              {historyBatches.map((b) => (
+                <div
+                  key={b.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                    padding: "10px 0",
+                    borderBottom: `1px solid ${colors.border}`,
+                  }}
+                >
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: colors.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {b.fileName}
+                    </div>
+                    <div style={{ fontSize: 12, color: colors.subtleInk, marginTop: 2 }}>
+                      {formatDateDisplay(b.entryDate.slice(0, 10))} · {SHIFT_SHORT_LABELS[b.shift]} Shift · {b.location} · {b.rowCount} row
+                      {b.rowCount === 1 ? "" : "s"}
+                    </div>
+                    <div style={{ fontSize: 12, color: colors.subtleInk, marginTop: 2 }}>
+                      {b.importedBy?.name ?? "Unknown"} · {formatRelativeTime(b.importedAt)}
+                    </div>
+                  </div>
+                  {confirmDeleteId === b.id ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                      <span style={{ fontSize: 12, color: colors.subtleInk }}>Revert this import?</span>
+                      <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmDeleteId(null)} disabled={deletingId === b.id}>
+                        Cancel
+                      </Button>
+                      <Button type="button" size="sm" onClick={() => void handleDeleteBatch(b.id)} disabled={deletingId === b.id}>
+                        {deletingId === b.id ? "Reverting…" : "Revert"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setConfirmDeleteId(b.id)}
+                      aria-label={`Delete import ${b.fileName}`}
+                      title="Delete - reverts the cells it changed"
+                      style={{ flexShrink: 0 }}
+                    >
+                      <ClearIcon />
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </Modal>
       )}
     </div>

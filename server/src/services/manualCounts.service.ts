@@ -47,7 +47,8 @@ export async function saveManualCount(
   shift: Shift,
   location: StockLocation,
   manualCount: number,
-  userId?: number
+  userId?: number,
+  importBatchId?: number | null,
 ) {
   const product = await productRepository.findActiveById(productId);
   if (!product) throw HttpError.notFound("Active product not found");
@@ -65,12 +66,39 @@ export async function saveManualCount(
     changedById: userId,
     oldValue: existing,
     newValue: saved,
+    importBatchId,
   });
 
   await propagateOpeningStock(productId, entryDate, shift, location, userId);
 
   broadcastRealtimeEvent();
   return saved;
+}
+
+/// Reverting a CSV import whose row *created* a count that didn't exist
+/// before (see importBatch.service.ts's revertImportBatch) - there's no prior
+/// value to restore, so the row is removed outright instead of upserted back
+/// to something. Still goes through the same change-log + forward-propagation
+/// steps a real delete would, so the next period's opening stock is
+/// recomputed exactly as if this count had never been entered.
+export async function deleteManualCount(productId: number, entryDate: Date, shift: Shift, location: StockLocation, userId?: number) {
+  const existing = await manualCountRepository.findOne(productId, entryDate, shift, location);
+  if (!existing) return;
+
+  await manualCountRepository.delete(existing.id);
+
+  await recordChange({
+    tableName: TABLE,
+    recordId: existing.id,
+    action: "DELETE",
+    changedById: userId,
+    oldValue: existing,
+    newValue: undefined,
+  });
+
+  await propagateOpeningStock(productId, entryDate, shift, location, userId);
+
+  broadcastRealtimeEvent();
 }
 
 /// Section 4.4/4.6 - a manual count is the starting point of the next

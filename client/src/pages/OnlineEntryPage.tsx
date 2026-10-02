@@ -127,6 +127,15 @@ export function OnlineEntryPage() {
     null,
   );
   const [undoing, setUndoing] = useState(false);
+  // productId -> the Import History batch its still-staged Manual Count came
+  // from (see handleImportRow) - threaded into saveManualCount at Save time
+  // so that specific write can later be found and reverted (Import History's
+  // delete action). Invalidated the moment that same cell is hand-edited
+  // (handleCommit, below) - a manual retouch after import must never let a
+  // later "delete this import" clobber it.
+  const [importedBatchByProduct, setImportedBatchByProduct] = useState<
+    Record<number, number>
+  >({});
   const canEdit =
     user?.role === "ONLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
@@ -288,6 +297,14 @@ export function OnlineEntryPage() {
       rows?.find((r) => r.product.id === productId)?.entry[key] ?? 0,
     );
     stage(productId, key, value, savedValue);
+    if (key === MANUAL_COUNT_KEY) {
+      setImportedBatchByProduct((prev) => {
+        if (!(productId in prev)) return prev;
+        const next = { ...prev };
+        delete next[productId];
+        return next;
+      });
+    }
   }
 
   // Flushes every staged product's changes in one pass - each product is
@@ -334,6 +351,7 @@ export function OnlineEntryPage() {
     progress.start();
     const failed: string[] = [];
     const revertTo: PendingByProduct = {};
+    const savedManualCountIds: number[] = [];
     const entries = Object.entries(pending);
     for (let i = 0; i < entries.length; i++) {
       const [productIdStr, changes] = entries[i];
@@ -361,8 +379,10 @@ export function OnlineEntryPage() {
         }
         // After the entry itself, so the count's variance is measured
         // against the freshly saved Remaining Stock.
-        if (manualCount !== undefined)
-          await saveManualCount(productId, date, shift, "ONLINE", manualCount);
+        if (manualCount !== undefined) {
+          await saveManualCount(productId, date, shift, "ONLINE", manualCount, importedBatchByProduct[productId]);
+          savedManualCountIds.push(productId);
+        }
         clear(productId);
         if (Object.keys(oldValues).length > 0) revertTo[productId] = oldValues;
       } catch (e) {
@@ -378,6 +398,13 @@ export function OnlineEntryPage() {
     }
     setSaving(false);
     setShowPreview(false);
+    if (savedManualCountIds.length > 0) {
+      setImportedBatchByProduct((prev) => {
+        const next = { ...prev };
+        for (const id of savedManualCountIds) delete next[id];
+        return next;
+      });
+    }
     if (Object.keys(revertTo).length > 0) setLastSavedBatch(revertTo);
     if (failed.length) {
       setError(`Failed to save: ${failed.join("; ")}`);
@@ -419,6 +446,7 @@ export function OnlineEntryPage() {
   async function handleImportRow(
     productId: number,
     values: Record<string, number>,
+    batchId?: number,
   ) {
     const savedRow = rows?.find((r) => r.product.id === productId);
     for (const [key, value] of Object.entries(values)) {
@@ -427,6 +455,9 @@ export function OnlineEntryPage() {
           ? (manualCounts[productId] ?? Number.NaN)
           : Number(savedRow?.entry[key] ?? 0);
       stage(productId, key, value, savedValue);
+    }
+    if (batchId !== undefined && MANUAL_COUNT_KEY in values) {
+      setImportedBatchByProduct((prev) => ({ ...prev, [productId]: batchId }));
     }
   }
 

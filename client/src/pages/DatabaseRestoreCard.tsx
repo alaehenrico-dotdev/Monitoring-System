@@ -7,7 +7,6 @@ import { Modal } from "../components/Modal";
 import { InlineLoading } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { colors } from "../theme";
-import { clearReportHistory } from "../utils/reportHistory";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 
 type Status = "idle" | "confirming" | "backing-up" | "restoring" | "done" | "error";
@@ -69,8 +68,10 @@ export function DatabaseRestoreCard() {
       }
       setStatus("restoring");
       await restoreDatabaseBackup(file, resetToken, setUploaded);
-      // Browser-local caches of the pre-restore data (see DataResetPage).
-      clearReportHistory();
+      // Report History is server-backed now (api/reportHistory.ts) - the
+      // restored .sql dump already replaces that table's rows along with
+      // everything else, so there's nothing to clear client-side here.
+      // Browser-local cache of pre-restore staged edits (see DataResetPage).
       clearAllPendingEntryState();
       setStatus("done");
     } catch (err) {

@@ -16,6 +16,7 @@ export async function recordChange(
     changedById?: number | null;
     oldValue?: unknown;
     newValue?: unknown;
+    importBatchId?: number | null;
   },
   db: Db = prisma,
 ) {

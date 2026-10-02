@@ -146,6 +146,23 @@ export function Sidebar() {
             </div>
           )}
         </div>
+        {/* App version (Section: "app version ... beside the app name") -
+            __APP_VERSION__ is injected at build time from package.json
+            (vite.config.ts), so this always matches whatever was actually
+            built, not a hand-typed string that can drift from a real
+            release. */}
+        <div
+          style={{
+            flexShrink: 0,
+            padding: "6px 14px 10px",
+            fontSize: 11,
+            color: "var(--ae-glass-text)",
+            opacity: 0.55,
+            borderTop: "1px solid color-mix(in srgb, var(--ae-glass-text) 15%, transparent)",
+          }}
+        >
+          Ala Eh Stocks Monitoring System · v{__APP_VERSION__}
+        </div>
       </motion.div>
     </>
   );

@@ -5,7 +5,6 @@ import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { colors } from "../theme";
-import { clearReportHistory } from "../utils/reportHistory";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 import { InlineLoading, Spinner } from "../components/Spinner";
 
@@ -133,11 +132,10 @@ export function DataResetPage() {
       }
       setStatus("resetting");
       await resetAllData(resetToken);
-      // The Daily/Variance Report History pages list is browser-local
-      // (localStorage, see utils/reportHistory.ts) - the server-side wipe
-      // above can't touch it, but leaving old entries around after a reset
-      // would let an admin reopen a "history" report that's now empty.
-      clearReportHistory();
+      // Report History is server-backed now (api/reportHistory.ts) - the
+      // reset above already wipes it server-side (dataReset.service.ts), so
+      // there's nothing left to clear client-side here.
+      //
       // Same reasoning, for the Online/Offline Entry and Manual Count
       // pages' own staged-but-unsaved edits (sessionStorage, see
       // hooks/usePendingEntryChanges.ts) - without this, a pending edit from

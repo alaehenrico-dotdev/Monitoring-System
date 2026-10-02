@@ -31,10 +31,15 @@ export async function saveManualCount(
   shift: Shift,
   location: StockLocation,
   manualCount: number,
+  /// Set only when this save is committing a value a confirmed CSV import
+  /// staged (see CsvTools.tsx) - tags the server's change_log row so Import
+  /// History can find and, if needed, revert exactly this write.
+  importBatchId?: number,
 ): Promise<ManualCountEntry> {
   try {
     return await http.put<ManualCountEntry>(`/manual-counts/${productId}?date=${date}&shift=${shift}&location=${location}`, {
       manualCount,
+      importBatchId,
     });
   } catch (err) {
     if (!isTauri || !(err instanceof TypeError)) throw err;

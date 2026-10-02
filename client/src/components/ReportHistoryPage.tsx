@@ -1,11 +1,14 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { readReportHistory, type ReportHistoryEntry } from "../utils/reportHistory";
+import { listReportHistory, type ReportHistoryEntry } from "../api/reportHistory";
 import { matchesSearch } from "../utils/search";
-import { CalendarIcon, ClockIcon, HistoryIcon, PrinterIcon } from "./icons";
+import { CalendarIcon, ClockIcon, DownloadIcon, HistoryIcon } from "./icons";
 import { Toolbar, ToolbarControls } from "./Toolbar";
 import { PageHeader } from "./PageHeader";
 import { SearchInput } from "./SearchInput";
+import { Toast } from "./Toast";
+import { TableSkeleton } from "./Skeleton";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 
 type HistoryType = ReportHistoryEntry["type"];
 
@@ -21,23 +24,25 @@ interface Props {
 /**
  * Shared body of the Daily / Variance Report History pages. Each generated
  * report is a glass card (what it covers, when it was generated, one-click
- * Open & Print) and the cards are grouped under Today / Yesterday / date
+ * Download) and the cards are grouped under Today / Yesterday / date
  * headings, newest first - instead of the old flat three-column table.
- * History is browser-local (utils/reportHistory.ts), so it only ever lists
- * what was generated on this device.
+ * Server-backed (api/reportHistory.ts) - the same list for every device and
+ * tester, not just whichever browser happened to generate a given report.
  */
 export function ReportHistoryPage({ type, title, subtitle, backTo, backLabel }: Props) {
-  const [history, setHistory] = useState<ReportHistoryEntry[]>(() => load(type));
+  const [history, setHistory] = useState<ReportHistoryEntry[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const realtimeVersion = useRealtimeVersion();
 
   useEffect(() => {
-    const refresh = () => setHistory(load(type));
-    window.addEventListener("report-history-changed", refresh);
-    return () => window.removeEventListener("report-history-changed", refresh);
-  }, [type]);
+    listReportHistory(type)
+      .then(setHistory)
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load report history"));
+  }, [type, realtimeVersion]);
 
   const visible = useMemo(
-    () => history.filter((e) => matchesSearch([e.scope, describe(e).title, describe(e).category], query)),
+    () => (history ?? []).filter((e) => matchesSearch([e.scope, describe(e).title, describe(e).category], query)),
     [history, query],
   );
 
@@ -67,13 +72,16 @@ export function ReportHistoryPage({ type, title, subtitle, backTo, backLabel }: 
         </Toolbar>
       </PageHeader>
 
-      {history.length === 0 ? (
+      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
+      {!history ? (
+        <TableSkeleton headers={["Report"]} label={`Loading ${type} history…`} />
+      ) : history.length === 0 ? (
         <div className="ae-hist-empty">
           <span className="ae-hist-empty-icon">
             <HistoryIcon />
           </span>
           <h3>No generated {type} entries yet</h3>
-          <p>Every {type} you open is listed here so you can reprint it later.</p>
+          <p>Every {type} you open is listed here so you can download it again later.</p>
           <Link to={backTo} className="ae-btn ae-btn-primary" style={{ textDecoration: "none" }}>
             Go to {type}
           </Link>
@@ -121,18 +129,20 @@ function HistoryCard({ entry }: { entry: ReportHistoryEntry }) {
         <p className="ae-hist-card-time" title={new Date(entry.generatedAt).toLocaleString()}>
           <ClockIcon />
           Generated {timeOfDay(entry.generatedAt)} · {relativeTime(entry.generatedAt)}
+          {entry.generatedBy && <> · {entry.generatedBy.name}</>}
         </p>
       </div>
+      {/* Still a navigation under the hood (the report page re-fetches live
+          data for this exact date/range and auto-triggers the PDF - see
+          DailyReportPage.tsx/VarianceReportPage.tsx's `printAfterLoad`), but
+          presented as the one-click Download it functionally already is,
+          rather than "open this page". */}
       <Link to={entry.route} className="ae-btn ae-btn-secondary ae-btn-sm ae-hist-open" style={{ textDecoration: "none" }}>
-        <PrinterIcon />
-        Open &amp; Print
+        <DownloadIcon />
+        Download
       </Link>
     </article>
   );
-}
-
-function load(type: HistoryType): ReportHistoryEntry[] {
-  return readReportHistory().filter((entry) => entry.type === type);
 }
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;

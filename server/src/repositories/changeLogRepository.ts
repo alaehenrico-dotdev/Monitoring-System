@@ -8,6 +8,7 @@ export interface ChangeLogCreateData {
   changedById?: number | null;
   oldValue?: unknown;
   newValue?: unknown;
+  importBatchId?: number | null;
 }
 
 export interface ChangeLogFilters {
@@ -26,6 +27,7 @@ export const changeLogRepository = {
         changedById: data.changedById ?? null,
         oldValue: data.oldValue === undefined ? undefined : JSON.parse(JSON.stringify(data.oldValue)),
         newValue: data.newValue === undefined ? undefined : JSON.parse(JSON.stringify(data.newValue)),
+        importBatchId: data.importBatchId ?? null,
       },
     });
   },
@@ -36,6 +38,26 @@ export const changeLogRepository = {
       include: { changedBy: { select: { id: true, name: true, username: true, role: true } } },
       orderBy: { changedAt: "desc" },
       take: 500,
+    });
+  },
+
+  /// Every write a given import batch produced, in the order they were made -
+  /// see importBatch.service.ts's revertImportBatch, which reverts each one.
+  findByImportBatch(importBatchId: number) {
+    return prisma.changeLog.findMany({
+      where: { importBatchId },
+      orderBy: { id: "asc" },
+    });
+  },
+
+  /// The single most recent change_log row for one record, regardless of
+  /// which batch (if any) wrote it - revertImportBatch's "has this cell been
+  /// touched since the import?" check: a record is still safe to revert only
+  /// when its own import-tagged row is still this.
+  findLatestForRecord(tableName: string, recordId: number) {
+    return prisma.changeLog.findFirst({
+      where: { tableName, recordId },
+      orderBy: { id: "desc" },
     });
   },
 };
