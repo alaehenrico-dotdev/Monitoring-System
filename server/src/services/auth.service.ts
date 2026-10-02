@@ -2,8 +2,9 @@ import bcrypt from "bcryptjs";
 import { userRepository } from "../repositories/userRepository";
 import { signToken } from "../utils/jwt";
 import { HttpError } from "../utils/HttpError";
+import { env } from "../config/env";
 
-export async function login(username: string, password: string) {
+export async function login(username: string, password: string, isDesktopClient = false) {
   const user = await userRepository.findByUsername(username);
   if (!user || !user.isActive) throw HttpError.unauthorized("Invalid username or password");
 
@@ -11,6 +12,6 @@ export async function login(username: string, password: string) {
   if (!valid) throw HttpError.unauthorized("Invalid username or password");
 
   const authUser = { id: user.id, username: user.username, name: user.name, role: user.role };
-  const token = signToken(authUser);
+  const token = signToken(authUser, isDesktopClient ? env.desktopJwtExpiresIn : env.jwtExpiresIn);
   return { token, user: authUser };
 }

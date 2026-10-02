@@ -49,6 +49,14 @@ export const env = {
   // instead of failing open. See .env.example for what to set locally.
   jwtSecret: requiredSecret("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
+  // The Tauri desktop app gets a much longer-lived token than the web login
+  // (auth.service.ts's login() picks between the two based on the request's
+  // Origin - see app.ts's own Tauri-origin allowlist for the same three
+  // values) - it's an installed app on a known company PC, not a browser tab
+  // that might be on a shared/public machine, so staying logged in across
+  // days/weeks is the actually-wanted behavior there, not a risk tradeoff
+  // the short web expiry is protecting against.
+  desktopJwtExpiresIn: process.env.DESKTOP_JWT_EXPIRES_IN ?? "90d",
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
   // Full path to the mysqldump binary, for hosts (notably Windows) where the
