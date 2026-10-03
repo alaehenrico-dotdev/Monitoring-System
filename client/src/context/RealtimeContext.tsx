@@ -28,6 +28,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
     let closedByEffect = false;
     let socket: WebSocket | null = null;
+    let hasConnected = false;
     let reconnectDelay = BASE_RECONNECT_MS;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
@@ -36,8 +37,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       socket = new WebSocket(getWsUrl());
 
       socket.onopen = () => {
+        if (closedByEffect) return;
         reconnectDelay = BASE_RECONNECT_MS;
         socket?.send(JSON.stringify({ type: "auth", token: getToken() }));
+        // A disconnect may have hidden server changes while the socket was
+        // down. Refetch tables and wake the desktop sync as soon as it returns.
+        if (hasConnected) setVersion((v) => v + 1);
+        hasConnected = true;
       };
 
       socket.onmessage = (event) => {

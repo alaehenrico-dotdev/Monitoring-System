@@ -1,4 +1,4 @@
-import { getKnownReachable } from "./reachability";
+import { getKnownReachable, setKnownReachable } from "./reachability";
 
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 
@@ -100,6 +100,7 @@ export async function coreRequest<T>(path: string, options: RequestInit = {}): P
   try {
     res = await fetch(`${API_URL}${path}`, { ...options, headers, signal: controller.signal });
   } catch (err) {
+    if (isTauri) setKnownReachable(false);
     // A timed-out fetch throws a DOMException("AbortError"), not the
     // TypeError every "couldn't reach it" check in this codebase looks for
     // (isNetworkError here and in offlineStore.ts, plus direct `instanceof
@@ -121,6 +122,7 @@ export async function coreRequest<T>(path: string, options: RequestInit = {}): P
   }
 
   if (!res.ok) {
+    if (isTauri) setKnownReachable(true);
     const body = await res.json().catch(() => ({ error: res.statusText }));
     if (res.status === 401) {
       setToken(null);
@@ -128,6 +130,7 @@ export async function coreRequest<T>(path: string, options: RequestInit = {}): P
     }
     throw new ApiError(res.status, body.error ?? "Request failed");
   }
+  if (isTauri) setKnownReachable(true);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }

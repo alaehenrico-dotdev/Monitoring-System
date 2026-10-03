@@ -64,6 +64,7 @@
   /* Low Stock row tint (TotalStocksTable) - same relationship to
      --ae-danger-text as --ae-warning-bg has to --ae-warning-text. */
   --ae-danger-bg: #f7d9da;
+  --ae-success-text: #2f6b3c;
   /* Category group-header bar inside data tables (StockGrid,
      TotalStocksTable, ManualCountPage) - green (theme.ts's `colors.green`)
      so the category bar reads distinctly from the red/gold/yellow used
@@ -177,6 +178,7 @@
   /* Same reasoning as --ae-danger-bg (light mode) - a low-luminance tint of
      the dark-mode danger hue rather than light mode's tint verbatim. */
   --ae-danger-bg: #3a1518;
+  --ae-success-text: #79c987;
   /* A darker, lower-luminance green than light mode's --ae-category-bg -
      same relationship as --ae-warning-bg/--ae-danger-text above, so the
      bar stays green but doesn't glow against the near-black page. */

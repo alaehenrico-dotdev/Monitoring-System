@@ -1,21 +1,22 @@
-// Drives the sync engine: on app launch, whenever the configured server
-// transitions from unreachable to reachable, and periodically while idle.
+// Drives sync at launch, on reconnect, on server realtime events, and as an
+// idle fallback.
 import { useEffect, useRef, useState } from "react";
 import { registerSyncRunner, setSyncUiState } from "./SyncStore";
 import { useServerConnectivity } from "./connectivity";
 import { runSync } from "./engine";
 import { countPendingSyncChanges, countUnresolvedConflicts } from "./localDb";
+import { useRealtimeVersion } from "../../context/RealtimeContext";
 
-// Not the same interval as the connectivity health check (30s) - this is
-// how often a full push+pull runs while the app sits idle and reachable, to
-// pick up other clients' changes even without a reconnect event of its own.
-const IDLE_SYNC_INTERVAL_MS = 60_000;
+// How often a full push+pull runs while idle, to cover missed realtime events.
+const IDLE_SYNC_INTERVAL_MS = 5 * 60_000;
 
 export function useSyncEngine() {
   const { isReachable, reconnects } = useServerConnectivity();
+  const realtimeVersion = useRealtimeVersion();
   const [pendingCount, setPendingCount] = useState(0);
   const [conflictCount, setConflictCount] = useState(0);
   const syncing = useRef(false);
+  const syncAgain = useRef(false);
 
   async function refreshCounts() {
     setPendingCount(await countPendingSyncChanges());
@@ -23,7 +24,13 @@ export function useSyncEngine() {
   }
 
   async function sync() {
-    if (syncing.current) return;
+    if (syncing.current) {
+      // Realtime/reconnect triggers can arrive while push+pull is in flight.
+      // Remember one follow-up so a change arriving during that request is
+      // not left waiting for the idle timer.
+      syncAgain.current = true;
+      return;
+    }
     syncing.current = true;
     setSyncUiState({ syncing: true });
     try {
@@ -39,6 +46,10 @@ export function useSyncEngine() {
       syncing.current = false;
       setSyncUiState({ syncing: false });
       await refreshCounts();
+      if (syncAgain.current) {
+        syncAgain.current = false;
+        void sync();
+      }
     }
   }
 
@@ -61,6 +72,14 @@ export function useSyncEngine() {
     if (reconnects > 0) sync();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reconnects]);
+
+  // Another client may have saved data on the server. The shared WebSocket
+  // listener refreshes its pages and bumps this version; immediately pull the
+  // new server state into the desktop app's SQLite mirror as well.
+  useEffect(() => {
+    if (realtimeVersion > 0 && isReachable) sync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [realtimeVersion, isReachable]);
 
   return { isReachable, pendingCount, conflictCount };
 }

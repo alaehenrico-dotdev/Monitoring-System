@@ -478,3 +478,21 @@ export function SyncIcon() {
     </svg>
   );
 }
+
+export function CheckIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m3 8.3 3.2 3.2L13 4.8" />
+    </svg>
+  );
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Ala Eh Stocks Monitoring System",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "identifier": "com.alaeh.monitoring",
   "build": {
     "frontendDist": "../dist",
@@ -18,7 +18,7 @@
         "minWidth": 1024,
         "minHeight": 640,
         "resizable": true,
-        "fullscreen": false,
+        "fullscreen": true,
         "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --unsafely-treat-insecure-origin-as-secure=http://192.168.0.178:4000"
       }
     ],

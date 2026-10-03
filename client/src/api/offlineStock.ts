@@ -26,6 +26,10 @@ export function computeDeliverySlots(entry: Record<string, unknown>, changes: Re
 /// Offline fallback - see api/onlineStock.ts's matching getOnlineGrid for the
 /// full reasoning (same structured-mirror fallback, tauri/sync/localGrid.ts).
 export async function getOfflineGrid(date: string, shift: Shift): Promise<OfflineGridRow[]> {
+  if (isTauri && getKnownReachable() === false) {
+    const { getLocalOfflineGrid } = await import("../tauri/sync/localGrid");
+    return getLocalOfflineGrid(date, shift);
+  }
   try {
     return await http.get<OfflineGridRow[]>(`/offline-stock?date=${date}&shift=${shift}`);
   } catch (err) {

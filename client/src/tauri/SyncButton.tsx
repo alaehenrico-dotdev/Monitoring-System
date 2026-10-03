@@ -2,7 +2,7 @@
 // HeaderExtras.tsx's React.lazy() import, gated on MODE === "tauri", so it
 // stays out of the web build like everything else under src/tauri/.
 import { useCursorGlow, CursorGlowOverlay } from "../components/CursorGlow";
-import { SyncIcon } from "../components/icons";
+import { CheckIcon, SyncIcon } from "../components/icons";
 import { requestSync, useSyncUiState } from "./sync/SyncStore";
 
 function describe(
@@ -32,6 +32,7 @@ export default function SyncButton() {
     handlePointerLeave,
   } = useCursorGlow<HTMLButtonElement>();
   const label = describe(syncing, failed, lastSyncedAt);
+  const showSuccess = !syncing && !failed && lastSyncedAt !== null;
 
   return (
     <button
@@ -61,7 +62,7 @@ export default function SyncButton() {
         borderRadius: "50%",
         border: "0.5px solid transparent",
         background: "var(--ae-surface)",
-        color: failed ? "var(--ae-danger-text)" : "var(--ae-text)",
+        color: failed ? "var(--ae-danger-text)" : showSuccess ? "var(--ae-success-text)" : "var(--ae-text)",
         cursor: syncing ? "progress" : "pointer",
         boxShadow: "0 1px 4px rgba(12, 12, 12,0.15)",
         transition:
@@ -78,7 +79,7 @@ export default function SyncButton() {
         className={syncing ? "ae-sync-spin" : undefined}
         style={{ display: "flex" }}
       >
-        <SyncIcon />
+        {showSuccess ? <CheckIcon /> : <SyncIcon />}
       </span>
     </button>
   );

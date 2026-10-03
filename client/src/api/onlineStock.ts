@@ -11,6 +11,10 @@ import { ONLINE_TRANSFER_FIELDS } from "../tauri/sync/offlineFields";
 /// device. Never trusted as authoritative - the server remains the one
 /// source of truth, recomputed fresh on every real request and every sync.
 export async function getOnlineGrid(date: string, shift: Shift): Promise<OnlineGridRow[]> {
+  if (isTauri && getKnownReachable() === false) {
+    const { getLocalOnlineGrid } = await import("../tauri/sync/localGrid");
+    return getLocalOnlineGrid(date, shift);
+  }
   try {
     return await http.get<OnlineGridRow[]>(`/online-stock?date=${date}&shift=${shift}`);
   } catch (err) {
