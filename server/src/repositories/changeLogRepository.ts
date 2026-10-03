@@ -43,8 +43,8 @@ export const changeLogRepository = {
 
   /// Every write a given import batch produced, in the order they were made -
   /// see importBatch.service.ts's revertImportBatch, which reverts each one.
-  findByImportBatch(importBatchId: number) {
-    return prisma.changeLog.findMany({
+  findByImportBatch(importBatchId: number, db: Db = prisma) {
+    return db.changeLog.findMany({
       where: { importBatchId },
       orderBy: { id: "asc" },
     });
@@ -54,8 +54,8 @@ export const changeLogRepository = {
   /// which batch (if any) wrote it - revertImportBatch's "has this cell been
   /// touched since the import?" check: a record is still safe to revert only
   /// when its own import-tagged row is still this.
-  findLatestForRecord(tableName: string, recordId: number) {
-    return prisma.changeLog.findFirst({
+  findLatestForRecord(tableName: string, recordId: number, db: Db = prisma) {
+    return db.changeLog.findFirst({
       where: { tableName, recordId },
       orderBy: { id: "desc" },
     });

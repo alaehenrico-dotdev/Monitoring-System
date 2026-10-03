@@ -1,5 +1,5 @@
 import { Shift, StockLocation } from "@prisma/client";
-import { prisma } from "../lib/prisma";
+import { prisma, type Db } from "../lib/prisma";
 
 export interface ImportBatchCreateData {
   location: StockLocation;
@@ -20,8 +20,8 @@ export const importBatchRepository = {
     return prisma.importBatch.update({ where: { id }, data: { rowCount } });
   },
 
-  findById(id: number) {
-    return prisma.importBatch.findUnique({ where: { id } });
+  findById(id: number, db: Db = prisma) {
+    return db.importBatch.findUnique({ where: { id } });
   },
 
   findMany(filters: { location?: StockLocation }) {
@@ -33,7 +33,7 @@ export const importBatchRepository = {
     });
   },
 
-  delete(id: number) {
-    return prisma.importBatch.delete({ where: { id } });
+  delete(id: number, db: Db = prisma) {
+    return db.importBatch.delete({ where: { id } });
   },
 };

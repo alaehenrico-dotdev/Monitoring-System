@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type FocusEvent as ReactFocusEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -137,13 +138,14 @@ export function RowGlowScroll({
     setRing(null);
   }
 
-  // Clicking a row pins a persistent outline on it (see focusRing above) -
-  // clicking elsewhere in the same row (a different cell, to edit the next
-  // field) just re-pins the same row rather than toggling it off, so the
-  // outline doesn't flicker away mid-edit. Clicking outside any row (the
-  // scroll container's own background) clears it.
-  function handleClick(e: ReactMouseEvent<HTMLDivElement>) {
-    const row = (e.target as Element).closest("tbody tr");
+  // Pins a persistent highlight on `row` (see focusRing above) - re-pinning
+  // the same row (a different cell, to edit the next field) is a no-op
+  // rather than re-measuring/re-persisting on every keystroke, since during
+  // active encoding this fires on every cell focused, not just once. Passing
+  // `null` (clicking the scroll container's own background, outside any
+  // row) clears it.
+  function pinRow(row: Element | null) {
+    if (row === focusedRowRef.current) return;
     focusedRowRef.current = row;
     setFocusRing(rectOf(row));
 
@@ -154,8 +156,26 @@ export function RowGlowScroll({
       else sessionStorage.removeItem(focusStorageKey);
     } catch {
       // Best effort - a private window or blocked site data just means the
-      // outline doesn't survive navigation, not that clicking breaks.
+      // highlight doesn't survive navigation, not that clicking breaks.
     }
+  }
+
+  function handleClick(e: ReactMouseEvent<HTMLDivElement>) {
+    const row = (e.target as Element).closest("tbody tr");
+    pinRow(row);
+  }
+
+  // Keyboard-driven cell navigation (StockGrid's handleKeyDown moves focus
+  // with a direct `.focus()` call via document.querySelector, not a click)
+  // needs to pin the row it lands on too - this is the main way the focused
+  // row actually changes while encoding, tabbing/arrowing cell to cell.
+  // React's onFocus bubbles (unlike native DOM focus), so one listener here
+  // catches a mouse click into a cell and a keyboard-driven focus change the
+  // same way. Never clears the pin itself (no onBlur handler) - same as a
+  // click, it stays pinned until a different row is focused or clicked.
+  function handleFocus(e: ReactFocusEvent<HTMLDivElement>) {
+    const row = (e.target as Element).closest("tbody tr");
+    if (row) pinRow(row);
   }
 
   // Restores whatever row was focused last time, on mount and whenever
@@ -263,6 +283,7 @@ export function RowGlowScroll({
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
+      onFocus={handleFocus}
     >
       {children}
       {focusRing && (

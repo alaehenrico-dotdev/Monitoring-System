@@ -1,4 +1,5 @@
-import { http } from "./http";
+import { coreRequest, http } from "./http";
+import { getKnownReachable } from "./reachability";
 import type { OfflineEntry, OfflineGridRow, Shift } from "../types";
 import { OFFLINE_TRANSFER_FIELDS } from "../tauri/sync/offlineFields";
 
@@ -50,24 +51,69 @@ export interface OfflineEntryInput {
 
 const isTauri = import.meta.env.MODE === "tauri";
 
+async function stageOfflineAndPreview(
+  productId: number,
+  date: string,
+  shift: Shift,
+  changes: Record<string, number>,
+): Promise<OfflineEntry> {
+  // deliveryOut (the flat CSV-import total) isn't itself a stageable field -
+  // resolveDelivery/computeDeliverySlots already expand it into the five
+  // slots server-side (and client-side, for preview) before it ever reaches
+  // here; stageOfflineEdit only knows about the slots themselves, same as
+  // the server's real additive fields.
+  const { deliveryOut: _deliveryOut, ...slotsAndOther } = changes;
+  const { stageOfflineEdit } = await import("../tauri/sync/localDb");
+  const preview = await stageOfflineEdit(productId, date, shift, slotsAndOther);
+  return {
+    productId: preview.productId,
+    entryDate: `${preview.entryDate}T00:00:00.000Z`,
+    shift: preview.shift,
+    openingStock: preview.openingStock,
+    stockInOlToOff: preview.stockInOlToOff,
+    stockOutOffToOl: preview.stockOutOffToOl,
+    offlineStock: preview.offlineStock,
+    productionIn: preview.productionIn,
+    deliveryOut: preview.deliveryOut,
+    delivery1: preview.delivery1,
+    delivery2: preview.delivery2,
+    delivery3: preview.delivery3,
+    delivery4: preview.delivery4,
+    delivery5: preview.delivery5,
+    upsellOut: preview.upsellOut,
+    backloads: preview.backloads,
+    remainingStock: preview.remainingStock,
+  };
+}
+
 /// Returns the saved row so the caller can merge it into local state instead
 /// of re-fetching the whole grid after every keystroke. Offline fallback -
 /// see saveOnlineEntry's matching comment in api/onlineStock.ts, same
 /// reasoning applies here (additive fields stage locally and merge on sync;
 /// transfer fields are rejected rather than staged, since the live grid
-/// disables those cells while offline).
+/// disables those cells while offline), including why this goes through
+/// coreRequest and checks getKnownReachable() itself rather than going
+/// through http.put.
 export async function saveOfflineEntry(
   productId: number,
   date: string,
   shift: Shift,
   changes: OfflineEntryInput | Record<string, number>,
 ): Promise<OfflineEntry> {
+  const attemptedTransfer = OFFLINE_TRANSFER_FIELDS.some((f) => (changes as Record<string, number>)[f] !== undefined);
+
+  if (!attemptedTransfer && isTauri && getKnownReachable() === false) {
+    return stageOfflineAndPreview(productId, date, shift, changes as Record<string, number>);
+  }
+
   try {
-    return await http.put<OfflineEntry>(`/offline-stock/${productId}?date=${date}&shift=${shift}`, changes);
+    return await coreRequest<OfflineEntry>(`/offline-stock/${productId}?date=${date}&shift=${shift}`, {
+      method: "PUT",
+      body: JSON.stringify(changes),
+    });
   } catch (err) {
     if (!isTauri || !(err instanceof TypeError)) throw err;
 
-    const attemptedTransfer = OFFLINE_TRANSFER_FIELDS.some((f) => (changes as Record<string, number>)[f] !== undefined);
     if (attemptedTransfer) {
       // `new Error(message, { cause })` needs an ES2022 lib - this project
       // targets ES2020 (tsconfig.json), so cause is set as a plain property
@@ -77,32 +123,6 @@ export async function saveOfflineEntry(
       throw rejection;
     }
 
-    // deliveryOut (the flat CSV-import total) isn't itself a stageable
-    // field - resolveDelivery/computeDeliverySlots already expand it into
-    // the five slots server-side (and client-side, for preview) before it
-    // ever reaches here; stageOfflineEdit only knows about the slots
-    // themselves, same as the server's real additive fields.
-    const { deliveryOut: _deliveryOut, ...slotsAndOther } = changes as Record<string, number>;
-    const { stageOfflineEdit } = await import("../tauri/sync/localDb");
-    const preview = await stageOfflineEdit(productId, date, shift, slotsAndOther);
-    return {
-      productId: preview.productId,
-      entryDate: `${preview.entryDate}T00:00:00.000Z`,
-      shift: preview.shift,
-      openingStock: preview.openingStock,
-      stockInOlToOff: preview.stockInOlToOff,
-      stockOutOffToOl: preview.stockOutOffToOl,
-      offlineStock: preview.offlineStock,
-      productionIn: preview.productionIn,
-      deliveryOut: preview.deliveryOut,
-      delivery1: preview.delivery1,
-      delivery2: preview.delivery2,
-      delivery3: preview.delivery3,
-      delivery4: preview.delivery4,
-      delivery5: preview.delivery5,
-      upsellOut: preview.upsellOut,
-      backloads: preview.backloads,
-      remainingStock: preview.remainingStock,
-    };
+    return stageOfflineAndPreview(productId, date, shift, changes as Record<string, number>);
   }
 }

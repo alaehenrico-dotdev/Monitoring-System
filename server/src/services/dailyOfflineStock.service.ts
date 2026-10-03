@@ -1,5 +1,5 @@
-import { Shift } from "@prisma/client";
-import { prisma, type Db } from "../lib/prisma";
+import { DailyOfflineStock, Shift } from "@prisma/client";
+import { prisma, serializableTransaction, type Db } from "../lib/prisma";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { productRepository } from "../repositories/productRepository";
@@ -105,14 +105,35 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
 }
 
 /// Encoder-facing upsert for one product/date/shift cell row (Section 4.3).
+///
+/// Wrapped in one DB transaction together with its Online mirror
+/// (mirrorTransferToOnline, below): both upserts and both change-log writes
+/// commit or roll back together - see saveOnlineEntry's matching comment
+/// (dailyOnlineStock.service.ts) for the partial-commit bug this closes, and
+/// for why that transaction is SERIALIZABLE rather than the default
+/// REPEATABLE READ (the negative-stock-guard race serializableTransaction's
+/// own doc comment, lib/prisma.ts, describes).
+///
+/// `db` stays an accepted parameter (rather than being removed now that this
+/// opens its own transaction) so a caller that needs this save as part of a
+/// LARGER transaction - sync.service.ts's pushChanges, composing its own
+/// idempotency-marker write into the same transaction - can compose it in;
+/// passing one in skips opening a second, nested transaction (that caller is
+/// then responsible for its own transaction's isolation level).
 export async function saveOfflineEntry(
   productId: number,
   entryDate: Date,
   shift: Shift,
   input: OfflineEntryInput,
   userId?: number,
-  db: Db = prisma,
-) {
+  db?: Db,
+): Promise<DailyOfflineStock> {
+  if (!db) {
+    const saved = await serializableTransaction((tx) => saveOfflineEntry(productId, entryDate, shift, input, userId, tx));
+    broadcastRealtimeEvent();
+    return saved;
+  }
+
   const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
   const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
@@ -165,7 +186,10 @@ export async function saveOfflineEntry(
     db,
   );
 
-  broadcastRealtimeEvent();
+  // Not broadcast here - the `!db` branch above does it once the transaction
+  // that wraps this whole function has actually committed. A caller that
+  // passes its own `db`/`tx` in (composing this into a larger transaction)
+  // owns broadcasting for itself, once ITS transaction commits.
   return saved;
 }
 

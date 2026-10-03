@@ -11,6 +11,19 @@ export type PendingByProduct = Record<number, Record<string, number>>;
 /// while I was editing (or offline)".
 export type BaselineByProduct = Record<number, Record<string, number>>;
 
+/// What a single product's Save needs Undo to put back - captured by
+/// handleSaveAll (OnlineEntryPage/OfflineEntryPage), replayed by
+/// handleUndoLastSave. Manual count is tracked separately from `fields`
+/// (rather than folded into the same Record<string, number> PendingByProduct
+/// uses) because its own revert value can be `null` - the count didn't exist
+/// before this save created it, so there's nothing numeric to restore it to.
+export interface SaveRevert {
+  fields: Record<string, number>;
+  /// Absent entirely if this product's save didn't touch its manual count.
+  manualCount?: number | null;
+}
+export type LastSavedBatch = Record<number, SaveRevert>;
+
 /// Baselines live under their own prefix (not ENTRY_PREFIX) so
 /// utils/unsavedWork.ts, which counts every ENTRY_PREFIX key as a page's
 /// staged edits, never mistakes one for a second pending set.

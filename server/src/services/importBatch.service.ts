@@ -1,4 +1,5 @@
 import { Shift, StockLocation } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { importBatchRepository } from "../repositories/importBatchRepository";
 import { changeLogRepository } from "../repositories/changeLogRepository";
 import { deleteManualCount, saveManualCount } from "./manualCounts.service";
@@ -41,37 +42,54 @@ interface ManualCountSnapshot {
 /// touched again since (a manual correction, a second import) is left alone
 /// and counted as "skipped" instead - deleting an old import must never
 /// silently overwrite a newer, legitimate edit.
+///
+/// The whole revert (every row's deleteManualCount/saveManualCount, plus the
+/// batch row's own deletion) runs in one DB transaction. Previously each
+/// step committed independently - a failure partway through left some rows
+/// reverted and others not, with the batch row still sitting there pointing
+/// at that now-inconsistent state and nothing to retry or roll back.
 export async function revertImportBatch(id: number, userId?: number) {
-  const batch = await importBatchRepository.findById(id);
-  if (!batch) throw HttpError.notFound("Import batch not found");
+  return prisma.$transaction(async (tx) => {
+    const batch = await importBatchRepository.findById(id, tx);
+    if (!batch) throw HttpError.notFound("Import batch not found");
 
-  const logs = await changeLogRepository.findByImportBatch(id);
-  let reverted = 0;
-  let skipped = 0;
+    const logs = await changeLogRepository.findByImportBatch(id, tx);
+    let reverted = 0;
+    let skipped = 0;
 
-  for (const log of logs) {
-    if (log.tableName !== MANUAL_COUNTS_TABLE) continue; // nothing else is ever tagged with a batch today
+    for (const log of logs) {
+      if (log.tableName !== MANUAL_COUNTS_TABLE) continue; // nothing else is ever tagged with a batch today
 
-    const latest = await changeLogRepository.findLatestForRecord(log.tableName, log.recordId);
-    if (!latest || latest.id !== log.id) {
-      skipped++;
-      continue;
-    }
-
-    const current = log.newValue as unknown as ManualCountSnapshot;
-    if (log.action === "CREATE") {
-      await deleteManualCount(current.productId, new Date(current.entryDate), current.shift, current.location, userId);
-    } else {
-      const prior = log.oldValue as unknown as ManualCountSnapshot | null;
-      if (!prior) {
+      const latest = await changeLogRepository.findLatestForRecord(log.tableName, log.recordId, tx);
+      if (!latest || latest.id !== log.id) {
         skipped++;
         continue;
       }
-      await saveManualCount(current.productId, new Date(current.entryDate), current.shift, current.location, Number(prior.manualCount), userId);
-    }
-    reverted++;
-  }
 
-  await importBatchRepository.delete(id);
-  return { reverted, skipped };
+      const current = log.newValue as unknown as ManualCountSnapshot;
+      if (log.action === "CREATE") {
+        await deleteManualCount(current.productId, new Date(current.entryDate), current.shift, current.location, userId, tx);
+      } else {
+        const prior = log.oldValue as unknown as ManualCountSnapshot | null;
+        if (!prior) {
+          skipped++;
+          continue;
+        }
+        await saveManualCount(
+          current.productId,
+          new Date(current.entryDate),
+          current.shift,
+          current.location,
+          Number(prior.manualCount),
+          userId,
+          undefined,
+          tx,
+        );
+      }
+      reverted++;
+    }
+
+    await importBatchRepository.delete(id, tx);
+    return { reverted, skipped };
+  });
 }

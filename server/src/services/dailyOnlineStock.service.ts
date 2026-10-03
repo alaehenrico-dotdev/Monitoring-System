@@ -1,4 +1,5 @@
-import { Shift } from "@prisma/client";
+import { DailyOnlineStock, Shift } from "@prisma/client";
+import { prisma, serializableTransaction, type Db } from "../lib/prisma";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
@@ -32,8 +33,8 @@ export interface OnlineEntryInput {
 
 /// Section 4.6 - auto carry-forward (delegated to the repository, which owns
 /// the "immediately preceding shift" query).
-export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift): Promise<number> {
-  return dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift);
+export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+  return dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 }
 
 function calculate(opening: number, input: Required<Omit<OnlineEntryInput, "openingStock">>) {
@@ -81,13 +82,53 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
 }
 
 /// Encoder-facing upsert for one product/date/shift cell row (Section 4.2).
-export async function saveOnlineEntry(productId: number, entryDate: Date, shift: Shift, input: OnlineEntryInput, userId?: number) {
-  const product = await productRepository.findActiveById(productId);
+///
+/// Wrapped in one DB transaction together with its Offline mirror
+/// (mirrorTransferToOffline, below): both upserts and both change-log writes
+/// commit or roll back together. Previously these ran as separate
+/// sequential awaits - if the mirror's own negative-stock guard threw, the
+/// Online row (and its change-log entry) had already committed, leaving the
+/// two tables inconsistent (Online records a transfer the Offline side never
+/// got) despite the client correctly seeing the save as failed.
+///
+/// That outer transaction is SERIALIZABLE (serializableTransaction, lib/
+/// prisma.ts), not the default REPEATABLE READ - atomicity alone doesn't
+/// stop two concurrent saves on the SAME row from each reading the same
+/// pre-write Remaining Stock, each computing a non-negative result from it,
+/// and both committing a write that - combined - takes the real balance
+/// negative even though each one's own guard "passed". See
+/// serializableTransaction's own doc comment for how SERIALIZABLE closes
+/// that race (and why a transaction conflict there is retried, not an
+/// error).
+///
+/// `db` stays an accepted parameter (same reasoning as saveOfflineEntry's own
+/// doc comment) so a caller that needs this save atomic with its OWN extra
+/// write - sync.service.ts's pushChanges recording a push's idempotency
+/// marker in the same transaction as the delta it guards - can compose it
+/// in rather than this opening a second, nested transaction. Such a caller
+/// is responsible for its OWN transaction's isolation level - pushChanges
+/// also uses serializableTransaction, for the same negative-stock-race
+/// reasoning as here.
+export async function saveOnlineEntry(
+  productId: number,
+  entryDate: Date,
+  shift: Shift,
+  input: OnlineEntryInput,
+  userId?: number,
+  db?: Db,
+): Promise<DailyOnlineStock> {
+  if (!db) {
+    const saved = await serializableTransaction((tx) => saveOnlineEntry(productId, entryDate, shift, input, userId, tx));
+    broadcastRealtimeEvent();
+    return saved;
+  }
+
+  const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
-  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift);
+  const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
 
   const openingStock =
-    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift));
+    input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift, db));
   const merged: Required<Omit<OnlineEntryInput, "openingStock">> = {
     stockInOffToOl: input.stockInOffToOl ?? toNum(existing?.stockInOffToOl),
     stockOutOlToOff: input.stockOutOlToOff ?? toNum(existing?.stockOutOlToOff),
@@ -108,16 +149,19 @@ export async function saveOnlineEntry(productId: number, entryDate: Date, shift:
   }
 
   const data = { productId, entryDate, shift, openingStock, ...merged, onlineStock, remainingStock, encodedById: userId };
-  const saved = await dailyOnlineStockRepository.upsert(existing?.id, data);
+  const saved = await dailyOnlineStockRepository.upsert(existing?.id, data, db);
 
-  await recordChange({
-    tableName: TABLE,
-    recordId: saved.id,
-    action: existing ? "UPDATE" : "CREATE",
-    changedById: userId,
-    oldValue: existing,
-    newValue: saved,
-  });
+  await recordChange(
+    {
+      tableName: TABLE,
+      recordId: saved.id,
+      action: existing ? "UPDATE" : "CREATE",
+      changedById: userId,
+      oldValue: existing,
+      newValue: saved,
+    },
+    db,
+  );
 
   // Section 4.3 "key change from Excel" - a transfer entered once here is
   // mirrored onto the Offline table by writing straight to its repository
@@ -129,10 +173,14 @@ export async function saveOnlineEntry(productId: number, entryDate: Date, shift:
     entryDate,
     shift,
     { stockOutOffToOl: merged.stockInOffToOl, stockInOlToOff: merged.stockOutOlToOff },
-    userId
+    userId,
+    db,
   );
 
-  broadcastRealtimeEvent();
+  // Not broadcast here - the `!db` branch above does it once the transaction
+  // that wraps this whole function has actually committed. A caller that
+  // passes its own `db`/`tx` in (composing this into a larger transaction)
+  // owns broadcasting for itself, once ITS transaction commits.
   return saved;
 }
 
@@ -141,9 +189,10 @@ async function mirrorTransferToOffline(
   entryDate: Date,
   shift: Shift,
   mirrored: { stockOutOffToOl: number; stockInOlToOff: number },
-  userId?: number
+  userId?: number,
+  db: Db = prisma,
 ) {
-  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift);
+  const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
 
   // saveOnlineEntry calls this mirror unconditionally after every save, even
   // when only an unrelated field (e.g. Fulfillment Out) changed and the
@@ -157,7 +206,7 @@ async function mirrorTransferToOffline(
     return; // nothing has actually transferred yet - don't create a blank row just to mirror zeros
   }
 
-  const openingStock = existing ? toNum(existing.openingStock) : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift);
+  const openingStock = existing ? toNum(existing.openingStock) : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 
   const merged = {
     stockInOlToOff: mirrored.stockInOlToOff,
@@ -176,7 +225,7 @@ async function mirrorTransferToOffline(
   // Out for Offline that can't exceed what Offline actually has on hand,
   // even though the transfer itself was entered on the Online grid.
   if (isNegativeStock(remainingStock)) {
-    const product = await productRepository.findActiveById(productId);
+    const product = await productRepository.findActiveById(productId, db);
     throw HttpError.badRequest(
       `This transfer would take ${product?.name ?? `product #${productId}`}'s Offline stock below zero (would end at ${remainingStock}).`
     );
@@ -194,14 +243,17 @@ async function mirrorTransferToOffline(
     // existing encoder attribution if the row already exists.
     encodedById: existing?.encodedById ?? userId,
   };
-  const saved = await dailyOfflineStockRepository.upsert(existing?.id, data);
+  const saved = await dailyOfflineStockRepository.upsert(existing?.id, data, db);
 
-  await recordChange({
-    tableName: OFFLINE_TABLE,
-    recordId: saved.id,
-    action: existing ? "UPDATE" : "CREATE",
-    changedById: userId,
-    oldValue: existing,
-    newValue: saved,
-  });
+  await recordChange(
+    {
+      tableName: OFFLINE_TABLE,
+      recordId: saved.id,
+      action: existing ? "UPDATE" : "CREATE",
+      changedById: userId,
+      oldValue: existing,
+      newValue: saved,
+    },
+    db,
+  );
 }

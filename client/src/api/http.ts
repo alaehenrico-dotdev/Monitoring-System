@@ -1,3 +1,5 @@
+import { getKnownReachable } from "./reachability";
+
 export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
 
 export class ApiError extends Error {
@@ -71,10 +73,11 @@ function isNetworkError(err: unknown): boolean {
 // .ts, offlineStock.ts, manualCounts.ts, AuthContext.tsx's session check)
 // only kicks in once this call actually fails - so "detect offline and show
 // local data" was waiting out that same OS timeout first. Aborting well
-// before that (see connectivity.ts's own, separate 5s health-check timeout
-// for the same reasoning) is what actually makes the fallback feel instant
-// instead of stalled.
-const REQUEST_TIMEOUT_MS = 8_000;
+// before that (see connectivity.ts's own, separate health-check timeout for
+// the same reasoning) is what actually makes the fallback feel instant
+// instead of stalled. Every endpoint this app calls is a simple local-LAN
+// CRUD/report query, so 4s is already generous slack above normal latency.
+const REQUEST_TIMEOUT_MS = 4_000;
 
 // The actual HTTP call plus auth header/401/ApiError handling - no offline
 // interception. Used directly by sendQueuedWrite() and the structured sync
@@ -129,23 +132,66 @@ export async function coreRequest<T>(path: string, options: RequestInit = {}): P
   return (await res.json()) as T;
 }
 
+// The generic outbox (tauri/offlineStore.ts) replays a queued write by
+// re-sending it verbatim once reconnected, with no idempotency key - safe
+// only for a method whose server handler treats the body as an absolute
+// "set this" rather than "do this once" (PUT/PATCH update a known resource
+// to the given state; a duplicate replay after a crash mid-flush just sets
+// it to the same state again). POST creates a NEW resource each time it's
+// processed - every endpoint this app POSTs to (products, import batches,
+// report history, system log) would create a second row on a duplicate
+// replay. So POST is deliberately excluded from auto-queueing here: offline,
+// it fails with a plain network error immediately, the same as it would
+// with no offline support at all, rather than silently queuing something
+// that can't be safely retried unattended.
+function isQueueableMethod(method: string): boolean {
+  return method === "PUT" || method === "PATCH" || method === "DELETE";
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const method = options.method ?? "GET";
+
+  // The health-check hooks already poll server reachability independently of
+  // any individual request - if the last poll found it down, don't pay out
+  // REQUEST_TIMEOUT_MS again just to rediscover that on every single call
+  // (the whole reason the server-down case feels slower than wifi-off:
+  // wifi-off fails a fetch almost instantly, but a reachable network with an
+  // unreachable server has to wait out the full connect timeout instead).
+  // Go straight to the same fallback a failed fetch would reach, and only
+  // fall through to a real attempt if there's nothing cached to serve yet -
+  // better to wait than show nothing.
+  if (isTauri && getKnownReachable() === false) {
+    if (isQueueableMethod(method)) {
+      const { queueWrite } = await import("../tauri/offlineStore");
+      await queueWrite(method, path, options.body as string | undefined);
+      throw new QueuedOfflineError();
+    }
+    if (method === "GET") {
+      const { getCachedResponse } = await import("../tauri/offlineStore");
+      const cached = await getCachedResponse<T>(path);
+      if (cached !== null) return cached;
+    }
+    // POST: fall through to a real attempt below, which will fail with the
+    // genuine network error (isQueueableMethod is false for it) - there's
+    // nothing cached to serve for a create, and nothing safe to queue.
+  }
 
   let data: T;
   try {
     data = await coreRequest<T>(path, options);
   } catch (err) {
     if (!isTauri || !isNetworkError(err)) throw err;
-    if (method !== "GET") {
+    if (isQueueableMethod(method)) {
       const { queueWrite } = await import("../tauri/offlineStore");
       await queueWrite(method, path, options.body as string | undefined);
       throw new QueuedOfflineError();
     }
-    const { getCachedResponse } = await import("../tauri/offlineStore");
-    const cached = await getCachedResponse<T>(path);
-    if (cached === null) throw err;
-    return cached;
+    if (method === "GET") {
+      const { getCachedResponse } = await import("../tauri/offlineStore");
+      const cached = await getCachedResponse<T>(path);
+      if (cached !== null) return cached;
+    }
+    throw err;
   }
 
   if (isTauri && method === "GET") {

@@ -64,6 +64,14 @@ const { offlineRepo, onlineRepo } = vi.hoisted(() => ({
 
 vi.mock("../repositories/dailyOfflineStockRepository", () => ({ dailyOfflineStockRepository: offlineRepo }));
 vi.mock("../repositories/dailyOnlineStockRepository", () => ({ dailyOnlineStockRepository: onlineRepo }));
+// saveOfflineEntry/saveOnlineEntry now wrap themselves in prisma.$transaction
+// (see their own doc comments) - the stateful repository doubles above don't
+// care what `db`/`tx` they're called with, so the fake transaction client
+// just needs to run the callback.
+vi.mock("../lib/prisma", () => ({
+  prisma: { $transaction: (cb: (tx: unknown) => unknown) => cb({}) },
+  serializableTransaction: (cb: (tx: unknown) => unknown) => cb({}),
+}));
 vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(async (id: number) => ({ id, name: `Product #${id}` })) },
 }));

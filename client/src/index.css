@@ -50,6 +50,11 @@
   --ae-border: #e7dfc9;
   --ae-border-soft: #f1ebd8;
   --ae-row-hover: rgba(12, 12, 12, 0.035);
+  /* The focused row (RowGlowScroll's .ae-row-focus overlay) - same gold
+     family as --ae-toolbar-border/the ring sweep, at an alpha that tints a
+     row clearly against --ae-row-hover without hiding the numbers/inputs
+     it's drawn on top of. */
+  --ae-row-focus-bg: rgba(245, 192, 0, 0.16);
   --ae-warning-bg: #f7e7c2;
   --ae-warning-text: #8a6800;
   --ae-header-bg: #e7dfc9;
@@ -156,6 +161,9 @@
   --ae-border: #3d3d3d;
   --ae-border-soft: #2e2e2e;
   --ae-row-hover: rgba(255, 255, 255, 0.045);
+  /* More opaque than the light-theme value - the same alpha reads noticeably
+     fainter against these dark surfaces. */
+  --ae-row-focus-bg: rgba(245, 192, 0, 0.22);
   --ae-warning-bg: #2b2306;
   --ae-warning-text: #fdd023;
   --ae-header-bg: #2a2a2a;
@@ -439,12 +447,19 @@ table input[type="number"] {
   );
 }
 
-/* The row last clicked (RowGlowScroll) - a full, thin outline rather than
-   .ae-row-ring's top/bottom-only sweep, so a click-selected row reads as
-   distinctly "pinned" instead of just currently hovered. Sits just inside
-   the row's edges (box-sizing: border-box + inset 0) so the border doesn't
-   add to the row's footprint or nudge the column widths of an adjacent
-   cell. */
+/* The row last clicked or focused (RowGlowScroll) - a full outline plus a
+   translucent fill, so the currently-encoded row reads as distinctly
+   "pinned" instead of just currently hovered, and stays that obvious even
+   while scrolled away from the pointer or after switching tabs and back
+   (RowGlowScroll restores it from sessionStorage). Sits just inside the
+   row's edges (box-sizing: border-box + inset 0) so the border doesn't add
+   to the row's footprint or nudge the column widths of an adjacent cell.
+   The fill is translucent, not opaque - this div paints on top of the whole
+   static table underneath it (an absolutely-positioned sibling always
+   paints after static in-flow content, regardless of z-index), so an opaque
+   fill would hide the row's own numbers/inputs rather than just tint them.
+   pointer-events: none carries that same requirement - a click or keystroke
+   must still reach the actual cell underneath, not this overlay. */
 .ae-row-focus {
   position: absolute;
   /* Same z-index as .ae-row-ring (not the sticky header's 1) - stays under
@@ -452,6 +467,7 @@ table input[type="number"] {
      to sit right at the header's edge. */
   z-index: 0;
   box-sizing: border-box;
+  background-color: var(--ae-row-focus-bg);
   border: 1px solid var(--ae-toolbar-border);
   border-radius: 2px;
   pointer-events: none;
@@ -1126,12 +1142,14 @@ table input[type="number"] {
    The row never wraps. If even the circle tier is wider than the viewport,
    the toolbar scrolls horizontally.
 
-   No blank space, at any tier: the search box (and, in compact/circle,
-   the selects and date pickers) are elastic - each has a per-tier
-   flex-basis (the width the tier is measured with) and is allowed to GROW
-   into whatever room is left, so widening the window or collapsing the
-   sidebar is absorbed by the filters instead of leaving an empty gap.
-   Fixed widths are only used for buttons.
+   Layout is two groups on one row: the filter cluster (search / category /
+   date / shift) stays packed to its own content width on the LEFT, and the
+   action group (Save / Clear / PDF / Report / Import / History / Zoom) is
+   pushed to the opposite end via `margin-left: auto` on
+   .ae-toolbar-controls, so the two never drift together and the toolbar
+   reads as "inputs here, actions there" at a glance. Fixed widths are used
+   where a stable control size is needed, while the compact and circle
+   tiers still shrink and scroll when necessary.
 
    Every width that matters for measuring is set with `!important` so a
    page's inline width can't make the real row and the hidden measuring
@@ -1166,7 +1184,12 @@ table input[type="number"] {
      size (the small-screen rules below used to widen this to -12/-16px). */
   margin: 0 -8px 6px;
   background: var(--ae-surface);
-  border: 1px solid var(--ae-toolbar-border);
+  /* No outer border: it rendered as a gold line running the full width of
+     the row, under every filter and button alike. The nav-tab redesign
+     already marks each control individually (the underline on hover/focus
+     for filters and buttons, the hairline on search) - the container itself
+     stays borderless so it doesn't double up on that. */
+  border: none;
   border-radius: 10px;
   box-shadow: 0 1px 3px rgba(12, 12, 12, 0.06);
   position: relative;
@@ -1233,31 +1256,71 @@ table input[type="number"] {
   transition: opacity 220ms ease;
 }
 
-/* Filter cluster (first child of the toolbar). It takes all leftover width
-   and its elastic children split it. The :not() keeps this from matching
-   on a page whose first child is ToolbarControls. */
+/* Filter cluster (first child of the toolbar). It stays fitted to its
+   contents so the filters sit directly beside each other on the left end
+   of the row, leaving the action group (below) free to claim everything
+   else and sit flush against the right end. The :not() keeps this from
+   matching on a page whose first child is ToolbarControls. */
 .ae-toolbar > div:first-child:not(.ae-toolbar-controls) {
   display: flex;
   align-items: center;
   gap: var(--ae-toolbar-gap);
-  flex: 1 1 auto;
+  /*
+     Keep the filter group sized to its actual contents.
+     The old `flex: 1` made this group consume every remaining pixel,
+     which created a large empty area between the last filter and the
+     action buttons. The controls now stay packed together, and the
+     leftover space is claimed by .ae-toolbar-controls' own auto margin
+     instead (see below).
+  */
+  flex: 0 1 auto;
   min-width: 0;
+  width: fit-content;
+  max-width: 100%;
   transition: gap 180ms ease;
 }
-/* Floor tier: don't crush the filters below their minimum - let the row
-   scroll instead. */
+/* Floor tier: keep the filter group at its content width so the toolbar
+   remains compact and can scroll naturally when the row is too wide. */
 .ae-toolbar--circle > div:first-child:not(.ae-toolbar-controls) {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: none;
 }
 
-/* Action group (CSV / PDF / zoom ...): never shrinks. */
+/* ---- Filter cluster: packed together like the top nav tabs, not spaced
+   out as separate boxed fields. Tighter than the generic --ae-toolbar-gap
+   (which is shared with the button group, which still wants room), with a
+   thin "|" between each item instead of bare whitespace - the same
+   treatment .ae-header-tabs-divider gives its own groups. `:first-child`
+   (not `div:first-child`) also covers a page whose filter cluster is a
+   <form> (VarianceReportPage) rather than a <div>. */
+.ae-toolbar > :first-child:not(.ae-toolbar-controls) {
+  gap: 2px !important;
+}
+.ae-toolbar
+  > :first-child:not(.ae-toolbar-controls)
+  > *:not(:first-child)::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  background: var(--ae-glass-divider);
+}
+
+/* Action group (CSV / PDF / zoom ...): never shrinks, and is pushed to the
+   far right of the row by its own auto left-margin - this is the single
+   change that moves Save -> 100% to the right end of the toolbar instead
+   of trailing immediately after the last filter. */
 .ae-toolbar-controls {
   display: flex;
   align-items: center;
   gap: var(--ae-toolbar-gap);
   flex: 0 0 auto;
   min-width: 0;
-  margin-left: 0;
+  margin-left: auto;
   flex-wrap: nowrap;
   white-space: nowrap;
   transition: gap 180ms ease;
@@ -1272,37 +1335,106 @@ table input[type="number"] {
   background: var(--tb-hairline);
 }
 
-/* ---- Filters: borders always visible, no hover-only border ------------- */
+/* ---- Filters: nav-style - plain text, like the top nav tabs
+   (.ae-header-tab in this same file), instead of a boxed field. No fill,
+   no border, no chevron/lead icon on the trigger-style controls - the
+   label IS the control. Scoped to .ae-toolbar only: the same .ae-input /
+   .ae-select-trigger / .ae-date-trigger classes are still full boxed
+   fields everywhere else (modals, forms). The "essential" actions -
+   CSV/PDF/Import, Save, History, Clear/Undo - are .ae-btn / .ae-segment-btn,
+   untouched below, so they keep looking like real buttons.
+
+   Two different underline treatments live here on purpose:
+   - Search (an actual <input>) gets a persistent, always-visible hairline
+     that deepens to gold on hover/focus - it needs to read as "type here",
+     and a replaced element like <input> can't host the ::after trick below.
+   - The dropdown/date triggers (real <button>s) get the SAME animated,
+     center-grown underline as the top nav tabs (.ae-header-tab::after) -
+     they're tab-style controls, so they get the "click here" treatment
+     instead of a static line. */
 .ae-toolbar .ae-input,
 .ae-toolbar .ae-select,
-.ae-toolbar .ae-select-trigger {
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger {
+  position: relative;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
   height: var(--tb-h);
-  padding-top: 0;
-  padding-bottom: 0;
-  border-radius: var(--tb-radius);
-  border-color: var(--tb-hairline);
-  background-color: var(--tb-field-bg);
-  color: var(--tb-text);
+  padding: 0 10px;
+  border: none;
+  border-bottom: none;
+  border-radius: 0;
+  background-color: transparent;
+  /* Plain nav-label color (same token .ae-header-tab text uses) - NOT the
+     toolbar's themed gold .tb-text, which would make every filter look
+     "active" all the time. Gold is reserved for the underline itself. */
+  color: var(--ae-text);
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: none !important;
+  transition:
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Search / plain <select>: always-visible line (see note above). */
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select {
+  border-bottom: 1px solid var(--tb-hairline);
 }
 .ae-toolbar .ae-input:hover:not(:disabled):not(:focus),
 .ae-toolbar .ae-select:hover:not(:disabled):not(:focus) {
-  background-color: var(--tb-field-bg-hover);
-  border-color: rgba(245, 192, 0, 0.55);
+  background-color: transparent;
+  border-bottom-color: var(--ae-glass-accent);
+}
+.ae-toolbar .ae-input:focus,
+.ae-toolbar .ae-select:focus {
+  outline: none;
+  border-bottom-color: var(--ae-glass-accent);
+  border-bottom-width: 2px;
 }
 .ae-toolbar .ae-input:disabled {
-  background-color: var(--tb-field-bg);
-  color: var(--tb-text-muted);
+  background-color: transparent;
+  color: var(--ae-text-muted);
   opacity: 0.55;
 }
 .ae-toolbar .ae-input::placeholder {
-  color: var(--tb-text-muted);
+  color: var(--ae-text-muted);
 }
-.ae-toolbar .ae-search-icon {
-  color: var(--tb-text-muted);
+
+/* Dropdown / date triggers: nav-tab-style animated underline instead of a
+   border - same gradient token, same geometry, same transition as
+   .ae-header-tab::after. */
+.ae-toolbar .ae-select-trigger::after,
+.ae-toolbar .ae-date-trigger::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.2s ease;
 }
+.ae-toolbar .ae-select-trigger:hover::after,
+.ae-toolbar .ae-select-trigger:focus-visible::after,
+.ae-toolbar .ae-select-trigger[aria-expanded="true"]::after,
+.ae-toolbar .ae-date-trigger:hover::after,
+.ae-toolbar .ae-date-trigger:focus-visible::after,
+.ae-toolbar .ae-date-trigger[aria-expanded="true"]::after {
+  transform: scaleX(1);
+}
+.ae-toolbar .ae-select-trigger:focus-visible,
+.ae-toolbar .ae-date-trigger:focus-visible,
+.ae-toolbar .ae-select-trigger[aria-expanded="true"],
+.ae-toolbar .ae-date-trigger[aria-expanded="true"] {
+  outline: none;
+}
+
 /* Leading icon inside a filter trigger (Dropdown's `icon` prop): only in
    the full tier - the narrower tiers give the text every pixel. */
 .ae-select-trigger-lead {
@@ -1321,14 +1453,21 @@ table input[type="number"] {
 .ae-select-trigger:has(.ae-select-trigger-lead) .ae-select-trigger-text {
   flex: 1 1 auto;
 }
-.ae-toolbar--compact .ae-select-trigger-lead {
-  display: none;
+/* Pure text, like a nav tab: inside the toolbar the search icon and every
+   dropdown's leading icon / chevron are dropped so the control reads as a
+   label, not a field (kept for any .ae-select-trigger used outside the
+   toolbar, e.g. a modal's icon-less or icon-bearing select). */
+.ae-toolbar .ae-search-icon,
+.ae-toolbar .ae-select-trigger-lead,
+.ae-toolbar .ae-select-trigger-icon,
+.ae-toolbar .ae-date-trigger-icon {
+  display: none !important;
 }
 
 /* ---- Filters: sizing per tier ------------------------------------------ */
 /* full */
 .ae-toolbar input[type="search"] {
-  flex: 1 1 280px;
+  flex: 0 1 280px;
   width: 280px !important;
   min-width: 72px;
 }
@@ -1352,13 +1491,10 @@ table input[type="number"] {
 .ae-toolbar:not(.ae-toolbar--compact) .ae-date-trigger {
   min-width: 0;
 }
-/* Search icon sits closer to its text (the input's own inline padding-left
-   is 30px, so this needs !important). */
-.ae-toolbar .ae-search-icon {
-  left: 8px !important;
-}
+/* Search icon is hidden in the toolbar (nav-style, text-only) - override
+   the input's own inline padding-left (30px) that made room for it. */
 .ae-toolbar input[type="search"] {
-  padding-left: 27px !important;
+  padding-left: 10px !important;
 }
 
 /* compact
@@ -1412,28 +1548,33 @@ table input[type="number"] {
 }
 
 /* Zoom select (ZoomControl.tsx, className "ae-zoom-control").
-   It lives in ToolbarControls, which never shrinks, so it must be a fixed
-   width per tier - NOT one of the elastic filter selects above. These rules
-   come after them with equal specificity, so they win in every tier (circle
-   last, so it beats compact). ZoomControl no longer sets any sizing inline;
-   this is the single source of truth. */
+   It lives in ToolbarControls, which never shrinks. It used to carry a
+   fixed width sized to fit the text PLUS the trailing chevron icon - but
+   the chevron is hidden in the toolbar (see .ae-select-trigger-icon
+   above), so that width left dead space to the right of "100%" (and
+   stretched its underline across that empty space too, since the ::after
+   underline insets from the control's own edges). Sized to content instead,
+   within a min/max band per tier so it doesn't visibly jump as the text
+   changes length (50% vs 200%). These rules come after the elastic filter
+   selects with equal specificity, so they win in every tier (circle last,
+   so it beats compact). */
 .ae-toolbar .ae-zoom-control {
-  flex: 0 0 94px !important;
-  width: 94px !important;
-  min-width: 94px !important;
-  max-width: 94px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 54px !important;
+  max-width: 80px !important;
 }
 .ae-toolbar--compact .ae-zoom-control {
-  flex: 0 0 72px !important;
-  width: 72px !important;
-  min-width: 72px !important;
-  max-width: 72px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 48px !important;
+  max-width: 68px !important;
 }
 .ae-toolbar--circle .ae-zoom-control {
-  flex: 0 0 68px !important;
-  width: 68px !important;
-  min-width: 68px !important;
-  max-width: 68px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 44px !important;
+  max-width: 62px !important;
 }
 
 /* ---- Buttons: neutral by default, one yellow primary ------------------- */
@@ -1474,13 +1615,14 @@ table input[type="number"] {
 .ae-toolbar .ae-btn:not(.ae-btn-danger):hover:not(:disabled),
 .ae-toolbar .ae-toolbar-save:hover:not(:disabled),
 .ae-toolbar .ae-segment-btn:hover:not(:disabled) {
-  background: var(--tb-field-bg-hover);
-  border-color: rgba(245, 192, 0, 0.55);
+  /* No button-box hover effect. The label below gets the nav-style underline. */
+  background: transparent;
+  border-color: var(--tb-hairline);
 }
 .ae-toolbar .ae-btn:not(.ae-btn-danger):active:not(:disabled),
 .ae-toolbar .ae-toolbar-save:active:not(:disabled),
 .ae-toolbar .ae-segment-btn:active:not(:disabled) {
-  background: var(--ae-tb-field-bg-active);
+  background: transparent;
 }
 .ae-toolbar .ae-btn:disabled,
 .ae-toolbar .ae-segment-btn:disabled {
@@ -1501,12 +1643,12 @@ table input[type="number"] {
 }
 .ae-toolbar .ae-toolbar-primary:hover:not(:disabled),
 .ae-toolbar .ae-btn-primary:hover:not(:disabled) {
-  background: var(--ae-btn-yellow-hover);
-  border-color: var(--ae-btn-yellow-hover);
+  background: var(--ae-btn-yellow);
+  border-color: var(--ae-btn-yellow-active);
 }
 .ae-toolbar .ae-toolbar-primary:active:not(:disabled),
 .ae-toolbar .ae-btn-primary:active:not(:disabled) {
-  background: var(--ae-btn-yellow-active);
+  background: var(--ae-btn-yellow);
 }
 .ae-toolbar .ae-toolbar-primary:disabled {
   opacity: 0.45;
@@ -1533,6 +1675,45 @@ table input[type="number"] {
 }
 .ae-toolbar .ae-segment-btn:hover:not(:disabled) {
   border-color: transparent;
+}
+
+/* Nav-tab-style toolbar hover: underline the TEXT only.
+   This matches the Offline Entry tab treatment: no filled hover box and no
+   yellow border around the whole button. The label itself gets a short
+   animated underline beneath its text. */
+.ae-toolbar .ae-toolbar-btn-label,
+.ae-toolbar .ae-segment-label {
+  position: relative;
+}
+
+.ae-toolbar .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-segment-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.2s ease;
+}
+
+/* Hover/focus comes from the parent button, while the line belongs only to
+   the text label. */
+.ae-toolbar .ae-btn:not(:disabled):hover .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-btn:not(:disabled):focus-visible .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-toolbar-save:not(:disabled):hover .ae-toolbar-btn-label::after,
+.ae-toolbar
+  .ae-toolbar-save:not(:disabled):focus-visible
+  .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-segment-btn:not(:disabled):hover .ae-segment-label::after,
+.ae-toolbar
+  .ae-segment-btn:not(:disabled):focus-visible
+  .ae-segment-label::after {
+  transform: scaleX(1);
 }
 
 /* Button labels collapse to nothing in compact/circle. */
@@ -1568,7 +1749,7 @@ table input[type="number"] {
   padding: 0;
   gap: 0;
   border-radius: var(--tb-radius);
-  border: 1px solid var(--tb-hairline);
+  border: none;
   background: var(--tb-field-bg);
 }
 .ae-toolbar--compact .ae-btn {
@@ -1668,25 +1849,29 @@ table input[type="number"] {
   font-size: var(--tb-font);
   line-height: 1;
 }
-/* Same 1px hairline border on every bordered control (the segmented group's
-   own border is dropped in compact/circle, where each button carries one). */
-.ae-toolbar .ae-input,
-.ae-toolbar .ae-select,
-.ae-toolbar .ae-select-trigger,
-.ae-toolbar .ae-date-trigger,
+/* Same 1px hairline border on every bordered control - buttons only. The
+   nav-style filters (.ae-input / .ae-select / .ae-select-trigger /
+   .ae-date-trigger, restyled above) deliberately use their own underline
+   treatment instead of a full border/radius box, so they're excluded here
+   on purpose (the segmented group's own border is dropped in
+   compact/circle, where each button carries one). */
 .ae-toolbar
-  .ae-btn:not(.ae-btn-danger):not(.ae-toolbar-primary):not(.ae-btn-primary),
-.ae-toolbar .ae-toolbar-save:not(.ae-toolbar-primary) {
+  .ae-btn:not(.ae-btn-danger):not(.ae-toolbar-primary):not(.ae-btn-primary):not(
+    :has(.ae-toolbar-btn-label)
+  ),
+.ae-toolbar
+  .ae-toolbar-save:not(.ae-toolbar-primary):not(:has(.ae-toolbar-btn-label)) {
   border-width: 1px;
   border-style: solid;
 }
-/* Same side padding on dropdown/date triggers and text buttons (the search
-   box keeps its own, it reserves room for its icon). */
-.ae-toolbar .ae-select-trigger,
-.ae-toolbar .ae-date-trigger,
-.ae-toolbar .ae-select {
-  padding-left: var(--tb-pad-x);
-  padding-right: var(--tb-pad-x);
+/* A button whose text carries the nav-tab-style underline (::after on
+   .ae-toolbar-btn-label) reads as a plain label, not a boxed control - no
+   border at all, same treatment as the dropdown/date filters above. Higher
+   specificity than the border-color rule further up, so it wins regardless
+   of source order. */
+.ae-toolbar .ae-btn:not(.ae-btn-danger):has(.ae-toolbar-btn-label),
+.ae-toolbar .ae-toolbar-save:has(.ae-toolbar-btn-label) {
+  border: none;
 }
 .ae-toolbar .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save),
 .ae-toolbar .ae-segment-btn {

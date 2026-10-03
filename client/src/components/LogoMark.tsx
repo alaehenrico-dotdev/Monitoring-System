@@ -8,7 +8,8 @@ import logoVideo from "../assets/alaeh-logo-3d.webm";
  * The webm carries an alpha channel, so it's rendered as-is on whatever
  * surface it sits on - no circular clip (that would crop the 3D artwork)
  * and no backdrop. `muted` + `playsInline` are required for autoplay on
- * browsers/iOS; `/logo.jpg` is the poster shown until the video loads.
+ * browsers/iOS; `/alaeh-logo-3d-poster.png` (also alpha, matching the video)
+ * is the poster shown until the video loads.
  *
  * The outer `.ae-logo-mark` wrapper is kept because the header's hover
  * scale+glow CSS (`.ae-page-header-logo .ae-logo-mark` in index.css)
@@ -66,7 +67,7 @@ export function LogoMark({ size = 44 }: { size?: number; spin?: number }) {
       <video
         ref={videoRef}
         src={logoVideo}
-        poster="/logo.jpg"
+        poster="/alaeh-logo-3d-poster.png"
         autoPlay
         loop
         muted
