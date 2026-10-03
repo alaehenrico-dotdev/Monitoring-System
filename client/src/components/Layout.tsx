@@ -1,4 +1,4 @@
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
@@ -21,6 +21,15 @@ const isTauri = import.meta.env.MODE === "tauri";
 export function Layout() {
   const mainRef = useRef<HTMLElement>(null);
   const { online } = useOnlineStatus();
+
+  // Desktop updates installed before anyone was signed in (or while offline)
+  // are queued - send them now that there's a session. See pendingSystemLog.ts.
+  useEffect(() => {
+    if (isTauri)
+      void import("../tauri/pendingSystemLog").then((m) =>
+        m.flushPendingSystemLog(),
+      );
+  }, []);
 
   return (
     // Sidebar is now a floating overlay only (no docked width to reserve),

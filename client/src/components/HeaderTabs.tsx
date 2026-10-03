@@ -42,7 +42,6 @@ const groups: { heading: string; links: NavLinkDef[] }[] = [
     heading: "Admin",
     links: [
       { to: "/change-log", label: "Change Log", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/system-log", label: "System Log", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/products", label: "SKUs", roles: ["SUPERVISOR_ADMIN"] },
     ],
   },
