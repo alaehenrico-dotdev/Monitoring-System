@@ -5,6 +5,10 @@ import type { ManualCountEntry, ManualCountGridRow, Shift, StockLocation } from 
 /// Offline fallback - see api/onlineStock.ts's matching getOnlineGrid for the
 /// full reasoning (same structured-mirror fallback, tauri/sync/localGrid.ts).
 export async function getManualCountGrid(date: string, shift: Shift, location: StockLocation): Promise<ManualCountGridRow[]> {
+  if (isTauri && getKnownReachable() === false) {
+    const { getLocalManualCountGrid } = await import("../tauri/sync/localGrid");
+    return getLocalManualCountGrid(date, shift, location);
+  }
   try {
     return await http.get<ManualCountGridRow[]>(`/manual-counts?date=${date}&shift=${shift}&location=${location}`);
   } catch (err) {

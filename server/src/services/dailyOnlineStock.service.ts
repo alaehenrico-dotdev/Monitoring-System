@@ -5,6 +5,7 @@ import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRe
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
+import { propagateOpeningStock } from "./manualCounts.service";
 import { HttpError } from "../utils/HttpError";
 import {
   calculateOfflineRemaining,
@@ -176,6 +177,12 @@ export async function saveOnlineEntry(
     userId,
     db,
   );
+
+  // A correction to this period changes the next saved Online opening
+  // balance. Transfers are mirrored to Offline in this same transaction,
+  // so propagate that side too before the transaction commits.
+  await propagateOpeningStock(productId, entryDate, shift, "ONLINE", userId, db);
+  await propagateOpeningStock(productId, entryDate, shift, "OFFLINE", userId, db);
 
   // Not broadcast here - the `!db` branch above does it once the transaction
   // that wraps this whole function has actually committed. A caller that

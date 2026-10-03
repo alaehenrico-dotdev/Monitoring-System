@@ -155,7 +155,7 @@ export async function deleteManualCount(
 /// comes out unchanged or a row has its own manual count for this location
 /// (which supersedes whatever carries into it). TOTAL counts are informational
 /// only - they can't be split back into Online/Offline balances.
-async function propagateOpeningStock(productId: number, entryDate: Date, shift: Shift, location: StockLocation, userId: number | undefined, db: Db) {
+export async function propagateOpeningStock(productId: number, entryDate: Date, shift: Shift, location: StockLocation, userId: number | undefined, db: Db) {
   if (location === "TOTAL") return;
   let cursor = { entryDate, shift };
   for (;;) {

@@ -56,7 +56,13 @@ interface PushResponse {
 /// already has (under its own existing local_id) keeps that local_id - the
 /// fresh one is simply discarded in that case, which is harmless.
 export async function runPull(): Promise<void> {
-  const since = await getLastSyncedAt();
+  const lastSyncedAt = await getLastSyncedAt();
+  // Re-read a small overlap so DB timestamp precision or two writes in the
+  // same millisecond cannot leave a changed row permanently behind the
+  // cursor. Upserts are idempotent, so seeing a few rows twice is safe.
+  const since = lastSyncedAt
+    ? new Date(new Date(lastSyncedAt).getTime() - 5_000).toISOString()
+    : null;
   const qs = since ? `?since=${encodeURIComponent(since)}` : "";
   const result = await coreRequest<PullResponse>(`/sync/pull${qs}`);
 

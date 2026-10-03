@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import { API_URL } from "../api/http";
 import { setKnownReachable } from "../api/reachability";
 
-const HEALTH_CHECK_INTERVAL_MS = 30_000;
+const HEALTH_CHECK_INTERVAL_MS = 5_000;
+const HEALTH_CHECK_TIMEOUT_MS = 2_000;
 
 async function checkServerReachable(): Promise<boolean> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 5_000);
+  const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
     const url = new URL("/health", new URL(API_URL, window.location.href));
     const response = await fetch(url, { signal: controller.signal });

@@ -163,14 +163,14 @@ function rank(entryDate: string, shift: Shift): number {
 
 export async function getLocalOpeningStockOnline(productId: number, entryDate: string, shift: Shift): Promise<number> {
   const db = await getDb();
-  const priorRows = await db.select<{ remaining_stock: number; entry_date: string; shift: Shift }[]>(
-    `SELECT remaining_stock, entry_date, shift FROM daily_online_stock_cache
+  const priorRows = await db.select<{ local_id: string; opening_stock: number; stock_in_off_to_ol: number; stock_out_ol_to_off: number; production_in: number; fulfillment_out: number; rts: number; remaining_stock: number; entry_date: string; shift: Shift }[]>(
+    `SELECT local_id, opening_stock, stock_in_off_to_ol, stock_out_ol_to_off, production_in, fulfillment_out, rts, remaining_stock, entry_date, shift FROM daily_online_stock_cache
      WHERE product_id = $1 AND (entry_date < $2 OR (entry_date = $2 AND shift = 'MORNING' AND $3 = 'NIGHT'))
      ORDER BY entry_date DESC, shift DESC LIMIT 1`,
     [productId, entryDate, shift],
   );
-  const countRows = await db.select<{ manual_count: number; entry_date: string; shift: Shift }[]>(
-    `SELECT manual_count, entry_date, shift FROM manual_counts_cache
+  const countRows = await db.select<{ local_id: string; manual_count: number; entry_date: string; shift: Shift }[]>(
+    `SELECT local_id, manual_count, entry_date, shift FROM manual_counts_cache
      WHERE product_id = $1 AND location = 'ONLINE' AND (entry_date < $2 OR (entry_date = $2 AND shift = 'MORNING' AND $3 = 'NIGHT'))
      ORDER BY entry_date DESC, shift DESC LIMIT 1`,
     [productId, entryDate, shift],
@@ -178,9 +178,15 @@ export async function getLocalOpeningStockOnline(productId: number, entryDate: s
   const prior = priorRows[0] ?? null;
   const count = countRows[0] ?? null;
   if (count && (!prior || rank(count.entry_date, count.shift) >= rank(prior.entry_date, prior.shift))) {
-    return count.manual_count;
+    const pending = await getManualCountPending(count.local_id);
+    return pending?.manualCount ?? count.manual_count;
   }
-  return prior?.remaining_stock ?? 0;
+  if (!prior) return 0;
+  const pending = await getOnlineStockPending(prior.local_id);
+  return prior.opening_stock + prior.stock_in_off_to_ol - prior.stock_out_ol_to_off
+    + prior.production_in + (pending?.productionIn ?? 0)
+    - prior.fulfillment_out - (pending?.fulfillmentOut ?? 0)
+    + prior.rts + (pending?.rts ?? 0);
 }
 
 /// Writes the server's authoritative row into cache - called after a pull,
@@ -361,14 +367,14 @@ export async function listOfflineStockCacheForDate(entryDate: string, shift: Shi
 
 export async function getLocalOpeningStockOffline(productId: number, entryDate: string, shift: Shift): Promise<number> {
   const db = await getDb();
-  const priorRows = await db.select<{ remaining_stock: number; entry_date: string; shift: Shift }[]>(
-    `SELECT remaining_stock, entry_date, shift FROM daily_offline_stock_cache
+  const priorRows = await db.select<{ local_id: string; opening_stock: number; stock_in_ol_to_off: number; stock_out_off_to_ol: number; production_in: number; delivery1: number; delivery2: number; delivery3: number; delivery4: number; delivery5: number; backloads: number; upsell_out: number; remaining_stock: number; entry_date: string; shift: Shift }[]>(
+    `SELECT local_id, opening_stock, stock_in_ol_to_off, stock_out_off_to_ol, production_in, delivery1, delivery2, delivery3, delivery4, delivery5, backloads, upsell_out, remaining_stock, entry_date, shift FROM daily_offline_stock_cache
      WHERE product_id = $1 AND (entry_date < $2 OR (entry_date = $2 AND shift = 'MORNING' AND $3 = 'NIGHT'))
      ORDER BY entry_date DESC, shift DESC LIMIT 1`,
     [productId, entryDate, shift],
   );
-  const countRows = await db.select<{ manual_count: number; entry_date: string; shift: Shift }[]>(
-    `SELECT manual_count, entry_date, shift FROM manual_counts_cache
+  const countRows = await db.select<{ local_id: string; manual_count: number; entry_date: string; shift: Shift }[]>(
+    `SELECT local_id, manual_count, entry_date, shift FROM manual_counts_cache
      WHERE product_id = $1 AND location = 'OFFLINE' AND (entry_date < $2 OR (entry_date = $2 AND shift = 'MORNING' AND $3 = 'NIGHT'))
      ORDER BY entry_date DESC, shift DESC LIMIT 1`,
     [productId, entryDate, shift],
@@ -376,9 +382,20 @@ export async function getLocalOpeningStockOffline(productId: number, entryDate: 
   const prior = priorRows[0] ?? null;
   const count = countRows[0] ?? null;
   if (count && (!prior || rank(count.entry_date, count.shift) >= rank(prior.entry_date, prior.shift))) {
-    return count.manual_count;
+    const pending = await getManualCountPending(count.local_id);
+    return pending?.manualCount ?? count.manual_count;
   }
-  return prior?.remaining_stock ?? 0;
+  if (!prior) return 0;
+  const pending = await getOfflineStockPending(prior.local_id);
+  return prior.opening_stock + prior.stock_in_ol_to_off - prior.stock_out_off_to_ol
+    + prior.production_in + (pending?.productionIn ?? 0)
+    - prior.delivery1 - (pending?.delivery1 ?? 0)
+    - prior.delivery2 - (pending?.delivery2 ?? 0)
+    - prior.delivery3 - (pending?.delivery3 ?? 0)
+    - prior.delivery4 - (pending?.delivery4 ?? 0)
+    - prior.delivery5 - (pending?.delivery5 ?? 0)
+    + prior.backloads + (pending?.backloads ?? 0)
+    - prior.upsell_out - (pending?.upsellOut ?? 0);
 }
 
 export async function upsertOfflineStockFromServer(row: OfflineStockCache): Promise<void> {
