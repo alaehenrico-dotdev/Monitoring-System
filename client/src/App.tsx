@@ -58,9 +58,6 @@ const ProductsAdminPage = lazy(() =>
 const ChangeLogPage = lazy(() =>
   import("./pages/ChangeLogPage").then((m) => ({ default: m.ChangeLogPage })),
 );
-const SystemLogPage = lazy(() =>
-  import("./pages/SystemLogPage").then((m) => ({ default: m.SystemLogPage })),
-);
 const DashboardPage = lazy(() =>
   import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
 );
@@ -81,7 +78,9 @@ const SettingsPage = lazy(() =>
 // everything else that's Tauri-specific, still lazy-chunked the same as
 // every other page so this never ends up in the web build's main bundle.
 const ConflictsPage = lazy(() =>
-  import("./tauri/sync/ConflictsPage").then((m) => ({ default: m.ConflictsPage })),
+  import("./tauri/sync/ConflictsPage").then((m) => ({
+    default: m.ConflictsPage,
+  })),
 );
 
 export default function App() {
@@ -128,7 +127,11 @@ export default function App() {
                         element={<VarianceReportPage />}
                       />
                       <Route path="/change-log" element={<ChangeLogPage />} />
-                      <Route path="/system-log" element={<SystemLogPage />} />
+                      {/* System Log now lives in the Change Log page (as its own group). */}
+                      <Route
+                        path="/system-log"
+                        element={<Navigate to="/change-log" replace />}
+                      />
                       <Route path="/products" element={<ProductsAdminPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                     </Route>

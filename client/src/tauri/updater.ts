@@ -22,10 +22,23 @@ export async function checkForUpdates(): Promise<void> {
     // update, not relaunch() itself. Best effort: a server that's briefly
     // unreachable (or this device being offline) must never block the update
     // that already succeeded locally.
-    const { recordSystemLog } = await import("../api/systemLog");
-    recordSystemLog({ event: "DESKTOP_UPDATE", fromVersion: __APP_VERSION__, toVersion: update.version }).catch((err) =>
-      console.error("Failed to record system log entry", err),
-    );
+    //
+    // Queued first, then sent: this runs at launch, often before anyone has
+    // signed in, so a direct POST would 401 and the update would never reach
+    // the System Log. The queue (pendingSystemLog.ts) is flushed here when a
+    // session exists, otherwise by Layout.tsx after the next sign-in. The
+    // send is awaited (capped at 4s) so relaunch() below can't cut it off.
+    const { queueSystemLog, flushPendingSystemLog } =
+      await import("./pendingSystemLog");
+    queueSystemLog({
+      event: "DESKTOP_UPDATE",
+      fromVersion: __APP_VERSION__,
+      toVersion: update.version,
+    });
+    await Promise.race([
+      flushPendingSystemLog(),
+      new Promise((resolve) => setTimeout(resolve, 4000)),
+    ]);
 
     // downloadAndInstall() only replaces the files on disk - the running
     // process keeps going until relaunch() actually exits it. The download
