@@ -1,4 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
 import {
@@ -17,12 +23,25 @@ import { pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { formatDateDisplay, formatRelativeTime } from "../utils/dateFormat";
 import type { Product, Shift, StockLocation } from "../types";
 import { DatePicker } from "./DatePicker";
+import { confirmDownload } from "./DownloadConfirm";
 import { Dropdown } from "./Dropdown";
 import { ShiftFilter } from "./ShiftFilter";
 import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { toolbarLayoutTransition } from "../motion";
-import { ClearIcon, DownloadIcon, HistoryIcon, PrinterIcon, UploadIcon } from "./icons";
-import { createImportBatch, deleteImportBatch, finalizeImportBatch, listImportBatches, type ImportBatchSummary } from "../api/importBatches";
+import {
+  ClearIcon,
+  DownloadIcon,
+  HistoryIcon,
+  PrinterIcon,
+  UploadIcon,
+} from "./icons";
+import {
+  createImportBatch,
+  deleteImportBatch,
+  finalizeImportBatch,
+  listImportBatches,
+  type ImportBatchSummary,
+} from "../api/importBatches";
 import { Toast, type ToastVariant } from "./Toast";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { Modal } from "./Modal";
@@ -95,7 +114,10 @@ interface ImportBatch {
   /// productId -> key -> what Save changed it from/to, exactly as staged -
   /// used both to revert (oldValue) and to check nothing's touched the cell
   /// since (newValue, compared against getPendingValue).
-  entries: Record<number, Record<string, { oldValue: number; newValue: number }>>;
+  entries: Record<
+    number,
+    Record<string, { oldValue: number; newValue: number }>
+  >;
 }
 
 /// Imperative handle so a page's own whole-grid Save (handleSaveAll, not
@@ -117,7 +139,10 @@ function levenshtein(a: string, b: string): number {
     prevRow[0] = i;
     for (let j = 1; j <= b.length; j++) {
       const temp = prevRow[j];
-      prevRow[j] = a[i - 1] === b[j - 1] ? prevDiag : 1 + Math.min(prevDiag, prevRow[j], prevRow[j - 1]);
+      prevRow[j] =
+        a[i - 1] === b[j - 1]
+          ? prevDiag
+          : 1 + Math.min(prevDiag, prevRow[j], prevRow[j - 1]);
       prevDiag = temp;
     }
   }
@@ -141,7 +166,10 @@ function fuzzyScore(a: string, b: string): number {
   return 1 - levenshtein(na, nb) / Math.max(na.length, nb.length);
 }
 
-function bestFuzzyMatch(name: string, candidates: Product[]): { product: Product; score: number } | null {
+function bestFuzzyMatch(
+  name: string,
+  candidates: Product[],
+): { product: Product; score: number } | null {
   let best: { product: Product; score: number } | null = null;
   for (const product of candidates) {
     const score = fuzzyScore(name, product.name);
@@ -183,7 +211,11 @@ interface CsvToolsProps {
   /// either Save commits it (tagging the server write) or something else
   /// changes that exact cell first (which un-attributes it - see each
   /// page's own handleCommit/onChange).
-  onImportRow: (productId: number, values: Record<string, number>, batchId?: number) => Promise<void>;
+  onImportRow: (
+    productId: number,
+    values: Record<string, number>,
+    batchId?: number,
+  ) => Promise<void>;
   /// Whatever the caller's own pending-changes state currently has staged
   /// for this exact cell, or undefined if nothing is - CsvTools has no
   /// direct access to that state itself. Used only by "Undo Import" to
@@ -199,7 +231,10 @@ interface CsvToolsProps {
   /// it can under- or over-warn - it never blocks staging or Save, only
   /// surfaces the reason before Save is clicked instead of only after it
   /// fails. Omit entirely on a page with no such risk to check for.
-  validateImport?: (productId: number, changes: Record<string, number>) => string | undefined;
+  validateImport?: (
+    productId: number,
+    changes: Record<string, number>,
+  ) => string | undefined;
   /// Writers only - readers can still Export but shouldn't see Import.
   canImport: boolean;
   /// The date/shift/location the page is currently showing. When set,
@@ -278,27 +313,53 @@ function UnmatchedImportRowView({
 }) {
   const suggestion = bestFuzzyMatch(row.productName, candidates);
   return (
-    <div style={{ padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}>
+    <div
+      style={{ padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}
+    >
       <div style={{ fontSize: 13, color: colors.ink }}>
-        “{row.productName}”{row.category ? <span style={{ color: colors.subtleInk }}> in “{row.category}”</span> : null}
+        “{row.productName}”
+        {row.category ? (
+          <span style={{ color: colors.subtleInk }}> in “{row.category}”</span>
+        ) : null}
       </div>
       {suggestion ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4, fontSize: 12.5, color: colors.subtleInk }}>
-          <span>
-            Use “{suggestion.product.name}” instead?
-          </span>
-          <Button type="button" variant="secondary" size="sm" onClick={() => onAccept(row.rawLineIndex, suggestion.product)}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginTop: 4,
+            fontSize: 12.5,
+            color: colors.subtleInk,
+          }}
+        >
+          <span>Use “{suggestion.product.name}” instead?</span>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => onAccept(row.rawLineIndex, suggestion.product)}
+          >
             Accept
           </Button>
         </div>
       ) : (
-        <div style={{ marginTop: 4, fontSize: 12.5, color: colors.subtleInk }}>No match found.</div>
+        <div style={{ marginTop: 4, fontSize: 12.5, color: colors.subtleInk }}>
+          No match found.
+        </div>
       )}
     </div>
   );
 }
 
-const targetFieldStyle = { display: "grid", gridTemplateColumns: "90px 1fr", alignItems: "center", gap: 10, fontSize: 13, color: colors.ink } as const;
+const targetFieldStyle = {
+  display: "grid",
+  gridTemplateColumns: "90px 1fr",
+  alignItems: "center",
+  gap: 10,
+  fontSize: 13,
+  color: colors.ink,
+} as const;
 
 /// Highlighted "this import goes into ..." line - shown in the target dialog
 /// and again at the top of the Review modal.
@@ -332,788 +393,1096 @@ function ImportTargetBanner({ label }: { label: string }) {
  * can open in Excel and re-import purely to seed/correct Opening Stock from
  * existing data (e.g. the last pre-system report, or a day that had none).
  */
-export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(function CsvTools({
-  filenamePrefix,
-  date,
-  rows,
-  columns,
-  onImportRow,
-  getPendingValue,
-  validateImport,
-  canImport,
-  importTarget,
-  onImportTargetChange,
-  importLocations,
-  importTodayValue,
-  importKeys = ["openingStock"],
-  blankAsZero = false,
-  showExport = true,
-  showPdf = true,
-  disabled = false,
-  pdfDisabled = false,
-  onBeforePrint,
-  exportFormat = "csv",
-  pdf,
-}, ref) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const progress = useTopProgress();
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [messageVariant, setMessageVariant] = useState<ToastVariant>("info");
-  // Parsing (busy) and Save (savingImport) are two separate, sequential
-  // steps now - see handleImportFile/handleConfirmImport - so each gets its
-  // own in-flight flag rather than one covering both.
-  const [importReview, setImportReview] = useState<ImportReview | null>(null);
-  const [savingImport, setSavingImport] = useState(false);
-  const importContextRef = useRef<ImportParseContext | null>(null);
-  // The most recent review-modal Save, revertible via "Undo Import" until
-  // either a second import overwrites it (one level only, same rule as the
-  // page's own per-save Undo) or notifyCommitted says it's been superseded
-  // by a real, already-saved edit (see CsvToolsHandle above).
-  const [lastImportBatch, setLastImportBatch] = useState<ImportBatch | null>(null);
-  // Whether the *current* toast message is the one "Undo Import" belongs to
-  // - kept separate from lastImportBatch itself (which can outlive its own
-  // toast) so the action doesn't show up again next to some later, unrelated
-  // message while a stale-but-not-yet-superseded batch still exists.
-  const [showUndoImport, setShowUndoImport] = useState(false);
-  const undoInFlightRef = useRef(false);
-  // Target dialog draft (null = closed) and the label of the sheet the
-  // current review/import belongs to.
-  const [targetDraft, setTargetDraft] = useState<ImportTarget | null>(null);
-  const [reviewLabel, setReviewLabel] = useState<string | null>(null);
-  // Import History (Section: CSV import into Manual Count) - a lightweight
-  // modal next to Import itself, not a separate page, since it's purely an
-  // accessory to the Import button it sits beside. null batches = either not
-  // opened yet or still loading (distinguished from historyError below).
-  const [showHistory, setShowHistory] = useState(false);
-  const [historyBatches, setHistoryBatches] = useState<ImportBatchSummary[] | null>(null);
-  const [historyError, setHistoryError] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  // A file picked while the grid is still loading the newly chosen sheet is
-  // held here and parsed as soon as that data is ready (see effect below).
-  const pendingFileRef = useRef<File | null>(null);
-  useEffect(() => {
-    if (!disabled && pendingFileRef.current) {
-      const file = pendingFileRef.current;
-      pendingFileRef.current = null;
-      void handleImportFile(file);
-    }
-    // handleImportFile is re-created every render; only `disabled` matters.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [disabled]);
-  const asExcel = exportFormat === "excel" && !canImport;
-
-  useImperativeHandle(ref, () => ({
-    // Called by the page's own whole-grid Save (handleSaveAll), never by
-    // anything in this file - once that Save actually commits an imported
-    // cell to the server, lastImportBatch's "oldValue -> newValue" is no
-    // longer describing a pending edit at all, so re-staging oldValue via
-    // Undo Import at that point would create a brand-new, real change
-    // instead of just dropping a still-pending one back to baseline.
-    notifyCommitted: () => {
-      setLastImportBatch(null);
-      setShowUndoImport(false);
+export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
+  function CsvTools(
+    {
+      filenamePrefix,
+      date,
+      rows,
+      columns,
+      onImportRow,
+      getPendingValue,
+      validateImport,
+      canImport,
+      importTarget,
+      onImportTargetChange,
+      importLocations,
+      importTodayValue,
+      importKeys = ["openingStock"],
+      blankAsZero = false,
+      showExport = true,
+      showPdf = true,
+      disabled = false,
+      pdfDisabled = false,
+      onBeforePrint,
+      exportFormat = "csv",
+      pdf,
     },
-  }));
-
-  function handleExport() {
-    if (asExcel) {
-      // The real SKU code gets its own column here, alongside the product
-      // name - unlike the CSV path below, nothing re-imports an Excel
-      // export, so there's no "SKU" alias to preserve for a parser to match
-      // against (see handleImportFile's productIdx lookup).
-      const headers = ["Category", "SKU", "Product", ...columns.map((c) => c.label)];
-      const dataRows = rows.map((r) => [r.product.category, r.product.sku ?? "", r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
-      downloadExcel(`${filenamePrefix}-${date}.xls`, toExcelTable(headers, dataRows));
-      return;
-    }
-    // Uppercased to match the convention of the files people re-import (a
-    // spreadsheet edited outside the app tends to use ALL-CAPS headers) -
-    // parsing already lowercases before comparing (see handleImportFile),
-    // so this is purely cosmetic and doesn't affect what re-imports. "SKU"
-    // here is still the product name, not the real sku code - re-import
-    // matches products by this column (see productIdx below) and the code
-    // alone isn't always present/typed by whoever edited the file offline.
-    const headers = ["Category", "SKU", ...columns.map((c) => c.label)].map((h) => h.toUpperCase());
-    const dataRows = rows.map((r) => [r.product.category, r.product.name, ...columns.map((c) => String(r.entry[c.key] ?? 0))]);
-    downloadCsv(`${filenamePrefix}-${date}.csv`, toCsv(headers, dataRows));
-  }
-
-  async function handlePdf() {
-    if (onBeforePrint && !(await onBeforePrint())) return;
-    try {
-      // No real byte/row progress for a synchronous local PDF build (Section:
-      // Loading system) - track() eases the bar toward 90% and holds it
-      // there for as long as this actually takes, instead of a fake timer.
-      await progress.track(() =>
-        downloadTablePdf({
-          filename: pdfFileName(filenamePrefix, date),
-          title: pdf?.title ?? filenamePrefix.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
-          subtitle: pdf?.subtitle ?? formatDateDisplay(date),
-          notes: pdf?.notes,
-          sections: [stockGridSection(rows, columns, { sumKeys: pdf?.sumKeys, flagKey: pdf?.flagKey })],
-        }),
-      );
-    } catch (err) {
-      setMessage(err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed");
-      setMessageVariant("error");
-      setShowUndoImport(false);
-    }
-  }
-
-  /// One file line -> the values that differ from `entry`. A blank cell is
-  /// skipped normally, or read as 0 when blankAsZero is set (Manual Count).
-  /// With blankAsZero an unset current value (null/blank, "not counted yet")
-  /// always differs from an imported 0, so the zero is really staged.
-  function diffImportLine(
-    line: string[],
-    columnIndexes: { key: string; idx: number }[],
-    entry: Record<string, unknown>,
-  ): Record<string, number> {
-    const changes: Record<string, number> = {};
-    for (const { key, idx } of columnIndexes) {
-      const raw = line[idx];
-      const blank = raw === undefined || raw.trim() === "";
-      if (blank && !blankAsZero) continue;
-      const parsed = blank ? 0 : Number(raw);
-      if (Number.isNaN(parsed)) continue;
-      const cur = entry[key];
-      const unset = cur === null || cur === undefined || cur === "";
-      const differs = blankAsZero && unset ? true : parsed !== Number(cur ?? 0);
-      if (differs) changes[key] = parsed;
-    }
-    return changes;
-  }
-
-  async function handleImportFile(file: File) {
-    setBusy(true);
-    setMessage(null);
-    setShowUndoImport(false);
-    try {
-      const text = await file.text();
-      const table = parseCsv(text);
-      if (table.length < 2) throw new Error("File has no data rows");
-
-      // See findHeaderRowIndex's own doc comment: a file that's been
-      // round-tripped through Excel (or had a title/blank row pasted above
-      // it - exactly what the monthly report's own layout looks like) can
-      // push the real column headers down a row or two. Some real-world
-      // exports (Section 8.1) header this column "Products" (plural) rather
-      // than "Product" - both spellings (and this app's own "SKU"/"SKUs",
-      // per the Section 4.1 renaming) are accepted so neither an old export
-      // nor the current business file fails to import.
-      const headerRowIdx = findHeaderRowIndex(table);
-      if (headerRowIdx === -1) throw new Error('Expected a "SKU" (or "Product") column - re-export the grid and edit that file');
-
-      const header = table[headerRowIdx].map((h) => h.trim().toLowerCase());
-      const productIdx = findProductColumnIndex(header);
-      const categoryIdx = header.indexOf("category");
-
-      // Import only ever writes Opening Stock. Every other cell (Stock In/
-      // Out, Production, per-destination delivery, Upsell, Backloads, ...)
-      // starts at 0 each day and is meant to be entered fresh as that day's
-      // real activity happens - importing a past day's own figures for
-      // those onto a different day would silently fabricate movements that
-      // never happened on the day being seeded. A file's Remaining Stock
-      // (or an Opening Stock column of its own) is the one figure that's
-      // legitimately "existing data" to carry over.
-      const importedColumns = columns.filter((c) => importKeys.includes(c.key));
-      const columnIndexes = matchColumnIndexes(importedColumns, header);
-      // Whether Opening Stock itself wasn't found in this file at all -
-      // worth a heads-up, since every row will otherwise just look
-      // "unchanged" with no indication why (see the toast message below).
-      const missingColumns = unmatchedColumns(importedColumns, header);
-
-      const matchedRows: MatchedImportRow[] = [];
-      const unmatchedRows: UnmatchedImportRow[] = [];
-      let unchanged = 0;
-      // Some monthly reports (see Section 8.1) have no Category column at
-      // all - instead a category shows up as its own row (e.g.
-      // "PREMIUM (350 ML)") with every stat column left blank, followed by
-      // that category's products. Track the most recent one of those as an
-      // implied category so a product name that repeats across sections
-      // (e.g. "Toyo Mansi" exists in three different ones) still resolves
-      // to the right SKU instead of whichever same-named row happens to
-      // come first.
-      let currentCategory: string | undefined;
-      // The authoritative set of category names actually in the product
-      // list, normalized the same way as everything else - checked first,
-      // below, because a "blank stat columns" check alone isn't reliable:
-      // the online report's own "Class A (Gallon)" header row carries stray
-      // Production/Fulfillment/RTS subtotal figures (a spreadsheet
-      // artifact), not blanks, but it's still a section header, not a
-      // product named "Class A (Gallon)".
-      const knownCategoryNames = new Set(rows.map((r) => categoryKey(r.product.category)));
-      const importLines = table.slice(headerRowIdx + 1);
-      for (const [rawLineIndex, line] of importLines.entries()) {
-        const productName = line[productIdx]?.trim();
-        if (!productName) continue;
-
-        if (categoryIdx === -1 && knownCategoryNames.has(categoryKey(productName))) {
-          currentCategory = productName;
-          continue;
-        }
-
-        const hasAnyData = line.some((cell, i) => i !== productIdx && i !== categoryIdx && cell.trim() !== "");
-        // With blankAsZero, an all-blank row that is really a product (its
-        // Manual Count was just left empty) is a 0 count, not a section header.
-        const isBlankProductRow =
-          blankAsZero &&
-          !hasAnyData &&
-          !!findMatchingProduct(rows, productName, categoryIdx !== -1 ? line[categoryIdx]?.trim() : currentCategory);
-        if (!hasAnyData && !isBlankProductRow) {
-          if (categoryIdx === -1) currentCategory = productName;
-          continue;
-        }
-
-        const category = categoryIdx !== -1 ? line[categoryIdx]?.trim() : currentCategory;
-        // See findMatchingProduct's own doc comment (utils/importMatch.ts)
-        // for why this normalizes both sides and matches on category too,
-        // when known.
-        const match = findMatchingProduct(rows, productName, category);
-        if (!match) {
-          unmatchedRows.push({ productName, category, rawLineIndex });
-          continue;
-        }
-
-        // Only include values that actually differ from what's already on
-        // the grid. A round-tripped export (open in Excel, tweak one cell,
-        // re-import) otherwise resubmits every unchanged "0" as a real edit -
-        // 60+ redundant writes (and change-log entries) for what's really a
-        // one-cell correction.
-        const changes = diffImportLine(line, columnIndexes, match.entry);
-        if (Object.keys(changes).length === 0) {
-          unchanged++;
-          continue;
-        }
-
-        matchedRows.push({
-          productId: match.product.id,
-          productName: match.product.name,
-          category: match.product.category,
-          changes,
-          warning: validateImport?.(match.product.id, changes),
-        });
+    ref,
+  ) {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const progress = useTopProgress();
+    const [busy, setBusy] = useState(false);
+    const [message, setMessage] = useState<string | null>(null);
+    const [messageVariant, setMessageVariant] = useState<ToastVariant>("info");
+    // Parsing (busy) and Save (savingImport) are two separate, sequential
+    // steps now - see handleImportFile/handleConfirmImport - so each gets its
+    // own in-flight flag rather than one covering both.
+    const [importReview, setImportReview] = useState<ImportReview | null>(null);
+    const [savingImport, setSavingImport] = useState(false);
+    const importContextRef = useRef<ImportParseContext | null>(null);
+    // The most recent review-modal Save, revertible via "Undo Import" until
+    // either a second import overwrites it (one level only, same rule as the
+    // page's own per-save Undo) or notifyCommitted says it's been superseded
+    // by a real, already-saved edit (see CsvToolsHandle above).
+    const [lastImportBatch, setLastImportBatch] = useState<ImportBatch | null>(
+      null,
+    );
+    // Whether the *current* toast message is the one "Undo Import" belongs to
+    // - kept separate from lastImportBatch itself (which can outlive its own
+    // toast) so the action doesn't show up again next to some later, unrelated
+    // message while a stale-but-not-yet-superseded batch still exists.
+    const [showUndoImport, setShowUndoImport] = useState(false);
+    const undoInFlightRef = useRef(false);
+    // Target dialog draft (null = closed) and the label of the sheet the
+    // current review/import belongs to.
+    const [targetDraft, setTargetDraft] = useState<ImportTarget | null>(null);
+    const [reviewLabel, setReviewLabel] = useState<string | null>(null);
+    // Import History (Section: CSV import into Manual Count) - a lightweight
+    // modal next to Import itself, not a separate page, since it's purely an
+    // accessory to the Import button it sits beside. null batches = either not
+    // opened yet or still loading (distinguished from historyError below).
+    const [showHistory, setShowHistory] = useState(false);
+    const [historyBatches, setHistoryBatches] = useState<
+      ImportBatchSummary[] | null
+    >(null);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
+    // A file picked while the grid is still loading the newly chosen sheet is
+    // held here and parsed as soon as that data is ready (see effect below).
+    const pendingFileRef = useRef<File | null>(null);
+    useEffect(() => {
+      if (!disabled && pendingFileRef.current) {
+        const file = pendingFileRef.current;
+        pendingFileRef.current = null;
+        void handleImportFile(file);
       }
+      // handleImportFile is re-created every render; only `disabled` matters.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [disabled]);
+    const asExcel = exportFormat === "excel" && !canImport;
 
-      // Everything past this point (accepting a suggestion, Save) needs the
-      // raw lines/column layout again to re-derive a diff - stashed here
-      // rather than re-parsed, since the file itself isn't kept around.
-      importContextRef.current = { lines: importLines, columnIndexes, unchangedCount: unchanged, fileName: file.name };
-      setReviewLabel(importTarget ? describeTarget(importTarget) : null);
-      setImportReview({ matchedRows, unmatchedRows, missingColumns: missingColumns.map((c) => c.label) });
-    } catch (err) {
-      setMessage(err instanceof Error ? `Import failed: ${err.message}` : "Import failed");
-      setMessageVariant("error");
-      setShowUndoImport(false);
-    } finally {
-      setBusy(false);
+    useImperativeHandle(ref, () => ({
+      // Called by the page's own whole-grid Save (handleSaveAll), never by
+      // anything in this file - once that Save actually commits an imported
+      // cell to the server, lastImportBatch's "oldValue -> newValue" is no
+      // longer describing a pending edit at all, so re-staging oldValue via
+      // Undo Import at that point would create a brand-new, real change
+      // instead of just dropping a still-pending one back to baseline.
+      notifyCommitted: () => {
+        setLastImportBatch(null);
+        setShowUndoImport(false);
+      },
+    }));
+
+    async function handleExport() {
+      if (asExcel) {
+        // The real SKU code gets its own column here, alongside the product
+        // name - unlike the CSV path below, nothing re-imports an Excel
+        // export, so there's no "SKU" alias to preserve for a parser to match
+        // against (see handleImportFile's productIdx lookup).
+        const headers = [
+          "Category",
+          "SKU",
+          "Product",
+          ...columns.map((c) => c.label),
+        ];
+        const dataRows = rows.map((r) => [
+          r.product.category,
+          r.product.sku ?? "",
+          r.product.name,
+          ...columns.map((c) => String(r.entry[c.key] ?? 0)),
+        ]);
+        const excelName = `${filenamePrefix}-${date}.xls`;
+        if (!(await confirmDownload("Excel", excelName))) return;
+        downloadExcel(excelName, toExcelTable(headers, dataRows));
+        return;
+      }
+      // Uppercased to match the convention of the files people re-import (a
+      // spreadsheet edited outside the app tends to use ALL-CAPS headers) -
+      // parsing already lowercases before comparing (see handleImportFile),
+      // so this is purely cosmetic and doesn't affect what re-imports. "SKU"
+      // here is still the product name, not the real sku code - re-import
+      // matches products by this column (see productIdx below) and the code
+      // alone isn't always present/typed by whoever edited the file offline.
+      const headers = ["Category", "SKU", ...columns.map((c) => c.label)].map(
+        (h) => h.toUpperCase(),
+      );
+      const dataRows = rows.map((r) => [
+        r.product.category,
+        r.product.name,
+        ...columns.map((c) => String(r.entry[c.key] ?? 0)),
+      ]);
+      const csvName = `${filenamePrefix}-${date}.csv`;
+      if (!(await confirmDownload("CSV", csvName))) return;
+      downloadCsv(csvName, toCsv(headers, dataRows));
     }
-  }
 
-  /// Moves one unmatched row onto the matched list using the destination the
-  /// user picked from its fuzzy suggestion - re-running the same "only
-  /// include changed values" diff against THAT product's current row (not
-  /// the one the file's own text implied), same as a normal match. A row
-  /// that turns out identical to the suggested product's current values is
-  /// still removed from the unmatched list (the user resolved it) but never
-  /// added to matched - same "nothing to change" treatment as any other
-  /// unchanged row.
-  function acceptSuggestion(rawLineIndex: number, product: Product) {
-    const context = importContextRef.current;
-    const line = context?.lines[rawLineIndex];
-    if (!context || !line) return;
+    async function handlePdf() {
+      if (onBeforePrint && !(await onBeforePrint())) return;
+      const pdfName = pdfFileName(filenamePrefix, date);
+      if (!(await confirmDownload("PDF", pdfName))) return;
+      try {
+        // No real byte/row progress for a synchronous local PDF build (Section:
+        // Loading system) - track() eases the bar toward 90% and holds it
+        // there for as long as this actually takes, instead of a fake timer.
+        await progress.track(() =>
+          downloadTablePdf({
+            filename: pdfName,
+            title:
+              pdf?.title ??
+              filenamePrefix
+                .replace(/-/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
+            subtitle: pdf?.subtitle ?? formatDateDisplay(date),
+            notes: pdf?.notes,
+            sections: [
+              stockGridSection(rows, columns, {
+                sumKeys: pdf?.sumKeys,
+                flagKey: pdf?.flagKey,
+              }),
+            ],
+          }),
+        );
+      } catch (err) {
+        setMessage(
+          err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed",
+        );
+        setMessageVariant("error");
+        setShowUndoImport(false);
+      }
+    }
 
-    const currentRow = rows.find((r) => r.product.id === product.id);
-    const changes = diffImportLine(line, context.columnIndexes, currentRow?.entry ?? {});
+    /// One file line -> the values that differ from `entry`. A blank cell is
+    /// skipped normally, or read as 0 when blankAsZero is set (Manual Count).
+    /// With blankAsZero an unset current value (null/blank, "not counted yet")
+    /// always differs from an imported 0, so the zero is really staged.
+    function diffImportLine(
+      line: string[],
+      columnIndexes: { key: string; idx: number }[],
+      entry: Record<string, unknown>,
+    ): Record<string, number> {
+      const changes: Record<string, number> = {};
+      for (const { key, idx } of columnIndexes) {
+        const raw = line[idx];
+        const blank = raw === undefined || raw.trim() === "";
+        if (blank && !blankAsZero) continue;
+        const parsed = blank ? 0 : Number(raw);
+        if (Number.isNaN(parsed)) continue;
+        const cur = entry[key];
+        const unset = cur === null || cur === undefined || cur === "";
+        const differs =
+          blankAsZero && unset ? true : parsed !== Number(cur ?? 0);
+        if (differs) changes[key] = parsed;
+      }
+      return changes;
+    }
 
-    setImportReview((prev) => {
-      if (!prev) return prev;
-      const unmatchedRows = prev.unmatchedRows.filter((u) => u.rawLineIndex !== rawLineIndex);
-      const matchedRows = Object.keys(changes).length
-        ? [
-            ...prev.matchedRows,
-            {
-              productId: product.id,
-              productName: product.name,
-              category: product.category,
-              changes,
-              warning: validateImport?.(product.id, changes),
-            },
-          ]
-        : prev.matchedRows;
-      return { ...prev, matchedRows, unmatchedRows };
-    });
-  }
+    async function handleImportFile(file: File) {
+      setBusy(true);
+      setMessage(null);
+      setShowUndoImport(false);
+      try {
+        const text = await file.text();
+        const table = parseCsv(text);
+        if (table.length < 2) throw new Error("File has no data rows");
 
-  /// The Review modal's own Save - this is the point the old inline import
-  /// actually mutated anything, so it's also where the network progress bar
-  /// now starts/advances/finishes (see handleImportFile, which no longer
-  /// touches it at all - parsing is purely local and instant). Also the
-  /// point that captures lastImportBatch: the old value for each changed
-  /// cell, resolved from `rows` the exact same way the review modal's own
-  /// diff already does, since that's the only "what did this actually
-  /// change from" this component ever has - a fresh recompute here, not a
-  /// carry-over from MatchedImportRow (which only ever needed the new
-  /// values) or the modal's own render (which never persists what it drew).
-  async function handleConfirmImport() {
-    if (!importReview || importReview.matchedRows.length === 0) return;
-    setSavingImport(true);
-    progress.start();
-    try {
-      // Import History (Section: CSV import into Manual Count) - registered
-      // up front so every row below can be tagged with it. Best-effort: a
-      // batch that fails to register just means this import won't show up
-      // in Import History (or be revertible from there), not that the
-      // import itself should be blocked on it.
-      let historyBatchId: number | undefined;
-      if (importTarget) {
-        try {
-          const batch = await createImportBatch({
-            location: importTarget.location,
-            date: importTarget.date,
-            shift: importTarget.shift,
-            fileName: importContextRef.current?.fileName ?? "import.csv",
+        // See findHeaderRowIndex's own doc comment: a file that's been
+        // round-tripped through Excel (or had a title/blank row pasted above
+        // it - exactly what the monthly report's own layout looks like) can
+        // push the real column headers down a row or two. Some real-world
+        // exports (Section 8.1) header this column "Products" (plural) rather
+        // than "Product" - both spellings (and this app's own "SKU"/"SKUs",
+        // per the Section 4.1 renaming) are accepted so neither an old export
+        // nor the current business file fails to import.
+        const headerRowIdx = findHeaderRowIndex(table);
+        if (headerRowIdx === -1)
+          throw new Error(
+            'Expected a "SKU" (or "Product") column - re-export the grid and edit that file',
+          );
+
+        const header = table[headerRowIdx].map((h) => h.trim().toLowerCase());
+        const productIdx = findProductColumnIndex(header);
+        const categoryIdx = header.indexOf("category");
+
+        // Import only ever writes Opening Stock. Every other cell (Stock In/
+        // Out, Production, per-destination delivery, Upsell, Backloads, ...)
+        // starts at 0 each day and is meant to be entered fresh as that day's
+        // real activity happens - importing a past day's own figures for
+        // those onto a different day would silently fabricate movements that
+        // never happened on the day being seeded. A file's Remaining Stock
+        // (or an Opening Stock column of its own) is the one figure that's
+        // legitimately "existing data" to carry over.
+        const importedColumns = columns.filter((c) =>
+          importKeys.includes(c.key),
+        );
+        const columnIndexes = matchColumnIndexes(importedColumns, header);
+        // Whether Opening Stock itself wasn't found in this file at all -
+        // worth a heads-up, since every row will otherwise just look
+        // "unchanged" with no indication why (see the toast message below).
+        const missingColumns = unmatchedColumns(importedColumns, header);
+
+        const matchedRows: MatchedImportRow[] = [];
+        const unmatchedRows: UnmatchedImportRow[] = [];
+        let unchanged = 0;
+        // Some monthly reports (see Section 8.1) have no Category column at
+        // all - instead a category shows up as its own row (e.g.
+        // "PREMIUM (350 ML)") with every stat column left blank, followed by
+        // that category's products. Track the most recent one of those as an
+        // implied category so a product name that repeats across sections
+        // (e.g. "Toyo Mansi" exists in three different ones) still resolves
+        // to the right SKU instead of whichever same-named row happens to
+        // come first.
+        let currentCategory: string | undefined;
+        // The authoritative set of category names actually in the product
+        // list, normalized the same way as everything else - checked first,
+        // below, because a "blank stat columns" check alone isn't reliable:
+        // the online report's own "Class A (Gallon)" header row carries stray
+        // Production/Fulfillment/RTS subtotal figures (a spreadsheet
+        // artifact), not blanks, but it's still a section header, not a
+        // product named "Class A (Gallon)".
+        const knownCategoryNames = new Set(
+          rows.map((r) => categoryKey(r.product.category)),
+        );
+        const importLines = table.slice(headerRowIdx + 1);
+        for (const [rawLineIndex, line] of importLines.entries()) {
+          const productName = line[productIdx]?.trim();
+          if (!productName) continue;
+
+          if (
+            categoryIdx === -1 &&
+            knownCategoryNames.has(categoryKey(productName))
+          ) {
+            currentCategory = productName;
+            continue;
+          }
+
+          const hasAnyData = line.some(
+            (cell, i) =>
+              i !== productIdx && i !== categoryIdx && cell.trim() !== "",
+          );
+          // With blankAsZero, an all-blank row that is really a product (its
+          // Manual Count was just left empty) is a 0 count, not a section header.
+          const isBlankProductRow =
+            blankAsZero &&
+            !hasAnyData &&
+            !!findMatchingProduct(
+              rows,
+              productName,
+              categoryIdx !== -1 ? line[categoryIdx]?.trim() : currentCategory,
+            );
+          if (!hasAnyData && !isBlankProductRow) {
+            if (categoryIdx === -1) currentCategory = productName;
+            continue;
+          }
+
+          const category =
+            categoryIdx !== -1 ? line[categoryIdx]?.trim() : currentCategory;
+          // See findMatchingProduct's own doc comment (utils/importMatch.ts)
+          // for why this normalizes both sides and matches on category too,
+          // when known.
+          const match = findMatchingProduct(rows, productName, category);
+          if (!match) {
+            unmatchedRows.push({ productName, category, rawLineIndex });
+            continue;
+          }
+
+          // Only include values that actually differ from what's already on
+          // the grid. A round-tripped export (open in Excel, tweak one cell,
+          // re-import) otherwise resubmits every unchanged "0" as a real edit -
+          // 60+ redundant writes (and change-log entries) for what's really a
+          // one-cell correction.
+          const changes = diffImportLine(line, columnIndexes, match.entry);
+          if (Object.keys(changes).length === 0) {
+            unchanged++;
+            continue;
+          }
+
+          matchedRows.push({
+            productId: match.product.id,
+            productName: match.product.name,
+            category: match.product.category,
+            changes,
+            warning: validateImport?.(match.product.id, changes),
           });
-          historyBatchId = batch.id;
-        } catch {
-          // See the comment above - proceed without one.
         }
+
+        // Everything past this point (accepting a suggestion, Save) needs the
+        // raw lines/column layout again to re-derive a diff - stashed here
+        // rather than re-parsed, since the file itself isn't kept around.
+        importContextRef.current = {
+          lines: importLines,
+          columnIndexes,
+          unchangedCount: unchanged,
+          fileName: file.name,
+        };
+        setReviewLabel(importTarget ? describeTarget(importTarget) : null);
+        setImportReview({
+          matchedRows,
+          unmatchedRows,
+          missingColumns: missingColumns.map((c) => c.label),
+        });
+      } catch (err) {
+        setMessage(
+          err instanceof Error
+            ? `Import failed: ${err.message}`
+            : "Import failed",
+        );
+        setMessageVariant("error");
+        setShowUndoImport(false);
+      } finally {
+        setBusy(false);
       }
-
-      const total = importReview.matchedRows.length;
-      const batchEntries: ImportBatch["entries"] = {};
-      for (let i = 0; i < importReview.matchedRows.length; i++) {
-        const row = importReview.matchedRows[i];
-        if (historyBatchId !== undefined) await onImportRow(row.productId, row.changes, historyBatchId);
-        else await onImportRow(row.productId, row.changes);
-
-        const priorRow = rows.find((r) => r.product.id === row.productId);
-        const fields: Record<string, { oldValue: number; newValue: number }> = {};
-        for (const [key, newValue] of Object.entries(row.changes)) {
-          fields[key] = { oldValue: Number(priorRow?.entry[key] ?? 0), newValue };
-        }
-        batchEntries[row.productId] = fields;
-
-        progress.set(Math.round(((i + 1) / total) * 100));
-      }
-
-      if (historyBatchId !== undefined) void finalizeImportBatch(historyBatchId, importReview.matchedRows.length);
-
-      setLastImportBatch({ fileName: importContextRef.current?.fileName ?? "import", importedAt: Date.now(), entries: batchEntries });
-      setShowUndoImport(true);
-
-      const updated = importReview.matchedRows.length;
-      const unchanged = importContextRef.current?.unchangedCount ?? 0;
-      const stillUnmatched = importReview.unmatchedRows.length;
-      const parts = [`Imported ${updated} row${updated === 1 ? "" : "s"}${reviewLabel ? ` into ${reviewLabel}` : ""}`];
-      if (unchanged) parts.push(`${unchanged} unchanged`);
-      if (stillUnmatched) parts.push(`${stillUnmatched} still unmatched after review`);
-      setMessage(`${parts.join(", ")}.`);
-      // Worth reading in full, not glancing past - stays up until dismissed
-      // rather than auto-clearing while there's something unresolved (rows
-      // that still didn't match anything even after the review modal).
-      setMessageVariant(stillUnmatched ? "error" : "info");
-      progress.done();
-      setImportReview(null);
-    } catch (err) {
-      setMessage(err instanceof Error ? `Import failed: ${err.message}` : "Import failed");
-      setMessageVariant("error");
-      setShowUndoImport(false);
-      progress.fail();
-    } finally {
-      setSavingImport(false);
     }
-  }
 
-  /// One-shot "Undo Import" (see lastImportBatch's own doc comment) - only
-  /// reverts a cell that's still exactly what this import last staged for
-  /// it (checked via getPendingValue), so a manual edit - or a second
-  /// import - made to that cell afterward is left alone rather than
-  /// silently overwritten. Reuses onImportRow one cell at a time, same as
-  /// the import itself used, so a revert is indistinguishable from staging
-  /// that old value by hand.
-  async function handleUndoImport() {
-    if (undoInFlightRef.current) return;
-    const batch = lastImportBatch;
-    if (!batch) return;
-    undoInFlightRef.current = true;
-    setShowUndoImport(false);
-    progress.start();
-    try {
-      const cells = Object.entries(batch.entries).flatMap(([productIdStr, fields]) =>
-        Object.entries(fields).map(([key, values]) => ({ productId: Number(productIdStr), key, ...values })),
+    /// Moves one unmatched row onto the matched list using the destination the
+    /// user picked from its fuzzy suggestion - re-running the same "only
+    /// include changed values" diff against THAT product's current row (not
+    /// the one the file's own text implied), same as a normal match. A row
+    /// that turns out identical to the suggested product's current values is
+    /// still removed from the unmatched list (the user resolved it) but never
+    /// added to matched - same "nothing to change" treatment as any other
+    /// unchanged row.
+    function acceptSuggestion(rawLineIndex: number, product: Product) {
+      const context = importContextRef.current;
+      const line = context?.lines[rawLineIndex];
+      if (!context || !line) return;
+
+      const currentRow = rows.find((r) => r.product.id === product.id);
+      const changes = diffImportLine(
+        line,
+        context.columnIndexes,
+        currentRow?.entry ?? {},
       );
 
-      let reverted = 0;
-      let skipped = 0;
-      for (let i = 0; i < cells.length; i++) {
-        const cell = cells[i];
-        if (getPendingValue(cell.productId, cell.key) === cell.newValue) {
-          await onImportRow(cell.productId, { [cell.key]: cell.oldValue });
-          reverted++;
-        } else {
-          skipped++;
+      setImportReview((prev) => {
+        if (!prev) return prev;
+        const unmatchedRows = prev.unmatchedRows.filter(
+          (u) => u.rawLineIndex !== rawLineIndex,
+        );
+        const matchedRows = Object.keys(changes).length
+          ? [
+              ...prev.matchedRows,
+              {
+                productId: product.id,
+                productName: product.name,
+                category: product.category,
+                changes,
+                warning: validateImport?.(product.id, changes),
+              },
+            ]
+          : prev.matchedRows;
+        return { ...prev, matchedRows, unmatchedRows };
+      });
+    }
+
+    /// The Review modal's own Save - this is the point the old inline import
+    /// actually mutated anything, so it's also where the network progress bar
+    /// now starts/advances/finishes (see handleImportFile, which no longer
+    /// touches it at all - parsing is purely local and instant). Also the
+    /// point that captures lastImportBatch: the old value for each changed
+    /// cell, resolved from `rows` the exact same way the review modal's own
+    /// diff already does, since that's the only "what did this actually
+    /// change from" this component ever has - a fresh recompute here, not a
+    /// carry-over from MatchedImportRow (which only ever needed the new
+    /// values) or the modal's own render (which never persists what it drew).
+    async function handleConfirmImport() {
+      if (!importReview || importReview.matchedRows.length === 0) return;
+      setSavingImport(true);
+      progress.start();
+      try {
+        // Import History (Section: CSV import into Manual Count) - registered
+        // up front so every row below can be tagged with it. Best-effort: a
+        // batch that fails to register just means this import won't show up
+        // in Import History (or be revertible from there), not that the
+        // import itself should be blocked on it.
+        let historyBatchId: number | undefined;
+        if (importTarget) {
+          try {
+            const batch = await createImportBatch({
+              location: importTarget.location,
+              date: importTarget.date,
+              shift: importTarget.shift,
+              fileName: importContextRef.current?.fileName ?? "import.csv",
+            });
+            historyBatchId = batch.id;
+          } catch {
+            // See the comment above - proceed without one.
+          }
         }
-        progress.set(Math.round(((i + 1) / cells.length) * 100));
+
+        const total = importReview.matchedRows.length;
+        const batchEntries: ImportBatch["entries"] = {};
+        for (let i = 0; i < importReview.matchedRows.length; i++) {
+          const row = importReview.matchedRows[i];
+          if (historyBatchId !== undefined)
+            await onImportRow(row.productId, row.changes, historyBatchId);
+          else await onImportRow(row.productId, row.changes);
+
+          const priorRow = rows.find((r) => r.product.id === row.productId);
+          const fields: Record<string, { oldValue: number; newValue: number }> =
+            {};
+          for (const [key, newValue] of Object.entries(row.changes)) {
+            fields[key] = {
+              oldValue: Number(priorRow?.entry[key] ?? 0),
+              newValue,
+            };
+          }
+          batchEntries[row.productId] = fields;
+
+          progress.set(Math.round(((i + 1) / total) * 100));
+        }
+
+        if (historyBatchId !== undefined)
+          void finalizeImportBatch(
+            historyBatchId,
+            importReview.matchedRows.length,
+          );
+
+        setLastImportBatch({
+          fileName: importContextRef.current?.fileName ?? "import",
+          importedAt: Date.now(),
+          entries: batchEntries,
+        });
+        setShowUndoImport(true);
+
+        const updated = importReview.matchedRows.length;
+        const unchanged = importContextRef.current?.unchangedCount ?? 0;
+        const stillUnmatched = importReview.unmatchedRows.length;
+        const parts = [
+          `Imported ${updated} row${updated === 1 ? "" : "s"}${reviewLabel ? ` into ${reviewLabel}` : ""}`,
+        ];
+        if (unchanged) parts.push(`${unchanged} unchanged`);
+        if (stillUnmatched)
+          parts.push(`${stillUnmatched} still unmatched after review`);
+        setMessage(`${parts.join(", ")}.`);
+        // Worth reading in full, not glancing past - stays up until dismissed
+        // rather than auto-clearing while there's something unresolved (rows
+        // that still didn't match anything even after the review modal).
+        setMessageVariant(stillUnmatched ? "error" : "info");
+        progress.done();
+        setImportReview(null);
+      } catch (err) {
+        setMessage(
+          err instanceof Error
+            ? `Import failed: ${err.message}`
+            : "Import failed",
+        );
+        setMessageVariant("error");
+        setShowUndoImport(false);
+        progress.fail();
+      } finally {
+        setSavingImport(false);
       }
-
-      setLastImportBatch(null);
-      const parts = [`Reverted ${reverted} cell${reverted === 1 ? "" : "s"} from ${batch.fileName}`];
-      if (skipped) parts.push(`${skipped} cell${skipped === 1 ? "" : "s"} skipped, already changed since`);
-      setMessage(`${parts.join(", ")}.`);
-      setMessageVariant(skipped ? "error" : "info");
-      progress.done();
-    } catch (err) {
-      setMessage(err instanceof Error ? `Undo failed: ${err.message}` : "Undo failed");
-      setMessageVariant("error");
-      progress.fail();
-    } finally {
-      undoInFlightRef.current = false;
     }
-  }
 
-  function openHistory() {
-    setShowHistory(true);
-    setHistoryError(null);
-    setHistoryBatches(null);
-    listImportBatches(importTarget?.location)
-      .then(setHistoryBatches)
-      .catch((err) => setHistoryError(err instanceof Error ? err.message : "Failed to load import history"));
-  }
-
-  /// Deleting an entry reverts exactly the cells that import changed (unless
-  /// something else has touched them since - see the server's
-  /// revertImportBatch) and then removes it from the list. Whatever it
-  /// reverted shows up via realtime, same as any other save - this never
-  /// needs to tell a page to refresh itself directly.
-  async function handleDeleteBatch(id: number) {
-    setDeletingId(id);
-    try {
-      const result = await deleteImportBatch(id);
-      setHistoryBatches((prev) => prev?.filter((b) => b.id !== id) ?? prev);
-      setConfirmDeleteId(null);
-      const parts = [`Reverted ${result.reverted} cell${result.reverted === 1 ? "" : "s"}`];
-      if (result.skipped) parts.push(`${result.skipped} skipped - already changed since`);
-      setMessage(`${parts.join(", ")}.`);
-      setMessageVariant(result.skipped ? "error" : "info");
+    /// One-shot "Undo Import" (see lastImportBatch's own doc comment) - only
+    /// reverts a cell that's still exactly what this import last staged for
+    /// it (checked via getPendingValue), so a manual edit - or a second
+    /// import - made to that cell afterward is left alone rather than
+    /// silently overwritten. Reuses onImportRow one cell at a time, same as
+    /// the import itself used, so a revert is indistinguishable from staging
+    /// that old value by hand.
+    async function handleUndoImport() {
+      if (undoInFlightRef.current) return;
+      const batch = lastImportBatch;
+      if (!batch) return;
+      undoInFlightRef.current = true;
       setShowUndoImport(false);
-    } catch (err) {
-      setHistoryError(err instanceof Error ? err.message : "Failed to delete import");
-    } finally {
-      setDeletingId(null);
-    }
-  }
+      progress.start();
+      try {
+        const cells = Object.entries(batch.entries).flatMap(
+          ([productIdStr, fields]) =>
+            Object.entries(fields).map(([key, values]) => ({
+              productId: Number(productIdStr),
+              key,
+              ...values,
+            })),
+        );
 
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-      {/* `layout` on the group and every segment button - compact mode
+        let reverted = 0;
+        let skipped = 0;
+        for (let i = 0; i < cells.length; i++) {
+          const cell = cells[i];
+          if (getPendingValue(cell.productId, cell.key) === cell.newValue) {
+            await onImportRow(cell.productId, { [cell.key]: cell.oldValue });
+            reverted++;
+          } else {
+            skipped++;
+          }
+          progress.set(Math.round(((i + 1) / cells.length) * 100));
+        }
+
+        setLastImportBatch(null);
+        const parts = [
+          `Reverted ${reverted} cell${reverted === 1 ? "" : "s"} from ${batch.fileName}`,
+        ];
+        if (skipped)
+          parts.push(
+            `${skipped} cell${skipped === 1 ? "" : "s"} skipped, already changed since`,
+          );
+        setMessage(`${parts.join(", ")}.`);
+        setMessageVariant(skipped ? "error" : "info");
+        progress.done();
+      } catch (err) {
+        setMessage(
+          err instanceof Error ? `Undo failed: ${err.message}` : "Undo failed",
+        );
+        setMessageVariant("error");
+        progress.fail();
+      } finally {
+        undoInFlightRef.current = false;
+      }
+    }
+
+    function openHistory() {
+      setShowHistory(true);
+      setHistoryError(null);
+      setHistoryBatches(null);
+      listImportBatches(importTarget?.location)
+        .then(setHistoryBatches)
+        .catch((err) =>
+          setHistoryError(
+            err instanceof Error
+              ? err.message
+              : "Failed to load import history",
+          ),
+        );
+    }
+
+    /// Deleting an entry reverts exactly the cells that import changed (unless
+    /// something else has touched them since - see the server's
+    /// revertImportBatch) and then removes it from the list. Whatever it
+    /// reverted shows up via realtime, same as any other save - this never
+    /// needs to tell a page to refresh itself directly.
+    async function handleDeleteBatch(id: number) {
+      setDeletingId(id);
+      try {
+        const result = await deleteImportBatch(id);
+        setHistoryBatches((prev) => prev?.filter((b) => b.id !== id) ?? prev);
+        setConfirmDeleteId(null);
+        const parts = [
+          `Reverted ${result.reverted} cell${result.reverted === 1 ? "" : "s"}`,
+        ];
+        if (result.skipped)
+          parts.push(`${result.skipped} skipped - already changed since`);
+        setMessage(`${parts.join(", ")}.`);
+        setMessageVariant(result.skipped ? "error" : "info");
+        setShowUndoImport(false);
+      } catch (err) {
+        setHistoryError(
+          err instanceof Error ? err.message : "Failed to delete import",
+        );
+      } finally {
+        setDeletingId(null);
+      }
+    }
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        {/* `layout` on the group and every segment button - compact mode
           (index.css's .ae-toolbar--compact rules) turns this from one
           joined pill with text labels into individually circular icon
           buttons purely via a CSS class swap, which otherwise pops
           instantly. `layout` makes that whole reshape (background,
           border-radius, each button's own width) animate smoothly via
           Framer's FLIP projection instead. */}
-      <motion.div
-        layout
-        transition={toolbarLayoutTransition}
-        className="ae-segment-group"
-        aria-label="Export/Import"
-        title="Export/Import"
-      >
-        {showExport && (
-          <>
-            <motion.button
-              layout
-              transition={toolbarLayoutTransition}
-              whileTap={{ scale: 0.94 }}
-              type="button"
-              className="ae-segment-btn"
-              onClick={handleExport}
-              disabled={disabled}
-              title={asExcel ? "Export as Excel (.xls)" : "Export"}
-            >
-              <UploadIcon />
-              <span className="ae-segment-label">{asExcel ? "Export Excel" : "Export"}</span>
-            </motion.button>
-            {showPdf && <div className="ae-segment-divider" />}
-          </>
-        )}
-        {showPdf && (
-          <motion.button
-            layout
-            transition={toolbarLayoutTransition}
-            whileTap={{ scale: 0.94 }}
-            type="button"
-            className="ae-segment-btn"
-            onClick={() => void handlePdf()}
-            disabled={disabled || pdfDisabled}
-            title={pdfDisabled ? "Save your changes first - PDF reflects only saved data" : "Download as PDF"}
-          >
-            <PrinterIcon />
-            <span className="ae-segment-label">PDF</span>
-          </motion.button>
-        )}
-        {canImport && (
-          <>
-            {(showExport || showPdf) && <div className="ae-segment-divider" />}
-            <motion.button
-              layout
-              transition={toolbarLayoutTransition}
-              whileTap={{ scale: 0.94 }}
-              type="button"
-              className="ae-segment-btn"
-              onClick={() => {
-                if (importTarget) setTargetDraft({ ...importTarget });
-                else fileInputRef.current?.click();
-              }}
-              disabled={disabled || busy}
-              title={busy ? "Importing…" : "Import"}
-            >
-              <DownloadIcon />
-              <span className="ae-segment-label">{busy ? "Importing…" : "Import"}</span>
-            </motion.button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              style={{ display: "none" }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  if (disabled) {
-                    pendingFileRef.current = file;
-                    setMessage("Loading the selected sheet - the file will be read as soon as it is ready.");
-                    setMessageVariant("info");
-                  } else void handleImportFile(file);
-                }
-                e.target.value = "";
-              }}
-            />
-          </>
-        )}
-      </motion.div>
-      {canImport && (
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          onClick={openHistory}
-          disabled={disabled}
-          aria-label="Import History"
-          title="Import History"
-          className="ae-tap-target ae-toolbar-icon-btn"
-          style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
+        <motion.div
+          layout
+          transition={toolbarLayoutTransition}
+          className="ae-segment-group"
+          aria-label="Export/Import"
+          title="Export/Import"
         >
-          <HistoryIcon />
-        </Button>
-      )}
-      <Toast
-        message={message}
-        onDismiss={() => {
-          setMessage(null);
-          setShowUndoImport(false);
-        }}
-        variant={messageVariant}
-        duration={messageVariant === "error" ? null : 6000}
-        action={showUndoImport && lastImportBatch ? { label: "Undo Import", onClick: () => void handleUndoImport() } : undefined}
-      />
-      {targetDraft && importTarget && (
-        <Modal title="Import into which sheet?" onClose={() => setTargetDraft(null)} width={460}>
-          <p style={{ margin: "0 0 14px", fontSize: 13, color: colors.subtleInk }}>
-            Pick the date, location and shift this file belongs to. Nothing is changed until you review the import and press Save.
-          </p>
-          <div style={{ display: "grid", gap: 12 }}>
-            <label style={targetFieldStyle}>
-              <span>Date</span>
-              <DatePicker
-                aria-label="Import date"
-                value={targetDraft.date}
-                onChange={(date) => setTargetDraft((d) => (d ? { ...d, date } : d))}
-                todayValue={importTodayValue ?? getCurrentShiftAndDate().date}
-              />
-            </label>
-            <label style={targetFieldStyle}>
-              <span>Location</span>
-              <Dropdown
-                aria-label="Import location"
-                value={targetDraft.location}
-                onChange={(v) => setTargetDraft((d) => (d ? { ...d, location: v as StockLocation } : d))}
-                disabled={!importLocations || importLocations.length <= 1}
-                options={(importLocations && importLocations.length > 0 ? importLocations : [importTarget.location]).map((l) => ({ value: l, label: l }))}
-              />
-            </label>
-            <label style={targetFieldStyle}>
-              <span>Shift</span>
-              <ShiftFilter value={targetDraft.shift} onChange={(s) => s && setTargetDraft((d) => (d ? { ...d, shift: s } : d))} />
-            </label>
-          </div>
-          <ImportTargetBanner label={describeTarget(targetDraft)} />
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setTargetDraft(null)}>
-              Cancel
-            </Button>
-            <Button
+          {showExport && (
+            <>
+              <motion.button
+                layout
+                transition={toolbarLayoutTransition}
+                whileTap={{ scale: 0.94 }}
+                type="button"
+                className="ae-segment-btn"
+                onClick={handleExport}
+                disabled={disabled}
+                title={asExcel ? "Export as Excel (.xls)" : "Export"}
+              >
+                <UploadIcon />
+                <span className="ae-segment-label">
+                  {asExcel ? "Export Excel" : "Export"}
+                </span>
+              </motion.button>
+              {showPdf && <div className="ae-segment-divider" />}
+            </>
+          )}
+          {showPdf && (
+            <motion.button
+              layout
+              transition={toolbarLayoutTransition}
+              whileTap={{ scale: 0.94 }}
               type="button"
-              size="sm"
-              onClick={() => {
-                const t = targetDraft;
-                setTargetDraft(null);
-                if (t.date !== importTarget.date || t.shift !== importTarget.shift || t.location !== importTarget.location) onImportTargetChange?.(t);
-                // Still inside the click, so the browser allows the picker.
-                fileInputRef.current?.click();
-              }}
-              disabled={!targetDraft.date}
+              className="ae-segment-btn"
+              onClick={() => void handlePdf()}
+              disabled={disabled || pdfDisabled}
+              title={
+                pdfDisabled
+                  ? "Save your changes first - PDF reflects only saved data"
+                  : "Download as PDF"
+              }
             >
-              Choose file…
-            </Button>
-          </div>
-        </Modal>
-      )}
-      {importReview && (
-        <Modal title={reviewLabel ? `Review Import - ${reviewLabel}` : "Review Import"} onClose={() => setImportReview(null)} width={760}>
-          {reviewLabel && <ImportTargetBanner label={reviewLabel} />}
-          <PendingChangesPreview
-            items={importReview.matchedRows.flatMap((row): PendingChangeDetail[] =>
-              Object.entries(row.changes).map(([key, newValue]) => ({
-                productId: row.productId,
-                name: row.productName,
-                category: row.category,
-                label: columns.find((c) => c.key === key)?.label ?? key,
-                // Resolved the same way describePendingChanges resolves an
-                // old value - against the last-saved `rows`, never the
-                // (already-changed) values sitting in this review.
-                oldValue: Number(rows.find((r) => r.product.id === row.productId)?.entry[key] ?? 0),
-                newValue,
-              })),
-            )}
-          />
-          {importReview.matchedRows.some((r) => r.warning) && (
-            <div style={{ marginTop: 14 }}>
-              {/* Advisory only (see validateImport's own doc comment) -
+              <PrinterIcon />
+              <span className="ae-segment-label">PDF</span>
+            </motion.button>
+          )}
+          {canImport && (
+            <>
+              {(showExport || showPdf) && (
+                <div className="ae-segment-divider" />
+              )}
+              <motion.button
+                layout
+                transition={toolbarLayoutTransition}
+                whileTap={{ scale: 0.94 }}
+                type="button"
+                className="ae-segment-btn"
+                onClick={() => {
+                  if (importTarget) setTargetDraft({ ...importTarget });
+                  else fileInputRef.current?.click();
+                }}
+                disabled={disabled || busy}
+                title={busy ? "Importing…" : "Import"}
+              >
+                <DownloadIcon />
+                <span className="ae-segment-label">
+                  {busy ? "Importing…" : "Import"}
+                </span>
+              </motion.button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                style={{ display: "none" }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (disabled) {
+                      pendingFileRef.current = file;
+                      setMessage(
+                        "Loading the selected sheet - the file will be read as soon as it is ready.",
+                      );
+                      setMessageVariant("info");
+                    } else void handleImportFile(file);
+                  }
+                  e.target.value = "";
+                }}
+              />
+            </>
+          )}
+        </motion.div>
+        {canImport && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={openHistory}
+            disabled={disabled}
+            aria-label="Import History"
+            title="Import History"
+            className="ae-tap-target ae-toolbar-icon-btn"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <HistoryIcon />
+          </Button>
+        )}
+        <Toast
+          message={message}
+          onDismiss={() => {
+            setMessage(null);
+            setShowUndoImport(false);
+          }}
+          variant={messageVariant}
+          duration={messageVariant === "error" ? null : 6000}
+          action={
+            showUndoImport && lastImportBatch
+              ? { label: "Undo Import", onClick: () => void handleUndoImport() }
+              : undefined
+          }
+        />
+        {targetDraft && importTarget && (
+          <Modal
+            title="Import into which sheet?"
+            onClose={() => setTargetDraft(null)}
+            width={460}
+          >
+            <p
+              style={{
+                margin: "0 0 14px",
+                fontSize: 13,
+                color: colors.subtleInk,
+              }}
+            >
+              Pick the date, location and shift this file belongs to. Nothing is
+              changed until you review the import and press Save.
+            </p>
+            <div style={{ display: "grid", gap: 12 }}>
+              <label style={targetFieldStyle}>
+                <span>Date</span>
+                <DatePicker
+                  aria-label="Import date"
+                  value={targetDraft.date}
+                  onChange={(date) =>
+                    setTargetDraft((d) => (d ? { ...d, date } : d))
+                  }
+                  todayValue={importTodayValue ?? getCurrentShiftAndDate().date}
+                />
+              </label>
+              <label style={targetFieldStyle}>
+                <span>Location</span>
+                <Dropdown
+                  aria-label="Import location"
+                  value={targetDraft.location}
+                  onChange={(v) =>
+                    setTargetDraft((d) =>
+                      d ? { ...d, location: v as StockLocation } : d,
+                    )
+                  }
+                  disabled={!importLocations || importLocations.length <= 1}
+                  options={(importLocations && importLocations.length > 0
+                    ? importLocations
+                    : [importTarget.location]
+                  ).map((l) => ({ value: l, label: l }))}
+                />
+              </label>
+              <label style={targetFieldStyle}>
+                <span>Shift</span>
+                <ShiftFilter
+                  value={targetDraft.shift}
+                  onChange={(s) =>
+                    s && setTargetDraft((d) => (d ? { ...d, shift: s } : d))
+                  }
+                />
+              </label>
+            </div>
+            <ImportTargetBanner label={describeTarget(targetDraft)} />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginTop: 16,
+              }}
+            >
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setTargetDraft(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  const t = targetDraft;
+                  setTargetDraft(null);
+                  if (
+                    t.date !== importTarget.date ||
+                    t.shift !== importTarget.shift ||
+                    t.location !== importTarget.location
+                  )
+                    onImportTargetChange?.(t);
+                  // Still inside the click, so the browser allows the picker.
+                  fileInputRef.current?.click();
+                }}
+                disabled={!targetDraft.date}
+              >
+                Choose file…
+              </Button>
+            </div>
+          </Modal>
+        )}
+        {importReview && (
+          <Modal
+            title={
+              reviewLabel ? `Review Import - ${reviewLabel}` : "Review Import"
+            }
+            onClose={() => setImportReview(null)}
+            width={760}
+          >
+            {reviewLabel && <ImportTargetBanner label={reviewLabel} />}
+            <PendingChangesPreview
+              items={importReview.matchedRows.flatMap(
+                (row): PendingChangeDetail[] =>
+                  Object.entries(row.changes).map(([key, newValue]) => ({
+                    productId: row.productId,
+                    name: row.productName,
+                    category: row.category,
+                    label: columns.find((c) => c.key === key)?.label ?? key,
+                    // Resolved the same way describePendingChanges resolves an
+                    // old value - against the last-saved `rows`, never the
+                    // (already-changed) values sitting in this review.
+                    oldValue: Number(
+                      rows.find((r) => r.product.id === row.productId)?.entry[
+                        key
+                      ] ?? 0,
+                    ),
+                    newValue,
+                  })),
+              )}
+            />
+            {importReview.matchedRows.some((r) => r.warning) && (
+              <div style={{ marginTop: 14 }}>
+                {/* Advisory only (see validateImport's own doc comment) -
                   these rows are still staged and still counted in
                   "Save (N)" below; this is a heads-up before Save is
                   clicked, not a second gate. colors.warningText (not
                   colors.danger - reserved for an actual failure) so the
                   header doesn't read as more alarming than it is. */}
-              <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.warningText }}>
-                ⚠ May fail to save
-              </h4>
-              <ul style={{ margin: 0, padding: "0 0 0 18px", fontSize: 12.5, color: colors.subtleInk }}>
-                {importReview.matchedRows
-                  .filter((r) => r.warning)
-                  .map((r) => (
-                    <li key={r.productId}>
-                      <strong style={{ color: colors.ink }}>{r.productName}</strong>: {r.warning}
-                    </li>
-                  ))}
-              </ul>
-            </div>
-          )}
-          {importReview.missingColumns.length > 0 && (
-            <p style={{ margin: "12px 0 0", fontSize: 12.5, color: colors.subtleInk }}>
-              Not found in this file, left unchanged: {importReview.missingColumns.join(", ")}.
-            </p>
-          )}
-          {importReview.unmatchedRows.length > 0 && (
-            <div style={{ marginTop: 18 }}>
-              <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.ink }}>
-                Unmatched ({importReview.unmatchedRows.length})
-              </h4>
-              <div className="table-scroll" style={{ maxHeight: 240, overflowY: "auto" }}>
-                {importReview.unmatchedRows.map((row) => (
-                  <UnmatchedImportRowView
-                    key={row.rawLineIndex}
-                    row={row}
-                    candidates={rows.map((r) => r.product)}
-                    onAccept={acceptSuggestion}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-            <Button type="button" variant="secondary" size="sm" onClick={() => setImportReview(null)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => void handleConfirmImport()}
-              disabled={importReview.matchedRows.length === 0 || savingImport}
-            >
-              {savingImport ? "Saving…" : `Save (${importReview.matchedRows.length})`}
-            </Button>
-          </div>
-        </Modal>
-      )}
-      {showHistory && (
-        <Modal title="Import History" onClose={() => setShowHistory(false)} width={620}>
-          {historyError && (
-            <p style={{ margin: "0 0 12px", fontSize: 13, color: colors.danger }}>{historyError}</p>
-          )}
-          {!historyBatches && !historyError && (
-            <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>Loading…</p>
-          )}
-          {historyBatches && historyBatches.length === 0 && (
-            <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>No imports recorded yet.</p>
-          )}
-          {historyBatches && historyBatches.length > 0 && (
-            <div className="table-scroll" style={{ maxHeight: 420, overflowY: "auto" }}>
-              {historyBatches.map((b) => (
-                <div
-                  key={b.id}
+                <h4
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
-                    padding: "10px 0",
-                    borderBottom: `1px solid ${colors.border}`,
+                    margin: "0 0 6px",
+                    fontSize: 13,
+                    color: colors.warningText,
                   }}
                 >
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: colors.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {b.fileName}
-                    </div>
-                    <div style={{ fontSize: 12, color: colors.subtleInk, marginTop: 2 }}>
-                      {formatDateDisplay(b.entryDate.slice(0, 10))} · {SHIFT_SHORT_LABELS[b.shift]} Shift · {b.location} · {b.rowCount} row
-                      {b.rowCount === 1 ? "" : "s"}
-                    </div>
-                    <div style={{ fontSize: 12, color: colors.subtleInk, marginTop: 2 }}>
-                      {b.importedBy?.name ?? "Unknown"} · {formatRelativeTime(b.importedAt)}
-                    </div>
-                  </div>
-                  {confirmDeleteId === b.id ? (
-                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                      <span style={{ fontSize: 12, color: colors.subtleInk }}>Revert this import?</span>
-                      <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmDeleteId(null)} disabled={deletingId === b.id}>
-                        Cancel
-                      </Button>
-                      <Button type="button" size="sm" onClick={() => void handleDeleteBatch(b.id)} disabled={deletingId === b.id}>
-                        {deletingId === b.id ? "Reverting…" : "Revert"}
-                      </Button>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setConfirmDeleteId(b.id)}
-                      aria-label={`Delete import ${b.fileName}`}
-                      title="Delete - reverts the cells it changed"
-                      style={{ flexShrink: 0 }}
-                    >
-                      <ClearIcon />
-                    </Button>
-                  )}
+                  ⚠ May fail to save
+                </h4>
+                <ul
+                  style={{
+                    margin: 0,
+                    padding: "0 0 0 18px",
+                    fontSize: 12.5,
+                    color: colors.subtleInk,
+                  }}
+                >
+                  {importReview.matchedRows
+                    .filter((r) => r.warning)
+                    .map((r) => (
+                      <li key={r.productId}>
+                        <strong style={{ color: colors.ink }}>
+                          {r.productName}
+                        </strong>
+                        : {r.warning}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+            {importReview.missingColumns.length > 0 && (
+              <p
+                style={{
+                  margin: "12px 0 0",
+                  fontSize: 12.5,
+                  color: colors.subtleInk,
+                }}
+              >
+                Not found in this file, left unchanged:{" "}
+                {importReview.missingColumns.join(", ")}.
+              </p>
+            )}
+            {importReview.unmatchedRows.length > 0 && (
+              <div style={{ marginTop: 18 }}>
+                <h4
+                  style={{ margin: "0 0 6px", fontSize: 13, color: colors.ink }}
+                >
+                  Unmatched ({importReview.unmatchedRows.length})
+                </h4>
+                <div
+                  className="table-scroll"
+                  style={{ maxHeight: 240, overflowY: "auto" }}
+                >
+                  {importReview.unmatchedRows.map((row) => (
+                    <UnmatchedImportRowView
+                      key={row.rawLineIndex}
+                      row={row}
+                      candidates={rows.map((r) => r.product)}
+                      onAccept={acceptSuggestion}
+                    />
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginTop: 16,
+              }}
+            >
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setImportReview(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleConfirmImport()}
+                disabled={importReview.matchedRows.length === 0 || savingImport}
+              >
+                {savingImport
+                  ? "Saving…"
+                  : `Save (${importReview.matchedRows.length})`}
+              </Button>
             </div>
-          )}
-        </Modal>
-      )}
-    </div>
-  );
-});
+          </Modal>
+        )}
+        {showHistory && (
+          <Modal
+            title="Import History"
+            onClose={() => setShowHistory(false)}
+            width={620}
+          >
+            {historyError && (
+              <p
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: 13,
+                  color: colors.danger,
+                }}
+              >
+                {historyError}
+              </p>
+            )}
+            {!historyBatches && !historyError && (
+              <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>
+                Loading…
+              </p>
+            )}
+            {historyBatches && historyBatches.length === 0 && (
+              <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>
+                No imports recorded yet.
+              </p>
+            )}
+            {historyBatches && historyBatches.length > 0 && (
+              <div
+                className="table-scroll"
+                style={{ maxHeight: 420, overflowY: "auto" }}
+              >
+                {historyBatches.map((b) => (
+                  <div
+                    key={b.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                      padding: "10px 0",
+                      borderBottom: `1px solid ${colors.border}`,
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: colors.ink,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {b.fileName}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: colors.subtleInk,
+                          marginTop: 2,
+                        }}
+                      >
+                        {formatDateDisplay(b.entryDate.slice(0, 10))} ·{" "}
+                        {SHIFT_SHORT_LABELS[b.shift]} Shift · {b.location} ·{" "}
+                        {b.rowCount} row
+                        {b.rowCount === 1 ? "" : "s"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: colors.subtleInk,
+                          marginTop: 2,
+                        }}
+                      >
+                        {b.importedBy?.name ?? "Unknown"} ·{" "}
+                        {formatRelativeTime(b.importedAt)}
+                      </div>
+                    </div>
+                    {confirmDeleteId === b.id ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span style={{ fontSize: 12, color: colors.subtleInk }}>
+                          Revert this import?
+                        </span>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => setConfirmDeleteId(null)}
+                          disabled={deletingId === b.id}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => void handleDeleteBatch(b.id)}
+                          disabled={deletingId === b.id}
+                        >
+                          {deletingId === b.id ? "Reverting…" : "Revert"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setConfirmDeleteId(b.id)}
+                        aria-label={`Delete import ${b.fileName}`}
+                        title="Delete - reverts the cells it changed"
+                        style={{ flexShrink: 0 }}
+                      >
+                        <ClearIcon />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Modal>
+        )}
+      </div>
+    );
+  },
+);

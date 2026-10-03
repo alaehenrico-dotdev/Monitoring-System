@@ -18,10 +18,27 @@ import { downloadCsv } from "../utils/csv";
 // alike) exist purely so these tests can prove a file that also changes them
 // is still ignored for anything but Opening Stock.
 const columns: CsvColumn[] = [
-  { key: "openingStock", label: "Stocks (Opening)", editable: false, importable: true, aliases: ["Remaining Stocks"] },
-  { key: "stockInOlToOff", label: "Stocks In (Ol→Off)", editable: true, aliases: ["Stocks In"] },
+  {
+    key: "openingStock",
+    label: "Stocks (Opening)",
+    editable: false,
+    importable: true,
+    aliases: ["Remaining Stocks"],
+  },
+  {
+    key: "stockInOlToOff",
+    label: "Stocks In (Ol→Off)",
+    editable: true,
+    aliases: ["Stocks In"],
+  },
   { key: "productionIn", label: "Production (In)", editable: true },
-  { key: "deliveryOut", label: "Delivery (Out)", editable: false, importable: true, aliases: ["Delivery(Out)"] },
+  {
+    key: "deliveryOut",
+    label: "Delivery (Out)",
+    editable: false,
+    importable: true,
+    aliases: ["Delivery(Out)"],
+  },
 ];
 
 const product: Product = {
@@ -35,9 +52,24 @@ const product: Product = {
   lowStockThreshold: 0,
 };
 
-const rows = [{ product, entry: { openingStock: 20, stockInOlToOff: 5, productionIn: 10, deliveryOut: 3 } }];
+const rows = [
+  {
+    product,
+    entry: {
+      openingStock: 20,
+      stockInOlToOff: 5,
+      productionIn: 10,
+      deliveryOut: 3,
+    },
+  },
+];
 
-function renderCsvTools(validateImport?: (productId: number, changes: Record<string, number>) => string | undefined) {
+function renderCsvTools(
+  validateImport?: (
+    productId: number,
+    changes: Record<string, number>,
+  ) => string | undefined,
+) {
   const onImportRow = vi.fn().mockResolvedValue(undefined);
   render(
     <TopProgressProvider>
@@ -68,14 +100,22 @@ describe("CsvTools - export/import round trip", () => {
     const { onImportRow } = renderCsvTools();
 
     fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    expect(downloadCsv).toHaveBeenCalledTimes(1);
+    // Export now awaits the download confirmation (which resolves straight
+    // away outside the desktop app), so the download lands a tick later.
+    await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
     const [, content] = vi.mocked(downloadCsv).mock.calls[0];
 
-    const file = new File([content], "offline-entry-2026-06-01.csv", { type: "text/csv" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const file = new File([content], "offline-entry-2026-06-01.csv", {
+      type: "text/csv",
+    });
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Review Import")).toBeInTheDocument(),
+    );
 
     const saveButton = screen.getByRole("button", { name: "Save (0)" });
     expect(saveButton).toBeDisabled();
@@ -90,10 +130,14 @@ describe("CsvTools - export/import round trip", () => {
       "Class A (Liter),Sweet A,50,999,999,999",
     ].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Review Import")).toBeInTheDocument(),
+    );
 
     expect(screen.getByRole("button", { name: "Save (1)" })).toBeEnabled();
     expect(screen.getByText("Stocks (Opening)")).toBeInTheDocument();
@@ -116,10 +160,14 @@ describe("CsvTools - export/import round trip", () => {
       "Class A (Liter),Sweet A,,999,999,999",
     ].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Review Import")).toBeInTheDocument(),
+    );
 
     const saveButton = screen.getByRole("button", { name: "Save (0)" });
     expect(saveButton).toBeDisabled();
@@ -133,12 +181,19 @@ describe("CsvTools - export/import round trip", () => {
     // column is that day's already-stale opening balance, but this fixture
     // only has the ending balance - exactly the switchover/backfill case
     // Opening Stock import exists for.
-    const csv = ["CATEGORY,SKU,REMAINING STOCKS", "Class A (Liter),Sweet A,50"].join("\r\n");
+    const csv = [
+      "CATEGORY,SKU,REMAINING STOCKS",
+      "Class A (Liter),Sweet A,50",
+    ].join("\r\n");
     const file = new File([csv], "monthly-report.csv", { type: "text/csv" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Review Import")).toBeInTheDocument(),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save (1)" }));
     await waitFor(() => expect(onImportRow).toHaveBeenCalledTimes(1));
     expect(onImportRow).toHaveBeenCalledWith(product.id, { openingStock: 50 });
@@ -148,7 +203,9 @@ describe("CsvTools - export/import round trip", () => {
 describe("CsvTools - saving state", () => {
   it("disables Save and shows a loading label while the save is in flight", async () => {
     let resolveImport!: () => void;
-    const onImportRow = vi.fn(() => new Promise<void>((resolve) => (resolveImport = resolve)));
+    const onImportRow = vi.fn(
+      () => new Promise<void>((resolve) => (resolveImport = resolve)),
+    );
     render(
       <TopProgressProvider>
         <CsvTools
@@ -163,19 +220,30 @@ describe("CsvTools - saving state", () => {
       </TopProgressProvider>,
     );
 
-    const csv = ["CATEGORY,SKU,STOCKS (OPENING)", "Class A (Liter),Sweet A,50"].join("\r\n");
+    const csv = [
+      "CATEGORY,SKU,STOCKS (OPENING)",
+      "Class A (Liter),Sweet A,50",
+    ].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
-    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Review Import")).toBeInTheDocument(),
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Save (1)" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled());
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Saving…" })).toBeDisabled(),
+    );
     expect(onImportRow).toHaveBeenCalledTimes(1);
 
     resolveImport();
-    await waitFor(() => expect(screen.queryByText("Review Import")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText("Review Import")).not.toBeInTheDocument(),
+    );
   });
 });
 
@@ -187,22 +255,30 @@ describe("CsvTools - saving state", () => {
  */
 describe("CsvTools - validateImport advisory warning", () => {
   it("shows the warning in the Review modal but still stages and counts the row toward Save", async () => {
-    const { onImportRow } = renderCsvTools(
-      (productId, changes) =>
-        productId === product.id && changes.openingStock === 50
-          ? "This would take Sweet A's Offline stock below zero (would end at -3)."
-          : undefined,
+    const { onImportRow } = renderCsvTools((productId, changes) =>
+      productId === product.id && changes.openingStock === 50
+        ? "This would take Sweet A's Offline stock below zero (would end at -3)."
+        : undefined,
     );
 
-    const csv = ["CATEGORY,SKU,STOCKS (OPENING)", "Class A (Liter),Sweet A,50"].join("\r\n");
+    const csv = [
+      "CATEGORY,SKU,STOCKS (OPENING)",
+      "Class A (Liter),Sweet A,50",
+    ].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Review Import")).toBeInTheDocument(),
+    );
 
     expect(screen.getByText("⚠ May fail to save")).toBeInTheDocument();
-    expect(screen.getByText(/This would take Sweet A's Offline stock below zero/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/This would take Sweet A's Offline stock below zero/),
+    ).toBeInTheDocument();
     // Still fully stageable/saveable - this is advisory, not a second gate.
     const saveButton = screen.getByRole("button", { name: "Save (1)" });
     expect(saveButton).toBeEnabled();
@@ -214,12 +290,19 @@ describe("CsvTools - validateImport advisory warning", () => {
   it("shows no warning section when validateImport finds nothing wrong", async () => {
     renderCsvTools(() => undefined);
 
-    const csv = ["CATEGORY,SKU,STOCKS (OPENING)", "Class A (Liter),Sweet A,50"].join("\r\n");
+    const csv = [
+      "CATEGORY,SKU,STOCKS (OPENING)",
+      "Class A (Liter),Sweet A,50",
+    ].join("\r\n");
     const file = new File([csv], "edit.csv", { type: "text/csv" });
-    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const input = document.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
     fireEvent.change(input, { target: { files: [file] } });
 
-    await waitFor(() => expect(screen.getByText("Review Import")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText("Review Import")).toBeInTheDocument(),
+    );
     expect(screen.queryByText("⚠ May fail to save")).not.toBeInTheDocument();
   });
 });

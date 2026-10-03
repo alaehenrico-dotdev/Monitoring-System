@@ -2,6 +2,7 @@ import { lazy, Suspense, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
+import { DownloadConfirmHost } from "./DownloadConfirm";
 import { NavDrawerProvider } from "../context/NavDrawerContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { colors, fonts } from "../theme";
@@ -11,7 +12,9 @@ import { colors, fonts } from "../theme";
 // bundler never even emits the chunk, since isTauri is a build-time
 // constant and the import() call site is unreachable when it's false.
 const OfflineSyncBadge = lazy(() =>
-  import("../tauri/OfflineSyncBadge").then((m) => ({ default: m.OfflineSyncBadge })),
+  import("../tauri/OfflineSyncBadge").then((m) => ({
+    default: m.OfflineSyncBadge,
+  })),
 );
 const isTauri = import.meta.env.MODE === "tauri";
 
@@ -71,7 +74,8 @@ export function Layout() {
               boxShadow: "0 6px 20px rgba(12, 12, 12, 0.35)",
             }}
           >
-            Offline - showing saved data. Edits stay on this device until you reconnect.
+            Offline - showing saved data. Edits stay on this device until you
+            reconnect.
           </div>
         )}
         {isTauri && (
@@ -79,6 +83,7 @@ export function Layout() {
             <OfflineSyncBadge />
           </Suspense>
         )}
+        <DownloadConfirmHost />
         <BackToTop containerRef={mainRef} />
       </div>
     </NavDrawerProvider>
