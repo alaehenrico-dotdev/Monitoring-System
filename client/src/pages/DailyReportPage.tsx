@@ -16,6 +16,7 @@ import {
 import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
+import { confirmDownload } from "../components/DownloadConfirm";
 import {
   filterNotes,
   pdfFileName,
@@ -195,7 +196,9 @@ export function DailyReportPage() {
         if (nextReport.date !== requestedDate) {
           if (!silent) {
             setReport(null);
-            setError("The server returned a report for a different date. Please generate it again.");
+            setError(
+              "The server returned a report for a different date. Please generate it again.",
+            );
           }
           return;
         }
@@ -251,7 +254,7 @@ export function DailyReportPage() {
       ? rows.filter((r) => r.product.category === categoryFilter)
       : rows;
 
-  function handleExport() {
+  async function handleExport() {
     if (!report) return;
     const online = section(
       "ONLINE STOCK MONITORING",
@@ -276,10 +279,9 @@ export function DailyReportPage() {
     // when only e.g. the Online numbers are needed rather than the whole
     // thing.
     if (reportSection === "all") {
-      downloadExcel(
-        `daily-report-${report.date}.xls`,
-        [online, offline, total].join(""),
-      );
+      const allName = `daily-report-${report.date}.xls`;
+      if (!(await confirmDownload("Excel", allName))) return;
+      downloadExcel(allName, [online, offline, total].join(""));
       return;
     }
     const bySection: Record<Exclude<ReportSection, "all">, string> = {
@@ -287,10 +289,9 @@ export function DailyReportPage() {
       offline,
       total,
     };
-    downloadExcel(
-      `daily-report-${reportSection}-${report.date}.xls`,
-      bySection[reportSection],
-    );
+    const sectionName = `daily-report-${reportSection}-${report.date}.xls`;
+    if (!(await confirmDownload("Excel", sectionName))) return;
+    downloadExcel(sectionName, bySection[reportSection]);
   }
 
   // One PDF for whichever section(s) are selected, with the category filter
@@ -324,14 +325,16 @@ export function DailyReportPage() {
         }),
       );
     }
+    const pdfName = pdfFileName(
+      "daily-report",
+      reportSection === "all" ? undefined : reportSection,
+      report.date,
+    );
+    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({
-          filename: pdfFileName(
-            "daily-report",
-            reportSection === "all" ? undefined : reportSection,
-            report.date,
-          ),
+          filename: pdfName,
           title: "Daily Report",
           subtitle: formatDateDisplay(report.date),
           notes: [
@@ -424,7 +427,12 @@ export function DailyReportPage() {
         </Toolbar>
       </PageHeader>
 
-      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+      />
 
       {report && (
         <div>

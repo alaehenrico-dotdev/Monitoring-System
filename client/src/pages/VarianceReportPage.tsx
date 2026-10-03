@@ -19,6 +19,7 @@ import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { downloadTablePdf } from "../utils/tablePdf";
+import { confirmDownload } from "../components/DownloadConfirm";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import {
@@ -65,17 +66,14 @@ export function daysAgo(n: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-/// Section 4.8 - all flagged variances across a date range, filterable by
-/// product/category/location, to spot recurring problem SKUs (Section 4.4
-/// calls out Toyo Mansi and Oyster Sauce A as historically the largest).
+/// Section 4.8 - all flagged variances for ONE day (the selected date, not a
+/// range), filterable by category. Older report-history links that carry a
+/// startDate/endDate range open on that range's end date.
 export function VarianceReportPage() {
   const progress = useTopProgress();
   const [searchParams] = useSearchParams();
-  const [startDate, setStartDate] = useState(
-    searchParams.get("startDate") ?? daysAgo(30),
-  );
-  const [endDate, setEndDate] = useState(
-    searchParams.get("endDate") ?? daysAgo(0),
+  const [date, setDate] = useState(
+    searchParams.get("date") ?? searchParams.get("endDate") ?? daysAgo(0),
   );
   const [category, setCategory] = useState(searchParams.get("category") ?? "");
   const [rows, setRows] = useState<VarianceRow[] | null>(null);
@@ -83,21 +81,20 @@ export function VarianceReportPage() {
   const [error, setError] = useState<string | null>(null);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
   // Alert dialogs shown instead of generating: unsaved entry/count edits
-  // inside the date range, or a range with nothing to report on.
+  // on that date, or a date with nothing to report on.
   const [unsavedWork, setUnsavedWork] = useState<UnsavedWorkItem[] | null>(
     null,
   );
   const [emptyMessage, setEmptyMessage] = useState<string | null>(null);
   const realtimeVersion = useRealtimeVersion();
 
-  function changeDateRange(nextStart: string, nextEnd: string) {
-    if (nextStart === startDate && nextEnd === endDate) return;
+  function changeDate(nextDate: string) {
+    if (nextDate === date) return;
     requestId.current++;
     setRows(null);
     setError(null);
     setEmptyMessage(null);
-    setStartDate(nextStart);
-    setEndDate(nextEnd);
+    setDate(nextDate);
   }
 
   function changeCategory(nextCategory: string) {
@@ -135,14 +132,13 @@ export function VarianceReportPage() {
     e?.preventDefault();
     setError(null);
     const id = ++requestId.current;
-    const requestedStartDate = startDate;
-    const requestedEndDate = endDate;
+    const requestedDate = date;
 
     // Variance is System - Manual Count, and both sides come from saved data -
-    // staged edits inside this range would be silently left out of it.
+    // staged edits on this date would be silently left out of it.
     const unsaved = findUnsavedWork({
-      from: requestedStartDate,
-      to: requestedEndDate,
+      from: requestedDate,
+      to: requestedDate,
     });
     if (unsaved.length > 0) {
       setUnsavedWork(unsaved);
@@ -151,37 +147,36 @@ export function VarianceReportPage() {
 
     setRows(null);
     try {
+      // Daily report: the same day on both ends of the server's range query.
       const data = (await getVarianceReport({
-        startDate: requestedStartDate,
-        endDate: requestedEndDate,
+        startDate: requestedDate,
+        endDate: requestedDate,
         category: category || undefined,
       })) as VarianceRow[];
       if (id !== requestId.current) return;
-      const outOfRange = data.some((row) => {
-        const rowDate = row.entryDate.slice(0, 10);
-        return rowDate < requestedStartDate || rowDate > requestedEndDate;
-      });
+      const outOfRange = data.some(
+        (row) => row.entryDate.slice(0, 10) !== requestedDate,
+      );
       if (outOfRange) {
         throw new Error(
-          "The server returned a variance outside the selected date range.",
+          "The server returned a variance for a different date than the one selected.",
         );
       }
       if (data.length === 0) {
-        setEmptyMessage("No variances found for this date range.");
+        setEmptyMessage("No variances found for this date.");
         return;
       }
       setRows(data);
       const params = new URLSearchParams({
         history: "1",
-        startDate: requestedStartDate,
-        endDate: requestedEndDate,
+        date: requestedDate,
       });
       if (category) params.set("category", category);
       if (searchParams.get("history") !== "1") {
         // Best effort - see api/reportHistory.ts.
         recordReportHistory({
           type: "Variance Report",
-          scope: `${requestedStartDate} to ${requestedEndDate}`,
+          scope: requestedDate,
           route: `/variance-report?${params}`,
         }).catch(() => {});
       }
@@ -195,17 +190,14 @@ export function VarianceReportPage() {
   // fitted to the page) instead of window.print().
   async function handlePdf() {
     if (!rows) return;
+    const pdfName = pdfFileName("variance-report", date, category);
+    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({
-          filename: pdfFileName(
-            "variance-report",
-            startDate,
-            endDate,
-            category,
-          ),
+          filename: pdfName,
           title: "Variance Report",
-          subtitle: `${startDate} to ${endDate}`,
+          subtitle: date,
           notes: [
             ...filterNotes({ category }),
             `${rows.length} flagged variance(s) found.`,
@@ -228,7 +220,7 @@ export function VarianceReportPage() {
                 },
                 r.countedBy?.name ?? "\u2014",
               ]),
-              { emptyMessage: "No flagged variances in this date range." },
+              { emptyMessage: "No flagged variances on this date." },
             ),
           ],
         }),
@@ -258,15 +250,9 @@ export function VarianceReportPage() {
             }}
           >
             <DatePicker
-              aria-label="From"
-              value={startDate}
-              onChange={(value) => changeDateRange(value, endDate)}
-              style={{ maxWidth: 160 }}
-            />
-            <DatePicker
-              aria-label="To"
-              value={endDate}
-              onChange={(value) => changeDateRange(startDate, value)}
+              aria-label="Date"
+              value={date}
+              onChange={changeDate}
               style={{ maxWidth: 160 }}
             />
             <TextInput
@@ -301,7 +287,12 @@ export function VarianceReportPage() {
         </Toolbar>
       </PageHeader>
 
-      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+      />
 
       {rows && (
         <>
@@ -378,7 +369,7 @@ export function VarianceReportPage() {
 
       {!rows && !error && (
         <p style={{ fontSize: 13, color: colors.subtleInk }}>
-          Pick a date range and click Run report to build the report.
+          Pick a date and click Run report to build the daily report.
         </p>
       )}
 

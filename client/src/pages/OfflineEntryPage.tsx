@@ -55,6 +55,7 @@ import { OFFLINE_TRANSFER_FIELDS } from "../tauri/sync/offlineFields";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
+import { confirmDownload } from "../components/DownloadConfirm";
 import { filterNotes, pdfFileName, stockGridSection } from "../utils/pdfTables";
 import {
   getCurrentShiftAndDate,
@@ -215,7 +216,13 @@ export function OfflineEntryPage() {
   const gridColumns = useMemo(
     () =>
       isTauriOffline
-        ? columns.map((c) => (OFFLINE_TRANSFER_FIELDS.includes(c.key as (typeof OFFLINE_TRANSFER_FIELDS)[number]) ? { ...c, editable: false } : c))
+        ? columns.map((c) =>
+            OFFLINE_TRANSFER_FIELDS.includes(
+              c.key as (typeof OFFLINE_TRANSFER_FIELDS)[number],
+            )
+              ? { ...c, editable: false }
+              : c,
+          )
         : columns,
     [isTauriOffline],
   );
@@ -412,7 +419,14 @@ export function OfflineEntryPage() {
         // After the entry itself, so the count's variance is measured
         // against the freshly saved Remaining Stock.
         if (manualCount !== undefined) {
-          await saveManualCount(productId, date, shift, "OFFLINE", manualCount, importedBatchByProduct[productId]);
+          await saveManualCount(
+            productId,
+            date,
+            shift,
+            "OFFLINE",
+            manualCount,
+            importedBatchByProduct[productId],
+          );
           savedManualCountIds.push(productId);
         }
         clear(productId);
@@ -585,10 +599,12 @@ export function OfflineEntryPage() {
     // Same rule as the button's disabled state: any staged (green) edit locks
     // the PDF again until it's saved or discarded.
     if (!visibleRows || pendingCount > 0) return;
+    const pdfName = pdfFileName("offline-stock", date, shift);
+    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({
-          filename: pdfFileName("offline-stock", date, shift),
+          filename: pdfName,
           title: "Daily Offline Stock Monitoring",
           subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`,
           notes: filterNotes({ category: categoryFilter, query }),

@@ -461,3 +461,20 @@ export function MapPinIcon() {
     </svg>
   );
 }
+export function SyncIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M13.5 8a5.5 5.5 0 0 1-9.4 3.9M2.5 8a5.5 5.5 0 0 1 9.4-3.9" />
+      <path d="M12.5 1.5v3h-3M3.5 14.5v-3h3" />
+    </svg>
+  );
+}

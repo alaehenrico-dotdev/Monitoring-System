@@ -6,7 +6,11 @@ import {
   type KeyboardEvent,
 } from "react";
 import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
-import type { ManualCountEntry, ManualCountGridRow, StockLocation } from "../types";
+import type {
+  ManualCountEntry,
+  ManualCountGridRow,
+  StockLocation,
+} from "../types";
 import { Button, NumberCellInput } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
@@ -27,6 +31,7 @@ import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
+import { confirmDownload } from "../components/DownloadConfirm";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
@@ -156,9 +161,7 @@ export function ManualCountPage() {
   // date+shift's own keys - same reasoning as usePendingEntryChanges
   // (Online/Offline Entry): survives navigating to a different page and back,
   // or switching date/shift and back, instead of always starting empty.
-  const [drafts, setDrafts] = useState<Drafts>(() =>
-    loadDrafts(date, shift),
-  );
+  const [drafts, setDrafts] = useState<Drafts>(() => loadDrafts(date, shift));
   // location -> productId -> the Import History batch its still-staged draft
   // came from - threaded into saveManualCount at Save time so that write can
   // later be found and reverted. Not persisted (unlike drafts) - losing this
@@ -224,7 +227,12 @@ export function ManualCountPage() {
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [pendingCount]);
 
-  function setDraft(loc: CountLocation, productId: number, value: string, batchId?: number) {
+  function setDraft(
+    loc: CountLocation,
+    productId: number,
+    value: string,
+    batchId?: number,
+  ) {
     setDrafts((d) => ({ ...d, [loc]: { ...d[loc], [productId]: value } }));
     setImportedBatchByProduct((prev) => {
       const locMap = { ...prev[loc] };
@@ -294,7 +302,10 @@ export function ManualCountPage() {
       }
     }
     setDrafts((d) => {
-      const next: Drafts = { ONLINE: { ...d.ONLINE }, OFFLINE: { ...d.OFFLINE } };
+      const next: Drafts = {
+        ONLINE: { ...d.ONLINE },
+        OFFLINE: { ...d.OFFLINE },
+      };
       for (const s of succeeded) delete next[s.loc][s.productId];
       return next;
     });
@@ -323,19 +334,20 @@ export function ManualCountPage() {
   // One merged row per product, holding both locations' entries.
   const auditRows: AuditRow[] | null = gridRows
     ? gridRows.ONLINE.map((on) => {
-        const off = gridRows.OFFLINE.find((r) => r.product.id === on.product.id);
+        const off = gridRows.OFFLINE.find(
+          (r) => r.product.id === on.product.id,
+        );
         return {
           product: on.product,
           entries: {
             ONLINE: on.entry,
-            OFFLINE:
-              off?.entry ?? {
-                ...on.entry,
-                location: "OFFLINE" as const,
-                systemRemainingStock: 0,
-                manualCount: null,
-                variance: null,
-              },
+            OFFLINE: off?.entry ?? {
+              ...on.entry,
+              location: "OFFLINE" as const,
+              systemRemainingStock: 0,
+              manualCount: null,
+              variance: null,
+            },
           },
           saved: { ONLINE: on.isSaved, OFFLINE: off?.isSaved ?? false },
         };
@@ -362,10 +374,20 @@ export function ManualCountPage() {
       (showOffline ? toNum(r.entries.OFFLINE.systemRemainingStock) : 0);
     let variance: number | null = null;
     if (online !== null)
-      variance = (variance ?? 0) + toNum(r.entries.ONLINE.systemRemainingStock) - online;
+      variance =
+        (variance ?? 0) + toNum(r.entries.ONLINE.systemRemainingStock) - online;
     if (offline !== null)
-      variance = (variance ?? 0) + toNum(r.entries.OFFLINE.systemRemainingStock) - offline;
-    return { system, online, offline, total: (online ?? 0) + (offline ?? 0), variance };
+      variance =
+        (variance ?? 0) +
+        toNum(r.entries.OFFLINE.systemRemainingStock) -
+        offline;
+    return {
+      system,
+      online,
+      offline,
+      total: (online ?? 0) + (offline ?? 0),
+      variance,
+    };
   }
   const isFlagged = (r: AuditRow) => {
     const v = liveFigures(r).variance;
@@ -477,14 +499,16 @@ export function ManualCountPage() {
       { key: "total", label: "Total Count" },
       { key: "variance", label: "Variance" },
     ];
+    const pdfName = pdfFileName(
+      `audit-${FILTER_LABEL[sourceFilter].toLowerCase().replace(/\W+/g, "-")}`,
+      date,
+      shift,
+    );
+    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({
-          filename: pdfFileName(
-            `audit-${FILTER_LABEL[sourceFilter].toLowerCase().replace(/\W+/g, "-")}`,
-            date,
-            shift,
-          ),
+          filename: pdfName,
           title: "Manual Counting & Variance",
           subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift - ${FILTER_LABEL[sourceFilter]}`,
           sections: [
@@ -499,7 +523,8 @@ export function ManualCountPage() {
                     variance: f.variance ?? "",
                     offline: f.offline ?? "",
                     online: f.online ?? "",
-                    total: f.online === null && f.offline === null ? "" : f.total,
+                    total:
+                      f.online === null && f.offline === null ? "" : f.total,
                   },
                 };
               }),
@@ -548,7 +573,10 @@ export function ManualCountPage() {
               todayValue={getCurrentShiftAndDate().date}
             />
             <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-            <StockSourceFilter value={sourceFilter} onChange={setSourceFilter} />
+            <StockSourceFilter
+              value={sourceFilter}
+              onChange={setSourceFilter}
+            />
             <SearchInput
               value={query}
               onChange={setQuery}
@@ -646,7 +674,12 @@ export function ManualCountPage() {
           </ToolbarControls>
         </Toolbar>
       </PageHeader>
-      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+      />
       {!auditRows ? (
         <TableSkeleton
           headers={headers}

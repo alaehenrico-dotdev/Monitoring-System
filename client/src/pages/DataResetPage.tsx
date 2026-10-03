@@ -4,13 +4,20 @@ import { resetAllData, verifyResetPasscode } from "../api/dataReset";
 import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
+import { confirmDownload } from "../components/DownloadConfirm";
 import { colors } from "../theme";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 import { InlineLoading, Spinner } from "../components/Spinner";
 
 const COUNTDOWN_SECONDS = 10;
 
-type Status = "idle" | "confirming" | "backing-up" | "resetting" | "done" | "error";
+type Status =
+  | "idle"
+  | "confirming"
+  | "backing-up"
+  | "resetting"
+  | "done"
+  | "error";
 type LockStatus = "locked" | "verifying" | "unlocked";
 
 // Fixed brand colors, not the light/dark theme tokens (--ae-*) - this panel
@@ -120,6 +127,11 @@ export function DataResetPage() {
       // produces - before anything is wiped server-side. If the backup
       // itself fails (e.g. mysqldump isn't installed), the reset is
       // aborted rather than proceeding without a safety copy.
+      if (!(await confirmDownload("Database backup"))) {
+        throw new Error(
+          "Reset was cancelled - the safety backup wasn't downloaded, so nothing was changed.",
+        );
+      }
       try {
         await downloadDatabaseBackup();
       } catch (err) {
@@ -358,9 +370,9 @@ export function DataResetPage() {
           }}
         >
           All stock data below will be permanently deleted and cannot be
-          recovered. Clicking "Reset Now" will first save a full database
-          backup to your downloads, then perform the wipe - make sure your
-          browser lets it download that file.
+          recovered. Clicking "Reset Now" will first save a full database backup
+          to your downloads, then perform the wipe - make sure your browser lets
+          it download that file.
         </p>
 
         <div
@@ -485,7 +497,8 @@ export function DataResetPage() {
                 fontWeight: 600,
               }}
             >
-              A full backup was saved to your downloads, then all data was reset. The system is now a clean slate.
+              A full backup was saved to your downloads, then all data was
+              reset. The system is now a clean slate.
             </p>
           )}
           {status === "error" && error && (
@@ -496,7 +509,9 @@ export function DataResetPage() {
         </div>
       </div>
 
-      {(status === "confirming" || status === "backing-up" || status === "resetting") && (
+      {(status === "confirming" ||
+        status === "backing-up" ||
+        status === "resetting") && (
         <Modal
           title="Confirm data reset"
           onClose={status === "confirming" ? cancel : () => {}}
@@ -506,8 +521,8 @@ export function DataResetPage() {
             <>
               <p style={{ margin: "0 0 12px", fontSize: 13.5 }}>
                 This will permanently delete <strong>all</strong> entries,
-                counts, and reports. This cannot be undone. A full backup
-                will be downloaded to this device first.
+                counts, and reports. This cannot be undone. A full backup will
+                be downloaded to this device first.
               </p>
               <p style={{ margin: "0 0 18px", fontSize: 13 }}>
                 {secondsLeft > 0 ? (

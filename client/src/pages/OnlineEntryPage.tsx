@@ -46,6 +46,7 @@ import { ONLINE_TRANSFER_FIELDS } from "../tauri/sync/offlineFields";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
+import { confirmDownload } from "../components/DownloadConfirm";
 import { filterNotes, pdfFileName, stockGridSection } from "../utils/pdfTables";
 import {
   getCurrentShiftAndDate,
@@ -156,18 +157,30 @@ export function OnlineEntryPage() {
   // sessionStorage under this date+shift's own key, so navigating to another
   // page and back - or just switching shift/date and back - doesn't lose an
   // edit still in progress.
-  const { pending, baselines, displayRows, stage, clear, clearAll, resolveConflict, pendingCount } =
-    usePendingEntryChanges(
-      rows,
-      `ala-eh-pending:online:${date}:${shift}`,
-      computeOnlineFigures,
-    );
+  const {
+    pending,
+    baselines,
+    displayRows,
+    stage,
+    clear,
+    clearAll,
+    resolveConflict,
+    pendingCount,
+  } = usePendingEntryChanges(
+    rows,
+    `ala-eh-pending:online:${date}:${shift}`,
+    computeOnlineFigures,
+  );
 
   // Edits staged against values the server has since changed (typically made
   // offline, or before another user saved) - surfaced for side-by-side
   // resolution and blocking Save until decided.
   const conflicts = useMemo(
-    () => detectConflicts(rows, pending, baselines, [...columns, manualCountColumn]),
+    () =>
+      detectConflicts(rows, pending, baselines, [
+        ...columns,
+        manualCountColumn,
+      ]),
     [rows, pending, baselines],
   );
 
@@ -187,7 +200,13 @@ export function OnlineEntryPage() {
   const gridColumns = useMemo(
     () =>
       isTauriOffline
-        ? columns.map((c) => (ONLINE_TRANSFER_FIELDS.includes(c.key as (typeof ONLINE_TRANSFER_FIELDS)[number]) ? { ...c, editable: false } : c))
+        ? columns.map((c) =>
+            ONLINE_TRANSFER_FIELDS.includes(
+              c.key as (typeof ONLINE_TRANSFER_FIELDS)[number],
+            )
+              ? { ...c, editable: false }
+              : c,
+          )
         : columns,
     [isTauriOffline],
   );
@@ -321,7 +340,9 @@ export function OnlineEntryPage() {
     // saveOnlineEntry - so it's allowed to proceed past this point even
     // when !online.
     if (!online && !isTauri) {
-      setError("You're offline - your changes are kept on this device. Save again once you're back online.");
+      setError(
+        "You're offline - your changes are kept on this device. Save again once you're back online.",
+      );
       return false;
     }
     if (conflicts.length > 0) {
@@ -339,7 +360,11 @@ export function OnlineEntryPage() {
         return false;
       }
     } catch (e) {
-      setError(e instanceof Error ? `Couldn't check for newer changes: ${e.message}` : "Couldn't check for newer changes.");
+      setError(
+        e instanceof Error
+          ? `Couldn't check for newer changes: ${e.message}`
+          : "Couldn't check for newer changes.",
+      );
       return false;
     }
     setSaving(true);
@@ -380,7 +405,14 @@ export function OnlineEntryPage() {
         // After the entry itself, so the count's variance is measured
         // against the freshly saved Remaining Stock.
         if (manualCount !== undefined) {
-          await saveManualCount(productId, date, shift, "ONLINE", manualCount, importedBatchByProduct[productId]);
+          await saveManualCount(
+            productId,
+            date,
+            shift,
+            "ONLINE",
+            manualCount,
+            importedBatchByProduct[productId],
+          );
           savedManualCountIds.push(productId);
         }
         clear(productId);
@@ -558,10 +590,12 @@ export function OnlineEntryPage() {
     // Same rule as the button's disabled state: any staged (green) edit locks
     // the PDF again until it's saved or discarded.
     if (!visibleRows || pendingCount > 0) return;
+    const pdfName = pdfFileName("online-stock", date, shift);
+    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({
-          filename: pdfFileName("online-stock", date, shift),
+          filename: pdfName,
           title: "Daily Online Stock Monitoring",
           subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`,
           notes: filterNotes({ category: categoryFilter, query }),

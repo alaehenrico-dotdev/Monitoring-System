@@ -3,6 +3,7 @@ import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
+import { confirmDownload } from "../components/DownloadConfirm";
 import { DatabaseRestoreCard } from "./DatabaseRestoreCard";
 import { colors, motionTokens } from "../theme";
 
@@ -40,6 +41,7 @@ export function DatabaseBackupPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleDownload() {
+    if (!(await confirmDownload("Database backup"))) return;
     setStatus("downloading");
     setBytes(0);
     setError(null);
@@ -63,115 +65,120 @@ export function DatabaseBackupPage() {
 
   return (
     <div>
-    <div
-      style={{
-        maxWidth: 760,
-        background: "var(--ae-surface-glass)",
-        backdropFilter: "var(--ae-glass-blur)",
-        WebkitBackdropFilter: "var(--ae-glass-blur)",
-        border: `1px solid ${colors.border}`,
-        borderRadius: 8,
-        padding: "32px 36px",
-      }}
-    >
-      <h3
-        style={{
-          margin: "0 0 10px",
-          fontSize: 19,
-          fontWeight: 700,
-          color: colors.ink,
-        }}
-      >
-        Download a full database backup
-      </h3>
-      <p
-        style={{
-          margin: "0 0 24px",
-          fontSize: 13.5,
-          lineHeight: 1.6,
-          color: colors.subtleInk,
-          maxWidth: 560,
-        }}
-      >
-        Generates a complete SQL dump of the live database - every product,
-        entry, count, receipt, report, and account - as a single{" "}
-        <code>.sql</code> file you can store off-site. Restoring from it
-        requires a developer to load it back into a MySQL server.
-      </p>
-
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          flexWrap: "wrap",
+          maxWidth: 760,
+          background: "var(--ae-surface-glass)",
+          backdropFilter: "var(--ae-glass-blur)",
+          WebkitBackdropFilter: "var(--ae-glass-blur)",
+          border: `1px solid ${colors.border}`,
+          borderRadius: 8,
+          padding: "32px 36px",
         }}
       >
-        <Button
-          variant="primary"
-          onClick={handleDownload}
-          disabled={downloading}
+        <h3
           style={{
-            padding: "10px 22px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            color: colors.yellow,
+            margin: "0 0 10px",
+            fontSize: 19,
+            fontWeight: 700,
+            color: colors.ink,
           }}
         >
-          {downloading && <Spinner size="sm" color={colors.cream} />}
-          {downloading ? "Downloading…" : "Download Backup"}
-        </Button>
+          Download a full database backup
+        </h3>
+        <p
+          style={{
+            margin: "0 0 24px",
+            fontSize: 13.5,
+            lineHeight: 1.6,
+            color: colors.subtleInk,
+            maxWidth: 560,
+          }}
+        >
+          Generates a complete SQL dump of the live database - every product,
+          entry, count, receipt, report, and account - as a single{" "}
+          <code>.sql</code> file you can store off-site. Restoring from it
+          requires a developer to load it back into a MySQL server.
+        </p>
 
-        {downloading && (
-          <span
-            role="status"
-            aria-live="polite"
-            style={{ fontSize: 12.5, color: colors.subtleInk }}
-          >
-            {formatBytes(bytes)} received
-          </span>
-        )}
-        {status === "done" && (
-          <p
-            style={{
-              margin: 0,
-              fontSize: 12.5,
-              color: colors.gold,
-              fontWeight: 600,
-            }}
-          >
-            Backup downloaded ({formatBytes(bytes)}).
-          </p>
-        )}
-        <Toast message={status === "error" ? error : null} onDismiss={() => setError(null)} variant="error" duration={null} />
-      </div>
-
-      {(downloading || status === "done") && (
         <div
-          aria-hidden="true"
           style={{
-            marginTop: 18,
-            height: 4,
-            borderRadius: 2,
-            background: colors.paperAlt,
-            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
           }}
         >
-          <div
+          <Button
+            variant="primary"
+            onClick={handleDownload}
+            disabled={downloading}
             style={{
-              height: "100%",
-              width: "100%",
-              transform: `scaleX(${percent / 100})`,
-              transformOrigin: "left center",
-              background: colors.yellow,
-              transition: `transform ${downloading ? "0.5s" : "0.25s"} ${motionTokens.progressEase}`,
+              padding: "10px 22px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              color: colors.yellow,
             }}
+          >
+            {downloading && <Spinner size="sm" color={colors.cream} />}
+            {downloading ? "Downloading…" : "Download Backup"}
+          </Button>
+
+          {downloading && (
+            <span
+              role="status"
+              aria-live="polite"
+              style={{ fontSize: 12.5, color: colors.subtleInk }}
+            >
+              {formatBytes(bytes)} received
+            </span>
+          )}
+          {status === "done" && (
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12.5,
+                color: colors.gold,
+                fontWeight: 600,
+              }}
+            >
+              Backup downloaded ({formatBytes(bytes)}).
+            </p>
+          )}
+          <Toast
+            message={status === "error" ? error : null}
+            onDismiss={() => setError(null)}
+            variant="error"
+            duration={null}
           />
         </div>
-      )}
-    </div>
-    <DatabaseRestoreCard />
+
+        {(downloading || status === "done") && (
+          <div
+            aria-hidden="true"
+            style={{
+              marginTop: 18,
+              height: 4,
+              borderRadius: 2,
+              background: colors.paperAlt,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: "100%",
+                transform: `scaleX(${percent / 100})`,
+                transformOrigin: "left center",
+                background: colors.yellow,
+                transition: `transform ${downloading ? "0.5s" : "0.25s"} ${motionTokens.progressEase}`,
+              }}
+            />
+          </div>
+        )}
+      </div>
+      <DatabaseRestoreCard />
     </div>
   );
 }

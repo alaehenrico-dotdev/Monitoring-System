@@ -1,6 +1,7 @@
 // Drives the sync engine: on app launch, whenever the configured server
 // transitions from unreachable to reachable, and periodically while idle.
 import { useEffect, useRef, useState } from "react";
+import { registerSyncRunner, setSyncUiState } from "./SyncStore";
 import { useServerConnectivity } from "./connectivity";
 import { runSync } from "./engine";
 import { countPendingSyncChanges, countUnresolvedConflicts } from "./localDb";
@@ -24,15 +25,19 @@ export function useSyncEngine() {
   async function sync() {
     if (syncing.current) return;
     syncing.current = true;
+    setSyncUiState({ syncing: true });
     try {
       await runSync();
+      setSyncUiState({ failed: false, lastSyncedAt: Date.now() });
     } catch (err) {
+      setSyncUiState({ failed: true });
       // Best effort - a failed sync attempt (most likely the server just
       // went unreachable again mid-sync) just means the next trigger tries
       // again; nothing staged offline is lost either way.
       console.error("Sync failed", err);
     } finally {
       syncing.current = false;
+      setSyncUiState({ syncing: false });
       await refreshCounts();
     }
   }
@@ -46,6 +51,11 @@ export function useSyncEngine() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Lets the header's Sync button (tauri/SyncButton.tsx) trigger this same
+  // engine instead of running a second copy of it.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => registerSyncRunner(sync), []);
 
   useEffect(() => {
     if (reconnects > 0) sync();
