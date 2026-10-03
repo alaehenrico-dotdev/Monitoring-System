@@ -7,6 +7,23 @@ import type { AuthUser } from "../types";
 
 const isTauri = import.meta.env.MODE === "tauri";
 
+// Desktop build only, and only when a token already exists: the token's own
+// payload (decoded without verifying its signature - not a trust decision,
+// since every real request still carries this exact token and the server
+// verifies it for real; this only ever affects what name/role this client
+// DISPLAYS until getMe() confirms it), so the app can render from it on the
+// very first render instead of blocking behind ProtectedRoute's loading
+// screen for however long getMe() takes to succeed or time out. This is
+// what makes "server down" behave like "wifi off" at startup - this same
+// fallback used to only run *after* waiting out getMe()'s full network
+// timeout, in its .catch below, which was exactly the slow-vs-fast
+// asymmetry this was written to fix.
+function decodeOptimisticUser(): AuthUser | null {
+  if (!isTauri) return null;
+  const token = getToken();
+  return token ? decodeJwtPayload<AuthUser>(token) : null;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
@@ -25,12 +42,17 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(decodeOptimisticUser);
+  const [loading, setLoading] = useState(() => decodeOptimisticUser() === null);
   const [sessionError, setSessionError] = useState<string | null>(null);
 
   useEffect(() => {
     const hadToken = getToken() !== null;
+    // getMe() still runs either way, in the background, to get the current,
+    // authoritative state - this only decides what the .catch below does if
+    // that fails.
+    const optimisticallyShown = isTauri && hadToken && decodeOptimisticUser() !== null;
+
     getMe()
       .then(setUser)
       .catch((e) => {
@@ -38,33 +60,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (isAuthFailure || !hadToken) {
           // Either there was never a session to begin with, or the token
           // really is invalid/expired - both are the ordinary, expected path
-          // to the login screen, nothing to explain.
+          // to the login screen, nothing to explain. Also undoes the
+          // optimistic decode above, if any - a token that just failed
+          // verification isn't a valid session to keep displaying.
           setToken(null);
+          setUser(null);
           return;
         }
         // A token existed and the request still failed for some other reason
         // - don't wipe out what might still be a perfectly valid session over
         // a transient failure.
         //
-        // Desktop build only: let it straight into the app on local data
-        // (grid pages fall back to the structured SQLite mirror - see
-        // tauri/sync/localGrid.ts) rather than blocking on a server that
-        // might not even be started yet. The identity shown comes from the
-        // token's own payload, decoded without verifying its signature -
-        // that's not a trust decision, since every real request from here
-        // still carries this exact token and the server verifies it for
-        // real; this only ever affects what name/role this client DISPLAYS
-        // while it can't ask the server to confirm. Falls through to the
-        // ordinary sessionError screen below if that decode fails too (a
-        // corrupted token is not something to silently paper over).
-        if (isTauri && e instanceof TypeError) {
-          const token = getToken();
-          const payload = token && decodeJwtPayload<AuthUser>(token);
-          if (payload) {
-            setUser(payload);
-            return;
-          }
-        }
+        // Already showing the decoded token's identity from above - stay on
+        // it. If decoding it failed back there instead (corrupted token), or
+        // this isn't the desktop build, fall through to the ordinary
+        // sessionError screen - that's not something to silently paper over.
+        if (isTauri && e instanceof TypeError && optimisticallyShown) return;
         setSessionError(e instanceof Error ? e.message : "Couldn't reach the server - check your connection and try again.");
       })
       .finally(() => {

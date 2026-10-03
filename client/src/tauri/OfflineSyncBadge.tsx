@@ -29,7 +29,13 @@ export function OfflineSyncBadge() {
   }, []);
 
   useEffect(() => {
-    if (reconnects === 0) return;
+    // Deliberately also runs on mount (reconnects starts at 0, same as any
+    // later reconnect) - not just on a live reconnect transition during this
+    // session. Without this, a write queued while the app crashed/closed
+    // while still online (so no offline->online transition ever happens in
+    // the NEXT session, since it launches already online) would sit queued
+    // indefinitely - the structured sync engine already flushes on launch
+    // (useSyncEngine.ts) for the same reason.
     flushPendingWrites(sendQueuedWrite).then((result) => {
       if (result.rejected.length > 0) {
         // These were actively rejected by a reachable server (not a

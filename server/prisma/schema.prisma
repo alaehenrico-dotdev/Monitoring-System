@@ -231,6 +231,31 @@ model ImportBatch {
   @@map("import_batches")
 }
 
+/// Idempotency record for the offline sync push endpoint (sync.service.ts's
+/// pushChanges, client/src/tauri/sync/engine.ts's runPush). Every pending
+/// offline edit carries a client-generated `localId` (a UUID) that stays the
+/// same across retries of that SAME edit - if the client never saw a push
+/// attempt's response (a request timeout, a dropped connection after the
+/// server already committed), it retries with that identical localId rather
+/// than minting a new one. Without a durable record of "this localId was
+/// already applied", that retry would re-apply an additive delta
+/// (productionIn, fulfillmentOut, etc.) a second time, silently inflating
+/// the figure - manual counts are set, not additive, but still need the same
+/// guard against double-processing. Written in the SAME transaction as the
+/// delta it guards (see saveOnlineEntry/saveOfflineEntry/saveManualCount's
+/// own doc comments on the `db` parameter they accept for exactly this), so
+/// a crash between applying the delta and recording that it was applied is
+/// impossible - either both commit or neither does.
+model SyncPushApplication {
+  id        Int      @id @default(autoincrement())
+  localId   String   @unique
+  tableName String
+  serverId  Int
+  appliedAt DateTime @default(now())
+
+  @@map("sync_push_applications")
+}
+
 /// Server-backed Report History (Daily Report / Variance Report) - replaces
 /// the old client-only localStorage list (utils/reportHistory.ts) so what's
 /// been generated is durable and the same for every device/tester, not just

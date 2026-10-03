@@ -88,17 +88,17 @@ export const manualCountRepository = {
     return prisma.manualCount.findMany({ where: { entryDate, location: { in: ["ONLINE", "OFFLINE", "TOTAL"] } } });
   },
 
-  upsert(id: number | undefined, data: ManualCountData) {
+  upsert(id: number | undefined, data: ManualCountData, db: Db = prisma) {
     return id
-      ? prisma.manualCount.update({ where: { id }, data })
-      : prisma.manualCount.create({ data });
+      ? db.manualCount.update({ where: { id }, data })
+      : db.manualCount.create({ data });
   },
 
   /// Undoes a CSV import that created a count which didn't exist before (see
   /// manualCounts.service.ts's deleteManualCount) - a plain delete, not an
   /// upsert, since there's no "old value" to restore it to.
-  delete(id: number) {
-    return prisma.manualCount.delete({ where: { id } });
+  delete(id: number, db: Db = prisma) {
+    return db.manualCount.delete({ where: { id } });
   },
 
   /// Section 4.8 - Variance Report query, filterable by product/category/

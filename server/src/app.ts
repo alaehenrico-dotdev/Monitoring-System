@@ -11,6 +11,21 @@ import routes from "./routes";
 export function createApp() {
   const app = express();
 
+  // Trust exactly one reverse-proxy hop (ngrok, per PRODUCTION.md) so
+  // `req.ip`/`X-Forwarded-For` resolve to the real client, not ngrok's own
+  // local agent. Without this, Express's default (trust nothing) means
+  // every request behind the tunnel looks like it came from the same
+  // machine - the rate limiters below (keyed by IP) would then count every
+  // real visitor's traffic as one shared bucket, and the login brute-force
+  // guard (authLimiter) would do nothing for an attacker's real IP. `1`
+  // (not `true`) deliberately trusts only the immediate hop - trusting the
+  // whole chain would let a client forge its own `X-Forwarded-For` to fake
+  // a different "IP" on every request and dodge the limiters entirely. No
+  // proxy sits in front locally/in tests, so this is a no-op there (the
+  // header is simply absent and `req.ip` falls back to the direct
+  // connection, same as before).
+  app.set("trust proxy", 1);
+
   // This server only ever returns JSON (see routes below) and never renders
   // HTML itself (the React client is a separate origin/deploy - see
   // client/vite.config.ts's own CSP for that) - `contentSecurityPolicy` is

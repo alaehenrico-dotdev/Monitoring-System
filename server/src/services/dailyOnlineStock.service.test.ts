@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HttpError } from "../utils/HttpError";
 
+// saveOnlineEntry now wraps itself in prisma.$transaction (see its own doc
+// comment) - every repository call below is already mocked out regardless of
+// which `db`/`tx` it's given, so the fake transaction client just needs to
+// run the callback and doesn't need to do anything with it.
+vi.mock("../lib/prisma", () => ({
+  prisma: { $transaction: (cb: (tx: unknown) => unknown) => cb({}) },
+  serializableTransaction: (cb: (tx: unknown) => unknown) => cb({}),
+}));
+
 vi.mock("../repositories/dailyOnlineStockRepository", () => ({
   dailyOnlineStockRepository: {
     findByProductAndDate: vi.fn(),
@@ -60,6 +69,7 @@ describe("saveOnlineEntry - Stock In/Out per channel", () => {
     expect(dailyOnlineStockRepository.upsert).toHaveBeenCalledWith(
       undefined,
       expect.objectContaining({ remainingStock: 5 }),
+      expect.anything(),
     );
   });
 

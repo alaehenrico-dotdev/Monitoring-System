@@ -1,5 +1,5 @@
 import { Shift, StockLocation } from "@prisma/client";
-import { prisma } from "../lib/prisma";
+import { prisma, serializableTransaction, type Db } from "../lib/prisma";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { manualCountRepository } from "../repositories/manualCountRepository";
@@ -7,6 +7,7 @@ import { productRepository } from "../repositories/productRepository";
 import { saveOnlineEntry } from "./dailyOnlineStock.service";
 import { saveOfflineEntry } from "./dailyOfflineStock.service";
 import { saveManualCount } from "./manualCounts.service";
+import { broadcastRealtimeEvent } from "../lib/realtime";
 import { HttpError } from "../utils/HttpError";
 import { toNum } from "../utils/stockMath";
 import { toDateOnlyString } from "../utils/date";
@@ -30,6 +31,20 @@ import { toDateOnlyString } from "../utils/date";
  *   manualCount is NOT additive (a physical count, not an event) - a
  *   genuine conflict (server changed since this client's baseline AND the
  *   values actually differ) is reported, never silently overwritten.
+ *
+ *   Idempotent per item, keyed by each item's client-generated `localId`
+ *   (SyncPushApplication - schema.prisma): a client that never saw a push
+ *   attempt's response (request timeout, dropped connection after the
+ *   server already committed) retries with that SAME localId rather than
+ *   minting a new one. Without this, that retry would sum the same additive
+ *   delta onto the server's value a second time, silently inflating it -
+ *   exactly the class of bug an "offline-first, no data lost" app can't
+ *   afford. The idempotency marker is written in the SAME transaction as
+ *   the delta it guards (saveOnlineEntry/saveOfflineEntry/saveManualCount
+ *   all accept an external `db` for exactly this), so a crash between
+ *   applying a delta and recording that it was applied can't happen - either
+ *   both commit or neither does. A retry that finds its localId already
+ *   recorded skips straight to reporting the row as it stands now.
  */
 
 export interface PullResult {
@@ -176,6 +191,25 @@ export interface PushResult {
   conflicts: PushConflict[];
 }
 
+/// Re-reads the row a PRIOR push attempt already applied, by its serverId -
+/// used when this item's localId is found already recorded (see
+/// pushChanges): the delta must NOT be re-applied, but the response still
+/// needs to look like a normal "applied" result so the client clears its
+/// pending row the same way it would have the first time.
+async function fetchAppliedRow(tx: Db, tableName: PushItem["tableName"], serverId: number) {
+  if (tableName === "daily_online_stock") {
+    return serializeOnline(await tx.dailyOnlineStock.findUniqueOrThrow({ where: { id: serverId } }));
+  }
+  if (tableName === "daily_offline_stock") {
+    return serializeOffline(await tx.dailyOfflineStock.findUniqueOrThrow({ where: { id: serverId } }));
+  }
+  return serializeManualCount(await tx.manualCount.findUniqueOrThrow({ where: { id: serverId } }));
+}
+
+type ItemOutcome =
+  | { kind: "applied"; serverId: number; row: unknown; replay: boolean }
+  | { kind: "conflict"; reason: string; mine: unknown; server: unknown };
+
 export async function pushChanges(items: PushItem[], userId?: number): Promise<PushResult> {
   const applied: PushApplied[] = [];
   const conflicts: PushConflict[] = [];
@@ -183,43 +217,72 @@ export async function pushChanges(items: PushItem[], userId?: number): Promise<P
   for (const item of items) {
     const entryDate = new Date(`${item.entryDate}T00:00:00.000Z`);
     try {
-      if (item.tableName === "daily_online_stock") {
-        const existing = await dailyOnlineStockRepository.findByProductAndDate(item.productId, entryDate, item.shift);
-        const input: Record<string, number> = {};
-        for (const field of ONLINE_ADDITIVE_FIELDS) {
-          const d = item.delta?.[field];
-          if (d !== undefined) input[field] = toNum(existing?.[field as keyof typeof existing]) + d;
+      const outcome = await serializableTransaction(async (tx): Promise<ItemOutcome> => {
+        const already = await tx.syncPushApplication.findUnique({ where: { localId: item.localId } });
+        if (already) {
+          return {
+            kind: "applied",
+            serverId: already.serverId,
+            row: await fetchAppliedRow(tx, item.tableName, already.serverId),
+            replay: true,
+          };
         }
-        const saved = await saveOnlineEntry(item.productId, entryDate, item.shift, input, userId);
-        applied.push({ localId: item.localId, serverId: saved.id, row: serializeOnline(saved) });
-      } else if (item.tableName === "daily_offline_stock") {
-        const existing = await dailyOfflineStockRepository.findByProductAndDate(item.productId, entryDate, item.shift);
-        const input: Record<string, number> = {};
-        for (const field of OFFLINE_ADDITIVE_FIELDS) {
-          const d = item.delta?.[field];
-          if (d !== undefined) input[field] = toNum(existing?.[field as keyof typeof existing]) + d;
+
+        if (item.tableName === "daily_online_stock") {
+          const existing = await dailyOnlineStockRepository.findByProductAndDate(item.productId, entryDate, item.shift, tx);
+          const input: Record<string, number> = {};
+          for (const field of ONLINE_ADDITIVE_FIELDS) {
+            const d = item.delta?.[field];
+            if (d !== undefined) input[field] = toNum(existing?.[field as keyof typeof existing]) + d;
+          }
+          const saved = await saveOnlineEntry(item.productId, entryDate, item.shift, input, userId, tx);
+          await tx.syncPushApplication.create({ data: { localId: item.localId, tableName: item.tableName, serverId: saved.id } });
+          return { kind: "applied", serverId: saved.id, row: serializeOnline(saved), replay: false };
         }
-        const saved = await saveOfflineEntry(item.productId, entryDate, item.shift, input, userId);
-        applied.push({ localId: item.localId, serverId: saved.id, row: serializeOffline(saved) });
-      } else {
+
+        if (item.tableName === "daily_offline_stock") {
+          const existing = await dailyOfflineStockRepository.findByProductAndDate(item.productId, entryDate, item.shift, tx);
+          const input: Record<string, number> = {};
+          for (const field of OFFLINE_ADDITIVE_FIELDS) {
+            const d = item.delta?.[field];
+            if (d !== undefined) input[field] = toNum(existing?.[field as keyof typeof existing]) + d;
+          }
+          const saved = await saveOfflineEntry(item.productId, entryDate, item.shift, input, userId, tx);
+          await tx.syncPushApplication.create({ data: { localId: item.localId, tableName: item.tableName, serverId: saved.id } });
+          return { kind: "applied", serverId: saved.id, row: serializeOffline(saved), replay: false };
+        }
+
         if (!item.location) throw HttpError.badRequest("manual_counts push item missing location");
         if (item.manualCount === undefined) throw HttpError.badRequest("manual_counts push item missing manualCount");
-        const existing = await manualCountRepository.findOne(item.productId, entryDate, item.shift, item.location);
+        const existing = await manualCountRepository.findOne(item.productId, entryDate, item.shift, item.location, tx);
         const unseenServerChange = existing && existing.updatedAt.toISOString() !== item.baselineUpdatedAt;
         const valuesDiffer = existing && toNum(existing.manualCount) !== item.manualCount;
         if (unseenServerChange && valuesDiffer) {
-          conflicts.push({
-            localId: item.localId,
+          return {
+            kind: "conflict",
             reason: "Manual count changed on the server since this device last saw it",
             mine: item.manualCount,
             server: serializeManualCount(existing!),
-          });
-          continue;
+          };
         }
-        const product = await productRepository.findActiveById(item.productId);
+        const product = await productRepository.findActiveById(item.productId, tx);
         if (!product) throw HttpError.notFound("Active product not found");
-        const saved = await saveManualCount(item.productId, entryDate, item.shift, item.location, item.manualCount, userId);
-        applied.push({ localId: item.localId, serverId: saved.id, row: serializeManualCount(saved) });
+        const saved = await saveManualCount(item.productId, entryDate, item.shift, item.location, item.manualCount, userId, undefined, tx);
+        await tx.syncPushApplication.create({ data: { localId: item.localId, tableName: item.tableName, serverId: saved.id } });
+        return { kind: "applied", serverId: saved.id, row: serializeManualCount(saved), replay: false };
+      });
+
+      if (outcome.kind === "applied") {
+        applied.push({ localId: item.localId, serverId: outcome.serverId, row: outcome.row });
+        // Only for a genuinely new application - not broadcast by
+        // saveOnlineEntry/saveOfflineEntry/saveManualCount themselves since
+        // they were passed `tx` (composed into this transaction, which
+        // hadn't committed yet when they ran) - see their own doc comments.
+        // An idempotent replay (the `already` branch above) changed nothing,
+        // so there's nothing to tell other clients about.
+        if (!outcome.replay) broadcastRealtimeEvent();
+      } else {
+        conflicts.push({ localId: item.localId, reason: outcome.reason, mine: outcome.mine, server: outcome.server });
       }
     } catch (err) {
       if (err instanceof HttpError) {

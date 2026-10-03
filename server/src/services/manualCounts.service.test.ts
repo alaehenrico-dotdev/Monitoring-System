@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// saveManualCount/deleteManualCount now wrap themselves (and
+// propagateOpeningStock) in prisma.$transaction - every repository call
+// below is already mocked out regardless of which `db`/`tx` it's given, so
+// the fake transaction client just needs to run the callback.
+vi.mock("../lib/prisma", () => ({
+  prisma: { $transaction: (cb: (tx: unknown) => unknown) => cb({}) },
+}));
+
 vi.mock("../repositories/manualCountRepository", () => ({
   manualCountRepository: {
     findOne: vi.fn(),
@@ -73,7 +81,7 @@ describe("saveManualCount - Variance = System Remaining Stock - Manual Count", (
 
     await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 95);
 
-    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: 5 }));
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: 5 }), expect.anything());
   });
 
   it("is negative when the physical count is HIGHER than system stock (an overage, same sign convention everywhere else)", async () => {
@@ -84,7 +92,7 @@ describe("saveManualCount - Variance = System Remaining Stock - Manual Count", (
 
     await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 110);
 
-    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: -10 }));
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: -10 }), expect.anything());
   });
 });
 
@@ -108,7 +116,8 @@ describe("saveManualCount - carries the count into an already-saved next period"
 
     expect(dailyOnlineStockRepository.upsert).toHaveBeenCalledWith(
       7,
-      expect.objectContaining({ openingStock: 95, remainingStock: 90 })
+      expect.objectContaining({ openingStock: 95, remainingStock: 90 }),
+      expect.anything(),
     );
   });
 });

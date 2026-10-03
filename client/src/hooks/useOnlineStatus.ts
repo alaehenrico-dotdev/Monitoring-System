@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { API_URL } from "../api/http";
+import { setKnownReachable } from "../api/reachability";
 
 const HEALTH_CHECK_INTERVAL_MS = 30_000;
 
@@ -31,6 +32,7 @@ export function useOnlineStatus() {
       const reachable = navigator.onLine && await checkServerReachable();
       if (cancelled) return;
       setOnline(reachable);
+      setKnownReachable(reachable);
       if (reachable && !wasOnline.current) setReconnects((n) => n + 1);
       wasOnline.current = reachable;
     }

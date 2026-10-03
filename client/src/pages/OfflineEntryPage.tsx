@@ -45,7 +45,7 @@ import {
   describePendingChanges,
   detectConflicts,
   usePendingEntryChanges,
-  type PendingByProduct,
+  type LastSavedBatch,
 } from "../hooks/usePendingEntryChanges";
 import {
   deliverySlotColumns,
@@ -140,12 +140,12 @@ export function OfflineEntryPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   // One level of Undo for the most recent Save - the pre-save value of
-  // every field that batch touched, keyed the same way as pending edits.
-  // Undoing re-submits those old values through the same save endpoint (so
-  // it shows up in the Change Log like any other edit, not a silent
-  // rewrite) and is itself one-shot: undoing clears this, it doesn't turn
-  // into a redo stack.
-  const [lastSavedBatch, setLastSavedBatch] = useState<PendingByProduct | null>(
+  // every field (and manual count) that batch touched, keyed the same way as
+  // pending edits. Undoing re-submits those old values through the same save
+  // endpoints (so it shows up in the Change Log like any other edit, not a
+  // silent rewrite) and is itself one-shot: undoing clears this, it doesn't
+  // turn into a redo stack.
+  const [lastSavedBatch, setLastSavedBatch] = useState<LastSavedBatch | null>(
     null,
   );
   const [undoing, setUndoing] = useState(false);
@@ -389,7 +389,7 @@ export function OfflineEntryPage() {
     // visible once Save has actually started.
     setShowPreview(false);
     const failed: string[] = [];
-    const revertTo: PendingByProduct = {};
+    const revertTo: LastSavedBatch = {};
     const savedManualCountIds: number[] = [];
     const entries = Object.entries(pending);
     for (let i = 0; i < entries.length; i++) {
@@ -404,6 +404,13 @@ export function OfflineEntryPage() {
       for (const key of Object.keys(changes))
         if (key !== MANUAL_COUNT_KEY)
           oldValues[key] = Number(priorRow?.entry[key] ?? 0);
+      // Manual count's own prior value, from the same state handleCommit
+      // reads to stage it in the first place - captured here too (even
+      // though it's `null` whenever this save is the one creating the
+      // count) so Undo can revert it instead of silently leaving it in
+      // place. Read before this product's own save below overwrites it.
+      const hadManualCountChange = MANUAL_COUNT_KEY in changes;
+      const priorManualCount = manualCounts[productId] ?? null;
 
       try {
         const { [MANUAL_COUNT_KEY]: manualCount, ...entryChanges } = changes;
@@ -430,7 +437,12 @@ export function OfflineEntryPage() {
           savedManualCountIds.push(productId);
         }
         clear(productId);
-        if (Object.keys(oldValues).length > 0) revertTo[productId] = oldValues;
+        if (Object.keys(oldValues).length > 0 || hadManualCountChange) {
+          revertTo[productId] = {
+            fields: oldValues,
+            ...(hadManualCountChange ? { manualCount: priorManualCount } : {}),
+          };
+        }
       } catch (e) {
         const name = priorRow?.product.name ?? `#${productId}`;
         // The server's own message (e.g. the negative-stock guard's "would
@@ -565,7 +577,7 @@ export function OfflineEntryPage() {
   }
 
   // Re-submits the pre-save values captured above through the same save
-  // endpoint - an undo is its own tracked edit (shows up in the Change Log
+  // endpoints - an undo is its own tracked edit (shows up in the Change Log
   // like any other save), not a silent rewrite of history. One level only:
   // undoing consumes lastSavedBatch rather than pushing onto a redo stack.
   async function handleUndoLastSave() {
@@ -573,11 +585,33 @@ export function OfflineEntryPage() {
     setError(null);
     setUndoing(true);
     const failed: string[] = [];
-    for (const [productIdStr, oldValues] of Object.entries(lastSavedBatch)) {
+    for (const [productIdStr, revert] of Object.entries(lastSavedBatch)) {
       const productId = Number(productIdStr);
       try {
-        const saved = await saveOfflineEntry(productId, date, shift, oldValues);
-        mergeEntry(productId, saved);
+        if (Object.keys(revert.fields).length > 0) {
+          const saved = await saveOfflineEntry(
+            productId,
+            date,
+            shift,
+            revert.fields,
+          );
+          mergeEntry(productId, saved);
+        }
+        // After the entry fields, same order Save itself uses - the
+        // restored count's variance is measured against the Remaining Stock
+        // this just put back, not the one Save overwrote it with. `null`
+        // here means the count didn't exist before Save created it -
+        // saveManualCount clears it back to absent rather than restoring a
+        // number.
+        if ("manualCount" in revert) {
+          await saveManualCount(
+            productId,
+            date,
+            shift,
+            "OFFLINE",
+            revert.manualCount ?? null,
+          );
+        }
       } catch (e) {
         const name =
           rows?.find((r) => r.product.id === productId)?.product.name ??
