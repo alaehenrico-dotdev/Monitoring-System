@@ -115,7 +115,12 @@ export default defineConfig(({ mode }) => {
   // postMessage transport instead of erroring outright.
   const isTauri = mode === "tauri";
   const extraConnectSrc = isTauri
-    ? ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://ipc.localhost"]
+    // The installed desktop app can switch servers at runtime. Permit HTTPS
+    // API origins and their secure WebSocket endpoints so a stable public
+    // hostname (for example a reserved tunnel domain) works from any router.
+    // Plain HTTP LAN servers still need to be the build-time origin below for
+    // WebView2's insecure-origin exception.
+    ? ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://ipc.localhost", "https:", "wss:"]
     : [];
 
   return {
