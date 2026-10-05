@@ -1,5 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { ServerSettingsLink } from "./ServerSettings";
 
 interface NavLinkDef {
   to: string;
@@ -86,6 +87,9 @@ export function HeaderTabs() {
           ))}
         </div>
       ))}
+      <div className="ae-header-tabs-settings">
+        <ServerSettingsLink />
+      </div>
     </nav>
   );
 }

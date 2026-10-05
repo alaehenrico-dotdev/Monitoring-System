@@ -19,18 +19,8 @@ export function ServerSettingsLink() {
     <>
       <button
         type="button"
+        className="ae-server-settings-link"
         onClick={() => setOpen(true)}
-        style={{
-          background: "transparent",
-          border: "none",
-          cursor: "pointer",
-          fontFamily: "inherit",
-          fontSize: 12,
-          color: colors.cream,
-          opacity: 0.65,
-          marginTop: 14,
-          textDecoration: "underline",
-        }}
       >
         Can't connect? Change server address
       </button>
@@ -42,20 +32,23 @@ export function ServerSettingsLink() {
 function ServerSettingsModal({ onClose }: { onClose: () => void }) {
   const [url, setUrl] = useState(API_URL);
   const [error, setError] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
   const hasOverride = getStoredApiUrl() !== null;
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
     const trimmed = url.trim();
     if (!trimmed) {
       setError("Enter a server address.");
       return;
     }
+    let parsed: URL;
     try {
       // Must resolve to an absolute http(s) URL - a relative path (the web
       // build's own default) means nothing once this becomes the base of
       // every request in a desktop window with no origin of its own.
-      const parsed = new URL(trimmed);
+      parsed = new URL(trimmed);
       if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
         throw new Error("not http(s)");
       }
@@ -63,7 +56,25 @@ function ServerSettingsModal({ onClose }: { onClose: () => void }) {
       setError("That doesn't look like a valid address, e.g. http://192.168.0.178:4000/api");
       return;
     }
-    setApiUrl(trimmed);
+
+    setTesting(true);
+    try {
+      const healthUrl = new URL("/health", parsed).toString();
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 5000);
+      let response: Response;
+      try {
+        response = await fetch(healthUrl, { signal: controller.signal });
+      } finally {
+        window.clearTimeout(timeout);
+      }
+      if (!response.ok) throw new Error("The server did not pass its health check.");
+      setApiUrl(trimmed);
+    } catch {
+      setError("Couldn't reach that server. Check the URL and connection, then try again.");
+    } finally {
+      setTesting(false);
+    }
   }
 
   function handleReset() {
@@ -74,8 +85,9 @@ function ServerSettingsModal({ onClose }: { onClose: () => void }) {
     <Modal title="Server address" onClose={onClose} width={420}>
       <form onSubmit={handleSubmit}>
         <p style={{ margin: "0 0 16px", fontSize: 13, color: colors.subtleInk, lineHeight: 1.5 }}>
-          Point this device at a different server, e.g. after the server machine's
-          network address changes. Saving reloads the app and signs you out.
+          Use a stable HTTPS server address to connect from different routers. A
+          local network address only works while this device can reach that network.
+          The address is checked before switching; switching signs you out.
         </p>
         <Field label="Server URL" style={{ marginBottom: 12 }}>
           <TextInput
@@ -101,10 +113,12 @@ function ServerSettingsModal({ onClose }: { onClose: () => void }) {
             Reset to default
           </Button>
           <div style={{ display: "flex", gap: 10 }}>
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={testing}>
               Cancel
             </Button>
-            <Button type="submit">Save &amp; reload</Button>
+            <Button type="submit" disabled={testing}>
+              {testing ? "Checking server…" : "Test & switch"}
+            </Button>
           </div>
         </div>
       </form>

@@ -40,11 +40,20 @@ at it - same dev proxy, same `.env`/`.env.local`, same HMR as developing in a
 browser. `.env.tauri` (below) isn't involved in dev; it only matters for
 `tauri:build`.
 
-## The server URL is baked in at build time
+## Server address and using the app on different networks
 
-This was a deliberate tradeoff, not an oversight: **the installed app's
-server URL is fixed at build time**, not a runtime setting. There is no
-in-app "change server" screen.
+The installer includes a default server URL, and the installed app also has
+a **“Can't connect? Change server address”** option on its login screen. It
+checks the new address before switching and stores it on that device, so
+changing the server URL does not require rebuilding or reinstalling.
+
+For use across different routers, configure a stable **HTTPS** address for
+the server, such as a reserved tunnel domain, and enter it once in that
+screen. The app's API, health checks, and realtime connection then use that
+same address wherever the device has internet access. A private LAN address
+only works while the device can route to that LAN; the app cannot discover a
+server hidden behind another router or make a private server reachable by
+itself. The server still needs to be running and exposed through the tunnel.
 
 - `client/.env.tauri` holds `VITE_API_URL` as an **absolute** URL (an office
   LAN IP like `http://192.168.1.50:4000/api`, or a stable ngrok domain) -
@@ -52,15 +61,12 @@ in-app "change server" screen.
   app is installed, so this has to be a real, reachable origin.
 - `npm run build:tauri` (`vite build --mode tauri`) is what reads it; it's
   what `tauri build`'s `beforeBuildCommand` runs.
-- **Implication:** if you need the installed app to point at a different
-  server (e.g. you move from the office LAN to an ngrok tunnel, or the LAN IP
-  changes), you must change `.env.tauri`, rebuild, and reinstall. There's no
-  way to repoint an already-installed copy without doing that.
+- `.env.tauri` supplies only the initial/default address. You can change the
+  address later from the login screen without rebuilding.
 - `.env.tauri` is gitignored, same as `.env`/`.env.local` - copy
   `.env.tauri.example` and fill in the real value for a local build. The
   release workflow (below) writes it from a GitHub secret instead.
-- **Two other places have to match this same origin, or the app builds fine
-  but can't actually log in:**
+- **Two server-side/browser settings affect whether the connection works:**
   - `server/src/app.ts`'s CORS allowlist needs `CLIENT_ORIGIN` (or the
     always-allowed Tauri origins) to match where requests are actually coming
     from - a mismatch here fails silently as a generic "Login failed", not a
@@ -80,18 +86,17 @@ in-app "change server" screen.
     `.env.tauri`** - if you ever change the server's address, update this
     value too, or the desktop build will go back to silently failing to log
     in exactly like this.
-  - `client/vite.config.ts`'s CSP (`extraConnectSrc` in `cspPlugin`) needs
-    the same origins as the server's CORS allowlist above, plus
+  - `client/vite.config.ts`'s CSP (`extraConnectSrc` in `cspPlugin`) allows
+    HTTPS API origins and secure WebSockets for runtime server changes, plus
     `http://ipc.localhost` - Tauri's internal IPC bridge for plugin calls
     (e.g. the updater's `check()`) uses that as a separate origin from the
     page's own, and without it in `connect-src`, those calls get silently
     downgraded to a slower fallback transport instead of erroring.
 
-If this ever becomes a real pain point (e.g. the LAN IP changes often), the
-fix is a small settings screen that persists a chosen server URL (via
-`@tauri-apps/plugin-store` or similar) and has `http.ts` read it instead of
-the baked-in `VITE_API_URL` - that's a deliberate follow-up, not something
-this setup does today.
+The desktop build's CSP permits HTTPS API and secure WebSocket origins so a
+different stable HTTPS hostname can be selected at runtime. Plain HTTP LAN
+addresses remain tied to the build-time WebView2 insecure-origin exception;
+prefer HTTPS for a server that users reach from multiple networks.
 
 ## Building a signed installer locally
 
