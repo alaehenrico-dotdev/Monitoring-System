@@ -132,6 +132,7 @@ export default defineConfig(({ mode }) => {
       host: true,
       allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
       proxy: {
+        "/health": { target: "http://localhost:4000", changeOrigin: true },
         "/api": { target: "http://localhost:4000", changeOrigin: true },
         "/ws": { target: "http://localhost:4000", ws: true },
       },
@@ -145,6 +146,7 @@ export default defineConfig(({ mode }) => {
       host: true,
       allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
       proxy: {
+        "/health": { target: "http://localhost:4000", changeOrigin: true },
         "/api": { target: "http://localhost:4000", changeOrigin: true },
         "/ws": { target: "http://localhost:4000", ws: true },
       },

@@ -19,6 +19,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getDb } from "./db";
 
+const PENDING_WRITES_CHANGED_EVENT = "ala-eh-pending-writes-changed";
+
+function notifyPendingWritesChanged() {
+  window.dispatchEvent(new Event(PENDING_WRITES_CHANGED_EVENT));
+}
+
+export function onPendingWritesChanged(listener: () => void): () => void {
+  window.addEventListener(PENDING_WRITES_CHANGED_EVENT, listener);
+  return () => window.removeEventListener(PENDING_WRITES_CHANGED_EVENT, listener);
+}
+
 async function encrypt(plaintext: string): Promise<string> {
   return invoke<string>("encrypt_dpapi", { plaintext });
 }
@@ -76,6 +87,7 @@ export async function queueWrite(method: string, path: string, body: string | un
     encrypted,
     new Date().toISOString(),
   ]);
+  notifyPendingWritesChanged();
 }
 
 export async function getPendingWrites(): Promise<PendingWrite[]> {
@@ -127,6 +139,7 @@ export async function flushPendingWrites(
       await send(write.method, write.path, write.body);
       await removePendingWrite(write.id);
       result.flushed++;
+      notifyPendingWritesChanged();
     } catch (err) {
       if (isNetworkError(err)) break;
       // The server rejected this one on its own merits - won't succeed on
@@ -134,6 +147,7 @@ export async function flushPendingWrites(
       // write queued after it.
       await removePendingWrite(write.id);
       result.rejected.push({ write, error: err instanceof Error ? err.message : "Request failed" });
+      notifyPendingWritesChanged();
     }
   }
   return result;

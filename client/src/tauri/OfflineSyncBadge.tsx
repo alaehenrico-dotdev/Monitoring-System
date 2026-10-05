@@ -2,12 +2,13 @@
 // import.meta.env.MODE === "tauri" - so this file (and its offlineStore/sync
 // imports) never ends up in the plain web build's bundle, same reasoning as
 // every other file under src/tauri/.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { sendQueuedWrite } from "../api/http";
-import { flushPendingWrites, getPendingWriteCount } from "./offlineStore";
+import { flushPendingWrites, getPendingWriteCount, onPendingWritesChanged } from "./offlineStore";
 import { useSyncEngine } from "./sync/useSyncEngine";
+import { useSyncUiState } from "./sync/SyncStore";
 import { colors } from "../theme";
 
 /// Shows pending/conflict status for BOTH offline systems:
@@ -17,16 +18,23 @@ import { colors } from "../theme";
 ///   DailyOfflineStock/ManualCount), which drives its own push+pull on
 ///   launch, reconnect, and a periodic idle interval (see useSyncEngine)
 ///
-/// Renders nothing once both are empty - the plain "Offline - showing saved
-/// data" banner in Layout.tsx already covers the no-pending-changes case.
+/// Appears whenever the desktop server is unreachable, sync needs attention,
+/// or queued changes/conflicts remain. Healthy, fully synced sessions stay
+/// out of the way.
 export function OfflineSyncBadge() {
   const { reconnects } = useOnlineStatus();
   const [genericPendingCount, setGenericPendingCount] = useState(0);
-  const { pendingCount: syncPendingCount, conflictCount } = useSyncEngine();
+  const { isReachable, pendingCount: syncPendingCount, conflictCount } = useSyncEngine();
+  const { syncing, failed, lastSyncedAt } = useSyncUiState();
+
+  const refreshGenericPendingCount = useCallback(async () => {
+    setGenericPendingCount(await getPendingWriteCount());
+  }, []);
 
   useEffect(() => {
-    getPendingWriteCount().then(setGenericPendingCount);
-  }, []);
+    void refreshGenericPendingCount();
+    return onPendingWritesChanged(() => void refreshGenericPendingCount());
+  }, [refreshGenericPendingCount]);
 
   useEffect(() => {
     // Deliberately also runs on mount (reconnects starts at 0, same as any
@@ -47,12 +55,20 @@ export function OfflineSyncBadge() {
         // visible wherever they typed it (see usePendingEntryChanges).
         console.error("Some offline-queued writes were rejected and dropped:", result.rejected);
       }
-      getPendingWriteCount().then(setGenericPendingCount);
+      void refreshGenericPendingCount();
     });
-  }, [reconnects]);
+  }, [reconnects, refreshGenericPendingCount]);
 
   const totalPending = genericPendingCount + syncPendingCount;
-  if (totalPending === 0 && conflictCount === 0) return null;
+  if (isReachable && totalPending === 0 && conflictCount === 0 && !syncing && !failed) return null;
+
+  const lastSyncLabel = lastSyncedAt
+    ? `Last successful sync ${new Date(lastSyncedAt).toLocaleString()}`
+    : "No successful sync recorded on this device yet";
+  let connectionLabel = "Connected";
+  if (syncing) connectionLabel = "Syncing changes…";
+  else if (!isReachable) connectionLabel = "Server unreachable · using saved data";
+  else if (failed) connectionLabel = "Sync failed · tap Sync to retry";
 
   return (
     <div
@@ -65,9 +81,11 @@ export function OfflineSyncBadge() {
         zIndex: 150,
         display: "flex",
         alignItems: "center",
-        gap: 10,
-        padding: "6px 14px",
-        borderRadius: 999,
+        flexWrap: "wrap",
+        gap: "4px 10px",
+        maxWidth: "calc(100vw - 24px)",
+        padding: "8px 14px",
+        borderRadius: 12,
         fontSize: 12,
         fontWeight: 600,
         background: colors.charcoalRaised,
@@ -76,11 +94,13 @@ export function OfflineSyncBadge() {
         boxShadow: "0 6px 20px rgba(12, 12, 12, 0.35)",
       }}
     >
+      <span>{connectionLabel}</span>
       {totalPending > 0 && (
         <span>
-          {totalPending} change{totalPending === 1 ? "" : "s"} waiting to sync
+          {totalPending} change{totalPending === 1 ? "" : "s"} queued on this device
         </span>
       )}
+      {!syncing && <span>{lastSyncLabel}</span>}
       {conflictCount > 0 && (
         <Link to="/sync-conflicts" style={{ color: colors.danger, textDecoration: "underline" }}>
           {conflictCount} conflict{conflictCount === 1 ? "" : "s"} need review

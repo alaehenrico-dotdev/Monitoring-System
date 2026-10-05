@@ -64,7 +64,7 @@ export function Layout() {
         >
           <Outlet />
         </main>
-        {!online && (
+        {!online && !isTauri && (
           <div
             role="status"
             style={{

@@ -1,10 +1,10 @@
 // Drives sync at launch, on reconnect, on server realtime events, and as an
 // idle fallback.
 import { useEffect, useRef, useState } from "react";
-import { registerSyncRunner, setSyncUiState } from "./SyncStore";
+import { hydrateLastSyncedAt, registerSyncRunner, setSyncUiState } from "./SyncStore";
 import { useServerConnectivity } from "./connectivity";
 import { runSync } from "./engine";
-import { countPendingSyncChanges, countUnresolvedConflicts } from "./localDb";
+import { countPendingSyncChanges, countUnresolvedConflicts, getLastSyncedAt } from "./localDb";
 import { useRealtimeVersion } from "../../context/RealtimeContext";
 
 // How often a full push+pull runs while idle, to cover missed realtime events.
@@ -35,7 +35,8 @@ export function useSyncEngine() {
     setSyncUiState({ syncing: true });
     try {
       await runSync();
-      setSyncUiState({ failed: false, lastSyncedAt: Date.now() });
+      const lastSyncedAt = await getLastSyncedAt();
+      setSyncUiState({ failed: false, lastSyncedAt: lastSyncedAt ? Date.parse(lastSyncedAt) : null });
     } catch (err) {
       setSyncUiState({ failed: true });
       // Best effort - a failed sync attempt (most likely the server just
@@ -55,6 +56,9 @@ export function useSyncEngine() {
 
   useEffect(() => {
     refreshCounts();
+    void getLastSyncedAt().then((value) => {
+      hydrateLastSyncedAt(value ? Date.parse(value) : null);
+    });
     sync(); // on launch
     const interval = setInterval(() => {
       if (isReachable) sync();

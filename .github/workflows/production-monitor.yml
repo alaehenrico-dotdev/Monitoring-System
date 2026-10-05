@@ -1,0 +1,70 @@
+name: Production monitor
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public app, tunnel, API, and database
+        id: health
+        env:
+          MONITOR_HEALTH_URL: ${{ vars.MONITOR_HEALTH_URL }}
+        run: |
+          if [ -z "$MONITOR_HEALTH_URL" ]; then
+            echo "Set the repository Actions variable MONITOR_HEALTH_URL to the public app URL ending in /health." >&2
+            exit 2
+          fi
+          case "$MONITOR_HEALTH_URL" in
+            */health) ;;
+            *) echo "MONITOR_HEALTH_URL must end in /health." >&2; exit 2 ;;
+          esac
+          live_url="${MONITOR_HEALTH_URL%/health}/health/live"
+          if ! curl --fail --silent --show-error --output /dev/null --max-time 20 --retry 2 --retry-delay 5 \
+            --header "ngrok-skip-browser-warning: true" \
+            "$live_url"; then
+            echo "Public liveness check failed: the API or tunnel is unreachable." >&2
+            exit 1
+          fi
+          if ! http_code=$(curl --silent --show-error --output /tmp/monitor-health.json --write-out "%{http_code}" --max-time 20 --retry 2 --retry-delay 5 \
+            --header "ngrok-skip-browser-warning: true" \
+            "$MONITOR_HEALTH_URL"); then
+            echo "Public readiness request failed: the tunnel or API is unreachable." >&2
+            exit 1
+          fi
+          if [ "$http_code" != "200" ]; then
+            if [ "$(jq -r '.database // empty' /tmp/monitor-health.json 2>/dev/null)" = "unreachable" ]; then
+              echo "API is live, but its MySQL readiness check failed." >&2
+            else
+              echo "Public readiness check returned HTTP $http_code." >&2
+            fi
+            cat /tmp/monitor-health.json 2>/dev/null || true
+            exit 1
+          fi
+          jq -e '.status == "ok" and .database == "ok"' /tmp/monitor-health.json
+
+      - name: Send Slack alert on failure
+        if: failure()
+        env:
+          MONITOR_SLACK_WEBHOOK: ${{ secrets.MONITOR_SLACK_WEBHOOK }}
+          WORKFLOW_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$MONITOR_SLACK_WEBHOOK" ]; then
+            echo "Slack alert skipped; configure MONITOR_SLACK_WEBHOOK to receive Slack notifications."
+            exit 0
+          fi
+          payload=$(jq -n --arg text "Ala Eh production health check failed. Check the API, database, and ngrok tunnel. Details: $WORKFLOW_RUN_URL" '{text: $text}')
+          curl --fail --silent --show-error --max-time 15 \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "$MONITOR_SLACK_WEBHOOK"
+
+      - name: Report successful health check
+        if: success()
+        run: echo "Public health endpoint returned HTTP 2xx; API and database are reachable through the tunnel." >> "$GITHUB_STEP_SUMMARY"
