@@ -37,3 +37,49 @@ jobs:
 
       - name: Build (both workspaces)
         run: npm run build
+
+  end-to-end:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ala_eh_stocks_e2e
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/ala_eh_stocks_e2e
+      JWT_SECRET: "ci-e2e-jwt-secret-not-used-anywhere-real"
+      DATA_RESET_PASSCODE: "482913"
+      CLIENT_ORIGIN: http://localhost:5173
+      SEED_ADMIN_PASSWORD: "E2eAdmin-Only-Password-8492"
+      SEED_ONLINE_ENCODER_PASSWORD: "E2eOnline-Only-Password-8492"
+      SEED_OFFLINE_ENCODER_PASSWORD: "E2eOffline-Only-Password-8492"
+      E2E_DATABASE_NAME: ala_eh_stocks_e2e
+      E2E_ALLOW_DESTRUCTIVE_RESTORE: I_HAVE_A_DISPOSABLE_E2E_DATABASE
+      E2E_RESET_PASSCODE: "482913"
+      E2E_ADMIN_PASSWORD: "E2eAdmin-Only-Password-8492"
+      E2E_ONLINE_PASSWORD: "E2eOnline-Only-Password-8492"
+      E2E_OFFLINE_PASSWORD: "E2eOffline-Only-Password-8492"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install MySQL client utilities for backup and restore
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+      - name: Apply schema migrations
+        run: npm run prisma:migrate:deploy --workspace server
+      - name: Seed isolated E2E accounts and products
+        run: npm run seed --workspace server
+      - name: Exercise login, permissions, stock, sync, and restore workflows
+        run: npm run e2e

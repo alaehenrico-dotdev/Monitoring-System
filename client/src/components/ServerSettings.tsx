@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { API_URL, getDefaultApiUrl, getStoredApiUrl, resetApiUrl, setApiUrl } from "../api/http";
+import { useServerReachable } from "../api/reachability";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { Modal } from "./Modal";
 import { Button, Field, TextInput } from "./ui";
 import { colors } from "../theme";
@@ -12,8 +14,12 @@ const isTauri = import.meta.env.MODE === "tauri";
 /// this renders nothing there.
 export function ServerSettingsLink() {
   const [open, setOpen] = useState(false);
+  // Keep reachability current even on the login screen, where the app shell's
+  // normal connectivity hook is not mounted.
+  useOnlineStatus();
+  const serverReachable = useServerReachable();
 
-  if (!isTauri) return null;
+  if (!isTauri || serverReachable) return null;
 
   return (
     <>

@@ -18,6 +18,14 @@ export function setSyncUiState(patch: Partial<SyncUiState>) {
   listeners.forEach((l) => l());
 }
 
+export function hydrateLastSyncedAt(lastSyncedAt: number | null) {
+  // A fresh sync can finish while SQLite is being read on launch. Hydration
+  // should only fill the empty initial value, never replace that fresh result.
+  if (state.lastSyncedAt === null && lastSyncedAt !== null) {
+    setSyncUiState({ lastSyncedAt });
+  }
+}
+
 export function registerSyncRunner(fn: () => Promise<void>): () => void {
   runner = fn;
   return () => {

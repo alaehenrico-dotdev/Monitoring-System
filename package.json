@@ -18,7 +18,8 @@
     "backup:snapshot": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup.ps1 -Mode snapshot -Label pre-migration",
     "restore": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/restore.ps1",
     "lint": "eslint .",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "e2e": "node scripts/e2e.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.0.1"

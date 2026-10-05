@@ -90,6 +90,27 @@ Nothing extra to configure — the WebSocket connection (`client/src/context/Rea
 derives its URL from the same `VITE_API_URL` the REST calls use, and rides through the same
 `vite preview` proxy and ngrok tunnel as everything else.
 
+## External uptime alerts
+
+The repository's **Production monitor** GitHub Actions workflow checks the
+public `/health` URL every five minutes. The app proxies that path through
+the same tunnel as the UI; the API responds successfully only when both the
+API and MySQL are reachable. `/health/live` is available for process-only
+liveness checks. A failed public check therefore catches an API crash, a
+database outage, or a stopped/broken tunnel from outside the server machine.
+
+Configure these GitHub repository settings:
+
+- Actions variable `MONITOR_HEALTH_URL`, for example
+  `https://your-reserved-domain.ngrok.app/health`.
+- Optional Actions secret `MONITOR_SLACK_WEBHOOK`, set to a Slack incoming
+  webhook URL to receive a message when a scheduled check fails. Without it,
+  the failed workflow run and logs are the alert.
+
+Use **Actions → Production monitor → Run workflow** to check the setup now.
+The scheduled monitor sends the ngrok browser-warning bypass header, so the
+health endpoint can be queried without an interactive browser.
+
 ## Backups (nightly, local, with retention)
 
 The app has no user-uploaded files - everything lives in MySQL - so backups are database-only. The
@@ -125,3 +146,21 @@ npm run restore -- -File C:\ala-eh-backups\daily\db_backup_2026-09-30_020000.sql
   data. If the task logs `server\.env not found`, register it under your own account instead of SYSTEM.
 - **Copies off the machine:** these are same-machine backups - a dead disk or a stolen PC takes them
   too. Periodically copy the folder to another drive or cloud storage.
+
+## End-to-end workflow checks
+
+CI runs `npm run e2e` against a fresh, isolated MySQL service. The checks
+exercise API login and roles, role-based write rejection, stock persistence,
+the desktop sync push/pull endpoints, and a backup/restore round-trip. Restore
+coverage requires `mysqldump` and `mysql` client tools.
+
+For a local run, prepare a **disposable database whose name contains `e2e`
+or `test`** and seed its accounts. Set
+`DATABASE_URL`, `E2E_DATABASE_NAME` (it must match the database in that URL),
+`JWT_SECRET`, `DATA_RESET_PASSCODE`, `SEED_ADMIN_PASSWORD`,
+`SEED_ONLINE_ENCODER_PASSWORD`, and `SEED_OFFLINE_ENCODER_PASSWORD`; then
+apply migrations and run the seed script. Set `E2E_ALLOW_DESTRUCTIVE_RESTORE=I_HAVE_A_DISPOSABLE_E2E_DATABASE`,
+the matching `E2E_*_PASSWORD` variables, and `E2E_RESET_PASSCODE`, then run
+`npm run e2e`. The runner starts its own local API process and refuses
+non-loopback API URLs, mismatched database names, or restore coverage without
+the explicit disposable-database confirmation. Never point it at production.

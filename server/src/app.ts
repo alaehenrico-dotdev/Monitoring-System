@@ -7,6 +7,8 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiLimiter } from "./middleware/rateLimit";
 import { requestLogger } from "./middleware/requestLogger";
 import routes from "./routes";
+import { prisma } from "./lib/prisma";
+import { asyncHandler } from "./utils/asyncHandler";
 
 export function createApp() {
   const app = express();
@@ -59,7 +61,18 @@ export function createApp() {
   app.use(express.json());
   app.use(requestLogger);
 
-  app.get("/health", (_req, res) => res.json({ status: "ok" }));
+  app.get("/health/live", (_req, res) => res.json({ status: "ok" }));
+  // Used by external uptime monitoring and client connectivity checks. A
+  // running API with an unreachable database is not ready to serve the app,
+  // so include a lightweight DB round-trip in this check.
+  app.get("/health", asyncHandler(async (_req, res) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      res.json({ status: "ok", database: "ok" });
+    } catch {
+      res.status(503).json({ status: "unavailable", database: "unreachable" });
+    }
+  }));
 
   app.use("/api", apiLimiter, routes);
 
