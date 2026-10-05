@@ -168,6 +168,15 @@ verify-then-trust a differently-signed update).
    release until you publish it. This is your chance to catch a bad build
    before every installed copy of the app offers it as an update.
 
+If the workflow fails with `Resource not accessible by integration` while
+creating the release, check **Settings → Actions → General → Workflow
+permissions** and allow the workflow to read and write repository contents.
+The workflow already declares `contents: write`. If an organization policy
+still blocks the built-in `GITHUB_TOKEN`, create a fine-grained token scoped to
+this repository with **Contents: Read and write**, save it as the Actions
+secret `RELEASE_TOKEN`, then rerun the failed workflow. The release workflow
+uses that secret when present and otherwise falls back to `GITHUB_TOKEN`.
+
 ## Offline support
 
 The desktop app tolerates the server/network dropping - it does NOT work as

@@ -8,8 +8,9 @@ on:
 jobs:
   release:
     runs-on: windows-latest
-    # Needed so tauri-action can create/update the GitHub Release and upload
-    # the installer + latest.json to it.
+    # Needed when RELEASE_TOKEN is not configured. A fine-grained PAT or GitHub
+    # App token can be supplied as RELEASE_TOKEN if repository/organization
+    # policy blocks GITHUB_TOKEN from creating releases.
     permissions:
       contents: write
     env:
@@ -45,7 +46,7 @@ jobs:
 
       - uses: tauri-apps/tauri-action@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
