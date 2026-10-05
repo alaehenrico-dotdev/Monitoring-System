@@ -24,7 +24,7 @@ const MONTH_LABELS = [
 ];
 // Floor for the plot height - the chart itself grows to fill whatever height
 // the dashboard's hero row gives this card (see .ae-dash-hero-row).
-const CHART_HEIGHT = 220;
+const CHART_HEIGHT = 240;
 // Each month stretches to fill this chart's own column (the dashboard's
 // hero row gives it the wide right-hand column, see .ae-dash-hero-row) -
 // this is only the floor it won't shrink below, so on a narrow screen the
@@ -176,7 +176,7 @@ export function MonthlyMonitoring() {
                 style={{
                   display: "flex",
                   alignItems: "stretch",
-                  gap: 8,
+                  gap: 10,
                   minWidth: "100%",
                 }}
               >
@@ -337,7 +337,7 @@ function ChannelBar({
       {hasData && (
         <span
           style={{
-            fontSize: 9.5,
+            fontSize: 10.5,
             color: colors.subtleInk,
             marginBottom: 4,
             whiteSpace: "nowrap",
@@ -349,7 +349,9 @@ function ChannelBar({
       <div
         style={{
           width: "100%",
-          maxWidth: 16,
+          // Bars widen with their column (up to 44px) so a wide desktop chart
+          // isn't a row of thin sticks with empty space around them.
+          maxWidth: 44,
           height: hasData ? `${heightPct}%` : 2,
           borderRadius: 2,
           background: hasData ? color : "transparent",

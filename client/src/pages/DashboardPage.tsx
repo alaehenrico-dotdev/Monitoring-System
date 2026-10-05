@@ -39,7 +39,8 @@ type Analytics = {
   varianceFlags: number;
 };
 
-const RECENT_ACTIVITY_LIMIT = 5;
+// Fetched 8; CSS shows 5 on short windows and all 8 on tall ones.
+const RECENT_ACTIVITY_LIMIT = 8;
 const COUNT_UP_DURATION_MS = 700;
 // How long each face (Online, then Offline) stays on screen before the
 // rotating stat card crossfades to the next one.
@@ -159,7 +160,8 @@ export function DashboardPage() {
   const [, forceRerenderOnDateChange] = useState(0);
   useEffect(() => {
     const id = setInterval(() => {
-      if (getCurrentShiftAndDate().date !== todayRef.current) forceRerenderOnDateChange((n) => n + 1);
+      if (getCurrentShiftAndDate().date !== todayRef.current)
+        forceRerenderOnDateChange((n) => n + 1);
     }, 60_000);
     return () => clearInterval(id);
   }, []);
@@ -211,7 +213,12 @@ export function DashboardPage() {
         subtitleClassName="ae-dash-subtitle"
       />
 
-      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+      />
 
       <div className="ae-dash-quicklinks">
         {QUICK_LINKS.map((l) => (

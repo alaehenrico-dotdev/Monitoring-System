@@ -2554,14 +2554,54 @@ table input[type="number"] {
    remaining width and is stretched to the full height of the left column. */
 .ae-dash-hero-row {
   display: grid;
-  grid-template-columns: minmax(340px, 460px) minmax(0, 1fr);
+  /* Proportional columns (5fr : 7fr) instead of a fixed 460px cap, so on a
+     wide desktop the stat cards and the chart both grow with the window
+     rather than the chart taking all the extra width. */
+  grid-template-columns: minmax(340px, 5fr) minmax(0, 7fr);
   gap: 14px;
   margin: 12px 0 24px;
   align-items: stretch;
+  /* Fill whatever height the viewport has left under the header on a tall
+     desktop screen (the page root is a column flex container), instead of
+     stopping at the content's natural height with a blank band below. */
+  flex: 1 1 auto;
+  /* Never squash below the content (the page root has min-height: 0). */
+  min-height: min-content;
 }
+/* Large desktops: give the chart a bit more of the row and let the gaps
+   breathe. */
+@media (min-width: 1500px) {
+  .ae-dash-hero-row {
+    grid-template-columns: minmax(380px, 4fr) minmax(0, 7fr);
+    gap: 18px;
+  }
+  .ae-dash-quicklinks {
+    gap: 14px;
+  }
+}
+/* Mid-size windows: stats get a touch less width so the chart keeps room. */
+@media (max-width: 1180px) {
+  .ae-dash-hero-row {
+    grid-template-columns: minmax(320px, 4fr) minmax(0, 6fr);
+  }
+}
+/* Stacked (tablet / phone): stat cards on top, activity under them, then the
+   chart. The chart no longer stretches beside the left column, so it needs
+   its own height. */
 @media (max-width: 900px) {
   .ae-dash-hero-row {
     grid-template-columns: 1fr;
+    flex: 0 0 auto;
+  }
+  .ae-dash-hero-chart {
+    min-height: 320px;
+  }
+}
+/* Recent Activity fetches 8 rows; a short window shows 5, a tall one all 8
+   (the card stretches with the row, so extra height is used, not wasted). */
+@media (max-height: 860px) {
+  .ae-dash-hero-activity .ae-table tbody tr:nth-child(n + 6) {
+    display: none;
   }
 }
 .ae-dash-hero-left {
@@ -2575,11 +2615,21 @@ table input[type="number"] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
+@media (max-width: 520px) {
+  .ae-dash-stats {
+    grid-template-columns: 1fr;
+  }
+}
 /* Without this, a 1fr grid item defaults to min-width: auto (its content's
    natural width), which would let the chart's own 12-month row force this
    whole column wider than its 1fr share instead of scrolling inside it. */
 .ae-dash-hero-chart {
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ae-dash-hero-chart > .ae-dash-section {
+  flex: 1;
 }
 .ae-dash-hero-chart .ae-dash-section,
 .ae-dash-hero-activity {
@@ -2636,11 +2686,27 @@ table input[type="number"] {
   height: 16px;
 }
 .ae-dash-hero-left .ae-dash-stat-value {
-  font-size: clamp(22px, 2.4vw, 28px);
+  font-size: clamp(22px, 2.4vw, 34px);
 }
 .ae-dash-hero-left .ae-dash-stat-label {
   font-size: 11px;
   line-height: 1.25;
+}
+@media (min-width: 1500px) {
+  .ae-dash-hero-left .ae-dash-stat {
+    padding: 20px 16px;
+    gap: 10px;
+  }
+  .ae-dash-hero-left .ae-dash-stat-label {
+    font-size: 12px;
+  }
+  .ae-dash-hero-activity .ae-dash-card .ae-table {
+    font-size: 13px;
+  }
+  .ae-dash-hero-activity .ae-dash-card .ae-table th,
+  .ae-dash-hero-activity .ae-dash-card .ae-table td {
+    padding: 8px 12px;
+  }
 }
 .ae-dash-stat {
   position: relative;
