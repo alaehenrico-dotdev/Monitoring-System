@@ -9,6 +9,7 @@ import { HeaderTabs } from "./HeaderTabs";
 import { ChevronIcon } from "./icons";
 import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
+import { useServerReachable } from "../api/reachability";
 
 const LOGO_SIZE = 56;
 // Collapsed header: the logo shrinks to roughly the title's own height so
@@ -65,6 +66,7 @@ export function PageHeader({
 }: PageHeaderProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { open, toggle } = useNavDrawer();
+  const reachable = useServerReachable();
   const [logoSpin, setLogoSpin] = useState(0);
   const lastSpinAtRef = useRef(0);
   const logoRef = useRef<HTMLButtonElement>(null);
@@ -120,7 +122,7 @@ export function PageHeader({
       <HeaderTabs />
       <div
         ref={headerRef}
-        className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}`}
+        className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}${reachable ? "" : " ae-page-header--offline"}`}
         onMouseMove={handlePointerMove}
         onMouseLeave={handlePointerLeave}
       >
