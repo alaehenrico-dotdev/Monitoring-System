@@ -2092,13 +2092,24 @@ table input[type="number"] {
      start, gentle settle - much less abrupt than the default `ease`. */
   --ae-collapse-dur: 340ms;
   --ae-collapse-ease: cubic-bezier(0.32, 0.72, 0, 1);
-  transition: padding var(--ae-collapse-dur) var(--ae-collapse-ease);
+  transition:
+    padding var(--ae-collapse-dur) var(--ae-collapse-ease),
+    border-color 250ms ease,
+    box-shadow 250ms ease;
   margin: -18px -18px 8px;
   /* Same all-around gold glow as the sidebar's own collapsed-icon state
      (Sidebar.tsx's boxShadow) - a soft drop shadow plus two rings of the
      brand yellow bleeding outward, so the card reads as the same kind of
      glowing chrome instead of a flat bordered box. */
   box-shadow: var(--ae-glass-shadow);
+}
+/* Server unreachable / Wi-Fi down (see useServerReachable): the header's
+   border turns red until the connection comes back. */
+.ae-page-header.ae-page-header--offline {
+  border-color: var(--ae-danger-text);
+  box-shadow:
+    var(--ae-glass-shadow),
+    0 0 0 1px var(--ae-danger-text);
 }
 /* Cursor-follow spotlight, same trick as .ae-toolbar::before /
    .ae-toolbar::before: --mx/--my/--spotlight-opacity are written by

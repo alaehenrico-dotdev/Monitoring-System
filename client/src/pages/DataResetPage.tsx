@@ -9,7 +9,7 @@ import { colors } from "../theme";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 import { InlineLoading, Spinner } from "../components/Spinner";
 
-const COUNTDOWN_SECONDS = 10;
+const COUNTDOWN_SECONDS = 7;
 
 type Status =
   | "idle"
