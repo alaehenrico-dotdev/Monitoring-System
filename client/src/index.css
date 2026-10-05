@@ -1181,10 +1181,10 @@ table input[type="number"] {
   --tb-hairline: var(--ae-tb-hairline);
   --tb-text: var(--ae-tb-text);
   --tb-text-muted: var(--ae-tb-text-muted);
-  padding: 5px;
+  padding: 3px 5px;
   /* Pulls the strip 8px past the page padding on each side at every screen
      size (the small-screen rules below used to widen this to -12/-16px). */
-  margin: 0 -8px 6px;
+  margin: 0 -8px 3px;
   background: var(--ae-surface);
   /* No outer border: it rendered as a gold line running the full width of
      the row, under every filter and button alike. The nav-tab redesign
@@ -1346,14 +1346,10 @@ table input[type="number"] {
    CSV/PDF/Import, Save, History, Clear/Undo - are .ae-btn / .ae-segment-btn,
    untouched below, so they keep looking like real buttons.
 
-   Two different underline treatments live here on purpose:
-   - Search (an actual <input>) gets a persistent, always-visible hairline
-     that deepens to gold on hover/focus - it needs to read as "type here",
-     and a replaced element like <input> can't host the ::after trick below.
-   - The dropdown/date triggers (real <button>s) get the SAME animated,
-     center-grown underline as the top nav tabs (.ae-header-tab::after) -
-     they're tab-style controls, so they get the "click here" treatment
-     instead of a static line. */
+   Search, category, date and shift (the .ae-input / .ae-select-trigger /
+   .ae-date-trigger controls) are fully borderless here, at rest and on
+   hover/focus alike - no line is ever drawn beneath them, so they read as
+   plain nav-style labels with nothing under them. */
 .ae-toolbar .ae-input,
 .ae-toolbar .ae-select,
 .ae-toolbar .ae-select-trigger,
@@ -1370,31 +1366,12 @@ table input[type="number"] {
   background-color: transparent;
   /* Plain nav-label color (same token .ae-header-tab text uses) - NOT the
      toolbar's themed gold .tb-text, which would make every filter look
-     "active" all the time. Gold is reserved for the underline itself. */
+     "active" all the time. */
   color: var(--ae-text);
   font-size: 13.5px;
   font-weight: 500;
   box-shadow: none !important;
-  transition:
-    border-color 150ms ease,
-    color 150ms ease;
-}
-
-/* Search / plain <select>: always-visible line (see note above). */
-.ae-toolbar .ae-input,
-.ae-toolbar .ae-select {
-  border-bottom: 1px solid var(--tb-hairline);
-}
-.ae-toolbar .ae-input:hover:not(:disabled):not(:focus),
-.ae-toolbar .ae-select:hover:not(:disabled):not(:focus) {
-  background-color: transparent;
-  border-bottom-color: var(--ae-glass-accent);
-}
-.ae-toolbar .ae-input:focus,
-.ae-toolbar .ae-select:focus {
-  outline: none;
-  border-bottom-color: var(--ae-glass-accent);
-  border-bottom-width: 2px;
+  transition: color 150ms ease;
 }
 .ae-toolbar .ae-input:disabled {
   background-color: transparent;
@@ -1403,38 +1380,6 @@ table input[type="number"] {
 }
 .ae-toolbar .ae-input::placeholder {
   color: var(--ae-text-muted);
-}
-
-/* Dropdown / date triggers: nav-tab-style animated underline instead of a
-   border - same gradient token, same geometry, same transition as
-   .ae-header-tab::after. */
-.ae-toolbar .ae-select-trigger::after,
-.ae-toolbar .ae-date-trigger::after {
-  content: "";
-  position: absolute;
-  left: 10px;
-  right: 10px;
-  bottom: 2px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--ae-glass-accent);
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform 0.2s ease;
-}
-.ae-toolbar .ae-select-trigger:hover::after,
-.ae-toolbar .ae-select-trigger:focus-visible::after,
-.ae-toolbar .ae-select-trigger[aria-expanded="true"]::after,
-.ae-toolbar .ae-date-trigger:hover::after,
-.ae-toolbar .ae-date-trigger:focus-visible::after,
-.ae-toolbar .ae-date-trigger[aria-expanded="true"]::after {
-  transform: scaleX(1);
-}
-.ae-toolbar .ae-select-trigger:focus-visible,
-.ae-toolbar .ae-date-trigger:focus-visible,
-.ae-toolbar .ae-select-trigger[aria-expanded="true"],
-.ae-toolbar .ae-date-trigger[aria-expanded="true"] {
-  outline: none;
 }
 
 /* Leading icon inside a filter trigger (Dropdown's `icon` prop): only in
@@ -2102,13 +2047,7 @@ table input[type="number"] {
 .ae-main p {
   margin: 0 0 8px;
 }
-.ae-main > div {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  min-width: 0;
-}
+.ae-main > div,
 .ae-grid-fill {
   display: flex;
   flex-direction: column;
@@ -2227,7 +2166,7 @@ table input[type="number"] {
 .ae-page-header-toolbar-slot {
   min-width: 0;
   /* Padding (not a margin) so it collapses away with the row. */
-  padding-top: 6px;
+  padding-top: 3px;
 }
 /* Bottom-center collapse tab - a small nub straddling the card's own
    bottom border (half in, half out, via the negative bottom offset) so it
@@ -3239,4 +3178,89 @@ table input[type="number"] {
   .ae-sync-spin {
     animation-duration: 2.4s;
   }
+}
+
+/* =========================================================================
+   Toolbar alignment correction
+   - Keeps every left-side filter and right-side action on the same optical
+     center line.
+   - Prevents the search input's native line-height from sitting lower than
+     the flex-centered controls.
+   - Keeps the text underline fully inside the toolbar instead of clipping
+     its lower edge against the toolbar's overflow box.
+   ========================================================================= */
+.ae-toolbar,
+.ae-toolbar > :first-child:not(.ae-toolbar-controls),
+.ae-toolbar-controls {
+  align-items: center;
+}
+
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger,
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-btn {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+}
+
+.ae-toolbar .ae-input {
+  line-height: 1;
+  padding-top: 0;
+  padding-bottom: 0;
+  text-align: left;
+}
+
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger {
+  line-height: 1;
+}
+
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-btn {
+  line-height: 1;
+}
+
+/* The toolbar clips horizontally, but the label underline must not be
+   allowed to fall below the row's visible content area. */
+.ae-toolbar .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-segment-label::after {
+  bottom: -2px;
+}
+
+/* Keep the left-side separators vertically centered and fully visible. */
+.ae-toolbar
+  > :first-child:not(.ae-toolbar-controls)
+  > *:not(:first-child)::before {
+  height: 16px;
+  margin-top: 0;
+  margin-bottom: 0;
+  align-self: center;
+}
+
+/* Final toolbar icon alignment pass.
+   The buttons already use flex centering, but the SVG artwork itself has a
+   slightly different visual center than the text glyphs. Nudge only the
+   toolbar action icons down by 1px so their visible strokes sit on the same
+   optical baseline as the labels. Positioning is used instead of changing
+   the flex alignment so the control's actual box remains perfectly centered. */
+.ae-toolbar .ae-btn > svg,
+.ae-toolbar .ae-toolbar-save > svg,
+.ae-toolbar .ae-segment-btn > svg {
+  position: relative;
+  top: 1px;
+}
+
+/* Preserve the sync/undo icon's own rotation animation while applying the
+   same 1px optical correction. */
+.ae-toolbar .ae-btn > svg.ae-sync-spin,
+.ae-toolbar .ae-toolbar-save > svg.ae-sync-spin,
+.ae-toolbar .ae-segment-btn > svg.ae-sync-spin {
+  top: 1px;
 }

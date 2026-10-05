@@ -1,6 +1,43 @@
 import { getKnownReachable, setKnownReachable } from "./reachability";
 
-export const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+const SERVER_URL_STORAGE_KEY = "ala-eh-server-url";
+
+// Baked in at build time from VITE_API_URL - fine for the web build, which
+// always rides through the same origin's proxy/tunnel (see PRODUCTION.md),
+// but the Tauri desktop build talks to an absolute LAN address that changes
+// whenever the server machine's IP does. Rebuilding and redistributing the
+// installer every time that happens is the "annoying" part this override
+// fixes - ServerSettings.tsx lets a user point the installed app at a new
+// address without a developer involved.
+const DEFAULT_API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:4000/api";
+
+export function getDefaultApiUrl(): string {
+  return DEFAULT_API_URL;
+}
+
+export function getStoredApiUrl(): string | null {
+  return localStorage.getItem(SERVER_URL_STORAGE_KEY);
+}
+
+export const API_URL = getStoredApiUrl() ?? DEFAULT_API_URL;
+
+// Persists the override and reloads the page - simpler and more reliable
+// than trying to hot-swap every live consumer of API_URL (the open realtime
+// WebSocket in RealtimeContext, in-flight health-check polling, the offline
+// sync engine) mid-session. The old session's token is cleared too since
+// it belongs to whichever server issued it, not necessarily the new one.
+export function setApiUrl(url: string) {
+  const normalized = url.trim().replace(/\/+$/, "");
+  localStorage.setItem(SERVER_URL_STORAGE_KEY, normalized);
+  setToken(null);
+  window.location.reload();
+}
+
+export function resetApiUrl() {
+  localStorage.removeItem(SERVER_URL_STORAGE_KEY);
+  setToken(null);
+  window.location.reload();
+}
 
 export class ApiError extends Error {
   status: number;
