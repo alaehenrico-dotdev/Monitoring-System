@@ -37,6 +37,16 @@ npm run build
 This runs `prisma generate && tsc` for the server and `tsc -b && vite build` for the client
 (unchanged, existing root script) — producing `server/dist` and `client/dist`.
 
+**Always run this plain `npm run build` last, after any `npm run build:tauri` / `npm run
+tauri:build`.** Both commands write to the same `client/dist` (`tauri.conf.json`'s
+`frontendDist`), but `build:tauri` compiles in the Tauri-only code paths (updater, SQLite
+offline cache, window title, sync badge — see `TAURI_SETUP.md`). `ala-eh-client` serves
+`client/dist` over plain HTTP via `vite preview` with no Tauri runtime behind it, so if that
+directory was last built with `build:tauri`, every page load throws `Cannot read properties of
+undefined (reading 'invoke')` and the updater/offline-sync/window-title features silently fail.
+Cutting a desktop release and redeploying the browser client in the same session means rebuilding
+twice, plain build last.
+
 ## 3. Environment
 
 Copy `server/.env.example` → `server/.env` on the production machine and fill in real values —
