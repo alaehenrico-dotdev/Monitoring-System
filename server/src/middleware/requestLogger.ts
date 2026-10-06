@@ -15,7 +15,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     console.log(
       JSON.stringify({
         method: req.method,
-        path: req.originalUrl,
+        // Query strings can contain user supplied filters or future secrets.
+        // Log only the route path, never the raw query string.
+        path: req.path,
         status: res.statusCode,
         durationMs: Math.round(durationMs * 100) / 100,
         userId: req.user?.id ?? null,

@@ -58,7 +58,10 @@ export function createApp() {
       exposedHeaders: ["Content-Disposition"],
     }),
   );
-  app.use(express.json());
+  // API JSON payloads are small; keep an explicit cap so an accidental or
+  // hostile oversized body cannot consume unbounded memory. Restore uploads
+  // use their own streaming limit in backup.service.ts.
+  app.use(express.json({ limit: "1mb" }));
   app.use(requestLogger);
 
   app.get("/health/live", (_req, res) => res.json({ status: "ok" }));

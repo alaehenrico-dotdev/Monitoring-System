@@ -2,6 +2,9 @@ import { spawn } from "child_process";
 import type { Request, Response } from "express";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
+const RESTORE_MAX_BYTES = 512 * 1024 * 1024;
+const RESTORE_TIMEOUT_MS = 10 * 60 * 1000;
+const DUMP_HEADER = /^-- (MySQL|MariaDB) dump/;
 
 function parseDatabaseUrl(databaseUrl: string) {
   const url = new URL(databaseUrl);
@@ -110,36 +113,48 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
     let stderr = "";
     let settled = false;
     let received = 0;
-    let checked = false;
+    let prefix = Buffer.alloc(0);
+    let validated = false;
+    let timeout: NodeJS.Timeout;
     const fail = (err: unknown) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timeout);
       mysql.kill();
       reject(err);
     };
+    timeout = setTimeout(() => fail(new HttpError(408, "Restore timed out and was stopped.")), RESTORE_TIMEOUT_MS);
 
-    mysql.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
+    mysql.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     mysql.on("error", (err) => {
-      fail(
-        (err as NodeJS.ErrnoException).code === "ENOENT"
-          ? new HttpError(500, "The mysql client isn't installed on this server (or MYSQL_PATH / MYSQLDUMP_PATH is wrong) - install the MySQL client tools to enable database restore.")
-          : err,
-      );
+      fail((err as NodeJS.ErrnoException).code === "ENOENT"
+        ? new HttpError(500, "The mysql client isn't installed on this server (or MYSQL_PATH / MYSQLDUMP_PATH is wrong) - install the MySQL client tools to enable database restore.")
+        : err);
     });
-    // Broken pipe when mysql exits early on an SQL error - reported via "close" below.
     mysql.stdin.on("error", () => {});
 
-    req.on("data", (chunk: Buffer) => {
+    req.on("data", (rawChunk: Buffer | string) => {
       if (settled) return;
+      const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
       received += chunk.length;
-      if (!checked) {
-        if (!/^-- (MySQL|MariaDB) dump/.test(chunk.subarray(0, 200).toString("utf8").replace(/^﻿/, ""))) {
-          fail(HttpError.badRequest("That file isn't a database backup made by this system's Download Backup."));
+      if (received > RESTORE_MAX_BYTES) {
+        fail(new HttpError(413, "Backup exceeds the 512 MB restore limit."));
+        return;
+      }
+      if (!validated) {
+        prefix = Buffer.concat([prefix, chunk]);
+        const headerText = prefix.subarray(0, 256).toString("utf8").replace(/^\uFEFF/, "");
+        if (!DUMP_HEADER.test(headerText)) {
+          if (prefix.length >= 256) fail(HttpError.badRequest("That file isn't a database backup made by this system's Download Backup."));
           return;
         }
-        checked = true;
+        validated = true;
+        if (!mysql.stdin.write(prefix)) {
+          req.pause();
+          mysql.stdin.once("drain", () => req.resume());
+        }
+        prefix = Buffer.alloc(0);
+        return;
       }
       if (!mysql.stdin.write(chunk)) {
         req.pause();
@@ -149,16 +164,16 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
     req.on("end", () => {
       if (settled) return;
       if (received === 0) fail(HttpError.badRequest("No backup file was uploaded."));
+      else if (!validated) fail(HttpError.badRequest("That file doesn't contain a complete database backup header."));
       else mysql.stdin.end();
     });
     req.on("error", fail);
-    // Upload dropped mid-way: a truncated dump would leave a half-restored
-    // database, so stop immediately rather than letting mysql "finish".
     req.on("aborted", () => fail(new HttpError(400, "The upload was interrupted - the restore was stopped.")));
 
     mysql.on("close", (code) => {
       if (settled) return;
       settled = true;
+      clearTimeout(timeout);
       if (code === 0) resolve();
       else reject(new HttpError(500, `Restore failed (mysql exited with code ${code})${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
     });

@@ -8,6 +8,9 @@ import type { AuthUser } from "../types/express";
 
 const RESET_TOKEN_SCOPE = "data-reset";
 const RESET_TOKEN_TTL = "5m";
+// The current deployment runs one API process. Keep reset authorization
+// one-use for both reset and restore during that process lifetime.
+const resetTokenStates = new Map<string, "in-use" | "used">();
 
 interface ResetTokenPayload extends jwt.JwtPayload {
   scope: typeof RESET_TOKEN_SCOPE;
@@ -31,7 +34,7 @@ function passcodeMatches(input: string, expected: string): boolean {
  */
 export function verifyPasscode(passcode: string, user: AuthUser): string | null {
   if (!passcodeMatches(passcode, env.dataResetPasscode)) return null;
-  return jwt.sign({ scope: RESET_TOKEN_SCOPE, sub: String(user.id) }, env.jwtSecret, { expiresIn: RESET_TOKEN_TTL });
+  return jwt.sign({ scope: RESET_TOKEN_SCOPE, sub: String(user.id) }, env.jwtSecret, { expiresIn: RESET_TOKEN_TTL, jwtid: crypto.randomUUID() });
 }
 
 export function assertValidResetToken(token: string, user: AuthUser) {
@@ -44,6 +47,28 @@ export function assertValidResetToken(token: string, user: AuthUser) {
   if (payload.scope !== RESET_TOKEN_SCOPE || payload.sub !== String(user.id)) {
     throw HttpError.forbidden("Invalid reset token");
   }
+  const tokenId = payload.jti;
+  if (!tokenId) throw HttpError.forbidden("Invalid reset token");
+  if (resetTokenStates.has(tokenId)) throw HttpError.forbidden("Reset passcode token has already been used");
+  return tokenId;
+}
+
+export function reserveResetToken(tokenId: string) {
+  if (resetTokenStates.has(tokenId)) throw HttpError.forbidden("Reset passcode token has already been used");
+  resetTokenStates.set(tokenId, "in-use");
+  setTimeout(() => {
+    if (resetTokenStates.get(tokenId) === "in-use") resetTokenStates.delete(tokenId);
+  }, 5 * 60 * 1000).unref();
+}
+
+export function consumeResetToken(tokenId: string) {
+  if (!resetTokenStates.has(tokenId)) throw HttpError.forbidden("Reset passcode token has already been used");
+  resetTokenStates.set(tokenId, "used");
+  setTimeout(() => resetTokenStates.delete(tokenId), 5 * 60 * 1000).unref();
+}
+
+export function releaseResetToken(tokenId: string) {
+  if (resetTokenStates.get(tokenId) === "in-use") resetTokenStates.delete(tokenId);
 }
 
 /**
@@ -56,9 +81,10 @@ export function assertValidResetToken(token: string, user: AuthUser) {
  * record that a reset ever occurred.
  */
 export async function resetAllData(resetToken: string, user: AuthUser) {
-  assertValidResetToken(resetToken, user);
-
-  const result = await prisma.$transaction(async (tx) => {
+  const tokenId = assertValidResetToken(resetToken, user);
+  reserveResetToken(tokenId);
+  try {
+    const result = await prisma.$transaction(async (tx) => {
     const onlineStock = await tx.dailyOnlineStock.deleteMany();
     const offlineStock = await tx.dailyOfflineStock.deleteMany();
     const manualCounts = await tx.manualCount.deleteMany();
@@ -97,8 +123,13 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     });
 
     return { deleted };
-  });
+    });
 
-  broadcastRealtimeEvent();
-  return result;
+    consumeResetToken(tokenId);
+    broadcastRealtimeEvent();
+    return result;
+  } catch (err) {
+    releaseResetToken(tokenId);
+    throw err;
+  }
 }

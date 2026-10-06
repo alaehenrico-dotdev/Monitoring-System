@@ -80,18 +80,19 @@ npm install
 
 ### 3. Run it
 
-From the repo root, one command starts both the API and the client together (labeled, color-coded
-output; `Ctrl+C` stops both):
+Start the API manually from the repository root by double-clicking `start-server.bat`. Keep its
+window open while using the app; closing it stops the API. In a separate terminal, start the web
+client:
 
 ```bash
-npm run dev
+npm run dev:client
 ```
 
 - API: `http://localhost:4000`
 - Client: `http://localhost:5173`
 
-(`npm run dev:server` / `npm run dev:client` from the root, or `npm run dev` from inside `server/`
-or `client/` directly, still work individually if you want them in separate terminals.)
+Alternatively, run `npm run dev:server` instead of the batch file. `npm run dev` starts both API
+and client together for the original combined workflow.
 
 **Dev proxy:** by default (`VITE_API_URL` unset or left at its `.env.example` value), the client
 calls the API's absolute URL directly (`http://localhost:4000/api`) — the server's `CLIENT_ORIGIN`

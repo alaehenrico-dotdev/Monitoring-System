@@ -58,8 +58,12 @@ Install pm2 globally once (`npm install -g pm2`), then from the repo root:
 ```bash
 pm2 start ecosystem.config.cjs
 pm2 save
-pm2 startup   # prints a command to run once, so pm2 restarts everything on machine reboot
 ```
+
+PM2 keeps these production processes running and restarts them if they crash. Do not run
+`pm2 startup` or configure PM2 to launch on login if you want to start the server manually.
+For local development, run `start-server.bat` from the repository root; close its window to stop
+the API.
 
 `ecosystem.config.cjs` runs two processes, restarting either automatically if it crashes:
 
