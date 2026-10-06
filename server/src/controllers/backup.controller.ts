@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { restoreDatabaseFromStream, streamDatabaseBackup } from "../services/backup.service";
-import { assertValidResetToken } from "../services/dataReset.service";
+import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveResetToken } from "../services/dataReset.service";
 import { HttpError } from "../utils/HttpError";
 
 // Matches every other export's filename style across the app (e.g.
@@ -40,8 +40,14 @@ export async function getBackupDownload(_req: Request, res: Response) {
 export async function postRestore(req: Request, res: Response) {
   const token = req.header("x-reset-token");
   if (!token) throw HttpError.unauthorized("Restore passcode required - unlock this page first");
-  assertValidResetToken(token, req.user!);
-
-  await restoreDatabaseFromStream(req);
-  res.json({ success: true });
+  const tokenId = assertValidResetToken(token, req.user!);
+  reserveResetToken(tokenId);
+  try {
+    await restoreDatabaseFromStream(req);
+    consumeResetToken(tokenId);
+    res.json({ success: true });
+  } catch (err) {
+    releaseResetToken(tokenId);
+    throw err;
+  }
 }

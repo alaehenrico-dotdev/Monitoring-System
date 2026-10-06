@@ -36,8 +36,27 @@ function requiredSecret(name: string, fallback?: string): string {
   return value;
 }
 
+function duration(name: string, fallback: string, maxSeconds: number): string {
+  const value = process.env[name] ?? fallback;
+  const match = /^(\d+)(s|m|h|d)$/i.exec(value);
+  if (!match) throw new Error(`${name} must be a duration such as 8h or 90d.`);
+  const amount = Number(match[1]);
+  const secondsPerUnit: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+  const seconds = amount * secondsPerUnit[match[2].toLowerCase()];
+  if (!Number.isSafeInteger(amount) || amount < 1 || seconds > maxSeconds) {
+    throw new Error(`${name} must be between 1 second and ${maxSeconds} seconds.`);
+  }
+  return value;
+}
+
+function positivePort(): number {
+  const port = Number(process.env.PORT ?? 4000);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be an integer from 1 to 65535.");
+  return port;
+}
+
 export const env = {
-  port: Number(process.env.PORT ?? 4000),
+  port: positivePort(),
   nodeEnv: process.env.NODE_ENV ?? "development",
   databaseUrl: required("DATABASE_URL"),
   // No fallback for either of these two: a default here would mean
@@ -48,7 +67,7 @@ export const env = {
   // simply forgot to set them. Missing either now fails the server at boot
   // instead of failing open. See .env.example for what to set locally.
   jwtSecret: requiredSecret("JWT_SECRET"),
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "8h",
+  jwtExpiresIn: duration("JWT_EXPIRES_IN", "8h", 30 * 24 * 60 * 60),
   // The Tauri desktop app gets a much longer-lived token than the web login
   // (auth.service.ts's login() picks between the two based on the request's
   // Origin - see app.ts's own Tauri-origin allowlist for the same three
@@ -56,7 +75,7 @@ export const env = {
   // that might be on a shared/public machine, so staying logged in across
   // days/weeks is the actually-wanted behavior there, not a risk tradeoff
   // the short web expiry is protecting against.
-  desktopJwtExpiresIn: process.env.DESKTOP_JWT_EXPIRES_IN ?? "90d",
+  desktopJwtExpiresIn: duration("DESKTOP_JWT_EXPIRES_IN", "90d", 180 * 24 * 60 * 60),
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
   // Full path to the mysqldump binary, for hosts (notably Windows) where the
