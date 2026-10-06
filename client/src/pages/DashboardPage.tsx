@@ -3,7 +3,6 @@ import {
   useEffect,
   useRef,
   useState,
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion } from "motion/react";
@@ -342,11 +341,7 @@ function CardMessage({ children }: { children: ReactNode }) {
 }
 
 /// A stat tile (Active SKUs, Variance flags, ...). Same surface + gold
-/// hairline as Toolbar's card, and the same cursor-follow spotlight: a soft
-/// glow that tracks the pointer while it's over the card and fades out on
-/// leave. `--mx`/`--my`/`--spotlight-opacity` are written straight onto the
-/// card's DOM node rather than through React state, so a `mousemove` never
-/// re-renders the card (or re-runs the count-up effect).
+/// hairline as Toolbar's card.
 function StatCard({
   icon,
   label,
@@ -358,40 +353,15 @@ function StatCard({
   value: number | undefined;
   alert?: boolean;
 }) {
-  const cardRef = useRef<HTMLDivElement>(null);
 
   // Counts up from the previous displayed value to `value` any time it
   // changes (including the first time it resolves from `undefined`).
   const animatedValue = useCountUp(value);
 
-  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>) {
-    const card = cardRef.current;
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    card.style.setProperty(
-      "--mx",
-      `${((e.clientX - rect.left) / rect.width) * 100}%`,
-    );
-    card.style.setProperty(
-      "--my",
-      `${((e.clientY - rect.top) / rect.height) * 100}%`,
-    );
-    card.style.setProperty("--spotlight-opacity", "1");
-  }
-
-  function handlePointerLeave() {
-    cardRef.current?.style.setProperty("--spotlight-opacity", "0");
-  }
-
   return (
     <div
-      ref={cardRef}
       className={`ae-dash-stat${alert ? " ae-dash-stat--alert" : ""}`}
-      onMouseMove={handlePointerMove}
-      onMouseLeave={handlePointerLeave}
     >
-      <div aria-hidden className="ae-dash-stat-spotlight" />
       <div aria-hidden className="ae-dash-stat-icon">
         {icon}
       </div>
@@ -408,7 +378,7 @@ function StatCard({
 /// between the two channels every few seconds - summing them into one
 /// number would imply a single stock pool that doesn't actually exist
 /// (Section 2.1), so this shows each in turn instead of adding them
-/// together. Same surface/spotlight chrome as StatCard, just with an
+/// together. Same surface chrome as StatCard, just with an
 /// animated face instead of a static value + a small dot pager showing
 /// which channel is currently on screen.
 function RotatingStockCard({
@@ -418,7 +388,6 @@ function RotatingStockCard({
   online: number | undefined;
   offline: number | undefined;
 }) {
-  const cardRef = useRef<HTMLDivElement>(null);
   const [faceIndex, setFaceIndex] = useState(0);
   const faces = [
     { label: "Online remaining stock", value: online },
@@ -436,36 +405,12 @@ function RotatingStockCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>) {
-    const card = cardRef.current;
-    if (!card) return;
-    const rect = card.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    card.style.setProperty(
-      "--mx",
-      `${((e.clientX - rect.left) / rect.width) * 100}%`,
-    );
-    card.style.setProperty(
-      "--my",
-      `${((e.clientY - rect.top) / rect.height) * 100}%`,
-    );
-    card.style.setProperty("--spotlight-opacity", "1");
-  }
-
-  function handlePointerLeave() {
-    cardRef.current?.style.setProperty("--spotlight-opacity", "0");
-  }
-
   const face = faces[faceIndex];
 
   return (
     <div
-      ref={cardRef}
       className="ae-dash-stat"
-      onMouseMove={handlePointerMove}
-      onMouseLeave={handlePointerLeave}
     >
-      <div aria-hidden className="ae-dash-stat-spotlight" />
       <div aria-hidden className="ae-dash-stat-icon">
         <BoxIcon />
       </div>

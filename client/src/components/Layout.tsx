@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
+import { CursorAura } from "./CursorAura";
 import { DownloadConfirmHost } from "./DownloadConfirm";
 import { NavDrawerProvider } from "../context/NavDrawerContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
@@ -47,6 +48,7 @@ export function Layout() {
           overflow: "hidden",
         }}
       >
+        <CursorAura />
         <Sidebar />
 
         <main
@@ -74,7 +76,7 @@ export function Layout() {
               transform: "translateX(-50%)",
               zIndex: 150,
               padding: "8px 16px",
-              borderRadius: 999,
+              borderRadius: 6,
               fontSize: 12.5,
               fontWeight: 600,
               background: colors.charcoalRaised,
@@ -83,7 +85,8 @@ export function Layout() {
               boxShadow: "0 6px 20px rgba(12, 12, 12, 0.35)",
             }}
           >
-            Server offline. Showing saved data; local edits sync when reconnected.
+            Server offline. Showing saved data; local edits sync when
+            reconnected.
           </div>
         )}
         {isTauri && (

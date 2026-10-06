@@ -100,7 +100,7 @@
   /* Glass chrome (page header card + nav drawer) - one set of tokens so the
      two always match. Light mode is frosted cream glass with dark text, so
      the chrome is no longer a dark slab on the light page. */
-  --ae-glass-bg: rgba(255, 252, 245, 0.66);
+  --ae-glass-bg: rgba(255, 252, 245, 0.5);
   --ae-glass-sheen: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.6),
@@ -117,11 +117,6 @@
     0 0 28px rgba(245, 192, 0, 0.1);
   --ae-glass-panel-shadow:
     0 16px 40px rgba(60, 45, 10, 0.22), 0 2px 8px rgba(60, 45, 10, 0.12);
-  /* Cursor-follow glow: gold on normal blend (white "screen" is invisible on
-     a light surface). */
-  --ae-glow-a: rgba(245, 192, 0, 0.3);
-  --ae-glow-b: rgba(245, 192, 0, 0.08);
-  --ae-glow-blend: normal;
 
   /* Toolbar controls that sit on the glass header. */
   --ae-tb-bg: rgba(255, 255, 255, 0.4);
@@ -138,8 +133,8 @@
      shows through them. Form fields, dropdown panels and dialogs stay solid
      for legibility. The sticky table header is more opaque than the panes so
      rows scrolling under it don't clash with its labels. */
-  --ae-surface-glass: rgba(255, 255, 255, 0.58);
-  --ae-header-glass: rgba(231, 223, 201, 0.86);
+  --ae-surface-glass: rgba(255, 255, 255, 0.4);
+  --ae-header-glass: rgba(231, 223, 201, 0.7);
   --ae-glass-blur: blur(14px) saturate(140%);
 }
 
@@ -196,7 +191,7 @@
   --ae-input-cell-edited-ring: rgba(76, 175, 104, 0.45);
 
   /* Dark glass - same look the nav drawer always had. */
-  --ae-glass-bg: rgba(35, 35, 35, 0.72);
+  --ae-glass-bg: rgba(35, 35, 35, 0.55);
   --ae-glass-sheen: linear-gradient(
     135deg,
     rgba(255, 255, 255, 0.12),
@@ -212,9 +207,6 @@
     0 0 28px rgba(245, 192, 0, 0.12);
   --ae-glass-panel-shadow:
     0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
-  --ae-glow-a: rgba(245, 192, 0, 0.3);
-  --ae-glow-b: rgba(245, 192, 0, 0.08);
-  --ae-glow-blend: screen;
 
   --ae-tb-bg: rgba(255, 255, 255, 0.035);
   --ae-tb-border: rgba(255, 255, 255, 0.09);
@@ -227,8 +219,8 @@
   --ae-tb-text: #f5c000;
   --ae-tb-text-muted: rgba(245, 192, 0, 0.65);
 
-  --ae-surface-glass: rgba(38, 38, 38, 0.58);
-  --ae-header-glass: rgba(42, 42, 42, 0.88);
+  --ae-surface-glass: rgba(38, 38, 38, 0.4);
+  --ae-header-glass: rgba(42, 42, 42, 0.74);
 }
 
 /* No backdrop-filter support: a translucent surface without blur would let
@@ -276,27 +268,38 @@ table input[type="number"] {
   border-spacing: 0;
   width: 100%;
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
+/* Header row: small uppercase labels, a hairline underneath (an inset
+   shadow, so it adds no height - HEADER_ROW_HEIGHT in the grids assumes the
+   row is 26px: 5px + 19px line + 2px) and a faint drop shadow so the sticky
+   header still lifts off the rows as they scroll under it. */
 .ae-table th {
   position: sticky;
   top: 0;
   z-index: 1;
   text-align: left;
-  padding: 5px 6px;
+  padding: 5px 6px 2px;
+  line-height: 19px;
   background: var(--ae-header-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   color: var(--ae-text);
+  font-size: 11.5px;
   font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   white-space: nowrap;
-  /* No hard rule under the header - a soft white glow instead, so the
-     sticky header reads as hovering just above the rows rather than
-     being pinned down by a line. */
-  box-shadow: 0 6px 10px -4px rgba(255, 255, 255, 0.35);
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border),
+    0 6px 8px -6px rgba(0, 0, 0, 0.35);
 }
+/* Body cells: a soft hairline between rows instead of bare stacked fills. */
 .ae-table td {
   text-align: center;
   padding: 3px 6px;
+  box-shadow: inset 0 -1px 0
+    color-mix(in srgb, var(--ae-border) 55%, transparent);
   transition: background-color 120ms ease;
 }
 .ae-table:not(.ae-table--left) td {
@@ -307,6 +310,80 @@ table input[type="number"] {
 }
 .ae-table--left td {
   text-align: left;
+}
+/* SKU / Product cells (StockGrid, TotalStocksTable, ManualCountPage). The
+   SKU uses the theme's gold accent - the brand yellow washed out on the
+   light theme's paper background. */
+.ae-table td.ae-cell-sku {
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ae-glass-accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ae-table td.ae-cell-name {
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ae-text);
+}
+/* Category bar: still the green --ae-category-bg, now with light
+   uppercase label text, a slim gold accent edge and no loud fill flash. */
+.ae-cat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  border: none;
+  border-left: 3px solid #f5c000;
+  background: var(--ae-category-bg);
+  color: #ffffff;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+.ae-cat-toggle:hover {
+  filter: brightness(1.12);
+}
+.ae-cat-toggle:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: -2px;
+}
+/* Subtotal and grand total rows. (The old 2px grand-total border was set on
+   the <tr>, which does nothing in a border-collapse: separate table - the
+   rule is drawn on the cells here.) */
+.ae-table tr.ae-row-subtotal td {
+  background-color: var(--ae-bg-alt);
+  font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 var(--ae-border),
+    inset 0 -1px 0 var(--ae-border);
+}
+.ae-table tr.ae-row-subtotal td:first-child {
+  color: var(--ae-text-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.ae-table tr.ae-row-grand td {
+  background-color: #f5c000;
+  /* Solid brand yellow across the whole row - flattens the per-column tints. */
+  background-image: none !important;
+  color: #0c0c0c;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 #d4a000,
+    inset 0 -1px 0 #d4a000;
+}
+.ae-table tr.ae-row-grand td:first-child {
+  font-size: 12px;
+  letter-spacing: 0.05em;
 }
 /* Spare input columns after Delivery (Out) (StockGrid's `expandable`
    columns): vertical grid lines on every cell of them, from the header
@@ -379,7 +456,7 @@ table input[type="number"] {
 .ae-row-ring {
   position: absolute;
   z-index: 0;
-  height: 1px;
+  height: 0.4px;
   pointer-events: none;
   background-image: linear-gradient(
     90deg,
@@ -435,22 +512,6 @@ table input[type="number"] {
   mask-composite: exclude;
 }
 
-.ae-row-spotlight {
-  position: absolute;
-  z-index: 0;
-  pointer-events: none;
-  mix-blend-mode: var(--ae-glow-blend);
-  /* Same yellow cursor-follow glow as the header/toolbar
-     (.ae-toolbar::before) - same tokens, so a row's hover reads as the same
-     effect used everywhere else instead of a table-specific one. */
-  background: radial-gradient(
-    circle 90px at var(--mx, 50%) var(--my, 50%),
-    var(--ae-glow-a),
-    var(--ae-glow-b) 55%,
-    transparent 75%
-  );
-}
-
 /* The row last clicked or focused (RowGlowScroll) - a full outline plus a
    translucent fill, so the currently-encoded row reads as distinctly
    "pinned" instead of just currently hovered, and stays that obvious even
@@ -494,7 +555,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border-radius: 8px;
+  border-radius: 6px;
   flex: 1;
   min-height: 0;
   margin: 0 calc(-18px / var(--ae-zoom, 1)) calc(-18px / var(--ae-zoom, 1));
@@ -545,7 +606,7 @@ table input[type="number"] {
 .ae-main::-webkit-scrollbar-thumb,
 .ae-modal-body::-webkit-scrollbar-thumb {
   background-color: #f5c000;
-  border-radius: 999px;
+  border-radius: 6px;
   border: 2px solid var(--ae-bg-alt);
 }
 .ae-table-scroll::-webkit-scrollbar-thumb:hover,
@@ -591,7 +652,7 @@ table input[type="number"] {
   font-size: 13px;
   padding: 7px 10px;
   border: 0.3px solid #525252;
-  border-radius: 999px;
+  border-radius: 6px;
   background: var(--ae-surface);
   color: var(--ae-text);
   transition:
@@ -619,7 +680,7 @@ table input[type="number"] {
 .ae-input-cell {
   /* Same corner radius as .ae-page-header (8px), instead of the pill
      radius inherited from .ae-input. */
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 2px 5px;
   background: var(--ae-input-cell-bg);
   color: var(--ae-input-cell-text);
@@ -779,7 +840,7 @@ table input[type="number"] {
   border: 0.3px solid #525252;
   /* Same 8px radius as .ae-page-header/.ae-modal-panel - every floating
      panel in the app reads as the same family of rounded brand chrome. */
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
   font-size: 13px;
   user-select: none;
@@ -800,7 +861,7 @@ table input[type="number"] {
   flex: 1;
   padding: 6px 8px;
   border: none;
-  border-radius: 999px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   font-size: 14px;
@@ -905,7 +966,7 @@ table input[type="number"] {
 .ae-datepicker-month {
   padding: 14px 0;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 6px;
   background: transparent;
   color: inherit;
   font-size: 13px;
@@ -943,7 +1004,7 @@ table input[type="number"] {
   flex-shrink: 0;
   padding: 5px 12px;
   border: 1px solid #d4a000;
-  border-radius: 999px;
+  border-radius: 6px;
   background: transparent;
   color: #d4a000;
   font-size: 12px;
@@ -1014,7 +1075,7 @@ table input[type="number"] {
   background: var(--ae-surface);
   color: var(--ae-text);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
   font-size: 13px;
   outline: none;
@@ -1094,7 +1155,7 @@ table input[type="number"] {
   font-weight: 700;
   line-height: 1.2;
   padding: 8px 16px;
-  border-radius: 999px;
+  border-radius: 6px;
   cursor: pointer;
   border: 1px solid transparent;
   transition:
@@ -1166,8 +1227,7 @@ table input[type="number"] {
 
    The border is a plain, static 1px gold line (no gradient overlay and no
    hover state on it) so it is always visible in light and dark mode. The
-   only effect is the cursor-follow spotlight (.ae-toolbar::before), which
-   glows inside the toolbar and never touches the border itself.
+   only decoration.
    ========================================================================= */
 
 .ae-toolbar {
@@ -1182,7 +1242,7 @@ table input[type="number"] {
      Toolbar lives inside the glass .ae-page-header, so its control colors
      follow the light/dark glass tokens (--ae-tb-* in :root above). */
   --tb-h: 34px;
-  --tb-radius: 8px;
+  --tb-radius: 6px;
   --tb-field-bg: var(--ae-tb-field-bg);
   --tb-field-bg-hover: var(--ae-tb-field-bg-hover);
   --tb-hairline: var(--ae-tb-hairline);
@@ -1199,7 +1259,7 @@ table input[type="number"] {
      for filters and buttons, the hairline on search) - the container itself
      stays borderless so it doesn't double up on that. */
   border: none;
-  border-radius: 10px;
+  border-radius: 6px;
   box-shadow: 0 1px 3px rgba(12, 12, 12, 0.06);
   position: relative;
 
@@ -1239,30 +1299,6 @@ table input[type="number"] {
 }
 .ae-toolbar::-webkit-scrollbar {
   display: none;
-}
-
-/* Cursor-follow spotlight: a soft white glow centered on the pointer.
-   --mx / --my / --spotlight-opacity are written by Toolbar.tsx on
-   mousemove / mouseleave (no React state involved); the fade in/out is this
-   CSS transition. It's a pseudo-element, not a child, so it doesn't count as
-   the row's first child (which the filter-cluster rules below rely on) and
-   it never affects the measured width. pointer-events: none keeps it from
-   ever intercepting a click. */
-.ae-toolbar::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  mix-blend-mode: var(--ae-glow-blend);
-  background: radial-gradient(
-    circle 220px at var(--mx, 50%) var(--my, 50%),
-    var(--ae-glow-a),
-    var(--ae-glow-b) 55%,
-    transparent 75%
-  );
-  opacity: var(--spotlight-opacity, 0);
-  transition: opacity 220ms ease;
 }
 
 /* Filter cluster (first child of the toolbar). It stays fitted to its
@@ -1898,6 +1934,7 @@ table input[type="number"] {
    active page (and hover/keyboard focus). Overflows sideways (scrollbar
    hidden) instead of wrapping. */
 .ae-header-tabs {
+  position: relative;
   display: flex;
   /* Pages are column flex containers (.ae-main > div) with min-height: 0,
      and this strip clips its overflow, so without this it gets squeezed
@@ -1908,7 +1945,7 @@ table input[type="number"] {
   gap: 2px;
   margin: -18px -18px 0;
   /* Breathing room above and below the tab labels. */
-  padding: 8px 14px 8px 4px;
+  padding: 2px 14px 2px 4px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -1964,7 +2001,7 @@ table input[type="number"] {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  padding: 6px 10px 7px;
+  padding: 3px 10px 6px;
   text-decoration: none;
   white-space: nowrap;
   font-family: inherit;
@@ -1992,10 +2029,28 @@ table input[type="number"] {
 .ae-header-tabs + .ae-page-header {
   margin-top: 0;
 }
-.ae-header-tab[aria-current="page"]::after,
 .ae-header-tab:hover::after,
 .ae-header-tab:focus-visible::after {
   transform: scaleX(1);
+}
+/* The active tab's line is the sliding .ae-header-tabs-bar (HeaderTabs.tsx),
+   so the per-tab line is off there to avoid drawing two on top of each other. */
+.ae-header-tab[aria-current="page"]::after {
+  display: none;
+}
+/* The elastic active-tab underline: positioned (translateX + width) by
+   HeaderTabs.tsx with springs on each edge independently. */
+.ae-header-tabs-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 0;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, width;
 }
 
 .ae-segment-group {
@@ -2003,7 +2058,7 @@ table input[type="number"] {
   align-items: stretch;
   height: 32px;
   border: 0.3px solid #525252;
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--ae-surface);
   overflow: hidden;
 }
@@ -2043,6 +2098,36 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
+/* Cursor aura (components/CursorAura.tsx): fixed, behind .ae-main (z-index 1)
+   and over the seal watermark, so it shows through the translucent cards. */
+.ae-aura {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  --ae-aura-opacity: 1;
+  --ae-aura-blend: normal;
+}
+:root[data-theme="dark"] .ae-aura {
+  --ae-aura-opacity: 1;
+  --ae-aura-blend: screen;
+}
+.ae-aura-blob {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  will-change: transform;
+  mix-blend-mode: var(--ae-aura-blend);
+  opacity: var(--ae-aura-opacity);
+}
+@media print {
+  .ae-aura {
+    display: none !important;
+  }
+}
+
 /* App-wide default background: the page color with the Ala Eh! seal as a
    large, centered, fixed watermark. It is a pseudo-element behind everything
    (the cards, tables and inputs are opaque and simply cover it, so it only
@@ -2068,11 +2153,6 @@ table input[type="number"] {
   background: url("./assets/alaeh-bg.webp") center / var(--ae-watermark-size)
     no-repeat;
   opacity: var(--ae-watermark-opacity);
-  /* A soft white halo around the seal's own silhouette (the image is a
-     transparent cut-out, so drop-shadow traces its actual shape rather than
-     its square bounding box) - just enough to lift it off the page instead
-     of reading as a flat stamp. */
-  filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.3));
 }
 .ae-main {
   position: relative;
@@ -2125,7 +2205,7 @@ table input[type="number"] {
   backdrop-filter: blur(24px) saturate(150%);
   color: var(--ae-glass-text);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   padding: 12px 14px 10px;
   /* One duration + one curve for everything that moves when the header
      collapses/expands (height, padding, logo size, title spacing, fades), so
@@ -2150,29 +2230,6 @@ table input[type="number"] {
   box-shadow:
     var(--ae-glass-shadow),
     0 0 0 1px var(--ae-danger-text);
-}
-/* Cursor-follow spotlight, same trick as .ae-toolbar::before /
-   .ae-toolbar::before: --mx/--my/--spotlight-opacity are written by
-   PageHeader.tsx on mousemove/mouseleave, no React state involved. A
-   pseudo-element (not a child) so it paints behind everything else in the
-   card - the title, logo, toolbar, and HeaderExtras - purely by DOM order,
-   with no z-index needed. pointer-events: none keeps it from ever
-   intercepting a click on the logo/collapse button/toolbar controls. */
-.ae-page-header::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  mix-blend-mode: var(--ae-glow-blend);
-  background: radial-gradient(
-    circle 260px at var(--mx, 50%) var(--my, 50%),
-    var(--ae-glow-a),
-    var(--ae-glow-b) 55%,
-    transparent 75%
-  );
-  opacity: var(--spotlight-opacity, 0);
-  transition: opacity 220ms ease;
 }
 /* Nothing sits below the title once collapsed - drop its own bottom
    margin, since the toolbar row (still present for the collapse button
@@ -2409,12 +2466,6 @@ table input[type="number"] {
   margin: 0;
   padding: 5px;
   --ae-toolbar-gap: 8px;
-}
-/* With the toolbar's box gone, its own spotlight would show up as a
-   separate rectangle inside the header - the header's glow already covers
-   this area, so the toolbar's is off here. */
-.ae-page-header .ae-toolbar::before {
-  display: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .ae-page-header {
@@ -2728,7 +2779,7 @@ table input[type="number"] {
 .ae-dash-hero-left .ae-dash-stat-icon {
   width: 30px;
   height: 30px;
-  border-radius: 7px;
+  border-radius: 6px;
 }
 .ae-dash-hero-left .ae-dash-stat-icon svg {
   width: 16px;
@@ -2772,7 +2823,7 @@ table input[type="number"] {
   /* Same 8px radius as .ae-page-header - every card on this page reads as
      the same family of "rounded brand chrome" instead of the old sharp-
      cornered boxes. */
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow:
     0 1px 2px rgba(12, 12, 12, 0.04),
     0 4px 10px rgba(12, 12, 12, 0.06);
@@ -2797,27 +2848,13 @@ table input[type="number"] {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: 6px;
   background: color-mix(in srgb, #d4a000 14%, transparent);
   color: #d4a000;
 }
 .ae-dash-stat--alert .ae-dash-stat-icon {
   background: color-mix(in srgb, #c1272d 14%, transparent);
   color: #c1272d;
-}
-/* Cursor-follow glow - same idea as the toolbar's, tinted brand gold. */
-.ae-dash-stat-spotlight {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: var(--spotlight-opacity, 0);
-  transition: opacity 220ms ease;
-  background: radial-gradient(
-    circle 180px at var(--mx, 50%) var(--my, 50%),
-    rgba(212, 160, 0, 0.2),
-    rgba(212, 160, 0, 0.07) 55%,
-    transparent 75%
-  );
 }
 .ae-dash-stat-value {
   position: relative;
@@ -2886,7 +2923,7 @@ table input[type="number"] {
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   color: var(--ae-text);
   text-decoration: none;
   font-size: 13.5px;
@@ -2906,7 +2943,7 @@ table input[type="number"] {
   width: 32px;
   height: 32px;
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: color-mix(in srgb, #d4a000 14%, transparent);
   color: #d4a000;
 }
@@ -2960,7 +2997,7 @@ table input[type="number"] {
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: 0.3px solid #525252;
-  border-radius: 8px;
+  border-radius: 6px;
   box-shadow:
     0 1px 2px rgba(12, 12, 12, 0.04),
     0 4px 10px rgba(12, 12, 12, 0.06);
@@ -3140,7 +3177,7 @@ table input[type="number"] {
 }
 .ae-hist-day span {
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 700;
   color: var(--ae-glass-accent);
@@ -3160,7 +3197,7 @@ table input[type="number"] {
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   transition:
     border-color 140ms ease,
     box-shadow 140ms ease,
@@ -3178,7 +3215,7 @@ table input[type="number"] {
   justify-content: center;
   width: 36px;
   height: 36px;
-  border-radius: 8px;
+  border-radius: 6px;
   background: #f5c000;
   color: #0c0c0c;
 }
@@ -3208,7 +3245,7 @@ table input[type="number"] {
 }
 .ae-hist-chip {
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: 6px;
   font-size: 11px;
   font-weight: 600;
   color: var(--ae-text);
@@ -3269,7 +3306,7 @@ table input[type="number"] {
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
 }
 .ae-hist-empty h3 {
   margin: 6px 0 0;
@@ -3287,7 +3324,7 @@ table input[type="number"] {
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: 10px;
+  border-radius: 6px;
   background: #f5c000;
   color: #0c0c0c;
 }

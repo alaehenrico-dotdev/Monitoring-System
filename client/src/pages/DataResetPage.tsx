@@ -197,7 +197,7 @@ export function DataResetPage() {
             background: `linear-gradient(180deg, ${PANEL_BG_ALT}, ${PANEL_BG})`,
             border: `1px solid ${PANEL_BORDER}`,
             // Same 8px radius as .ae-page-header/Modal/every other card.
-            borderRadius: 8,
+            borderRadius: 6,
             padding: "32px 32px",
             boxShadow: "0 14px 34px rgba(12, 12, 12,0.28)",
           }}
@@ -255,7 +255,7 @@ export function DataResetPage() {
                 letterSpacing: 3,
                 padding: "10px 12px",
                 // Pill, matching every other text input in the app (.ae-input).
-                borderRadius: 999,
+                borderRadius: 6,
                 border: `1px solid ${PANEL_BORDER}`,
                 background: "rgba(255,255,255,0.05)",
                 color: PANEL_TEXT,
@@ -314,7 +314,7 @@ export function DataResetPage() {
           maxWidth: 760,
           background: `linear-gradient(180deg, ${PANEL_BG_ALT}, ${PANEL_BG})`,
           border: `1px solid ${PANEL_BORDER}`,
-          borderRadius: 8,
+          borderRadius: 6,
           padding: "36px 40px",
           boxShadow: "0 14px 34px rgba(12, 12, 12,0.28)",
         }}

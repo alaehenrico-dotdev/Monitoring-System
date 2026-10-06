@@ -13,12 +13,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <App />
       </HashRouter>
     </ErrorBoundary>
-  </React.StrictMode>
+  </React.StrictMode>,
 );
 
 registerServiceWorker();
 
 if (import.meta.env.MODE === "tauri") {
   import("./tauri/updater").then(({ checkForUpdates }) => checkForUpdates());
-  import("./tauri/appInfo").then(({ setWindowTitleWithVersion }) => setWindowTitleWithVersion());
+  import("./tauri/appInfo").then(({ setWindowTitleWithVersion }) =>
+    setWindowTitleWithVersion(),
+  );
 }

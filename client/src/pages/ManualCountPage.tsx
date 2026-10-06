@@ -734,7 +734,7 @@ export function ManualCountPage() {
                                   ? `Expand ${category}`
                                   : `Collapse ${category}`
                             }
-                            style={categoryToggleStyle}
+                            className="ae-cat-toggle"
                           >
                             <span
                               style={{
@@ -786,8 +786,10 @@ export function ManualCountPage() {
                                 : undefined
                             }
                           >
-                            <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
-                            <td style={nameCellStyle}>{r.product.name}</td>
+                            <td className="ae-cell-sku">
+                              {r.product.sku ?? "—"}
+                            </td>
+                            <td className="ae-cell-name">{r.product.name}</td>
                             <td>{f.system.toLocaleString()}</td>
                             {showOffline && countCell("OFFLINE")}
                             {showOnline && countCell("ONLINE")}
@@ -809,14 +811,14 @@ export function ManualCountPage() {
                           </tr>
                         );
                       })}
-                      <tr style={subtotalRowStyle}>
+                      <tr className="ae-row-subtotal">
                         <td colSpan={2}>Subtotal - {category}</td>
                         {renderTotals(groupRows)}
                       </tr>
                     </Fragment>
                   );
                 })}
-                <tr style={grandTotalRowStyle}>
+                <tr className="ae-row-grand">
                   <td colSpan={2}>GRAND TOTAL</td>
                   {renderTotals(visibleRows ?? [])}
                 </tr>
@@ -923,44 +925,6 @@ export function ManualCountPage() {
     );
   }
 }
-
-const nameCellStyle: CSSProperties = {
-  textAlign: "left",
-  whiteSpace: "nowrap",
-  color: colors.ink,
-};
-const skuCellStyle: CSSProperties = {
-  textAlign: "left",
-  whiteSpace: "nowrap",
-  color: colors.yellow,
-  fontVariantNumeric: "tabular-nums",
-};
-// Same three styles as StockGrid/TotalStocksTable - see StockGrid's
-// categoryToggleStyle doc comment for why this is a real <button>.
-const categoryToggleStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  width: "100%",
-  textAlign: "left",
-  font: "inherit",
-  fontWeight: 700,
-  padding: "6px 8px",
-  border: "none",
-  borderLeft: `4px solid ${colors.red}`,
-  background: "var(--ae-category-bg)",
-  color: colors.yellow,
-  cursor: "pointer",
-};
-const subtotalRowStyle: CSSProperties = {
-  fontWeight: 600,
-  background: colors.paperAlt,
-};
-const grandTotalRowStyle: CSSProperties = {
-  fontWeight: 700,
-  background: colors.warningBg,
-  borderTop: `2px solid ${colors.black}`,
-};
 
 // Column color coding for the count grid: the two count inputs in blue,
 // Variance in teal (a cool color that sits next to the blue without being

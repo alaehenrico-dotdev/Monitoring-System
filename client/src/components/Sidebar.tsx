@@ -70,7 +70,7 @@ export function Sidebar() {
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
-          borderRadius: 8, // matches .ae-page-header
+          borderRadius: 6, // matches .ae-page-header
           // Glass panel: notably more transparent + a stronger blur than
           // the old edge-to-edge drawer had, so it reads as floating glass
           // over the page rather than an opaque card.
@@ -137,7 +137,7 @@ export function Sidebar() {
                   border:
                     "1px solid color-mix(in srgb, var(--ae-glass-accent) 55%, transparent)",
                   // Matches the nav tabs directly above it, not a leftover square corner.
-                  borderRadius: 8,
+                  borderRadius: 6,
                   padding: "4px 10px",
                 }}
               >
@@ -158,7 +158,8 @@ export function Sidebar() {
             fontSize: 11,
             color: "var(--ae-glass-text)",
             opacity: 0.55,
-            borderTop: "1px solid color-mix(in srgb, var(--ae-glass-text) 15%, transparent)",
+            borderTop:
+              "1px solid color-mix(in srgb, var(--ae-glass-text) 15%, transparent)",
           }}
         >
           Ala Eh Stocks Monitoring System · v{__APP_VERSION__}

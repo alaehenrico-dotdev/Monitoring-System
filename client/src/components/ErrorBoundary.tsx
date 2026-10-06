@@ -59,9 +59,17 @@ export class ErrorBoundary extends Component<Props, State> {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 20 }}>Something went wrong.</h1>
-        <p style={{ margin: 0, maxWidth: 420, fontSize: 13.5, color: colors.subtleInk }}>
-          This page ran into an unexpected error. Reloading usually fixes it - if it keeps
-          happening, let a supervisor know what you were doing when it showed up.
+        <p
+          style={{
+            margin: 0,
+            maxWidth: 420,
+            fontSize: 13.5,
+            color: colors.subtleInk,
+          }}
+        >
+          This page ran into an unexpected error. Reloading usually fixes it -
+          if it keeps happening, let a supervisor know what you were doing when
+          it showed up.
         </p>
         <button
           type="button"
@@ -76,7 +84,7 @@ export class ErrorBoundary extends Component<Props, State> {
             background: colors.yellow,
             border: "none",
             // Pill, matching .ae-btn - every button in the app is this shape.
-            borderRadius: 999,
+            borderRadius: 6,
             cursor: "pointer",
           }}
         >
