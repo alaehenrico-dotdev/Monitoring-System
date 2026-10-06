@@ -23,7 +23,7 @@ function describe(
 }
 
 export default function SyncButton() {
-  const { syncing, failed, lastSyncedAt } = useSyncUiState();
+  const { syncing, failed, succeeded, lastSyncedAt } = useSyncUiState();
   const {
     hostRef,
     gradientRef,
@@ -32,7 +32,7 @@ export default function SyncButton() {
     handlePointerLeave,
   } = useCursorGlow<HTMLButtonElement>();
   const label = describe(syncing, failed, lastSyncedAt);
-  const showSuccess = !syncing && !failed && lastSyncedAt !== null;
+  const showSuccess = succeeded && !syncing && !failed;
 
   return (
     <button

@@ -34,13 +34,15 @@ export function useSyncEngine() {
       return;
     }
     syncing.current = true;
-    setSyncUiState({ syncing: true });
+    // A new attempt replaces the previous result immediately, so the header
+    // button cannot keep showing a successful checkmark while it is syncing.
+    setSyncUiState({ syncing: true, failed: false, succeeded: false });
     try {
       await runSync();
       const lastSyncedAt = await getLastSyncedAt();
-      setSyncUiState({ failed: false, lastSyncedAt: lastSyncedAt ? Date.parse(lastSyncedAt) : null });
+      setSyncUiState({ failed: false, succeeded: true, lastSyncedAt: lastSyncedAt ? Date.parse(lastSyncedAt) : null });
     } catch (err) {
-      setSyncUiState({ failed: true });
+      setSyncUiState({ failed: true, succeeded: false });
       // Best effort - a failed sync attempt (most likely the server just
       // went unreachable again mid-sync) just means the next trigger tries
       // again; nothing staged offline is lost either way.
@@ -61,6 +63,7 @@ export function useSyncEngine() {
     void getLastSyncedAt().then((value) => {
       hydrateLastSyncedAt(value ? Date.parse(value) : null);
     });
+    void sync();
     const interval = setInterval(() => {
       if (isReachableRef.current) sync();
     }, IDLE_SYNC_INTERVAL_MS);

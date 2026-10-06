@@ -6,10 +6,11 @@ import { useSyncExternalStore } from "react";
 export interface SyncUiState {
   syncing: boolean;
   failed: boolean;
+  succeeded: boolean;
   lastSyncedAt: number | null;
 }
 
-let state: SyncUiState = { syncing: false, failed: false, lastSyncedAt: null };
+let state: SyncUiState = { syncing: false, failed: false, succeeded: false, lastSyncedAt: null };
 let runner: (() => Promise<void>) | null = null;
 const listeners = new Set<() => void>();
 
