@@ -10,7 +10,7 @@ async function checkServerReachable(): Promise<boolean> {
   const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
     const url = new URL("/health", new URL(API_URL, window.location.href));
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
     return response.ok;
   } catch {
     return false;

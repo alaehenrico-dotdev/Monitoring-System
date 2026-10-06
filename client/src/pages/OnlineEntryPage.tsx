@@ -341,7 +341,7 @@ export function OnlineEntryPage() {
     // when !online.
     if (!online && !isTauri) {
       setError(
-        "You're offline - your changes are kept on this device. Save again once you're back online.",
+        "Offline. Changes stay here; save again when reconnected.",
       );
       return false;
     }

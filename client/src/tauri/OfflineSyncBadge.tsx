@@ -63,12 +63,12 @@ export function OfflineSyncBadge() {
   if (isReachable && totalPending === 0 && conflictCount === 0 && !syncing && !failed) return null;
 
   const lastSyncLabel = lastSyncedAt
-    ? `Last successful sync ${new Date(lastSyncedAt).toLocaleString()}`
-    : "No successful sync recorded on this device yet";
+    ? `Last server sync ${new Date(lastSyncedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
+    : "Local data available · first server sync pending";
   let connectionLabel = "Connected";
-  if (syncing) connectionLabel = "Syncing changes…";
+  if (syncing) connectionLabel = "Syncing…";
   else if (!isReachable) connectionLabel = "Server unreachable · using saved data";
-  else if (failed) connectionLabel = "Sync failed · tap Sync to retry";
+  else if (failed) connectionLabel = "Sync failed · tap Sync";
 
   return (
     <div
@@ -97,13 +97,13 @@ export function OfflineSyncBadge() {
       <span>{connectionLabel}</span>
       {totalPending > 0 && (
         <span>
-          {totalPending} change{totalPending === 1 ? "" : "s"} queued on this device
+          {totalPending} pending
         </span>
       )}
       {!syncing && <span>{lastSyncLabel}</span>}
       {conflictCount > 0 && (
         <Link to="/sync-conflicts" style={{ color: colors.danger, textDecoration: "underline" }}>
-          {conflictCount} conflict{conflictCount === 1 ? "" : "s"} need review
+          {conflictCount} conflict{conflictCount === 1 ? "" : "s"}
         </Link>
       )}
     </div>

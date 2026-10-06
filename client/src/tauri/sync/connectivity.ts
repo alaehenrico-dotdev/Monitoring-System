@@ -18,14 +18,16 @@ function healthUrl(): string {
 }
 
 export async function checkServerReachable(): Promise<boolean> {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
-    const res = await fetch(healthUrl(), { signal: controller.signal });
-    clearTimeout(timeout);
+    const res = await fetch(healthUrl(), { signal: controller.signal, cache: "no-store" });
     return res.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -35,9 +37,11 @@ export async function checkServerReachable(): Promise<boolean> {
 /// actual unreachable -> reachable transition, for the sync engine to react
 /// to - not on every poll tick.
 export function useServerConnectivity() {
-  const [isReachable, setIsReachable] = useState(true);
+  // Stay in offline mode until the configured server's health endpoint has
+  // answered successfully. navigator.onLine alone cannot establish this.
+  const [isReachable, setIsReachable] = useState(false);
   const [reconnects, setReconnects] = useState(0);
-  const wasReachable = useRef(true);
+  const wasReachable = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
