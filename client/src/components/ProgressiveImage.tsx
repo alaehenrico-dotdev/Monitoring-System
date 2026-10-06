@@ -45,7 +45,7 @@ export function ProgressiveImage({
   placeholderColor = "var(--ae-bg-alt)",
   width,
   height,
-  radius = 4,
+  radius = 6,
   className = "",
   style,
 }: ProgressiveImageProps) {
@@ -54,7 +54,13 @@ export function ProgressiveImage({
   return (
     <div
       className={`ae-progressive-img-wrap ${className}`.trim()}
-      style={{ width, height, borderRadius: radius, background: placeholderColor, ...style }}
+      style={{
+        width,
+        height,
+        borderRadius: radius,
+        background: placeholderColor,
+        ...style,
+      }}
     >
       {placeholderSrc && (
         <img

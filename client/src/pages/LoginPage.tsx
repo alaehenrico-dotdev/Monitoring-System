@@ -87,7 +87,7 @@ export function LoginPage() {
             background: colors.paper,
             // Same 8px radius as .ae-page-header/Modal/every other card - one
             // family of rounded brand chrome across the app.
-            borderRadius: 8,
+            borderRadius: 6,
             padding: 24,
             // Positioning context for the 1px animated border sweep below
             // (replaces the old static gold border).

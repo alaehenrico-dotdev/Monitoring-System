@@ -6,7 +6,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { sendQueuedWrite } from "../api/http";
-import { flushPendingWrites, getPendingWriteCount, onPendingWritesChanged } from "./offlineStore";
+import {
+  flushPendingWrites,
+  getPendingWriteCount,
+  onPendingWritesChanged,
+} from "./offlineStore";
 import { useSyncEngine } from "./sync/useSyncEngine";
 import { useSyncUiState } from "./sync/SyncStore";
 import { colors } from "../theme";
@@ -24,7 +28,11 @@ import { colors } from "../theme";
 export function OfflineSyncBadge() {
   const { reconnects } = useOnlineStatus();
   const [genericPendingCount, setGenericPendingCount] = useState(0);
-  const { isReachable, pendingCount: syncPendingCount, conflictCount } = useSyncEngine();
+  const {
+    isReachable,
+    pendingCount: syncPendingCount,
+    conflictCount,
+  } = useSyncEngine();
   const { syncing, failed, lastSyncedAt } = useSyncUiState();
 
   const refreshGenericPendingCount = useCallback(async () => {
@@ -53,21 +61,32 @@ export function OfflineSyncBadge() {
         // own the way the structured sync tables do, so this is logged
         // rather than silently dropped. The user's original entry is still
         // visible wherever they typed it (see usePendingEntryChanges).
-        console.error("Some offline-queued writes were rejected and dropped:", result.rejected);
+        console.error(
+          "Some offline-queued writes were rejected and dropped:",
+          result.rejected,
+        );
       }
       void refreshGenericPendingCount();
     });
   }, [reconnects, refreshGenericPendingCount]);
 
   const totalPending = genericPendingCount + syncPendingCount;
-  if (isReachable && totalPending === 0 && conflictCount === 0 && !syncing && !failed) return null;
+  if (
+    isReachable &&
+    totalPending === 0 &&
+    conflictCount === 0 &&
+    !syncing &&
+    !failed
+  )
+    return null;
 
   const lastSyncLabel = lastSyncedAt
     ? `Last server sync ${new Date(lastSyncedAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`
     : "Local data available · first server sync pending";
   let connectionLabel = "Connected";
   if (syncing) connectionLabel = "Syncing…";
-  else if (!isReachable) connectionLabel = "Server unreachable · using saved data";
+  else if (!isReachable)
+    connectionLabel = "Server unreachable · using saved data";
   else if (failed) connectionLabel = "Sync failed · tap Sync";
 
   return (
@@ -85,7 +104,7 @@ export function OfflineSyncBadge() {
         gap: "4px 10px",
         maxWidth: "calc(100vw - 24px)",
         padding: "8px 14px",
-        borderRadius: 12,
+        borderRadius: 6,
         fontSize: 12,
         fontWeight: 600,
         background: colors.charcoalRaised,
@@ -95,14 +114,13 @@ export function OfflineSyncBadge() {
       }}
     >
       <span>{connectionLabel}</span>
-      {totalPending > 0 && (
-        <span>
-          {totalPending} pending
-        </span>
-      )}
+      {totalPending > 0 && <span>{totalPending} pending</span>}
       {!syncing && <span>{lastSyncLabel}</span>}
       {conflictCount > 0 && (
-        <Link to="/sync-conflicts" style={{ color: colors.danger, textDecoration: "underline" }}>
+        <Link
+          to="/sync-conflicts"
+          style={{ color: colors.danger, textDecoration: "underline" }}
+        >
           {conflictCount} conflict{conflictCount === 1 ? "" : "s"}
         </Link>
       )}

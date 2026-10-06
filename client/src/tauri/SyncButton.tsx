@@ -1,7 +1,6 @@
 // Header sync button for the desktop app. Only ever reached via
 // HeaderExtras.tsx's React.lazy() import, gated on MODE === "tauri", so it
 // stays out of the web build like everything else under src/tauri/.
-import { useCursorGlow, CursorGlowOverlay } from "../components/CursorGlow";
 import { CheckIcon, SyncIcon } from "../components/icons";
 import { requestSync, useSyncUiState } from "./sync/SyncStore";
 
@@ -24,26 +23,14 @@ function describe(
 
 export default function SyncButton() {
   const { syncing, failed, succeeded, lastSyncedAt } = useSyncUiState();
-  const {
-    hostRef,
-    gradientRef,
-    spotlightRef,
-    handlePointerMove,
-    handlePointerLeave,
-  } = useCursorGlow<HTMLButtonElement>();
   const label = describe(syncing, failed, lastSyncedAt);
   const showSuccess = succeeded && !syncing && !failed;
 
   return (
     <button
-      ref={hostRef}
       type="button"
       onClick={() => void requestSync()}
-      onMouseMove={handlePointerMove}
-      onMouseLeave={(e) => {
-        handlePointerLeave();
-        e.currentTarget.style.transform = "scale(1)";
-      }}
+      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
       onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
       disabled={syncing}
@@ -60,7 +47,7 @@ export default function SyncButton() {
         alignItems: "center",
         justifyContent: "center",
         borderRadius: "50%",
-        border: "0.5px solid transparent",
+        border: "0.5px solid var(--ae-border)",
         background: "var(--ae-surface)",
         color: failed ? "var(--ae-danger-text)" : showSuccess ? "var(--ae-success-text)" : "var(--ae-text)",
         cursor: syncing ? "progress" : "pointer",
@@ -69,12 +56,6 @@ export default function SyncButton() {
           "background-color 120ms ease, color 120ms ease, transform 120ms ease",
       }}
     >
-      <CursorGlowOverlay
-        gradientRef={gradientRef}
-        spotlightRef={spotlightRef}
-        borderWidth={0.5}
-        spotlightRadius={40}
-      />
       <span
         className={syncing ? "ae-sync-spin" : undefined}
         style={{ display: "flex" }}

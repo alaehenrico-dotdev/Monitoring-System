@@ -12,7 +12,7 @@ import type { CSSProperties, ReactNode } from "react";
 export function Skeleton({
   width = "100%",
   height = 14,
-  radius = 4,
+  radius = 6,
   style,
   className = "",
 }: {

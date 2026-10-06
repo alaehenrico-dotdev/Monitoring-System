@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode, type MouseEvent as ReactMouseEvent } from "react";
+import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { motion, MotionConfig } from "motion/react";
 import { toolbarLayoutTransition } from "../motion";
 
@@ -33,15 +33,6 @@ const ToolbarModeContext = createContext<ToolbarMode>("full");
  * it is always visible. (The previous animated gradient overlay was drawn on
  * top of a transparent border, and its black gradient stops made the border
  * vanish for long stretches.)
- *
- * The cursor-follow effect is a soft white glow that tracks the pointer
- * inside the toolbar. It is the `.ae-toolbar::before` pseudo-element in
- * index.css, driven by three CSS custom properties (`--mx`, `--my`,
- * `--spotlight-opacity`) that the handlers below write straight onto the row
- * with `style.setProperty` - never through React state, which would
- * re-render the toolbar tree on every `mousemove`. Because it is a pseudo-
- * element rather than an extra child, the filter cluster stays the row's
- * real first child (see the note in the JSX).
  *
  * Responsiveness is a three-tier ladder, measured exactly rather than
  * guessed from a width breakpoint:
@@ -145,23 +136,6 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
     };
   }, []);
 
-  // Cursor position as a percentage of the row, written straight to CSS
-  // custom properties. `.ae-toolbar::before` reads them to place the glow.
-  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>) {
-    const row = rowRef.current;
-    if (!row) return;
-    const rect = row.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    row.style.setProperty("--mx", `${((e.clientX - rect.left) / rect.width) * 100}%`);
-    row.style.setProperty("--my", `${((e.clientY - rect.top) / rect.height) * 100}%`);
-    row.style.setProperty("--spotlight-opacity", "1");
-  }
-
-  // Fade the glow back out (the opacity transition lives in CSS).
-  function handlePointerLeave() {
-    rowRef.current?.style.setProperty("--spotlight-opacity", "0");
-  }
-
   const compact = mode !== "full";
   const circle = mode === "circle";
 
@@ -184,8 +158,6 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
         transition={toolbarLayoutTransition}
         className={`ae-toolbar ${compact ? "ae-toolbar--compact" : ""} ${circle ? "ae-toolbar--circle" : ""} ${className}`.trim()}
         style={{ WebkitOverflowScrolling: "touch" }}
-        onMouseMove={handlePointerMove}
-        onMouseLeave={handlePointerLeave}
         ref={rowRef}
       >
         {children}

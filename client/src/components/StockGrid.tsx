@@ -144,7 +144,7 @@ function toNum(v: unknown): number {
 // Height of the single sticky header row (`.ae-table th`'s own `top: 0` /
 // `position: sticky`) - where a category row's own sticky offset starts, so
 // it sits right under the header rather than overlapping it.
-const HEADER_ROW_HEIGHT = 29;
+const HEADER_ROW_HEIGHT = 26;
 
 function focusCell(productId: number, key: string) {
   const el = document.querySelector<HTMLInputElement>(
@@ -241,7 +241,8 @@ export function StockGrid({
   // are showing. Not persisted - it's a view toggle, like the category
   // collapse above.
   const [extrasOpen, setExtrasOpen] = useState(false);
-  const [extraNames, setExtraNames] = useState<Record<string, string>>(loadNames);
+  const [extraNames, setExtraNames] =
+    useState<Record<string, string>>(loadNames);
 
   const groups = new Map<string, GridRow[]>();
   for (const row of rows) {
@@ -386,7 +387,10 @@ export function StockGrid({
                           setExtraNames((n) => {
                             const next = { ...n, [sc.key]: value };
                             try {
-                              localStorage.setItem(NAMES_STORAGE_KEY, JSON.stringify(next));
+                              localStorage.setItem(
+                                NAMES_STORAGE_KEY,
+                                JSON.stringify(next),
+                              );
                             } catch {
                               // label only - fine to lose
                             }
@@ -450,7 +454,7 @@ export function StockGrid({
                             ? `Expand ${category}`
                             : `Collapse ${category}`
                       }
-                      style={categoryToggleStyle}
+                      className="ae-cat-toggle"
                     >
                       <span
                         style={{
@@ -480,8 +484,8 @@ export function StockGrid({
                         : undefined
                     }
                   >
-                    <td style={skuCellStyle}>{row.product.sku ?? "—"}</td>
-                    <td style={nameCellStyle}>{row.product.name}</td>
+                    <td className="ae-cell-sku">{row.product.sku ?? "—"}</td>
+                    <td className="ae-cell-name">{row.product.name}</td>
                     {columns.map((col) => {
                       const raw = row.entry[col.key];
                       const cell =
@@ -540,7 +544,7 @@ export function StockGrid({
                     })}
                   </tr>
                 ))}
-                <tr key={`${category}-subtotal`} style={subtotalRowStyle}>
+                <tr key={`${category}-subtotal`} className="ae-row-subtotal">
                   <td colSpan={2}>Subtotal - {category}</td>
                   {columns.map((col) => (
                     <Fragment key={col.key}>
@@ -557,7 +561,10 @@ export function StockGrid({
                             style={tintFor(col)}
                           >
                             {groupRows
-                              .reduce((sum, r) => sum + toNum(r.entry[sc.key]), 0)
+                              .reduce(
+                                (sum, r) => sum + toNum(r.entry[sc.key]),
+                                0,
+                              )
                               .toLocaleString()}
                           </td>
                         ))}
@@ -567,7 +574,7 @@ export function StockGrid({
               </Fragment>
             );
           })}
-          <tr style={grandTotalRowStyle}>
+          <tr className="ae-row-grand">
             <td colSpan={2}>GRAND TOTAL</td>
             {columns.map((col) => (
               <Fragment key={col.key}>
@@ -597,21 +604,6 @@ export function StockGrid({
   );
 }
 
-// Product names never wrap - a long name (e.g. "Distilled Cane Vinegar
-// White") just widens this one column instead of breaking to a second line
-// and inflating every row's height. Border/padding/alignment defaults
-// otherwise come from the shared .ae-table CSS (index.css).
-const nameCellStyle: CSSProperties = {
-  textAlign: "left",
-  whiteSpace: "nowrap",
-  color: colors.ink,
-};
-const skuCellStyle: CSSProperties = {
-  textAlign: "left",
-  whiteSpace: "nowrap",
-  color: colors.yellow,
-  fontVariantNumeric: "tabular-nums",
-};
 const lockedStyle: CSSProperties = {
   backgroundColor: colors.paperAlt,
   color: "var(--ae-num-text)",
@@ -619,25 +611,6 @@ const lockedStyle: CSSProperties = {
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
 const inputStyle: CSSProperties = { width: 64, textAlign: "center" };
-// A real <button>, not just a styled <td> (the old categoryRowStyle) - the
-// whole category bar needs to be a single clickable/keyboard-focusable
-// target for the expand/collapse arrow, spanning every column exactly like
-// the row it replaces did.
-const categoryToggleStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  width: "100%",
-  textAlign: "left",
-  font: "inherit",
-  fontWeight: 700,
-  padding: "5px 6px",
-  border: "none",
-  borderLeft: `4px solid ${colors.red}`,
-  background: "var(--ae-category-bg)",
-  color: colors.yellow,
-  cursor: "pointer",
-};
 // The expand arrow: a small dark tab centered on the Delivery header's right
 // border (half inside the cell, half over the next one). The header cell is
 // position: sticky, so it is the containing block for this absolute button.
@@ -653,18 +626,9 @@ const headerArrowStyle: CSSProperties = {
   height: 18,
   padding: 0,
   border: "none",
-  borderRadius: 4,
+  borderRadius: 6,
   background: colors.black,
   color: colors.yellow,
   cursor: "pointer",
   lineHeight: 0,
-};
-const subtotalRowStyle: CSSProperties = {
-  fontWeight: 600,
-  background: colors.paperAlt,
-};
-const grandTotalRowStyle: CSSProperties = {
-  fontWeight: 700,
-  background: colors.warningBg,
-  borderTop: `2px solid ${colors.black}`,
 };

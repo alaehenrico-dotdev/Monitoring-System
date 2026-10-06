@@ -1,4 +1,4 @@
-import { Fragment, useState, type CSSProperties } from "react";
+import { Fragment, useState } from "react";
 import type { StockLocation, TotalStockRow } from "../types";
 import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
@@ -14,14 +14,17 @@ import { ChevronIcon } from "./icons";
 // Height of the single sticky header row (`.ae-table th`'s own `top: 0` /
 // `position: sticky`) - where a category row's own sticky offset starts, so
 // it sits right under the header rather than overlapping it.
-const HEADER_ROW_HEIGHT = 29;
+const HEADER_ROW_HEIGHT = 26;
 
 /// A product is "low stock" only once an admin has configured a threshold
 /// for it (ProductsAdminPage) - null means no alert is configured, not an
 /// alert at zero, so it never fires for the majority of SKUs that have
 /// never had one set.
 function isLowStock(row: TotalStockRow): boolean {
-  return row.product.lowStockThreshold !== null && row.totalRemainingStock <= row.product.lowStockThreshold;
+  return (
+    row.product.lowStockThreshold !== null &&
+    row.totalRemainingStock <= row.product.lowStockThreshold
+  );
 }
 
 export function TotalStocksTable({
@@ -119,7 +122,7 @@ export function TotalStocksTable({
                           ? `Expand ${category}`
                           : `Collapse ${category}`
                       }
-                      style={categoryToggleStyle}
+                      className="ae-cat-toggle"
                     >
                       <span
                         style={{
@@ -138,61 +141,63 @@ export function TotalStocksTable({
                 {groupRows.map((r) => {
                   const lowStock = isLowStock(r);
                   return (
-                  <tr
-                    key={r.product.id}
-                    id={`ae-totalstocks-row-${r.product.id}`}
-                    className={
-                      isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"
-                    }
-                    style={
-                      // Low Stock takes priority over the variance tint - a
-                      // product actually running low matters more right now
-                      // than a manual-count mismatch.
-                      lowStock
-                        ? { background: colors.dangerBg }
-                        : r.totalVariance
-                          ? { background: colors.warningBg }
-                          : undefined
-                    }
-                  >
-                    <td style={skuCellStyle}>{r.product.sku ?? "—"}</td>
-                    <td style={nameCellStyle}>
-                      {r.product.name}
-                      {lowStock && (
-                        <span
-                          title={`At or below the low stock alert (${r.product.lowStockThreshold} ${r.product.unit})`}
-                          style={{
-                            marginLeft: 8,
-                            padding: "1px 7px",
-                            border: `1px solid ${colors.danger}`,
-                            borderRadius: 999,
-                            fontSize: 10.5,
-                            fontWeight: 700,
-                            letterSpacing: "0.04em",
-                            textTransform: "uppercase",
-                            color: colors.danger,
-                          }}
-                        >
-                          Low Stock
-                        </span>
-                      )}
-                    </td>
-                    {showOnline && (
-                      <td>{r.onlineRemainingStock.toLocaleString()}</td>
-                    )}
-                    {showOffline && (
-                      <td>{r.offlineRemainingStock.toLocaleString()}</td>
-                    )}
-                    {showTotal && (
-                      <td style={{ fontWeight: 600 }}>
-                        {r.totalRemainingStock.toLocaleString()}
+                    <tr
+                      key={r.product.id}
+                      id={`ae-totalstocks-row-${r.product.id}`}
+                      className={
+                        isCollapsed
+                          ? "ae-cat-row ae-row-collapsed"
+                          : "ae-cat-row"
+                      }
+                      style={
+                        // Low Stock takes priority over the variance tint - a
+                        // product actually running low matters more right now
+                        // than a manual-count mismatch.
+                        lowStock
+                          ? { background: colors.dangerBg }
+                          : r.totalVariance
+                            ? { background: colors.warningBg }
+                            : undefined
+                      }
+                    >
+                      <td className="ae-cell-sku">{r.product.sku ?? "—"}</td>
+                      <td className="ae-cell-name">
+                        {r.product.name}
+                        {lowStock && (
+                          <span
+                            title={`At or below the low stock alert (${r.product.lowStockThreshold} ${r.product.unit})`}
+                            style={{
+                              marginLeft: 8,
+                              padding: "1px 7px",
+                              border: `1px solid ${colors.danger}`,
+                              borderRadius: 6,
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              letterSpacing: "0.04em",
+                              textTransform: "uppercase",
+                              color: colors.danger,
+                            }}
+                          >
+                            Low Stock
+                          </span>
+                        )}
                       </td>
-                    )}
-                  </tr>
+                      {showOnline && (
+                        <td>{r.onlineRemainingStock.toLocaleString()}</td>
+                      )}
+                      {showOffline && (
+                        <td>{r.offlineRemainingStock.toLocaleString()}</td>
+                      )}
+                      {showTotal && (
+                        <td style={{ fontWeight: 600 }}>
+                          {r.totalRemainingStock.toLocaleString()}
+                        </td>
+                      )}
+                    </tr>
                   );
                 })}
-                <tr style={subtotalRowStyle}>
-                  <td colSpan={2} style={nameCellStyle}>
+                <tr className="ae-row-subtotal">
+                  <td colSpan={2} className="ae-cell-name">
                     Subtotal - {category}
                   </td>
                   {showOnline && (
@@ -220,8 +225,8 @@ export function TotalStocksTable({
               </Fragment>
             );
           })}
-          <tr style={grandTotalRowStyle}>
-            <td colSpan={2} style={nameCellStyle}>
+          <tr className="ae-row-grand">
+            <td colSpan={2} className="ae-cell-name">
               GRAND TOTAL
             </td>
             {showOnline && (
@@ -245,42 +250,3 @@ export function TotalStocksTable({
     </RowGlowScroll>
   );
 }
-
-const nameCellStyle: CSSProperties = {
-  textAlign: "left",
-  whiteSpace: "nowrap",
-  color: colors.ink,
-};
-const skuCellStyle: CSSProperties = {
-  textAlign: "left",
-  whiteSpace: "nowrap",
-  color: colors.yellow,
-  fontVariantNumeric: "tabular-nums",
-};
-// See StockGrid's identical categoryToggleStyle - a real <button> spanning
-// every column so the expand/collapse arrow has one clickable/keyboard-
-// focusable target instead of a styled, inert <td>.
-const categoryToggleStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  width: "100%",
-  textAlign: "left",
-  font: "inherit",
-  fontWeight: 700,
-  padding: "5px 6px",
-  border: "none",
-  borderLeft: `4px solid ${colors.red}`,
-  background: "var(--ae-category-bg)",
-  color: colors.yellow,
-  cursor: "pointer",
-};
-const subtotalRowStyle: CSSProperties = {
-  fontWeight: 600,
-  background: colors.paperAlt,
-};
-const grandTotalRowStyle: CSSProperties = {
-  fontWeight: 700,
-  background: colors.warningBg,
-  borderTop: `2px solid ${colors.black}`,
-};

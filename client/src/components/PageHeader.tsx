@@ -1,7 +1,6 @@
 import {
   useRef,
   useState,
-  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { HeaderExtras } from "./HeaderExtras";
@@ -70,38 +69,12 @@ export function PageHeader({
   const [logoSpin, setLogoSpin] = useState(0);
   const lastSpinAtRef = useRef(0);
   const logoRef = useRef<HTMLButtonElement>(null);
-  const headerRef = useRef<HTMLDivElement>(null);
 
   function spinLogo() {
     const now = performance.now();
     if (now - lastSpinAtRef.current < LOGO_SPIN_MS) return;
     lastSpinAtRef.current = now;
     setLogoSpin((n) => n + 1);
-  }
-
-  // Cursor position as a percentage of the card, written straight to CSS
-  // custom properties - same trick as Toolbar.tsx/Sidebar.tsx, so the glow
-  // tracks the pointer without a re-render on every mousemove.
-  // `.ae-page-header::before` reads them to place the glow.
-  function handlePointerMove(e: ReactMouseEvent<HTMLDivElement>) {
-    const el = headerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    el.style.setProperty(
-      "--mx",
-      `${((e.clientX - rect.left) / rect.width) * 100}%`,
-    );
-    el.style.setProperty(
-      "--my",
-      `${((e.clientY - rect.top) / rect.height) * 100}%`,
-    );
-    el.style.setProperty("--spotlight-opacity", "1");
-  }
-
-  // Fade the glow back out (the opacity transition lives in CSS).
-  function handlePointerLeave() {
-    headerRef.current?.style.setProperty("--spotlight-opacity", "0");
   }
 
   function handleLogoClick() {
@@ -121,10 +94,7 @@ export function PageHeader({
           header is collapsed. */}
       <HeaderTabs />
       <div
-        ref={headerRef}
         className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}${reachable ? "" : " ae-page-header--offline"}`}
-        onMouseMove={handlePointerMove}
-        onMouseLeave={handlePointerLeave}
       >
         <div className="ae-page-header-top">
           <button

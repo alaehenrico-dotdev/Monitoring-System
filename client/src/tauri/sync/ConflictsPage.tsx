@@ -7,7 +7,11 @@ import { Button } from "../../components/ui";
 import { TableSkeleton } from "../../components/Skeleton";
 import { colors, fonts } from "../../theme";
 import { TABLE_LABELS } from "../../config/changeLog";
-import { listUnresolvedConflicts, resolveConflict, stageManualCount } from "./localDb";
+import {
+  listUnresolvedConflicts,
+  resolveConflict,
+  stageManualCount,
+} from "./localDb";
 import type { ManualCountCache, SyncConflict } from "./types";
 
 function isManualCountConflict(c: SyncConflict): boolean {
@@ -32,7 +36,14 @@ export function ConflictsPage() {
 
   async function keepMine(c: SyncConflict) {
     const server = c.serverValue as ManualCountCache;
-    await stageManualCount(c.productId, c.entryDate, c.shift, c.location!, server.systemRemainingStock, c.mineValue as number);
+    await stageManualCount(
+      c.productId,
+      c.entryDate,
+      c.shift,
+      c.location!,
+      server.systemRemainingStock,
+      c.mineValue as number,
+    );
     await resolveConflict(c.id);
     await reload();
   }
@@ -54,7 +65,15 @@ export function ConflictsPage() {
         {conflicts === null ? (
           <TableSkeleton headers={["Conflict"]} rows={3} />
         ) : conflicts.length === 0 ? (
-          <p style={{ fontFamily: fonts.body, color: colors.ink, opacity: 0.7, textAlign: "center", padding: 40 }}>
+          <p
+            style={{
+              fontFamily: fonts.body,
+              color: colors.ink,
+              opacity: 0.7,
+              textAlign: "center",
+              padding: 40,
+            }}
+          >
             No conflicts waiting for review.
           </p>
         ) : (
@@ -63,22 +82,34 @@ export function ConflictsPage() {
               key={c.id}
               style={{
                 background: colors.paper,
-                borderRadius: 8,
+                borderRadius: 6,
                 padding: 16,
                 marginBottom: 12,
                 border: `1px solid ${colors.gold}`,
               }}
             >
               <div style={{ fontWeight: 700, marginBottom: 4 }}>
-                {TABLE_LABELS[c.tableName] ?? c.tableName} - product #{c.productId}, {c.entryDate} ({c.shift}
+                {TABLE_LABELS[c.tableName] ?? c.tableName} - product #
+                {c.productId}, {c.entryDate} ({c.shift}
                 {c.location ? `, ${c.location}` : ""})
               </div>
-              <div style={{ fontSize: 13, color: colors.ink, opacity: 0.8, marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: colors.ink,
+                  opacity: 0.8,
+                  marginBottom: 10,
+                }}
+              >
                 {isManualCountConflict(c) ? (
                   <>
-                    You counted <strong>{String(c.mineValue)}</strong> offline, but the server's count is now{" "}
-                    <strong>{String((c.serverValue as ManualCountCache).manualCount)}</strong> (changed by someone else since you
-                    last synced). Pick which one should stand.
+                    You counted <strong>{String(c.mineValue)}</strong> offline,
+                    but the server's count is now{" "}
+                    <strong>
+                      {String((c.serverValue as ManualCountCache).manualCount)}
+                    </strong>{" "}
+                    (changed by someone else since you last synced). Pick which
+                    one should stand.
                   </>
                 ) : (
                   <>This change couldn't be applied: {c.reason}</>
@@ -87,14 +118,26 @@ export function ConflictsPage() {
 
               {isManualCountConflict(c) ? (
                 <div style={{ display: "flex", gap: 8 }}>
-                  <Button onClick={() => keepMine(c)}>Keep mine ({String(c.mineValue)})</Button>
-                  <Button onClick={() => keepServer(c)}>Keep server's ({String((c.serverValue as ManualCountCache).manualCount)})</Button>
+                  <Button onClick={() => keepMine(c)}>
+                    Keep mine ({String(c.mineValue)})
+                  </Button>
+                  <Button onClick={() => keepServer(c)}>
+                    Keep server's (
+                    {String((c.serverValue as ManualCountCache).manualCount)})
+                  </Button>
                 </div>
               ) : (
                 <div>
-                  <p style={{ fontSize: 13, color: colors.danger, marginBottom: 8 }}>
-                    This couldn't be saved as-is - go re-enter it on the live grid once you're back online, with the current
-                    numbers in front of you.
+                  <p
+                    style={{
+                      fontSize: 13,
+                      color: colors.danger,
+                      marginBottom: 8,
+                    }}
+                  >
+                    This couldn't be saved as-is - go re-enter it on the live
+                    grid once you're back online, with the current numbers in
+                    front of you.
                   </p>
                   <Button onClick={() => acknowledge(c)}>Acknowledge</Button>
                 </div>

@@ -109,7 +109,7 @@ export function DatabaseRestoreCard() {
         backdropFilter: "var(--ae-glass-blur)",
         WebkitBackdropFilter: "var(--ae-glass-blur)",
         border: `1px solid ${colors.border}`,
-        borderRadius: 8,
+        borderRadius: 6,
         padding: "32px 36px",
       }}
     >
