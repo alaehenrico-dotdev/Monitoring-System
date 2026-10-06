@@ -59,7 +59,7 @@ function ServerSettingsModal({ onClose }: { onClose: () => void }) {
         throw new Error("not http(s)");
       }
     } catch {
-      setError("That doesn't look like a valid address, e.g. http://192.168.0.178:4000/api");
+      setError(`That doesn't look like a valid address, e.g. ${getDefaultApiUrl()}`);
       return;
     }
 
@@ -99,7 +99,7 @@ function ServerSettingsModal({ onClose }: { onClose: () => void }) {
           <TextInput
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="http://192.168.0.178:4000/api"
+            placeholder={getDefaultApiUrl()}
             style={{ width: "100%" }}
             autoFocus
           />

@@ -289,12 +289,14 @@ table input[type="number"] {
   color: var(--ae-text);
   font-weight: 700;
   white-space: nowrap;
-  border-bottom: 2px solid var(--ae-header-rule);
+  /* No hard rule under the header - a soft white glow instead, so the
+     sticky header reads as hovering just above the rows rather than
+     being pinned down by a line. */
+  box-shadow: 0 6px 10px -4px rgba(255, 255, 255, 0.35);
 }
 .ae-table td {
   text-align: center;
   padding: 3px 6px;
-  border-bottom: 1px solid var(--ae-border);
   transition: background-color 120ms ease;
 }
 .ae-table:not(.ae-table--left) td {
@@ -479,11 +481,16 @@ table input[type="number"] {
   position: relative;
   min-width: 0;
   overflow-x: auto;
-  /* Full border all the way round, same edge + radius as the page header
-     card above it: the side/bottom margins match .ae-page-header's -18px
-     (a 6px gap to the viewport edge) instead of bleeding off-screen, so
-     the border is actually visible. */
-  border: 1px solid var(--ae-toolbar-border);
+  /* No hard edge around the table - a soft white glass glow (not the
+     brand-gold --ae-glass-shadow the page header card uses), so the whole
+     pane reads as floating rather than boxed in. Side/bottom margins still
+     match .ae-page-header's -18px (a 6px gap to the viewport edge) instead
+     of bleeding off-screen, so the glow has room to be visible. */
+  border: 0.3px solid #525252;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(255, 255, 255, 0.22),
+    0 0 32px rgba(255, 255, 255, 0.12);
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
@@ -583,7 +590,7 @@ table input[type="number"] {
   font-family: inherit;
   font-size: 13px;
   padding: 7px 10px;
-  border: 1px solid var(--ae-border);
+  border: 0.3px solid #525252;
   border-radius: 999px;
   background: var(--ae-surface);
   color: var(--ae-text);
@@ -769,7 +776,7 @@ table input[type="number"] {
   background: var(--ae-surface);
   color: var(--ae-text);
   /* Thin edge, matching the dialogs' 0.5px border (Modal.tsx). */
-  border: 0.5px solid var(--ae-toolbar-border);
+  border: 0.3px solid #525252;
   /* Same 8px radius as .ae-page-header/.ae-modal-panel - every floating
      panel in the app reads as the same family of rounded brand chrome. */
   border-radius: 8px;
@@ -922,7 +929,7 @@ table input[type="number"] {
   justify-content: space-between;
   gap: 8px;
   padding: 8px 12px 12px;
-  border-top: 1px solid var(--ae-border-soft);
+  border-top: 0.3px solid #525252;
 }
 .ae-datepicker-foot-text {
   min-width: 0;
@@ -1006,7 +1013,7 @@ table input[type="number"] {
   overflow: hidden;
   background: var(--ae-surface);
   color: var(--ae-text);
-  border: 1px solid var(--ae-toolbar-border);
+  border: none;
   border-radius: 8px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
   font-size: 13px;
@@ -1995,7 +2002,7 @@ table input[type="number"] {
   display: flex;
   align-items: stretch;
   height: 32px;
-  border: 1px solid var(--ae-border);
+  border: 0.3px solid #525252;
   border-radius: 8px;
   background: var(--ae-surface);
   overflow: hidden;
@@ -2061,6 +2068,11 @@ table input[type="number"] {
   background: url("./assets/alaeh-bg.webp") center / var(--ae-watermark-size)
     no-repeat;
   opacity: var(--ae-watermark-opacity);
+  /* A soft white halo around the seal's own silhouette (the image is a
+     transparent cut-out, so drop-shadow traces its actual shape rather than
+     its square bounding box) - just enough to lift it off the page instead
+     of reading as a flat stamp. */
+  filter: drop-shadow(0 0 28px rgba(255, 255, 255, 0.3));
 }
 .ae-main {
   position: relative;
@@ -2112,7 +2124,7 @@ table input[type="number"] {
   -webkit-backdrop-filter: blur(24px) saturate(150%);
   backdrop-filter: blur(24px) saturate(150%);
   color: var(--ae-glass-text);
-  border: 1px solid var(--ae-toolbar-border);
+  border: none;
   border-radius: 8px;
   padding: 12px 14px 10px;
   /* One duration + one curve for everything that moves when the header
@@ -2123,7 +2135,6 @@ table input[type="number"] {
   --ae-collapse-ease: cubic-bezier(0.32, 0.72, 0, 1);
   transition:
     padding var(--ae-collapse-dur) var(--ae-collapse-ease),
-    border-color 250ms ease,
     box-shadow 250ms ease;
   margin: -18px -18px 8px;
   /* Same all-around gold glow as the sidebar's own collapsed-icon state
@@ -2598,12 +2609,21 @@ table input[type="number"] {
   min-height: min-content;
 }
 /* Large desktops: give the chart a bit more of the row and let the gaps
-   breathe. */
+   breathe. Both "row-level" gaps (hero row's two columns, the left
+   column's own vertical stack) step up together, and both "item-level"
+   gaps (stat cards, quick-access tiles) step up together - previously
+   only the hero row and the quick-access grid got the bump, so the stat
+   cards and the left column's own stacking stayed at their base spacing
+   while their neighbors visibly opened up around them. */
 @media (min-width: 1500px) {
-  .ae-dash-hero-row {
-    grid-template-columns: minmax(380px, 4fr) minmax(0, 7fr);
+  .ae-dash-hero-row,
+  .ae-dash-hero-left {
     gap: 18px;
   }
+  .ae-dash-hero-row {
+    grid-template-columns: minmax(380px, 4fr) minmax(0, 7fr);
+  }
+  .ae-dash-stats,
   .ae-dash-quicklinks {
     gap: 14px;
   }
@@ -2748,7 +2768,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: 1px solid var(--ae-toolbar-border);
+  border: 0.3px solid #525252;
   /* Same 8px radius as .ae-page-header - every card on this page reads as
      the same family of "rounded brand chrome" instead of the old sharp-
      cornered boxes. */
@@ -2849,7 +2869,12 @@ table input[type="number"] {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
-  margin: 12px 0 24px;
+  /* Flex items don't collapse margins, so this bottom margin used to stack
+     with .ae-dash-hero-row's own 12px top margin for a 36px gap below the
+     quick-access row - almost twice the 20px gap above it (the subtitle's
+     8px bottom margin + this row's own 12px top margin). Matched to 8px so
+     the two sides land on the same 20px total. */
+  margin: 12px 0 8px;
   flex-shrink: 0;
 }
 .ae-dash-quicklink {
@@ -2860,7 +2885,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: 1px solid var(--ae-toolbar-border);
+  border: none;
   border-radius: 8px;
   color: var(--ae-text);
   text-decoration: none;
@@ -2934,7 +2959,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: 1px solid var(--ae-border);
+  border: 0.3px solid #525252;
   border-radius: 8px;
   box-shadow:
     0 1px 2px rgba(12, 12, 12, 0.04),
@@ -3134,7 +3159,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: 1px solid var(--ae-toolbar-border);
+  border: none;
   border-radius: 8px;
   transition:
     border-color 140ms ease,
@@ -3187,7 +3212,7 @@ table input[type="number"] {
   font-size: 11px;
   font-weight: 600;
   color: var(--ae-text);
-  border: 1px solid var(--ae-border);
+  border: 0.3px solid #525252;
 }
 .ae-hist-chip--accent {
   color: var(--ae-glass-accent);
@@ -3243,7 +3268,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: 1px solid var(--ae-toolbar-border);
+  border: none;
   border-radius: 8px;
 }
 .ae-hist-empty h3 {

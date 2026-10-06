@@ -129,6 +129,10 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), cspPlugin(apiOrigin, extraConnectSrc), pwaPrecachePlugin()],
     server: {
       port: 5173,
+      // Tauri's devUrl is fixed at localhost:5173. Without strictPort Vite
+      // silently falls back to 5174 when another process owns 5173, leaving
+      // Tauri pointed at a stale/browser server without the native IPC bridge.
+      strictPort: true,
       host: true,
       allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
       proxy: {
@@ -143,6 +147,7 @@ export default defineConfig(({ mode }) => {
     // Vite's dev transform.
     preview: {
       port: 5173,
+      strictPort: true,
       host: true,
       allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
       proxy: {

@@ -17,6 +17,8 @@ export function useSyncEngine() {
   const [conflictCount, setConflictCount] = useState(0);
   const syncing = useRef(false);
   const syncAgain = useRef(false);
+  const isReachableRef = useRef(isReachable);
+  isReachableRef.current = isReachable;
 
   async function refreshCounts() {
     setPendingCount(await countPendingSyncChanges());
@@ -59,9 +61,8 @@ export function useSyncEngine() {
     void getLastSyncedAt().then((value) => {
       hydrateLastSyncedAt(value ? Date.parse(value) : null);
     });
-    sync(); // on launch
     const interval = setInterval(() => {
-      if (isReachable) sync();
+      if (isReachableRef.current) sync();
     }, IDLE_SYNC_INTERVAL_MS);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps

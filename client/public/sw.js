@@ -74,14 +74,23 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(
-      fetch(request).catch(() => caches.match("/index.html", { cacheName: STATIC_CACHE })),
+      fetch(request).catch(async () => {
+        const cached = await caches.match("/index.html", { cacheName: STATIC_CACHE });
+        // A service worker must always resolve respondWith() to a Response.
+        // If the app shell was not precached (for example, a partial install),
+        // allow the browser's normal network error page instead of returning
+        // undefined and creating an unhandled FetchEvent rejection.
+        return cached || Response.error();
+      }),
     );
     return;
   }
 
   if (url.pathname.includes("/api/")) {
     if (NEVER_CACHE.test(url.pathname)) return;
-    event.respondWith(networkFirst(request, API_CACHE));
+    event.respondWith(
+      networkFirst(request, API_CACHE).catch(() => Response.error()),
+    );
     return;
   }
 
@@ -92,7 +101,10 @@ self.addEventListener("fetch", (event) => {
 
   if (url.origin === self.location.origin) {
     event.respondWith(
-      caches.match(request, { cacheName: STATIC_CACHE }).then((hit) => hit || fetch(request)),
+      caches
+        .match(request, { cacheName: STATIC_CACHE })
+        .then((hit) => hit || fetch(request))
+        .catch(() => Response.error()),
     );
   }
 });

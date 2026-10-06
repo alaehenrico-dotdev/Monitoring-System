@@ -54,7 +54,7 @@ export class ApiError extends Error {
 /// Never thrown in the web build.
 export class QueuedOfflineError extends Error {
   constructor() {
-    super("Saved offline - will sync once the connection is back.");
+    super("Saved offline. Syncs when reconnected.");
   }
 }
 
@@ -197,9 +197,26 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // (the whole reason the server-down case feels slower than wifi-off:
   // wifi-off fails a fetch almost instantly, but a reachable network with an
   // unreachable server has to wait out the full connect timeout instead).
-  // Go straight to the same fallback a failed fetch would reach, and only
-  // fall through to a real attempt if there's nothing cached to serve yet -
-  // better to wait than show nothing.
+  // In the desktop app, serve saved data as soon as connectivity has not yet
+  // been established (including cold start) or the last probe found the
+  // server down. Waiting for TCP's connect timeout just to rediscover this
+  // makes locally saved data look like a failed fetch. Keep trying the API
+  // in the background to refresh the cache, but return the local snapshot
+  // immediately when one exists.
+  if (isTauri && (getKnownReachable() === false || getKnownReachable() === null) && method === "GET") {
+    const { getCachedResponse } = await import("../tauri/offlineStore");
+    const cached = await getCachedResponse<T>(path);
+    if (cached !== null) {
+      void coreRequest<T>(path, options)
+        .then(async (fresh) => {
+          const { cacheResponse } = await import("../tauri/offlineStore");
+          await cacheResponse(path, fresh);
+        })
+        .catch(() => undefined);
+      return cached;
+    }
+  }
+
   if (isTauri && getKnownReachable() === false) {
     if (isQueueableMethod(method)) {
       const { queueWrite } = await import("../tauri/offlineStore");

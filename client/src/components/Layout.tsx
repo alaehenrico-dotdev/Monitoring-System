@@ -83,7 +83,7 @@ export function Layout() {
               boxShadow: "0 6px 20px rgba(12, 12, 12, 0.35)",
             }}
           >
-            Server Offline - Showing saved data (may be outdated)… Local edits stay on this device until reconnect and sync finish.
+            Server offline. Showing saved data; local edits sync when reconnected.
           </div>
         )}
         {isTauri && (
