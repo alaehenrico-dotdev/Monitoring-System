@@ -6,16 +6,10 @@
 // specific office server is unreachable (wrong subnet, VPN down, server
 // process crashed), so "is the OS online" isn't good enough here.
 //
-// This used to be polled per hook instance: useOnlineStatus is mounted
-// several times on a typical page (Layout, the server-settings link, the
-// offline badge, the entry page) and tauri/sync/connectivity.ts ran a
-// second poller of its own - every one of them hitting /health on its own
-// 5s interval, and every hit running a `SELECT 1` on the database. The
-// interval here is module level instead: it starts when the first consumer
-// subscribes and stops when the last unsubscribes, so N consumers cost one
-// request per interval rather than N.
+// The interval is module-level: it starts when the first consumer subscribes
+// and stops when the last unsubscribes, so multiple mounted consumers share
+// one health check instead of each querying the database.
 import { API_URL } from "./http";
-import { setKnownReachable } from "./reachability";
 
 export const HEALTH_CHECK_INTERVAL_MS = 5_000;
 export const HEALTH_CHECK_TIMEOUT_MS = 2_000;
@@ -57,7 +51,6 @@ function publish(reachable: boolean) {
   const reconnects = snapshot.reconnects + (reachable && !wasReachable ? 1 : 0);
   if (snapshot.reachable === reachable && reconnects === snapshot.reconnects) return;
   snapshot = { reachable, reconnects };
-  setKnownReachable(reachable);
   for (const listener of listeners) listener();
 }
 

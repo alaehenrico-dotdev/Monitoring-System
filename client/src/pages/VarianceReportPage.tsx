@@ -19,7 +19,6 @@ import { AlertDialog, UnsavedWorkDialog } from "../components/AlertDialog";
 import { findUnsavedWork, type UnsavedWorkItem } from "../utils/unsavedWork";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { downloadTablePdf } from "../utils/tablePdf";
-import { confirmDownload } from "../components/DownloadConfirm";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import {
@@ -194,7 +193,6 @@ export function VarianceReportPage() {
   async function handlePdf() {
     if (!rows) return;
     const pdfName = pdfFileName("variance-report", date, category);
-    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({

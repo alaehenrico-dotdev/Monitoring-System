@@ -1,12 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The point of the shared poller: useOnlineStatus is mounted several times
- * on a typical page (Layout, the server-settings link, the offline badge,
- * the entry page) and tauri/sync/connectivity.ts used to add a second
- * poller of its own. Each instance ran its own 5s /health interval, and
- * every /health runs a `SELECT 1` - so the cost scaled with how many
- * components happened to be on screen.
+ * useOnlineStatus can be mounted several times on one page. All consumers
+ * should share the same health interval and database probe.
  *
  * These drive subscribe/getSnapshot directly rather than mounting React:
  * useSyncExternalStore is a thin pass-through to exactly these, and the
@@ -14,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 vi.mock("./http", () => ({ API_URL: "http://localhost:4000" }));
-vi.mock("./reachability", () => ({ setKnownReachable: vi.fn() }));
 
 let fetchMock: ReturnType<typeof vi.fn>;
 

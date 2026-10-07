@@ -12,7 +12,7 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Check public app, tunnel, API, and database
+      - name: Check public app, API, and database
         id: health
         env:
           MONITOR_HEALTH_URL: ${{ vars.MONITOR_HEALTH_URL }}
@@ -27,15 +27,13 @@ jobs:
           esac
           live_url="${MONITOR_HEALTH_URL%/health}/health/live"
           if ! curl --fail --silent --show-error --output /dev/null --max-time 20 --retry 2 --retry-delay 5 \
-            --header "ngrok-skip-browser-warning: true" \
             "$live_url"; then
-            echo "Public liveness check failed: the API or tunnel is unreachable." >&2
+            echo "Public liveness check failed: the API is unreachable." >&2
             exit 1
           fi
           if ! http_code=$(curl --silent --show-error --output /tmp/monitor-health.json --write-out "%{http_code}" --max-time 20 --retry 2 --retry-delay 5 \
-            --header "ngrok-skip-browser-warning: true" \
             "$MONITOR_HEALTH_URL"); then
-            echo "Public readiness request failed: the tunnel or API is unreachable." >&2
+            echo "Public readiness request failed: the API is unreachable." >&2
             exit 1
           fi
           if [ "$http_code" != "200" ]; then
@@ -59,7 +57,7 @@ jobs:
             echo "Slack alert skipped; configure MONITOR_SLACK_WEBHOOK to receive Slack notifications."
             exit 0
           fi
-          payload=$(jq -n --arg text "Ala Eh production health check failed. Check the API, database, and ngrok tunnel. Details: $WORKFLOW_RUN_URL" '{text: $text}')
+          payload=$(jq -n --arg text "Ala Eh production health check failed. Check the API and database. Details: $WORKFLOW_RUN_URL" '{text: $text}')
           curl --fail --silent --show-error --max-time 15 \
             -H "Content-Type: application/json" \
             --data "$payload" \
@@ -67,4 +65,4 @@ jobs:
 
       - name: Report successful health check
         if: success()
-        run: echo "Public health endpoint returned HTTP 2xx; API and database are reachable through the tunnel." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Public health endpoint returned HTTP 2xx; API and database are reachable." >> "$GITHUB_STEP_SUMMARY"

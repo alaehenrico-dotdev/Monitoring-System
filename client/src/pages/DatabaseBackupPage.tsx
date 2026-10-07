@@ -3,7 +3,6 @@ import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
-import { confirmDownload } from "../components/DownloadConfirm";
 import { DatabaseRestoreCard } from "./DatabaseRestoreCard";
 import { colors, motionTokens } from "../theme";
 
@@ -42,7 +41,6 @@ export function DatabaseBackupPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleDownload() {
-    if (!(await confirmDownload("Database backup"))) return;
     setStatus("downloading");
     setDoneDismissed(false);
     setBytes(0);

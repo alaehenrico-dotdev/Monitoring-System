@@ -51,9 +51,8 @@ export async function getSystemRemainingStock(productId: number, entryDate: Date
 /// comment (dailyOnlineStock.service.ts) for the same class of bug on the
 /// stock-entry side.
 ///
-/// `db` stays an accepted parameter, same reasoning as saveOnlineEntry/
-/// saveOfflineEntry's own doc comments - sync.service.ts's pushChanges
-/// composes this into one transaction with its own idempotency-marker write.
+/// `db` stays an accepted parameter so related operations can compose this
+/// save into a caller-owned transaction without opening a nested transaction.
 export async function saveManualCount(
   productId: number,
   entryDate: Date,

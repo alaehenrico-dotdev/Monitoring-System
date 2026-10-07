@@ -2,7 +2,6 @@ import { useLayoutEffect, useRef } from "react";
 import { animate } from "motion/react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { ServerSettingsLink } from "./ServerSettings";
 
 interface NavLinkDef {
   to: string;
@@ -222,9 +221,6 @@ export function HeaderTabs() {
         </div>
       ))}
       <span ref={barRef} aria-hidden className="ae-header-tabs-bar" />
-      <div className="ae-header-tabs-settings">
-        <ServerSettingsLink />
-      </div>
     </nav>
   );
 }

@@ -58,10 +58,11 @@ see `server/src/config/env.ts`.
 | `JWT_SECRET` | server | required, no placeholder | Signs/verifies login JWTs |
 | `DATA_RESET_PASSCODE` | server | required, no placeholder | Gates the Data Reset admin panel |
 | `PORT` | server | optional (default `4000`) | API listen port |
+| `HOST` | server | optional (default `127.0.0.1`) | API bind address; keep loopback behind Nginx |
 | `JWT_EXPIRES_IN` | server | optional (default `8h`) | Login session lifetime |
 | `CLIENT_ORIGIN` | server | optional (default `http://localhost:5173`) | Allowed CORS origin |
 | `NODE_ENV` | server | optional (default `development`) | `production` in a real deployment — see [`PRODUCTION.md`](PRODUCTION.md) |
-| `VITE_API_URL` | client | optional (default `http://localhost:4000/api`) | API base URL the client calls directly, in both dev and production (see the dev proxy note below) |
+| `VITE_API_URL` | client | optional (default `/api`) | Same-origin API base URL; Vite proxies it in development and Nginx proxies it in production |
 
 ### 2. Install, migrate, seed
 
@@ -80,34 +81,29 @@ npm install
 
 ### 3. Run it
 
-Start the API manually from the repository root by double-clicking `start-server.bat`. Keep its
-window open while using the app; closing it stops the API. In a separate terminal, start the web
-client:
+From the repository root, start both the API and web client:
 
 ```bash
-npm run dev:client
+npm run dev
 ```
 
 - API: `http://localhost:4000`
 - Client: `http://localhost:5173`
 
-Alternatively, run `npm run dev:server` instead of the batch file. `npm run dev` starts both API
-and client together for the original combined workflow.
+You can also start either service separately with `npm run dev:server` or
+`npm run dev:client`.
 
-**Dev proxy:** by default (`VITE_API_URL` unset or left at its `.env.example` value), the client
-calls the API's absolute URL directly (`http://localhost:4000/api`) — the server's `CLIENT_ORIGIN`
-CORS setting is what allows that cross-port call from `:5173`. `client/vite.config.ts` also
-configures Vite's dev server to proxy `/api/*` to `http://localhost:4000` (`server.proxy` in that
-file); that path is only actually used if `VITE_API_URL` is set to a relative `/api` instead of the
-absolute URL, which the default setup above doesn't do — it's there for setups (e.g. behind an
-ngrok tunnel, see `allowedHosts` in the same config block) where hitting the API through the same
-origin as the client is preferable to a direct cross-origin call.
+**Same-origin API:** the client defaults to `/api`; Vite proxies `/api`, `/health`,
+and `/ws` to the local API during development. Production uses the same paths
+through Nginx, so browser clients do not need a hardcoded server IP or
+cross-origin API address.
 
-### 4. Sharing over ngrok / production
+### 4. Production deployment
 
-`NGROK_SETUP.md` covers tunneling this dev setup with ngrok. For a longer-running, pm2-managed
-deployment (production builds instead of dev-mode watchers, auto-restart, a reserved tunnel
-domain), see [`PRODUCTION.md`](PRODUCTION.md).
+For a Hostinger VPS deployment with HTTPS, Nginx, PM2, database backups,
+migrations, and GitHub checkout instructions, follow [`PRODUCTION.md`](PRODUCTION.md).
+Shared hosting is not suitable for the continuously running API and realtime
+WebSocket.
 
 ### 5. Tests & linting
 

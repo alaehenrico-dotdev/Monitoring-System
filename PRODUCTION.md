@@ -1,190 +1,198 @@
-# Running this in production (pm2 + ngrok)
+# Hostinger VPS deployment
 
-This app's real deployment is still XAMPP's MySQL + an ngrok tunnel (see [`NGROK_SETUP.md`](NGROK_SETUP.md)
-for the day-to-day "re-tunnel after an XAMPP reset" workflow) — this doc covers making that setup
-production-grade instead of running dev-mode watchers under a plain terminal: process management
-that survives a crash or a reboot, production builds instead of `tsx watch`/Vite's dev server, and
-a tunnel URL that doesn't change every time it's restarted.
+This project needs a continuously running Node.js API and MySQL-compatible
+database. Deploy it to a Hostinger VPS (or another Linux VPS); shared hosting
+is not suitable for the API or its realtime WebSocket connection. Nginx serves
+the built web client and reverse-proxies API traffic to the private Node
+process.
 
-## 1. Apply database migrations
+## 1. Prepare the VPS and DNS
 
-Run this from the repo root on every deployment that contains a new or changed
-folder under `server/prisma/migrations`. `prisma migrate deploy` is the
-production-safe command: it applies only migrations that are not already
-recorded in the database and does not create or rewrite migrations.
-
-`db:migrate:deploy` always takes a snapshot backup first (`backup:snapshot`,
-same command as below) and aborts without touching the schema if that backup
-fails for any reason - disk space, `mysqldump` missing, etc. - so a migration
-can never run without a fresh backup to fall back to:
+Point your domain's `A` record at the VPS IPv4 address (and its `AAAA` record
+only if IPv6 is configured). On an Ubuntu VPS, install Git, Node.js 22 LTS,
+Nginx, MySQL/MariaDB client tools, and Certbot:
 
 ```bash
-npm run db:migrate:deploy
+sudo apt update
+sudo apt install -y git nginx default-mysql-client certbot python3-certbot-nginx curl
+curl -fsSL https://deb.nodesource.com/setup_22.x -o /tmp/nodesource_setup.sh
+sudo bash /tmp/nodesource_setup.sh
+sudo apt install -y nodejs
+node --version
+npm --version
 ```
 
-If the command reports a failed migration, stop the deployment and restore or
-repair the database before restarting the API. Do not use `prisma migrate dev`
-against the production database.
+Allow inbound SSH, HTTP, and HTTPS in the Hostinger firewall; do not expose
+the API port or MySQL port.
 
-## 2. Build
+If the GitHub repository is private, add the VPS's SSH public key to that
+repository as a read-only deploy key, then clone it:
 
-From the repo root:
+```bash
+git clone git@github.com:OWNER/REPOSITORY.git /var/www/ala-eh
+cd /var/www/ala-eh
+npm ci
+```
+
+Never put a GitHub token, production `.env`, database password, or signing
+key in the repository.
+
+## 2. Create and configure the database
+
+Create a dedicated database and application user, for example:
+
+```sql
+CREATE DATABASE ala_eh_stocks CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'alaeh_app'@'127.0.0.1' IDENTIFIED BY 'REPLACE_WITH_A_LONG_PASSWORD';
+GRANT ALL PRIVILEGES ON ala_eh_stocks.* TO 'alaeh_app'@'127.0.0.1';
+```
+
+Keep MySQL bound to localhost; do not open port 3306 to the Internet. Set
+`DATABASE_URL` in `server/.env` to the MySQL connection string. URL-encode
+special characters in the username or password.
+
+Create `server/.env` with production values. Generate separate random secrets
+for `JWT_SECRET` and `DATA_RESET_PASSCODE`:
+
+```bash
+openssl rand -hex 32
+```
+
+Example:
+
+```dotenv
+NODE_ENV=production
+HOST=127.0.0.1
+PORT=4000
+DATABASE_URL="mysql://alaeh_app:URL_ENCODED_PASSWORD@127.0.0.1:3306/ala_eh_stocks"
+JWT_SECRET="REPLACE_WITH_A_UNIQUE_RANDOM_SECRET"
+DATA_RESET_PASSCODE="REPLACE_WITH_A_DIFFERENT_RANDOM_SECRET"
+JWT_EXPIRES_IN=8h
+CLIENT_ORIGIN=https://monitor.example.com
+TRUST_PROXY=loopback
+```
+
+Keep `server/.env` readable only by the deployment account. Do not use the
+seeded demonstration passwords in production.
+
+## 3. Back up, migrate, build, and seed
+
+Before a migration or deployment that changes data, take a database backup and
+copy it off the VPS. Configure a private MySQL client option file so the
+password is not placed on the command line:
+
+```ini
+# /root/.my.cnf (chmod 600)
+[client]
+user=alaeh_app
+password=YOUR_DATABASE_PASSWORD
+host=127.0.0.1
+```
+
+Then create a compressed pre-deploy dump:
+
+```bash
+sudo install -d -m 700 /var/backups/ala-eh
+sudo bash -o pipefail -c 'mysqldump --defaults-extra-file=/root/.my.cnf --single-transaction --routines --triggers ala_eh_stocks | gzip > "/var/backups/ala-eh/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz"'
+```
+
+Install the MySQL client tools on the VPS; the Settings > Backup & Restore
+feature also requires `mysqldump` and `mysql` to be available to the API user.
+Use encrypted off-site storage for backups and rehearse restores against a
+separate test database.
+
+From the repository root, build both applications and apply only committed
+Prisma migrations:
 
 ```bash
 npm run build
+npm run prisma:migrate:deploy --workspace server
 ```
 
-This runs `prisma generate && tsc` for the server and `tsc -b && vite build` for the client
-(unchanged, existing root script) — producing `server/dist` and `client/dist`.
+Run `npm run seed --workspace server` only for a new database. It creates
+initial records and demonstration accounts; change those passwords or remove
+the accounts before opening the site to users.
 
-**Always run this plain `npm run build` last, after any `npm run build:tauri` / `npm run
-tauri:build`.** Both commands write to the same `client/dist` (`tauri.conf.json`'s
-`frontendDist`), but `build:tauri` compiles in the Tauri-only code paths (updater, SQLite
-offline cache, window title, sync badge — see `TAURI_SETUP.md`). `ala-eh-client` serves
-`client/dist` over plain HTTP via `vite preview` with no Tauri runtime behind it, so if that
-directory was last built with `build:tauri`, every page load throws `Cannot read properties of
-undefined (reading 'invoke')` and the updater/offline-sync/window-title features silently fail.
-Cutting a desktop release and redeploying the browser client in the same session means rebuilding
-twice, plain build last.
+Build on the VPS or make sure the build machine has no `client/.env.local` or
+`client/.env.production` overriding `VITE_API_URL`. The production bundle must
+use the default relative `/api` path so it calls this domain through Nginx,
+not a developer machine's `localhost`.
 
-## 3. Environment
+## 4. Run the API with PM2
 
-Copy `server/.env.example` → `server/.env` on the production machine and fill in real values —
-same requirements as dev (`DATABASE_URL`, `JWT_SECRET`, `DATA_RESET_PASSCODE`, no placeholder
-values, see `server/src/config/env.ts`), plus:
-
-- `NODE_ENV="production"`
-- `CLIENT_ORIGIN` set to your reserved ngrok domain (step 4) instead of the `localhost:5173`
-  default, so CORS is scoped to the real production URL.
-- `TRUST_PROXY` — leave unset unless a proxy fronts the API from somewhere other than this
-  machine. The default, `loopback`, is what the ngrok setup needs: the ngrok agent runs here and
-  reaches the API over `127.0.0.1`, so its `X-Forwarded-For` is trusted and each visitor is rate
-  limited as themselves. The API's port also accepts direct connections, and those are *not*
-  trusted — a forged `X-Forwarded-For` from one is ignored, so it cannot pick a new `req.ip` per
-  request and walk around the login, passcode and global limiters. Set it to the proxy's IP/CIDR
-  (comma-separated for several) if the proxy is on another host. A hop count such as `1` is
-  rejected on purpose; that was the forgeable-header hole. See `server/.env.example`.
-- Optionally `RATE_LIMIT_*` to tune the limiters without a code change — see
-  `server/.env.example` for the names and shipped defaults.
-
-`client/.env` should keep `VITE_API_URL=/api` (relative), same as the ngrok dev setup in
-`NGROK_SETUP.md` — this is what lets the client, API, and realtime WebSocket all ride through one
-tunnel origin.
-
-## 4. Process management (pm2)
-
-Install pm2 globally once (`npm install -g pm2`), then from the repo root:
+The checked-in PM2 configuration runs only the API on `127.0.0.1:4000`.
+Nginx serves `client/dist` directly; do not expose Vite's development or
+preview server in production.
 
 ```bash
+sudo npm install --global pm2
 pm2 start ecosystem.config.cjs
 pm2 save
+pm2 startup
 ```
 
-PM2 keeps these production processes running and restarts them if they crash. Do not run
-`pm2 startup` or configure PM2 to launch on login if you want to start the server manually.
-For local development, run `start-server.bat` from the repository root; close its window to stop
-the API.
-
-`ecosystem.config.cjs` runs two processes, restarting either automatically if it crashes:
-
-- **`ala-eh-api`** — the built server (`node server/dist/server.js`).
-- **`ala-eh-client`** — `vite preview` serving the built client, still proxying `/api` and the
-  realtime `/ws` upgrade to the API on the same origin (`client/vite.config.ts`'s `preview.proxy` —
-  the production equivalent of the dev `server.proxy` `NGROK_SETUP.md` already relies on).
-
-Useful commands: `pm2 status`, `pm2 logs`, `pm2 restart ala-eh-api` (e.g. after deploying a new
-build — repeat steps 1–2, then restart both apps).
-
-## 5. Tunnel
+Run the exact privileged command printed by `pm2 startup` to configure startup
+after a reboot. Useful commands:
 
 ```bash
-ngrok http --url=<your-reserved-domain> 5173
+pm2 status
+pm2 logs ala-eh-api
+pm2 restart ala-eh-api
 ```
 
-Tunnel the **client's** port (5173, where `vite preview` and its proxy live) — same single-origin
-shape as the dev workflow, just pointed at production builds.
+## 5. Configure Nginx and HTTPS
 
-Use a **paid ngrok reserved domain** here rather than a free random one: a production URL that
-changes on every restart isn't something you can actually hand out. `NGROK_SETUP.md` covers this as
-an aside for dev; here it's the primary recommendation.
+Copy [`deploy/nginx/monitoring.conf.example`](deploy/nginx/monitoring.conf.example)
+to the VPS's Nginx sites-enabled directory. Replace `monitor.example.com` with
+your domain and confirm the static root matches `/var/www/ala-eh/client/dist`.
+The configuration serves the SPA, forwards `/api` and `/health`, and upgrades
+`/ws` for realtime updates. It allows database restore uploads slightly above
+the server's 512 MiB limit and streams those uploads instead of buffering them
+on disk.
 
-## Realtime sync
+Validate and reload Nginx, then issue a TLS certificate with Certbot or
+Hostinger's supported certificate flow:
 
-Nothing extra to configure — the WebSocket connection (`client/src/context/RealtimeContext.tsx`)
-derives its URL from the same `VITE_API_URL` the REST calls use, and rides through the same
-`vite preview` proxy and ngrok tunnel as everything else.
-
-## External uptime alerts
-
-The repository's **Production monitor** GitHub Actions workflow checks the
-public `/health` URL every five minutes. The app proxies that path through
-the same tunnel as the UI; the API responds successfully only when both the
-API and MySQL are reachable. `/health/live` is available for process-only
-liveness checks. A failed public check therefore catches an API crash, a
-database outage, or a stopped/broken tunnel from outside the server machine.
-
-Configure these GitHub repository settings:
-
-- Actions variable `MONITOR_HEALTH_URL`, for example
-  `https://your-reserved-domain.ngrok.app/health`.
-- Optional Actions secret `MONITOR_SLACK_WEBHOOK`, set to a Slack incoming
-  webhook URL to receive a message when a scheduled check fails. Without it,
-  the failed workflow run and logs are the alert.
-
-Use **Actions → Production monitor → Run workflow** to check the setup now.
-The scheduled monitor sends the ngrok browser-warning bypass header, so the
-health endpoint can be queried without an interactive browser.
-
-## Backups (nightly, local, with retention)
-
-The app has no user-uploaded files - everything lives in MySQL - so backups are database-only. The
-Settings > Backup & Restore page covers on-demand backups; these scripts add the unattended,
-scheduled kind. They read `DATABASE_URL` (and `MYSQLDUMP_PATH`) from `server/.env`, so there are no
-credentials to duplicate. Backups go to `C:\ala-eh-backups` (override with the `BACKUP_DIR` env var -
-ideally a different physical disk than the database).
-
-```powershell
-# One-time, from an elevated PowerShell: nightly run at 02:00 (catches up if the PC was off)
-powershell -ExecutionPolicy Bypass -File scripts\install-backup-task.ps1
-
-npm run backup            # take a daily-style backup now
-npm run backup:snapshot   # instant snapshot - run BEFORE prisma migrate / deploying an update
-npm run restore -- -List  # list backups
-npm run restore -- -File C:\ala-eh-backups\daily\db_backup_2026-09-30_020000.sql.gz
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot --nginx -d monitor.example.com
 ```
 
-- **Format / naming:** `db_backup_YYYY-MM-DD_HHmmss.sql.gz`, written to `*.partial` first and only
-  renamed after the whole file has been decompressed and checked for mysqldump's completion marker,
-  so a half-written dump is never kept as a "good" backup.
-- **Retention:** `daily\` keeps 7 days (`-RetentionDays`; the newest file is never deleted).
-  `snapshots\` keeps the newest 10 and is never touched by the daily purge.
-- **Safety checks:** refuses to run with less than 500 MB free (or 3x the last dump); exit code 1 and
-  an `[ERROR]` line on any failure. Everything is logged to `<BackupDir>\backup.log`.
-- **Permissions:** the backup folder is restricted to your account, SYSTEM and Administrators (it
-  holds every account and all stock data). The DB password travels via `MYSQL_PWD` to the child
-  process only, never on a command line. `server/.env` is deliberately *not* backed up alongside the
-  dumps - keep that secret somewhere separate.
-- **Restore:** stop the API first (`pm2 stop ala-eh-api`), run the restore command above (it verifies
-  the file, takes a `pre-restore` snapshot of the current data, and makes you type `RESTORE`), then
-  `pm2 start ala-eh-api`. Add `-Database some_scratch_db` to rehearse a restore without touching live
-  data. If the task logs `server\.env not found`, register it under your own account instead of SYSTEM.
-- **Copies off the machine:** these are same-machine backups - a dead disk or a stolen PC takes them
-  too. Periodically copy the folder to another drive or cloud storage.
+Test the public health endpoint after HTTPS is active:
 
-## End-to-end workflow checks
+```bash
+curl --fail https://monitor.example.com/health
+```
 
-CI runs `npm run e2e` against a fresh, isolated MySQL service. The checks
-exercise API login and roles, role-based write rejection, stock persistence,
-the desktop sync push/pull endpoints, and a backup/restore round-trip. Restore
-coverage requires `mysqldump` and `mysql` client tools.
+It should return `{"status":"ok","database":"ok"}`. `/health/live` checks the
+process without requiring the database.
 
-For a local run, prepare a **disposable database whose name contains `e2e`
-or `test`** and seed its accounts. Set
-`DATABASE_URL`, `E2E_DATABASE_NAME` (it must match the database in that URL),
-`JWT_SECRET`, `DATA_RESET_PASSCODE`, `SEED_ADMIN_PASSWORD`,
-`SEED_ONLINE_ENCODER_PASSWORD`, and `SEED_OFFLINE_ENCODER_PASSWORD`; then
-apply migrations and run the seed script. Set `E2E_ALLOW_DESTRUCTIVE_RESTORE=I_HAVE_A_DISPOSABLE_E2E_DATABASE`,
-the matching `E2E_*_PASSWORD` variables, and `E2E_RESET_PASSCODE`, then run
-`npm run e2e`. The runner starts its own local API process and refuses
-non-loopback API URLs, mismatched database names, or restore coverage without
-the explicit disposable-database confirmation. Never point it at production.
+## 6. Deploy updates
+
+Run tests and lint in CI before deployment. On the VPS, take and copy a fresh
+backup before applying schema migrations:
+
+```bash
+cd /var/www/ala-eh
+git pull --ff-only
+npm ci
+npm run build
+# Take and verify a database backup here.
+npm run prisma:migrate:deploy --workspace server
+pm2 restart ala-eh-api
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+The root `npm run db:migrate:deploy` helper also runs the repository's
+PowerShell snapshot script and is intended for Windows. On Linux, use the
+workspace migration command above after taking the explicit VPS backup.
+
+## Data preservation
+
+The retired desktop offline-sync and updater endpoints are no longer
+available. Legacy desktop sync and updater tables remain in the Prisma schema
+and database so existing deployments do not lose their historical records.
+They are no longer read or written by this application; remove them only in a
+separate, backed-up migration after confirming the data is no longer needed.

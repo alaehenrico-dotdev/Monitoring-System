@@ -27,6 +27,17 @@ export type LastSavedBatch = Record<number, SaveRevert>;
 /// Baselines live under their own prefix (not ENTRY_PREFIX) so
 /// utils/unsavedWork.ts, which counts every ENTRY_PREFIX key as a page's
 /// staged edits, never mistakes one for a second pending set.
+/// One undoable point in time: both maps together, since staging a cell
+/// writes to each and undoing one without the other would leave an edit with
+/// no baseline (or a baseline with no edit) behind.
+interface Snapshot {
+  pending: PendingByProduct;
+  baselines: BaselineByProduct;
+}
+
+/// Bounded so a long editing session can't grow the stack without limit.
+const HISTORY_LIMIT = 100;
+
 const BASELINE_PREFIX = "ala-eh-baseline:";
 const baselineKeyFor = (storageKey: string | undefined) => (storageKey ? BASELINE_PREFIX + storageKey : undefined);
 
@@ -156,6 +167,15 @@ export function usePendingEntryChanges(
 ) {
   const [pending, setPending] = useState<PendingByProduct>(() => loadPending(storageKey));
   const [baselines, setBaselines] = useState<BaselineByProduct>(() => loadBaselines(storageKey));
+  // Ctrl+Z / Ctrl+Shift+Z over the staged (not yet saved) edits. Snapshots
+  // are whole pending+baseline sets rather than per-cell diffs, which keeps
+  // undo correct for a Quick Fill that touches dozens of cells at once -
+  // that stages through stageMany and so costs exactly one history step,
+  // the same as a single typed cell. Not persisted: like any other undo
+  // stack it belongs to the current editing session, while `pending` itself
+  // survives navigation via sessionStorage.
+  const [past, setPast] = useState<Snapshot[]>([]);
+  const [future, setFuture] = useState<Snapshot[]>([]);
 
   // Re-derives pending from storage only when the key itself changes (a
   // different date/shift/page) - the persistence effect below is what reacts
@@ -167,6 +187,10 @@ export function usePendingEntryChanges(
     setLoadedForKey(storageKey);
     setPending(loadPending(storageKey));
     setBaselines(loadBaselines(storageKey));
+    // A different date/shift/page is a different sheet - its edits are not
+    // something the previous sheet's undo stack should be able to reach.
+    setPast([]);
+    setFuture([]);
   }
 
   useEffect(() => {
@@ -213,35 +237,96 @@ export function usePendingEntryChanges(
   /// Stages one cell's edit. Editing a cell back to its last-saved value
   /// removes it from the pending set entirely, rather than leaving a
   /// no-op change sitting in Preview/Save.
-  function stage(productId: number, key: string, value: number, savedValue: number) {
-    setPending((prev) => {
-      const productPending = { ...(prev[productId] ?? {}) };
-      if (value === savedValue) delete productPending[key];
-      else productPending[key] = value;
+  /// Records the state about to be replaced, so the next Ctrl+Z restores it.
+  /// Reads `pending`/`baselines` from the current render, which is the
+  /// committed state for the discrete user events (blur, Enter, a Quick Fill
+  /// click) that are the only things able to stage an edit.
+  function pushHistory() {
+    setPast((p) => [...p, { pending, baselines }].slice(-HISTORY_LIMIT));
+    // A fresh edit is a new branch - anything previously undone is no longer
+    // reachable by redo, the standard undo-stack rule.
+    setFuture([]);
+  }
 
-      const next = { ...prev };
-      if (Object.keys(productPending).length === 0) delete next[productId];
-      else next[productId] = productPending;
-      return next;
-    });
-    setBaselines((prev) => {
-      const productBase = { ...(prev[productId] ?? {}) };
+  /// Applies one cell's edit to both maps. Pure, so `stage` (one cell) and
+  /// `stageMany` (Quick Fill, many cells) share the same semantics - notably
+  /// "edited back to its saved value" dropping out of the pending set
+  /// entirely rather than lingering as a no-op change in Preview/Save.
+  function applyEdit(state: Snapshot, productId: number, key: string, value: number, savedValue: number): Snapshot {
+    const productPending = { ...(state.pending[productId] ?? {}) };
+    const productBase = { ...(state.baselines[productId] ?? {}) };
+
+    if (value === savedValue) {
+      delete productPending[key];
+      delete productBase[key];
+    } else {
+      productPending[key] = value;
       // Only the first stage of a key records its baseline - re-editing an
       // already-staged cell must keep the value it originally started from.
-      if (value === savedValue) delete productBase[key];
-      else if (productBase[key] === undefined && Number.isFinite(savedValue)) productBase[key] = savedValue;
-      else return prev;
-      const next = { ...prev };
-      if (Object.keys(productBase).length === 0) delete next[productId];
-      else next[productId] = productBase;
-      return next;
-    });
+      if (productBase[key] === undefined && Number.isFinite(savedValue)) productBase[key] = savedValue;
+    }
+
+    const nextPending = { ...state.pending };
+    if (Object.keys(productPending).length === 0) delete nextPending[productId];
+    else nextPending[productId] = productPending;
+
+    const nextBaselines = { ...state.baselines };
+    if (Object.keys(productBase).length === 0) delete nextBaselines[productId];
+    else nextBaselines[productId] = productBase;
+
+    return { pending: nextPending, baselines: nextBaselines };
+  }
+
+  function stage(productId: number, key: string, value: number, savedValue: number) {
+    pushHistory();
+    setPending((prev) => applyEdit({ pending: prev, baselines }, productId, key, value, savedValue).pending);
+    setBaselines((prev) => applyEdit({ pending, baselines: prev }, productId, key, value, savedValue).baselines);
+  }
+
+  /// Stages a batch of cell edits as ONE undoable step - what Quick Fill
+  /// (fill a value down a column, zero a whole category) commits. Folding
+  /// them through applyEdit in sequence means a fill behaves exactly as if
+  /// each cell had been typed, including dropping cells whose fill value
+  /// happens to equal what was already saved.
+  function stageMany(edits: { productId: number; key: string; value: number; savedValue: number }[]) {
+    if (edits.length === 0) return;
+    pushHistory();
+    const next = edits.reduce(
+      (state, e) => applyEdit(state, e.productId, e.key, e.value, e.savedValue),
+      { pending, baselines },
+    );
+    setPending(next.pending);
+    setBaselines(next.baselines);
+  }
+
+  function undo() {
+    if (past.length === 0) return;
+    const previous = past[past.length - 1];
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => [{ pending, baselines }, ...f].slice(0, HISTORY_LIMIT));
+    setPending(previous.pending);
+    setBaselines(previous.baselines);
+  }
+
+  function redo() {
+    if (future.length === 0) return;
+    const next = future[0];
+    setFuture((f) => f.slice(1));
+    setPast((p) => [...p, { pending, baselines }].slice(-HISTORY_LIMIT));
+    setPending(next.pending);
+    setBaselines(next.baselines);
   }
 
   /// Drops one product's pending changes once they've been saved (or the
   /// user discards them) - not the whole set, so a partial-failure Save
   /// (some products saved, some didn't) can clear just the successful ones.
   function clear(productId: number) {
+    // Called once per product as a Save succeeds. Those edits are now
+    // server state, so the history that could put them back is dropped -
+    // otherwise Ctrl+Z would re-stage values that are already saved and
+    // silently queue them to be written again.
+    setPast([]);
+    setFuture([]);
     setPending((prev) => {
       if (!(productId in prev)) return prev;
       const next = { ...prev };
@@ -259,6 +344,8 @@ export function usePendingEntryChanges(
   function clearAll() {
     setPending({});
     setBaselines({});
+    setPast([]);
+    setFuture([]);
   }
 
   /// Conflict resolution for one staged edit (see detectConflicts):
@@ -282,7 +369,26 @@ export function usePendingEntryChanges(
     }
   }
 
-  return { pending, baselines, displayRows, stage, clear, clearAll, resolveConflict, pendingCount: Object.keys(pending).length };
+  return {
+    pending,
+    baselines,
+    displayRows,
+    stage,
+    stageMany,
+    clear,
+    clearAll,
+    resolveConflict,
+    undo,
+    redo,
+    canUndo: past.length > 0,
+    canRedo: future.length > 0,
+    /// Products with at least one staged edit - what Save iterates over.
+    pendingCount: Object.keys(pending).length,
+    /// Individual cells staged. Always >= pendingCount, and the figure the
+    /// "N unsaved changes" indicator shows: an encoder who changed four
+    /// cells on one product has made four changes, not one.
+    pendingCellCount: Object.values(pending).reduce((n, changes) => n + Object.keys(changes).length, 0),
+  };
 }
 
 /// Called by Data Reset (DataResetPage.tsx) right after the server-side wipe

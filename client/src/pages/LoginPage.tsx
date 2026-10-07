@@ -3,7 +3,6 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/http";
 import { LogoMark } from "../components/LogoMark";
-import { ServerSettingsLink } from "../components/ServerSettings";
 import { TopBar } from "../components/TopBar";
 import { LoadingOverlay } from "../components/Spinner";
 import { Button, Field, TextInput } from "../components/ui";
@@ -144,7 +143,6 @@ export function LoginPage() {
           </Button>
         </form>
 
-        <ServerSettingsLink />
       </div>
     </>
   );

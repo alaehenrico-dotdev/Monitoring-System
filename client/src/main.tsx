@@ -17,10 +17,3 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 );
 
 registerServiceWorker();
-
-if (import.meta.env.MODE === "tauri") {
-  import("./tauri/updater").then(({ checkForUpdates }) => checkForUpdates());
-  import("./tauri/appInfo").then(({ setWindowTitleWithVersion }) =>
-    setWindowTitleWithVersion(),
-  );
-}

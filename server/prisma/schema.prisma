@@ -82,10 +82,8 @@ model Product {
   offlineStocks DailyOfflineStock[]
   manualCounts  ManualCount[]
 
-  // Desktop app offline sync (Tauri client/src/tauri/sync) - GET /sync/pull
-  // queries "what's changed since my last sync" via updatedAt on every
-  // mirrored table, not via ChangeLog (which stores full-row snapshots for
-  // the audit trail, not a cursor-queryable change feed).
+  // Retained for compatibility with existing databases; the client no
+  // longer exposes a sync endpoint.
   @@index([updatedAt])
   @@map("products")
 }
@@ -117,7 +115,8 @@ model DailyOnlineStock {
   // column. Confirmed via EXPLAIN against a seeded ~116k-row table: this
   // turns a full table scan into a ref/range lookup.
   @@index([entryDate, shift])
-  // Desktop app offline sync - see Product's matching index.
+  // Retained for compatibility with existing databases; no active endpoint
+  // uses this index.
   @@index([updatedAt])
   @@map("daily_online_stock")
 }
@@ -151,7 +150,8 @@ model DailyOfflineStock {
   @@unique([productId, entryDate, shift])
   // See the matching index on DailyOnlineStock above - same reasoning.
   @@index([entryDate, shift])
-  // Desktop app offline sync - see Product's matching index.
+  // Retained for compatibility with existing databases; no active endpoint
+  // uses this index.
   @@index([updatedAt])
   @@map("daily_offline_stock")
 }
@@ -177,7 +177,8 @@ model ManualCount {
   // all of which filter or range-scan entryDate across products (see the
   // DailyOnlineStock index above for why the unique key doesn't help).
   @@index([entryDate])
-  // Desktop app offline sync - see Product's matching index.
+  // Retained for compatibility with existing databases; no active endpoint
+  // uses this index.
   @@index([updatedAt])
   @@map("manual_counts")
 }
@@ -205,6 +206,15 @@ model ChangeLog {
   importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
 
   @@index([importBatchId])
+  // change_log is append-only and grows with every stock write, while both
+  // of its read paths filter on (tableName, recordId): the Change Log page
+  // (changeLogRepository.findMany) and, far more costly,
+  // findLatestForRecord - which revertImportBatch calls once per affected
+  // record, inside the revert transaction. Without this that lookup is a
+  // full scan of the whole audit table per record, so undoing one CSV
+  // import gets steadily slower as history accumulates. `id` is included so
+  // the `ORDER BY id DESC LIMIT 1` is served by the index too.
+  @@index([tableName, recordId, id])
   @@map("change_log")
 }
 
@@ -231,21 +241,8 @@ model ImportBatch {
   @@map("import_batches")
 }
 
-/// Idempotency record for the offline sync push endpoint (sync.service.ts's
-/// pushChanges, client/src/tauri/sync/engine.ts's runPush). Every pending
-/// offline edit carries a client-generated `localId` (a UUID) that stays the
-/// same across retries of that SAME edit - if the client never saw a push
-/// attempt's response (a request timeout, a dropped connection after the
-/// server already committed), it retries with that identical localId rather
-/// than minting a new one. Without a durable record of "this localId was
-/// already applied", that retry would re-apply an additive delta
-/// (productionIn, fulfillmentOut, etc.) a second time, silently inflating
-/// the figure - manual counts are set, not additive, but still need the same
-/// guard against double-processing. Written in the SAME transaction as the
-/// delta it guards (see saveOnlineEntry/saveOfflineEntry/saveManualCount's
-/// own doc comments on the `db` parameter they accept for exactly this), so
-/// a crash between applying the delta and recording that it was applied is
-/// impossible - either both commit or neither does.
+/// Legacy desktop-sync records. The model remains to preserve data in
+/// existing deployments; current application code no longer uses this table.
 model SyncPushApplication {
   id        Int      @id @default(autoincrement())
   localId   String   @unique
@@ -286,15 +283,11 @@ model ReportHistoryEntry {
   @@map("report_history_entries")
 }
 
-/// System Log (app version/release events) - separate from ChangeLog (which
-/// tracks edits to business records): this tracks the app itself changing
-/// version, starting with the Tauri desktop auto-updater (see
-/// client/src/tauri/updater.ts). `userId` is whoever's desktop app performed
-/// the update, not an admin acting on someone else's behalf.
+/// Legacy desktop-updater history. The model remains to preserve records in
+/// existing deployments; current application code no longer uses this table.
 model SystemLogEntry {
   id            Int      @id @default(autoincrement())
-  // "DESKTOP_UPDATE" today; a plain string (not an enum) so a future event
-  // kind (e.g. a server deploy hook) doesn't need a migration to add.
+  // Kept as a string to preserve historical event values.
   event         String
   fromVersion   String
   toVersion     String

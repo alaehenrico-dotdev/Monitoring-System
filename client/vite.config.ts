@@ -9,9 +9,7 @@ import { fileURLToPath } from "node:url";
 // no __dirname - derived the same way Node's own docs recommend.
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
-// Single source of truth for every "what version is this" display in the app
-// (Sidebar account popover, Tauri window title) - read once at build time
-// rather than bundling package.json itself or hand-duplicating the number.
+// Single source for the version display in the app (Sidebar account popover).
 const appVersion = (JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8")) as { version: string }).version;
 
 /**
@@ -30,12 +28,12 @@ const appVersion = (JSON.parse(readFileSync(join(rootDir, "package.json"), "utf8
  * injects `<script>` tags or uses `eval`/`dangerouslySetInnerHTML`, so it
  * stays as strict as the directive allows.
  */
-function cspPlugin(apiOrigin: string, extraConnectSrc: string[] = []): Plugin {
+function cspPlugin(apiOrigin: string): Plugin {
   // The realtime WebSocket connects to the same host as the API, just over
   // ws(s):// instead of http(s):// - explicit here rather than relying on
   // 'self' alone to also cover it.
   const wsOrigin = apiOrigin.replace(/^http/, "ws");
-  const connectSrc = ["'self'", apiOrigin, wsOrigin, ...extraConnectSrc].filter(Boolean).join(" ");
+  const connectSrc = ["'self'", "wss:", apiOrigin, wsOrigin].filter(Boolean).join(" ");
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
@@ -93,10 +91,8 @@ function pwaPrecachePlugin(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
-  // VITE_API_URL is normally an absolute URL when the API is on its own
-  // origin (see src/api/http.ts) - `connect-src` needs just the origin, not
-  // the full path. A relative value (same-origin API) or an unset var needs
-  // nothing extra, since `'self'` above already covers that case.
+  // For an absolute API URL, CSP needs its origin rather than the full path.
+  // Same-origin deployments use the page origin and secure WebSocket scheme.
   let apiOrigin = "";
   try {
     if (env.VITE_API_URL) apiOrigin = new URL(env.VITE_API_URL).origin;
@@ -104,56 +100,53 @@ export default defineConfig(({ mode }) => {
     // Relative VITE_API_URL (e.g. "/api") - same-origin, nothing to add.
   }
 
-  // The Tauri build serves the app from a custom-scheme origin rather than
-  // http(s) - confirmed from an actual DevTools CSP violation to be
-  // http://tauri.localhost on Windows WebView2, not https:// as Tauri's own
-  // docs suggest - tauri://localhost covers other platforms. 'self' already
-  // covers same-origin fetches to whichever of these is the page's own
-  // origin, but Tauri's internal IPC bridge calls a DIFFERENT origin
-  // (http://ipc.localhost) for plugin invokes (e.g. the updater's check()),
-  // which needs its own entry or Tauri silently falls back to a slower
-  // postMessage transport instead of erroring outright.
-  const isTauri = mode === "tauri";
-  const extraConnectSrc = isTauri
-    // The installed desktop app can switch servers at runtime. Permit HTTPS
-    // API origins and their secure WebSocket endpoints so a stable public
-    // hostname (for example a reserved tunnel domain) works from any router.
-    // Plain HTTP LAN servers still need to be the build-time origin below for
-    // WebView2's insecure-origin exception.
-    ? ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost", "http://ipc.localhost", "https:", "wss:"]
-    : [];
-
   return {
-    base: "./",
+    base: "/",
     define: { __APP_VERSION__: JSON.stringify(appVersion) },
-    plugins: [react(), cspPlugin(apiOrigin, extraConnectSrc), pwaPrecachePlugin()],
-    server: {
-      port: 5173,
-      // Tauri's devUrl is fixed at localhost:5173. Without strictPort Vite
-      // silently falls back to 5174 when another process owns 5173, leaving
-      // Tauri pointed at a stale/browser server without the native IPC bridge.
-      strictPort: true,
-      host: true,
-      allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
-      proxy: {
-        "/health": { target: "http://localhost:4000", changeOrigin: true },
-        "/api": { target: "http://localhost:4000", changeOrigin: true },
-        "/ws": { target: "http://localhost:4000", ws: true },
+    plugins: [react(), cspPlugin(apiOrigin), pwaPrecachePlugin()],
+    build: {
+      rollupOptions: {
+        output: {
+          // React/router/motion change only when a dependency is upgraded,
+          // while app code changes every deploy. Bundled together they share
+          // one hashed filename, so editing a page invalidates the framework
+          // too and returning users re-download all of it. Split out, a
+          // normal deploy only busts the (much smaller) app chunk.
+          //
+          // The lazily-imported PDF libraries (jspdf, html2canvas) are
+          // deliberately absent: they already get their own chunks via the
+          // dynamic import in utils/tablePdf.ts, and naming them here would
+          // pull them into the initial load.
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return undefined;
+            if (/\/node_modules\/(react|react-dom|scheduler)\//.test(id)) return "vendor-react";
+            if (/\/node_modules\/(react-router|react-router-dom|@remix-run)\//.test(id)) return "vendor-router";
+            if (/\/node_modules\/(motion|motion-dom|motion-utils|framer-motion)\//.test(id)) return "vendor-motion";
+            return undefined;
+          },
+        },
       },
     },
-    // `vite preview` serves the production build (see PRODUCTION.md) - same
-    // proxy shape as dev so it still fronts the API/realtime through one
-    // origin for the ngrok tunnel, just pointed at built assets instead of
-    // Vite's dev transform.
+    server: {
+      port: 5173,
+      strictPort: true,
+      host: true,
+      proxy: {
+        "/health": { target: "http://127.0.0.1:4000", changeOrigin: true },
+        "/api": { target: "http://127.0.0.1:4000", changeOrigin: true },
+        "/ws": { target: "http://127.0.0.1:4000", ws: true },
+      },
+    },
+    // Local production-build preview. Production deploys serve dist/ through
+    // Nginx and proxy these same API, health, and WebSocket paths.
     preview: {
       port: 5173,
       strictPort: true,
       host: true,
-      allowedHosts: ['.ngrok-free.dev', '.ngrok-free.app'],
       proxy: {
-        "/health": { target: "http://localhost:4000", changeOrigin: true },
-        "/api": { target: "http://localhost:4000", changeOrigin: true },
-        "/ws": { target: "http://localhost:4000", ws: true },
+        "/health": { target: "http://127.0.0.1:4000", changeOrigin: true },
+        "/api": { target: "http://127.0.0.1:4000", changeOrigin: true },
+        "/ws": { target: "http://127.0.0.1:4000", ws: true },
       },
     },
   };

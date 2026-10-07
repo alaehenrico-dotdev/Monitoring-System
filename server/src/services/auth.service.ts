@@ -4,7 +4,7 @@ import { signToken } from "../utils/jwt";
 import { HttpError } from "../utils/HttpError";
 import { env } from "../config/env";
 
-export async function login(username: string, password: string, isDesktopClient = false) {
+export async function login(username: string, password: string) {
   const user = await userRepository.findByUsername(username);
   if (!user || !user.isActive) throw HttpError.unauthorized("Invalid username or password");
 
@@ -12,6 +12,6 @@ export async function login(username: string, password: string, isDesktopClient 
   if (!valid) throw HttpError.unauthorized("Invalid username or password");
 
   const authUser = { id: user.id, username: user.username, name: user.name, role: user.role };
-  const token = signToken(authUser, isDesktopClient ? env.desktopJwtExpiresIn : env.jwtExpiresIn);
+  const token = signToken(authUser, env.jwtExpiresIn);
   return { token, user: authUser };
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomInt, randomUUID } from "node:crypto";
+import { randomInt } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const baseUrl = process.env.E2E_API_URL ?? "http://127.0.0.1:4000";
@@ -133,33 +133,6 @@ async function main() {
   assert.equal(savedGridRow?.isSaved, true);
   assert.equal(Number(savedGridRow?.entry.remainingStock), Number(savedRow.openingStock) + 11);
   logPass("stock save and readback");
-
-  const syncDate = addDays(date, 1);
-  const syncStartingGridResponse = await request(`/online-stock?date=${syncDate}&shift=MORNING`, { token: onlineUser.token });
-  const syncStartingGrid = await expectJson(syncStartingGridResponse, 200, "offline sync starting balance");
-  const syncStartingRow = syncStartingGrid.find((item) => item.product.id === product.id);
-  const localId = randomUUID();
-  const push = await request("/sync/push", {
-    method: "POST",
-    token: onlineUser.token,
-    body: {
-      items: [{
-        tableName: "daily_online_stock",
-        localId,
-        productId: product.id,
-        entryDate: syncDate,
-        shift: "MORNING",
-        baselineUpdatedAt: null,
-        delta: { productionIn: 7 },
-      }],
-    },
-  });
-  const pushed = await expectJson(push, 200, "offline change push");
-  assert.equal(pushed.applied.length, 1);
-  const pullResponse = await request("/sync/pull", { token: onlineUser.token });
-  const pulled = await expectJson(pullResponse, 200, "offline change pull");
-  assert.ok(pulled.onlineStock.some((row) => row.productId === product.id && row.entryDate === syncDate && Number(row.remainingStock) === Number(syncStartingRow?.entry.openingStock) + 7));
-  logPass("offline sync push and pull");
 
   const backupResponse = await request("/backup/download", { token: admin.token });
   assert.equal(backupResponse.status, 200, "admin can download a database backup");

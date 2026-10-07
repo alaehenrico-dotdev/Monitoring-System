@@ -23,7 +23,6 @@ import { pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { formatDateDisplay, formatRelativeTime } from "../utils/dateFormat";
 import type { Product, Shift, StockLocation } from "../types";
 import { DatePicker } from "./DatePicker";
-import { confirmDownload } from "./DownloadConfirm";
 import { Dropdown } from "./Dropdown";
 import { ShiftFilter } from "./ShiftFilter";
 import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
@@ -505,7 +504,6 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
           ...columns.map((c) => String(r.entry[c.key] ?? 0)),
         ]);
         const excelName = `${filenamePrefix}-${date}.xls`;
-        if (!(await confirmDownload("Excel", excelName))) return;
         downloadExcel(excelName, toExcelTable(headers, dataRows));
         return;
       }
@@ -525,14 +523,12 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
         ...columns.map((c) => String(r.entry[c.key] ?? 0)),
       ]);
       const csvName = `${filenamePrefix}-${date}.csv`;
-      if (!(await confirmDownload("CSV", csvName))) return;
       downloadCsv(csvName, toCsv(headers, dataRows));
     }
 
     async function handlePdf() {
       if (onBeforePrint && !(await onBeforePrint())) return;
       const pdfName = pdfFileName(filenamePrefix, date);
-      if (!(await confirmDownload("PDF", pdfName))) return;
       try {
         // No real byte/row progress for a synchronous local PDF build (Section:
         // Loading system) - track() eases the bar toward 90% and holds it

@@ -112,3 +112,86 @@ describe("StockGrid render cost", () => {
     expect(second).toHaveBeenCalledWith(3, "stockOut", 7);
   });
 });
+
+describe("StockGrid display additions", () => {
+  const readOnlyColumns: GridColumn[] = [
+    { key: "openingStock", label: "Opening", editable: false },
+    { key: "remainingStock", label: "Remaining", editable: false },
+  ];
+
+  function renderGrid(rows: GridRow[], extra: Record<string, unknown> = {}) {
+    return render(
+      <StockGrid
+        rows={rows}
+        columns={readOnlyColumns}
+        onCommit={vi.fn()}
+        readOnly
+        {...extra}
+      />,
+    );
+  }
+
+  function row(id: number, category: string, entry: Record<string, unknown>): GridRow {
+    return {
+      product: { id, sku: `AFP00${id}`, name: `Product ${id}`, category } as Product,
+      entry,
+    };
+  }
+
+  it("draws a zero cell as a dash instead of 0", () => {
+    const { container } = renderGrid([
+      row(1, "Sauces", { openingStock: 0, remainingStock: 250 }),
+    ]);
+    const zeroCell = container.querySelector("td.ae-num-zero");
+    expect(zeroCell?.textContent).toBe("\u2013");
+  });
+
+  it("keeps real values formatted with thousands separators", () => {
+    const { container } = renderGrid([
+      row(1, "Sauces", { openingStock: 1234, remainingStock: 250 }),
+    ]);
+    expect(container.textContent).toContain((1234).toLocaleString());
+  });
+
+  it("renders a % of total column only when asked for", () => {
+    const rows = [
+      row(1, "Sauces", { openingStock: 0, remainingStock: 250 }),
+      row(2, "Sauces", { openingStock: 0, remainingStock: 750 }),
+    ];
+    const without = renderGrid(rows);
+    expect(without.container.querySelector(".ae-pct-col")).toBeNull();
+    without.unmount();
+
+    const { container } = renderGrid(rows, {
+      percentOfTotalKey: "remainingStock",
+    });
+    const pcts = [...container.querySelectorAll("td.ae-pct-col")].map(
+      (el) => el.textContent,
+    );
+    // 250 and 750 of a 1000 total, then the category subtotal (100%) and the
+    // grand total's own 100%.
+    expect(pcts).toContain("25.0%");
+    expect(pcts).toContain("75.0%");
+    expect(pcts.filter((p) => p === "100.0%").length).toBe(2);
+  });
+
+  it("offers a single expand/collapse control for every category", () => {
+    const { getByText } = renderGrid([
+      row(1, "Sauces", { openingStock: 1, remainingStock: 1 }),
+      row(2, "Vinegars", { openingStock: 1, remainingStock: 1 }),
+    ]);
+    // Categories default to collapsed, so the control offers to expand.
+    const toggle = getByText("Expand all");
+    fireEvent.click(toggle);
+    expect(getByText("Collapse all")).toBeTruthy();
+  });
+
+  it("keeps subtotal rows out of the collapsed-row class, so totals survive collapsing", () => {
+    const { container } = renderGrid([
+      row(1, "Sauces", { openingStock: 5, remainingStock: 5 }),
+    ]);
+    const subtotal = container.querySelector("tr.ae-row-subtotal");
+    expect(subtotal).toBeTruthy();
+    expect(subtotal?.classList.contains("ae-row-collapsed")).toBe(false);
+  });
+});

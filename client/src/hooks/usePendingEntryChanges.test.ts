@@ -94,3 +94,109 @@ describe("conflict detection on resync", () => {
     expect(detectConflicts(newer, { 1: { openingStock: 50 } }, { 1: { openingStock: 100 } })).toEqual([]);
   });
 });
+
+describe("usePendingEntryChanges - undo/redo over staged edits", () => {
+  it("undo restores the previous staged state, redo reapplies it", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() => result.current.stage(1, "openingStock", 50, 100));
+    expect(result.current.pending[1].openingStock).toBe(50);
+    expect(result.current.canUndo).toBe(true);
+
+    act(() => result.current.undo());
+    // Back to nothing staged - the edit is gone, not merely hidden.
+    expect(result.current.pending[1]).toBeUndefined();
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.canRedo).toBe(true);
+
+    act(() => result.current.redo());
+    expect(result.current.pending[1].openingStock).toBe(50);
+  });
+
+  it("undo steps back one edit at a time", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() => result.current.stage(1, "openingStock", 50, 100));
+    act(() => result.current.stage(1, "productionIn", 7, 0));
+    expect(result.current.pendingCellCount).toBe(2);
+
+    act(() => result.current.undo());
+    expect(result.current.pending[1].productionIn).toBeUndefined();
+    expect(result.current.pending[1].openingStock).toBe(50);
+  });
+
+  it("a new edit after an undo clears the redo branch", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() => result.current.stage(1, "openingStock", 50, 100));
+    act(() => result.current.undo());
+    expect(result.current.canRedo).toBe(true);
+
+    act(() => result.current.stage(1, "productionIn", 3, 0));
+    expect(result.current.canRedo).toBe(false);
+  });
+
+  it("saving drops the history, so undo cannot re-stage saved values", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() => result.current.stage(1, "openingStock", 50, 100));
+    // clear() is what a successful per-product save calls.
+    act(() => result.current.clear(1));
+
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.canRedo).toBe(false);
+  });
+});
+
+describe("usePendingEntryChanges - stageMany (Quick Fill)", () => {
+  it("stages a batch as a single undo step", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() =>
+      result.current.stageMany([
+        { productId: 1, key: "openingStock", value: 20, savedValue: 100 },
+        { productId: 1, key: "productionIn", value: 30, savedValue: 0 },
+      ]),
+    );
+    expect(result.current.pendingCellCount).toBe(2);
+
+    // One undo, not two - the whole fill is one action to the encoder.
+    act(() => result.current.undo());
+    expect(result.current.pendingCellCount).toBe(0);
+  });
+
+  it("drops filled cells that already match their saved value", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() =>
+      result.current.stageMany([
+        { productId: 1, key: "openingStock", value: 100, savedValue: 100 },
+        { productId: 1, key: "productionIn", value: 30, savedValue: 0 },
+      ]),
+    );
+    // Only the genuine change is staged; the no-op never reaches Save.
+    expect(result.current.pendingCellCount).toBe(1);
+    expect(result.current.pending[1].openingStock).toBeUndefined();
+    expect(result.current.pending[1].productionIn).toBe(30);
+  });
+
+  it("does nothing, and adds no undo step, for an empty batch", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() => result.current.stageMany([]));
+    expect(result.current.canUndo).toBe(false);
+    expect(result.current.pendingCellCount).toBe(0);
+  });
+});
+
+describe("usePendingEntryChanges - pendingCellCount", () => {
+  it("counts cells, while pendingCount counts products", () => {
+    const { result } = renderHook(() => usePendingEntryChanges(rows));
+
+    act(() => result.current.stage(1, "openingStock", 50, 100));
+    act(() => result.current.stage(1, "productionIn", 7, 0));
+
+    expect(result.current.pendingCount).toBe(1);
+    expect(result.current.pendingCellCount).toBe(2);
+  });
+});

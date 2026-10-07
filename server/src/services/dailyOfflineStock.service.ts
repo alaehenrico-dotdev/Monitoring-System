@@ -115,12 +115,8 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
 /// REPEATABLE READ (the negative-stock-guard race serializableTransaction's
 /// own doc comment, lib/prisma.ts, describes).
 ///
-/// `db` stays an accepted parameter (rather than being removed now that this
-/// opens its own transaction) so a caller that needs this save as part of a
-/// LARGER transaction - sync.service.ts's pushChanges, composing its own
-/// idempotency-marker write into the same transaction - can compose it in;
-/// passing one in skips opening a second, nested transaction (that caller is
-/// then responsible for its own transaction's isolation level).
+/// `db` stays an accepted parameter so related operations can compose this
+/// save into a caller-owned transaction without opening a nested transaction.
 export async function saveOfflineEntry(
   productId: number,
   entryDate: Date,

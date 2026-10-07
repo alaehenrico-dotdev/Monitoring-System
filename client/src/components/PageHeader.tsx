@@ -1,6 +1,7 @@
 import {
   useRef,
   useState,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
 import { HeaderExtras } from "./HeaderExtras";
@@ -8,7 +9,7 @@ import { HeaderTabs } from "./HeaderTabs";
 import { ChevronIcon } from "./icons";
 import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
-import { useServerReachable } from "../api/reachability";
+import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
 const LOGO_SIZE = 56;
 // Collapsed header: the logo shrinks to roughly the title's own height so
@@ -65,10 +66,26 @@ export function PageHeader({
 }: PageHeaderProps) {
   const [collapsed, setCollapsed] = useState(false);
   const { open, toggle } = useNavDrawer();
-  const reachable = useServerReachable();
+  const { online } = useOnlineStatus();
   const [logoSpin, setLogoSpin] = useState(0);
   const lastSpinAtRef = useRef(0);
   const logoRef = useRef<HTMLButtonElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // The collapse ribbon follows the pointer along the header's bottom edge
+  // instead of sitting at a fixed spot. Written straight to a CSS variable
+  // (not state) so moving the mouse never re-renders the header.
+  function trackRibbon(e: ReactMouseEvent<HTMLDivElement>) {
+    const el = headerRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const half = 22; // half the ribbon's width, keeps it inside the card
+    const x = Math.min(
+      Math.max(e.clientX - rect.left, half),
+      rect.width - half,
+    );
+    el.style.setProperty("--ae-ribbon-x", `${x}px`);
+  }
 
   function spinLogo() {
     const now = performance.now();
@@ -94,7 +111,9 @@ export function PageHeader({
           header is collapsed. */}
       <HeaderTabs />
       <div
-        className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}${reachable ? "" : " ae-page-header--offline"}`}
+        ref={headerRef}
+        onMouseMove={trackRibbon}
+        className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}${online ? "" : " ae-page-header--offline"}`}
       >
         <div className="ae-page-header-top">
           <button

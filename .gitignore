@@ -3,7 +3,6 @@ dist/
 build/
 .env
 .env.local
-.env.tauri
 *.log
 .DS_Store
 coverage/

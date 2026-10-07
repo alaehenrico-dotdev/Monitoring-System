@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { env } from "./config/env";
-import { TAURI_ORIGINS } from "./config/tauriOrigins";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { apiLimiter } from "./middleware/rateLimit";
 import { requestLogger } from "./middleware/requestLogger";
@@ -14,7 +13,7 @@ export function createApp() {
   const app = express();
 
   // Which peers may set `X-Forwarded-For`, as an address allowlist (default
-  // loopback - the ngrok agent / local reverse proxy per PRODUCTION.md).
+  // loopback for the local Nginx reverse proxy in PRODUCTION.md).
   // Behind that proxy `req.ip` is the real client, so the IP-keyed limiters
   // below bucket per visitor instead of lumping the whole tunnel together.
   //
@@ -36,12 +35,6 @@ export function createApp() {
   // never serves, but the rest of helmet's defaults (nosniff, no
   // `X-Powered-By`, HSTS, etc.) still harden every JSON response.
   app.use(helmet({ contentSecurityPolicy: false }));
-  // The Tauri desktop client always reports one of TAURI_ORIGINS regardless
-  // of which server it's pointed at, so they're allowed unconditionally
-  // rather than needing their own env var. Every other origin still has to
-  // match the single configured env.clientOrigin, same as before this
-  // existed.
-  const allowedOrigins = [env.clientOrigin, ...TAURI_ORIGINS];
   // `exposedHeaders` for Content-Disposition - without this, a cross-origin
   // fetch() (client and server are separate origins by default, see
   // env.clientOrigin) can read the response body but the Headers object
@@ -54,7 +47,8 @@ export function createApp() {
       // No Origin header at all (curl, server-to-server) has nothing for a
       // browser to enforce either way - only a browser-sent Origin that
       // isn't in the allowlist is actually rejected.
-      origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
+      origin: (origin, callback) =>
+        callback(null, !origin || origin === env.clientOrigin),
       credentials: true,
       exposedHeaders: ["Content-Disposition"],
     }),
