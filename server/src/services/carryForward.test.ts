@@ -35,6 +35,19 @@ function makeStatefulStockRepository() {
       const key = dateKey(entryDate);
       return rows.find((r) => r.productId === productId && r.entryDate === key) ?? null;
     }),
+    // Mirrors the real repository's findNext: the earliest saved row strictly
+    // after the given period. These doubles key by date alone (single shift),
+    // so "strictly after" is just the next-greatest date.
+    findNext: vi.fn(async (productId: number, entryDate: Date, _shift: string) => {
+      const key = dateKey(entryDate);
+      const next = rows
+        .filter((r) => r.productId === productId && r.entryDate > key)
+        .sort((a, b) => a.entryDate.localeCompare(b.entryDate))[0];
+      // The real repository hands back a row whose entryDate is a Date, and
+      // the caller feeds that straight back into getOpeningStock/findNext/
+      // upsert - so widen the internal string key back out to a Date here.
+      return next ? { ...next, entryDate: new Date(`${next.entryDate}T00:00:00.000Z`) } : null;
+    }),
     getOpeningStock: vi.fn(async (productId: number, entryDate: Date, _shift: string) => {
       const key = dateKey(entryDate);
       const prior = rows
@@ -75,6 +88,11 @@ vi.mock("../lib/prisma", () => ({
 vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(async (id: number) => ({ id, name: `Product #${id}` })) },
 }));
+// These fixtures exercise pure system carry-forward - no physical counts are
+// recorded, so propagateOpeningStock never finds one superseding a period.
+vi.mock("../repositories/manualCountRepository", () => ({
+  manualCountRepository: { findOne: vi.fn(async () => null), upsert: vi.fn() },
+}));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 
 import { saveOfflineEntry } from "./dailyOfflineStock.service";
@@ -112,21 +130,25 @@ describe("Offline - Remaining Stock carries forward as the next day's Opening St
     expect(Number(day3.remainingStock)).toBe(115); // 100 + 10 - 0 + 5
   });
 
-  it("editing an earlier day's figures after the fact does NOT retroactively ripple into a later day already saved", async () => {
-    // This pins down the actual (documented) carry-forward contract: opening
-    // stock is captured once, at save time, from whatever the prior day's
-    // remainingStock was then - not a live formula re-evaluated later. Later
-    // days aren't re-derived automatically if an earlier one is corrected.
+  it("editing an earlier day's figures after the fact DOES ripple into a later day already saved", async () => {
+    // Pins down the carry-forward contract as of v1.5.1, where saveOffline/
+    // OnlineEntry gained a propagateOpeningStock call: correcting an earlier
+    // period re-derives the already-saved periods after it, so a late
+    // correction doesn't leave the chain permanently out of step. (Until
+    // v1.5.1 opening stock was captured once at save time and never
+    // re-derived; this test asserted that older contract.)
     await saveOfflineEntry(PRODUCT_ID, DAY1, SHIFT, { productionIn: 100, deliveryOut: 20 });
     const day2 = await saveOfflineEntry(PRODUCT_ID, DAY2, SHIFT, { productionIn: 0, deliveryOut: 0 });
     expect(Number(day2.openingStock)).toBe(80);
 
-    // Correcting day 1 afterward...
+    // Correcting day 1 afterward (remaining 100 - 20 -> 200 - 20 = 180)...
     await saveOfflineEntry(PRODUCT_ID, DAY1, SHIFT, { productionIn: 200, deliveryOut: 20 });
 
-    // ...leaves day 2's already-saved openingStock exactly as it was.
+    // ...re-derives day 2's opening stock from the corrected balance, and
+    // its own remaining stock follows (180 + 0 - 0).
     const day2Again = await offlineRepo.findByProductAndDate(PRODUCT_ID, DAY2, SHIFT);
-    expect(Number(day2Again?.openingStock)).toBe(80);
+    expect(Number(day2Again?.openingStock)).toBe(180);
+    expect(Number(day2Again?.remainingStock)).toBe(180);
   });
 });
 

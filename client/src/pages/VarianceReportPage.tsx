@@ -77,6 +77,9 @@ export function VarianceReportPage() {
   );
   const [category, setCategory] = useState(searchParams.get("category") ?? "");
   const [rows, setRows] = useState<VarianceRow[] | null>(null);
+  const [countDismissedFor, setCountDismissedFor] = useState<
+    VarianceRow[] | null
+  >(null);
   const requestId = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
@@ -293,12 +296,19 @@ export function VarianceReportPage() {
         variant="error"
         duration={null}
       />
+      <Toast
+        id="variance-count"
+        message={
+          rows && countDismissedFor !== rows
+            ? `${rows.length} flagged variance(s) found.`
+            : null
+        }
+        onDismiss={() => setCountDismissedFor(rows)}
+        duration={5000}
+      />
 
       {rows && (
         <>
-          <p style={{ fontSize: 13, color: colors.subtleInk }}>
-            {rows.length} flagged variance(s) found.
-          </p>
           <RowGlowScroll>
             <table className="ae-table" style={{ minWidth: 640 }}>
               <thead>
@@ -365,12 +375,6 @@ export function VarianceReportPage() {
             </table>
           </RowGlowScroll>
         </>
-      )}
-
-      {!rows && !error && (
-        <p style={{ fontSize: 13, color: colors.subtleInk }}>
-          Pick a date and click Run report to build the daily report.
-        </p>
       )}
 
       {unsavedWork && (

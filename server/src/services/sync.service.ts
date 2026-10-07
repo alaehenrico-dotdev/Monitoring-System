@@ -131,6 +131,7 @@ export async function pullChanges(since: Date | null): Promise<PullResult> {
   // before `serverTime` was recorded.
   const serverTime = new Date();
   const where = since ? { updatedAt: { gt: since } } : {};
+  const started = process.hrtime.bigint();
 
   const [products, onlineRows, offlineRows, manualCountRows] = await Promise.all([
     prisma.product.findMany({ where }),
@@ -138,6 +139,32 @@ export async function pullChanges(since: Date | null): Promise<PullResult> {
     prisma.dailyOfflineStock.findMany({ where }),
     prisma.manualCount.findMany({ where }),
   ]);
+
+  // TODO: paginate this. Every matching row goes out in ONE response and
+  // engine.ts applies them one at a time, so a first sync (since = null,
+  // i.e. a newly installed desktop app) pulls the entire history of all
+  // four tables at once - which grows without bound as the app is used,
+  // while coreRequest gives it 4s (REQUEST_TIMEOUT_MS, client api/http.ts)
+  // to arrive. Proposed shape: a cursor over (updatedAt, id) with a fixed
+  // page size, the client applying each page in a local transaction and
+  // only advancing its stored lastSyncedAt once a page has committed, so an
+  // interrupted first sync resumes from the last committed page instead of
+  // starting over. Deliberately not done in this pass; this log is here to
+  // size the problem from real usage first.
+  const rows = products.length + onlineRows.length + offlineRows.length + manualCountRows.length;
+  // eslint-disable-next-line no-console -- structured measurement line, same shape as middleware/requestLogger.ts
+  console.log(
+    JSON.stringify({
+      event: "sync.pull",
+      full: since === null,
+      rows,
+      products: products.length,
+      onlineStock: onlineRows.length,
+      offlineStock: offlineRows.length,
+      manualCounts: manualCountRows.length,
+      durationMs: Math.round(Number(process.hrtime.bigint() - started) / 1e4) / 100,
+    }),
+  );
 
   return {
     serverTime: serverTime.toISOString(),

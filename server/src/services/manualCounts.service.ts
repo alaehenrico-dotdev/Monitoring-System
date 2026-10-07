@@ -159,7 +159,7 @@ export async function propagateOpeningStock(productId: number, entryDate: Date, 
   if (location === "TOTAL") return;
   let cursor = { entryDate, shift };
   for (;;) {
-    let nextPeriod: { entryDate: Date; shift: Shift } | null = null;
+    let nextPeriod: { entryDate: Date; shift: Shift };
 
     if (location === "ONLINE") {
       const next = await dailyOnlineStockRepository.findNext(productId, cursor.entryDate, cursor.shift, db);

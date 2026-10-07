@@ -56,6 +56,16 @@ values, see `server/src/config/env.ts`), plus:
 - `NODE_ENV="production"`
 - `CLIENT_ORIGIN` set to your reserved ngrok domain (step 4) instead of the `localhost:5173`
   default, so CORS is scoped to the real production URL.
+- `TRUST_PROXY` — leave unset unless a proxy fronts the API from somewhere other than this
+  machine. The default, `loopback`, is what the ngrok setup needs: the ngrok agent runs here and
+  reaches the API over `127.0.0.1`, so its `X-Forwarded-For` is trusted and each visitor is rate
+  limited as themselves. The API's port also accepts direct connections, and those are *not*
+  trusted — a forged `X-Forwarded-For` from one is ignored, so it cannot pick a new `req.ip` per
+  request and walk around the login, passcode and global limiters. Set it to the proxy's IP/CIDR
+  (comma-separated for several) if the proxy is on another host. A hop count such as `1` is
+  rejected on purpose; that was the forgeable-header hole. See `server/.env.example`.
+- Optionally `RATE_LIMIT_*` to tune the limiters without a code change — see
+  `server/.env.example` for the names and shipped defaults.
 
 `client/.env` should keep `VITE_API_URL=/api` (relative), same as the ngrok dev setup in
 `NGROK_SETUP.md` — this is what lets the client, API, and realtime WebSocket all ride through one

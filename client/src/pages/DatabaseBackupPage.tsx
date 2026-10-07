@@ -37,12 +37,14 @@ function formatBytes(bytes: number): string {
 /// the ordinary SUPERVISOR_ADMIN route guard rather than a second passcode.
 export function DatabaseBackupPage() {
   const [status, setStatus] = useState<Status>("idle");
+  const [doneDismissed, setDoneDismissed] = useState(false);
   const [bytes, setBytes] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   async function handleDownload() {
     if (!(await confirmDownload("Database backup"))) return;
     setStatus("downloading");
+    setDoneDismissed(false);
     setBytes(0);
     setError(null);
     try {
@@ -134,18 +136,15 @@ export function DatabaseBackupPage() {
               {formatBytes(bytes)} received
             </span>
           )}
-          {status === "done" && (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 12.5,
-                color: colors.gold,
-                fontWeight: 600,
-              }}
-            >
-              Backup downloaded ({formatBytes(bytes)}).
-            </p>
-          )}
+          <Toast
+            id="backup-done"
+            message={
+              status === "done" && !doneDismissed
+                ? `Backup downloaded (${formatBytes(bytes)}).`
+                : null
+            }
+            onDismiss={() => setDoneDismissed(true)}
+          />
           <Toast
             message={status === "error" ? error : null}
             onDismiss={() => setError(null)}

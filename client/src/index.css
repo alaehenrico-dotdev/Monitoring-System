@@ -381,6 +381,13 @@ table input[type="number"] {
     inset 0 1px 0 #d4a000,
     inset 0 -1px 0 #d4a000;
 }
+/* Hover must not replace the yellow: the generic row-hover rule above would
+   otherwise win on specificity and tint the whole total row. */
+.ae-table tbody tr.ae-row-grand:hover td {
+  background-color: #f5c000;
+  background-image: none !important;
+  color: #0c0c0c;
+}
 .ae-table tr.ae-row-grand td:first-child {
   font-size: 12px;
   letter-spacing: 0.05em;

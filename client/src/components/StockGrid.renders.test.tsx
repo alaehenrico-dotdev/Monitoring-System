@@ -55,6 +55,7 @@ describe("StockGrid render cost", () => {
     const afterOneKeystroke = counter.renders;
 
     // Report the number so before/after is visible in the test log.
+    // eslint-disable-next-line no-console -- deliberate benchmark output, see comment above
     console.log(`cell renders for one keystroke: ${afterOneKeystroke} (grid has ${cells.length} editable cells)`);
 
     expect(cells[0].value).toBe("12");

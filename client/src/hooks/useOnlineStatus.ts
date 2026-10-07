@@ -1,53 +1,28 @@
-import { useEffect, useRef, useState } from "react";
-import { API_URL } from "../api/http";
-import { setKnownReachable } from "../api/reachability";
-
-const HEALTH_CHECK_INTERVAL_MS = 5_000;
-const HEALTH_CHECK_TIMEOUT_MS = 2_000;
-
-async function checkServerReachable(): Promise<boolean> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
-  try {
-    const url = new URL("/health", new URL(API_URL, window.location.href));
-    const response = await fetch(url, { signal: controller.signal, cache: "no-store" });
-    return response.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
+import { useState, useSyncExternalStore } from "react";
+import { getServerHealthSnapshot, subscribeServerHealth } from "../api/serverHealth";
 
 /// Tracks reachability of the configured API, not just whether the device
 /// has a network interface. Pages use reconnects to reload their current
 /// data from the server after an offline period.
+///
+/// Reads the shared poller in api/serverHealth.ts rather than polling on its
+/// own - this hook is mounted several times per page, and each instance used
+/// to run its own 5s /health interval (each of which runs a `SELECT 1`).
+/// Same shape as before, so callers are unchanged.
 export function useOnlineStatus() {
-  const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
-  const [reconnects, setReconnects] = useState(0);
-  const wasOnline = useRef(online);
+  const { reachable, reconnects } = useSyncExternalStore(
+    subscribeServerHealth,
+    getServerHealthSnapshot,
+    getServerHealthSnapshot,
+  );
+  // Counted from this instance's own mount, so `reconnects` starts at 0 here
+  // whatever the shared poller has already seen - same as when every hook
+  // kept its own counter.
+  const [reconnectBaseline] = useState(() => reconnects);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function check() {
-      const reachable = navigator.onLine && await checkServerReachable();
-      if (cancelled) return;
-      setOnline(reachable);
-      setKnownReachable(reachable);
-      if (reachable && !wasOnline.current) setReconnects((n) => n + 1);
-      wasOnline.current = reachable;
-    }
-    void check();
-    const interval = window.setInterval(() => void check(), HEALTH_CHECK_INTERVAL_MS);
-    window.addEventListener("online", check);
-    window.addEventListener("offline", check);
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-      window.removeEventListener("online", check);
-      window.removeEventListener("offline", check);
-    };
-  }, []);
+  // Optimistic until the first check answers: fall back to the browser's own
+  // flag rather than claiming the server is down before anything has asked.
+  const online = reachable ?? (typeof navigator === "undefined" ? true : navigator.onLine);
 
-  return { online, reconnects };
+  return { online, reconnects: reconnects - reconnectBaseline };
 }

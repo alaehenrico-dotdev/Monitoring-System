@@ -13,20 +13,21 @@ import { asyncHandler } from "./utils/asyncHandler";
 export function createApp() {
   const app = express();
 
-  // Trust exactly one reverse-proxy hop (ngrok, per PRODUCTION.md) so
-  // `req.ip`/`X-Forwarded-For` resolve to the real client, not ngrok's own
-  // local agent. Without this, Express's default (trust nothing) means
-  // every request behind the tunnel looks like it came from the same
-  // machine - the rate limiters below (keyed by IP) would then count every
-  // real visitor's traffic as one shared bucket, and the login brute-force
-  // guard (authLimiter) would do nothing for an attacker's real IP. `1`
-  // (not `true`) deliberately trusts only the immediate hop - trusting the
-  // whole chain would let a client forge its own `X-Forwarded-For` to fake
-  // a different "IP" on every request and dodge the limiters entirely. No
-  // proxy sits in front locally/in tests, so this is a no-op there (the
-  // header is simply absent and `req.ip` falls back to the direct
-  // connection, same as before).
-  app.set("trust proxy", 1);
+  // Which peers may set `X-Forwarded-For`, as an address allowlist (default
+  // loopback - the ngrok agent / local reverse proxy per PRODUCTION.md).
+  // Behind that proxy `req.ip` is the real client, so the IP-keyed limiters
+  // below bucket per visitor instead of lumping the whole tunnel together.
+  //
+  // This used to be a hop count of `1`, which trusts whoever the nearest
+  // sender happens to be. server.ts also accepts direct connections, so a
+  // client reaching the port straight could forge `X-Forwarded-For`, pick a
+  // new `req.ip` per request and walk around every limiter in
+  // middleware/rateLimit.ts - the login and passcode brute-force guards
+  // included. Keyed by address instead, a forged header from an untrusted
+  // peer is ignored and `req.ip` stays the real socket address.
+  //
+  // See config/env.ts's trustProxySetting() for the accepted values.
+  app.set("trust proxy", env.trustProxy);
 
   // This server only ever returns JSON (see routes below) and never renders
   // HTML itself (the React client is a separate origin/deploy - see
@@ -58,6 +59,10 @@ export function createApp() {
       exposedHeaders: ["Content-Disposition"],
     }),
   );
+  // Mounted before express.json() below: a client over its limit is turned
+  // away before the server spends anything reading and parsing up to 1 MB of
+  // body per request, which is the cheap part of the flood to skip.
+  app.use("/api", apiLimiter);
   // API JSON payloads are small; keep an explicit cap so an accidental or
   // hostile oversized body cannot consume unbounded memory. Restore uploads
   // use their own streaming limit in backup.service.ts.
@@ -77,7 +82,7 @@ export function createApp() {
     }
   }));
 
-  app.use("/api", apiLimiter, routes);
+  app.use("/api", routes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

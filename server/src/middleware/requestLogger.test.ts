@@ -21,7 +21,7 @@ afterEach(() => {
 
 describe("requestLogger", () => {
   it("calls next immediately without logging", () => {
-    const req = { method: "GET", originalUrl: "/api/products" } as Request;
+    const req = { method: "GET", originalUrl: "/api/products", path: "/api/products" } as Request;
     const res = makeRes(200);
     const next = vi.fn();
 
@@ -32,7 +32,7 @@ describe("requestLogger", () => {
   });
 
   it("logs a structured JSON line with method/path/status/duration/userId once the response finishes", () => {
-    const req = { method: "POST", originalUrl: "/api/receipts", user: { id: 7 } } as Request;
+    const req = { method: "POST", originalUrl: "/api/receipts", path: "/api/receipts", user: { id: 7 } } as Request;
     const res = makeRes(201);
 
     requestLogger(req, res, vi.fn() as NextFunction);
@@ -45,7 +45,7 @@ describe("requestLogger", () => {
   });
 
   it("logs userId: null for an unauthenticated request", () => {
-    const req = { method: "GET", originalUrl: "/health" } as Request;
+    const req = { method: "GET", originalUrl: "/health", path: "/health" } as Request;
     const res = makeRes(200);
 
     requestLogger(req, res, vi.fn() as NextFunction);

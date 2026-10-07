@@ -38,7 +38,12 @@ const COPY: Record<DownloadKind, { title: string; action: string }> = {
 export function DownloadConfirmHost() {
   const [queue, setQueue] = useState<DownloadRequest[]>([]);
   const queueRef = useRef<DownloadRequest[]>([]);
-  queueRef.current = queue;
+  // Synced in an effect rather than during render (refs must not be written
+  // while rendering). Only ever read from the unmount cleanup below, which
+  // runs after this has committed, so it still sees the latest queue.
+  useEffect(() => {
+    queueRef.current = queue;
+  });
 
   useEffect(() => {
     openRequest = (req) => setQueue((q) => [...q, req]);
