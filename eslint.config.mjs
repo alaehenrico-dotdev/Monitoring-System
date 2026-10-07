@@ -44,7 +44,7 @@ export default tseslint.config(
       // `_req`/`_next` - Express's error-handler middleware is recognized
       // by its 4-argument arity, so `_next` has to stay even though it's
       // never read).
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" }],
       "@typescript-eslint/no-explicit-any": "warn",
       // `warn`/`error` still allowed unprefixed - those are legitimate
       // logging, not leftover debugging output. A bare console.log is what
@@ -84,6 +84,14 @@ export default tseslint.config(
       // than silenced outright.
       "react-hooks/set-state-in-effect": "warn",
     },
+  },
+  {
+    // The service worker runs in a ServiceWorkerGlobalScope, not a window or
+    // Node - so `self`, `caches`, `fetch`, `Response` and `URL` are all
+    // legitimately global here. Scoped to this one file rather than
+    // loosening no-undef anywhere else.
+    files: ["client/public/sw.js"],
+    languageOptions: { globals: globals.serviceworker },
   },
   {
     files: ["**/*.config.{js,mjs,cjs,ts}"],

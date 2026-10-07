@@ -115,7 +115,6 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
     let received = 0;
     let prefix = Buffer.alloc(0);
     let validated = false;
-    let timeout: NodeJS.Timeout;
     const fail = (err: unknown) => {
       if (settled) return;
       settled = true;
@@ -123,7 +122,7 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
       mysql.kill();
       reject(err);
     };
-    timeout = setTimeout(() => fail(new HttpError(408, "Restore timed out and was stopped.")), RESTORE_TIMEOUT_MS);
+    const timeout = setTimeout(() => fail(new HttpError(408, "Restore timed out and was stopped.")), RESTORE_TIMEOUT_MS);
 
     mysql.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     mysql.on("error", (err) => {

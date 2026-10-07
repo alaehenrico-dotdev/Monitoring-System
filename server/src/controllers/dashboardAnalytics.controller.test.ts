@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Request, Response } from "express";
 
 vi.mock("../services/dashboardAnalytics.service", () => ({

@@ -13,6 +13,7 @@ vi.mock("../lib/prisma", () => ({
 vi.mock("../repositories/dailyOfflineStockRepository", () => ({
   dailyOfflineStockRepository: {
     findByProductAndDate: vi.fn(),
+    findNext: vi.fn(),
     getOpeningStock: vi.fn(),
     upsert: vi.fn(),
   },
@@ -20,6 +21,7 @@ vi.mock("../repositories/dailyOfflineStockRepository", () => ({
 vi.mock("../repositories/dailyOnlineStockRepository", () => ({
   dailyOnlineStockRepository: {
     findByProductAndDate: vi.fn(),
+    findNext: vi.fn(),
     getOpeningStock: vi.fn(),
     upsert: vi.fn(),
   },
@@ -36,7 +38,6 @@ vi.mock("./changeLog.service", () => ({
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { productRepository } from "../repositories/productRepository";
-import { recordChange } from "./changeLog.service";
 import { saveOfflineEntry } from "./dailyOfflineStock.service";
 
 const PRODUCT_ID = 1;
@@ -48,6 +49,10 @@ beforeEach(() => {
   vi.mocked(productRepository.findActiveById).mockResolvedValue({ id: PRODUCT_ID, name: "Sweet A" } as never);
   vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue(null);
   vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue(null);
+  // No later saved period in these single-period fixtures, so propagateOpeningStock
+  // stops immediately instead of walking forward.
+  vi.mocked(dailyOfflineStockRepository.findNext).mockResolvedValue(null);
+  vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValue(null);
   // `as never` on the whole mock fn, not just its return value - Prisma's
   // real .upsert() returns its own chainable `Prisma__...Client` type
   // (extra methods like `.product()`/`.encodedBy()` for `include`), which a

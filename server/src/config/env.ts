@@ -49,6 +49,66 @@ function duration(name: string, fallback: string, maxSeconds: number): string {
   return value;
 }
 
+/// Express's `trust proxy`, as an address allowlist rather than a hop count.
+///
+/// server.ts listens directly, so the API is reachable both through the
+/// reverse proxy (ngrok, per PRODUCTION.md) and straight on its port. A hop
+/// *count* like `1` trusts whatever the nearest sender claims, so a client
+/// connecting directly could forge `X-Forwarded-For`, change `req.ip` at
+/// will, and rotate its way around every IP-keyed limiter in
+/// middleware/rateLimit.ts - including the login and passcode brute-force
+/// guards. Trusting addresses instead means a forged header coming from an
+/// untrusted peer is ignored and `req.ip` stays the real socket address.
+///
+/// Default "loopback": the ngrok agent / local reverse proxy runs on this
+/// same host, so it connects from 127.0.0.1 or ::1. Set TRUST_PROXY only if
+/// a proxy fronts this API from a different address.
+///
+/// Accepted values:
+///   loopback | linklocal | uniquelocal   Express's named presets
+///   10.0.0.5, 192.168.0.0/16            one or more IPs/CIDRs (comma-separated)
+///   false | none | off                  trust nothing (direct exposure)
+///   true                                trust every hop - UNSAFE unless the
+///                                       API is genuinely unreachable except
+///                                       through a trusted proxy
+function trustProxySetting(): boolean | string[] {
+  const raw = process.env.TRUST_PROXY?.trim();
+  if (!raw) return ["loopback"];
+  const lowered = raw.toLowerCase();
+  if (lowered === "false" || lowered === "none" || lowered === "off") return false;
+  if (lowered === "true") return true;
+  // A bare number is Express's hop-count form - the exact setting this
+  // allowlist exists to replace, so it's rejected rather than silently
+  // reintroducing the forgeable-header hole.
+  if (/^\d+$/.test(raw)) {
+    throw new Error(
+      `TRUST_PROXY must name the proxy's address, not a hop count ("${raw}"). Use "loopback" for a local reverse proxy/ngrok agent, or the proxy's IP/CIDR.`,
+    );
+  }
+  const values = raw.split(",").map((v) => v.trim()).filter(Boolean);
+  if (values.length === 0) throw new Error("TRUST_PROXY must be loopback, an IP/CIDR list, true or false.");
+  return values;
+}
+
+/// Rate-limit thresholds (middleware/rateLimit.ts), overridable without a
+/// code change so a deployment can be tuned from real traffic. The defaults
+/// are the values this shipped with.
+function limitCount(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1) throw new Error(`${name} must be a positive integer.`);
+  return value;
+}
+
+function limitWindowMs(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1000) throw new Error(`${name} must be a whole number of milliseconds, at least 1000.`);
+  return value;
+}
+
 function positivePort(): number {
   const port = Number(process.env.PORT ?? 4000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be an integer from 1 to 65535.");
@@ -58,6 +118,15 @@ function positivePort(): number {
 export const env = {
   port: positivePort(),
   nodeEnv: process.env.NODE_ENV ?? "development",
+  trustProxy: trustProxySetting(),
+  rateLimit: {
+    globalLimit: limitCount("RATE_LIMIT_GLOBAL_MAX", 600),
+    globalWindowMs: limitWindowMs("RATE_LIMIT_GLOBAL_WINDOW_MS", 5 * 60 * 1000),
+    loginLimit: limitCount("RATE_LIMIT_LOGIN_MAX", 10),
+    loginWindowMs: limitWindowMs("RATE_LIMIT_LOGIN_WINDOW_MS", 15 * 60 * 1000),
+    passcodeLimit: limitCount("RATE_LIMIT_PASSCODE_MAX", 10),
+    passcodeWindowMs: limitWindowMs("RATE_LIMIT_PASSCODE_WINDOW_MS", 15 * 60 * 1000),
+  },
   databaseUrl: required("DATABASE_URL"),
   // No fallback for either of these two: a default here would mean
   // `required()` never actually throws, so every token this app has ever

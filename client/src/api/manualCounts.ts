@@ -127,6 +127,7 @@ export async function saveManualCount(
     if (manualCount === null) {
       throw new Error(
         "Can't undo this product's manual count while offline - the server is unreachable and clearing a count can't be queued yet. Reconnect and try Undo again.",
+        { cause: err },
       );
     }
 

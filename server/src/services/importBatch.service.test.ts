@@ -19,7 +19,7 @@ vi.mock("../lib/prisma", () => ({
 
 import { importBatchRepository } from "../repositories/importBatchRepository";
 import { changeLogRepository } from "../repositories/changeLogRepository";
-import { deleteManualCount, saveManualCount } from "./manualCounts.service";
+import { deleteManualCount } from "./manualCounts.service";
 import { revertImportBatch } from "./importBatch.service";
 
 const BATCH_ID = 1;

@@ -32,6 +32,7 @@ function formatBytes(bytes: number): string {
 export function DatabaseRestoreCard() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");
+  const [doneDismissed, setDoneDismissed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploaded, setUploaded] = useState(0);
   const [passcode, setPasscode] = useState("");
@@ -64,6 +65,7 @@ export function DatabaseRestoreCard() {
   async function performRestore() {
     if (!file || !resetToken) return;
     setError(null);
+    setDoneDismissed(false);
     setUploaded(0);
     setStatus("backing-up");
     try {
@@ -225,43 +227,25 @@ export function DatabaseRestoreCard() {
         </div>
       )}
 
-      {status === "done" && (
-        <p
-          style={{
-            margin: "16px 0 0",
-            fontSize: 12.5,
-            color: colors.gold,
-            fontWeight: 600,
-          }}
-        >
-          Database restored. Reload to see the restored data (you may need to
-          sign in again if accounts changed).{" "}
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            style={{
-              background: "none",
-              border: 0,
-              padding: 0,
-              color: "inherit",
-              font: "inherit",
-              textDecoration: "underline",
-              cursor: "pointer",
-            }}
-          >
-            Reload now
-          </button>
-        </p>
-      )}
-      {/* offset stacks this above DatabaseBackupPage's own error Toast
-          (this card is embedded on that same page), rather than both
-          portaling to the same bottom-right spot. */}
+      <Toast
+        id="restore-done"
+        message={
+          status === "done" && !doneDismissed
+            ? "Database restored. Reload to see the restored data (you may need to sign in again if accounts changed)."
+            : null
+        }
+        duration={null}
+        action={{
+          label: "Reload now",
+          onClick: () => window.location.reload(),
+        }}
+        onDismiss={() => setDoneDismissed(true)}
+      />
       <Toast
         message={status === "error" ? error : null}
         onDismiss={() => setError(null)}
         variant="error"
         duration={null}
-        offset={96}
       />
 
       {(status === "confirming" || busy) && (

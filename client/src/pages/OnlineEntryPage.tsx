@@ -340,9 +340,7 @@ export function OnlineEntryPage() {
     // saveOnlineEntry - so it's allowed to proceed past this point even
     // when !online.
     if (!online && !isTauri) {
-      setError(
-        "Offline. Changes stay here; save again when reconnected.",
-      );
+      setError("Offline. Changes stay here; save again when reconnected.");
       return false;
     }
     if (conflicts.length > 0) {
@@ -788,21 +786,11 @@ export function OnlineEntryPage() {
         variant="warning"
         duration={10000}
       />
-      {otherShiftCount !== null && otherShiftCount > 0 && (
-        <p
-          style={{ fontSize: 12, color: colors.warningText, margin: "0 0 8px" }}
-        >
-          ⚠ {otherShiftWarning}
-        </p>
-      )}
-      {/* offset stacks this above the shift-warning Toast right below it,
-          rather than both portaling to the same bottom-right spot. */}
       <Toast
         message={error}
         onDismiss={() => setError(null)}
         variant="error"
         duration={null}
-        offset={96}
       />
       <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
       {!rows ? (

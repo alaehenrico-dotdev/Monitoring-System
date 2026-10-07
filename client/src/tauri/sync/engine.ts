@@ -74,6 +74,26 @@ export async function runPull(): Promise<void> {
   await setLastSyncedAt(result.serverTime);
 }
 
+/// How many pending edits go in one /sync/push request.
+///
+/// sync.controller.ts caps a push body at 500 items and rejects the *whole*
+/// body above that, so a device that had built up more than 500 pending
+/// edits could never sync at all: every attempt failed validation and the
+/// queue only ever grew. Batching keeps a large backlog draining steadily.
+///
+/// The size is set by the client timeout, not that cap. coreRequest aborts
+/// at REQUEST_TIMEOUT_MS (4s, api/http.ts), and pushChanges applies each
+/// item in its own SERIALIZABLE transaction that also walks
+/// propagateOpeningStock forward - so cost is per item, not per request.
+/// Measured against a seeded database (71 products, edits spread over 30
+/// days): ~1.3s for 100, ~1.7s for 150, ~2.7s for 200, ~9.7s for 500. The
+/// 500 the server would still accept is more than twice the client's own
+/// timeout, and 200 clears it with only ~1.5x margin on a dev box with far
+/// less data than production. 100 keeps ~3x headroom, which is the point:
+/// a push that times out mid-batch is the expensive failure (the work is
+/// already committed server-side and only replays as a no-op next sync).
+export const SYNC_PUSH_BATCH_SIZE = 100;
+
 interface PendingContext {
   tableName: SyncTableName;
   productId: number;
@@ -154,8 +174,31 @@ export async function runPush(): Promise<{ applied: number; conflicts: number }>
 
   if (items.length === 0) return { applied: 0, conflicts: 0 };
 
-  const result = await coreRequest<PushResponse>("/sync/push", { method: "POST", body: JSON.stringify({ items }) });
+  // Drain the queue a batch at a time rather than in one request. A batch's
+  // pending rows are only cleared once the server has confirmed that batch,
+  // so if one fails part way through, that batch and everything after it are
+  // still pending and the next sync picks them up, while the batches already
+  // confirmed are not resent. Conflicts are recorded per batch too, so a
+  // conflict in one does not hold up the rest.
+  let applied = 0;
+  let conflicts = 0;
 
+  for (let start = 0; start < items.length; start += SYNC_PUSH_BATCH_SIZE) {
+    const batch = items.slice(start, start + SYNC_PUSH_BATCH_SIZE);
+    const result = await coreRequest<PushResponse>("/sync/push", { method: "POST", body: JSON.stringify({ items: batch }) });
+    await applyPushResult(result, context);
+    applied += result.applied.length;
+    conflicts += result.conflicts.length;
+  }
+
+  return { applied, conflicts };
+}
+
+/// Commits one batch's server response locally: cached rows are overwritten
+/// with what the server stored, conflicts are filed for the review screen,
+/// and either way the pending row is cleared - a conflict is a final answer,
+/// so retrying it forever would not change the outcome.
+async function applyPushResult(result: PushResponse, context: Map<string, PendingContext>): Promise<void> {
   for (const a of result.applied) {
     const ctx = context.get(a.localId);
     if (!ctx) continue;
@@ -189,8 +232,6 @@ export async function runPush(): Promise<{ applied: number; conflicts: number }>
     else if (ctx.tableName === "daily_offline_stock") await clearPendingOffline(c.localId);
     else await clearPendingManualCount(c.localId);
   }
-
-  return { applied: result.applied.length, conflicts: result.conflicts.length };
 }
 
 /// Push first, then pull - gets this client's own changes committed as

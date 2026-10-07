@@ -18,7 +18,12 @@ export function useSyncEngine() {
   const syncing = useRef(false);
   const syncAgain = useRef(false);
   const isReachableRef = useRef(isReachable);
-  isReachableRef.current = isReachable;
+  // Synced in an effect rather than during render (refs must not be written
+  // while rendering). Only ever read from the idle interval below, which
+  // fires after this has committed, so it still sees the latest value.
+  useEffect(() => {
+    isReachableRef.current = isReachable;
+  });
 
   async function refreshCounts() {
     setPendingCount(await countPendingSyncChanges());

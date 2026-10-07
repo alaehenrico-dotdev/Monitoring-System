@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { Button } from "../components/ui";
 import { Dropdown } from "../components/Dropdown";

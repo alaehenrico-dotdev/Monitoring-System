@@ -50,8 +50,11 @@ export async function checkForUpdates(): Promise<void> {
     // "Install" was first clicked.
     const { hasAnyUnsavedWork } = await import("../utils/unsavedWork");
     if (hasAnyUnsavedWork()) {
-      window.alert(
+      const { showToast } = await import("../components/Toast");
+      showToast(
         "Update downloaded, but you have unsaved changes on an entry page. Save your work, then close and reopen the app to finish installing it.",
+        "warning",
+        null,
       );
       return;
     }

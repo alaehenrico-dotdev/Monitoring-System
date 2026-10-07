@@ -1,9 +1,10 @@
-import { lazy, Suspense, useEffect, useRef } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
 import { CursorAura } from "./CursorAura";
 import { DownloadConfirmHost } from "./DownloadConfirm";
+import { Toast, ToastHost } from "./Toast";
 import { NavDrawerProvider } from "../context/NavDrawerContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { colors, fonts } from "../theme";
@@ -22,6 +23,11 @@ const isTauri = import.meta.env.MODE === "tauri";
 export function Layout() {
   const mainRef = useRef<HTMLElement>(null);
   const { online } = useOnlineStatus();
+  const [offlineDismissed, setOfflineDismissed] = useState(false);
+  // Show the offline notice again the next time the connection drops.
+  useEffect(() => {
+    if (online) setOfflineDismissed(false);
+  }, [online]);
 
   // Desktop updates installed before anyone was signed in (or while offline)
   // are queued - send them now that there's a session. See pendingSystemLog.ts.
@@ -66,29 +72,18 @@ export function Layout() {
         >
           <Outlet />
         </main>
-        {!online && !isTauri && (
-          <div
-            role="status"
-            style={{
-              position: "fixed",
-              bottom: 16,
-              left: "50%",
-              transform: "translateX(-50%)",
-              zIndex: 150,
-              padding: "8px 16px",
-              borderRadius: 6,
-              fontSize: 12.5,
-              fontWeight: 600,
-              background: colors.charcoalRaised,
-              color: colors.cream,
-              border: `1px solid ${colors.gold}`,
-              boxShadow: "0 6px 20px rgba(12, 12, 12, 0.35)",
-            }}
-          >
-            Server offline. Showing saved data; local edits sync when
-            reconnected.
-          </div>
-        )}
+        <Toast
+          id="server-offline"
+          message={
+            !online && !isTauri && !offlineDismissed
+              ? "Server offline. Showing saved data; local edits sync when reconnected."
+              : null
+          }
+          variant="warning"
+          duration={null}
+          onDismiss={() => setOfflineDismissed(true)}
+        />
+        <ToastHost />
         {isTauri && (
           <Suspense fallback={null}>
             <OfflineSyncBadge />
