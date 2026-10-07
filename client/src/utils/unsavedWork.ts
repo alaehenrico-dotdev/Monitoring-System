@@ -97,25 +97,3 @@ export function findUnsavedWork({ from, to }: { from: string; to: string }): Uns
 
   return found.sort((a, b) => a.date.localeCompare(b.date) || a.page.localeCompare(b.page) || a.shift.localeCompare(b.shift));
 }
-
-/**
- * Plain yes/no version of findUnsavedWork, with no date-range filter: is
- * there staged-but-unsaved work on ANY entry page or Manual Count page right
- * now. Used to guard against losing in-progress work to something that isn't
- * a normal save - e.g. the Tauri desktop app's updater (src/tauri/updater.ts)
- * forcing a restart once a downloaded update is ready, which would otherwise
- * silently discard whatever's staged in sessionStorage.
- */
-export function hasAnyUnsavedWork(): boolean {
-  try {
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i);
-      if (!key) continue;
-      if (!key.startsWith(ENTRY_PREFIX) && !key.startsWith(MANUAL_COUNT_PREFIX)) continue;
-      if (countStaged(sessionStorage.getItem(key)) > 0) return true;
-    }
-  } catch {
-    return false;
-  }
-  return false;
-}

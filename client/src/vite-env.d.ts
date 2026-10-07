@@ -10,5 +10,5 @@
 
 // Injected at build time by vite.config.ts's `define`, from client/package.json's
 // own "version" - the single source every "what version is this" display
-// reads from (the Sidebar account popover, the Tauri window title).
+// reads from (the Sidebar account popover).
 declare const __APP_VERSION__: string;

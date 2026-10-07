@@ -178,9 +178,8 @@ export function Toast({
   );
 }
 
-// ---- Imperative toasts, for code that isn't a React component (e.g. the
-// desktop updater, which used to call window.alert). <ToastHost/> is mounted
-// once in Layout and renders whatever showToast() last published.
+// ---- Imperative toasts, for code that isn't a React component. <ToastHost/>
+// is mounted once in Layout and renders whatever showToast() last published.
 interface PendingToast {
   id: number;
   message: string;

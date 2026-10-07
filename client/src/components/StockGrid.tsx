@@ -2,17 +2,27 @@ import {
   Fragment,
   memo,
   useCallback,
+  useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
 } from "react";
-import type { Product } from "../types";
+import type { ChangeLogEntry, Product } from "../types";
 import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { NumberCellInput } from "./ui";
 import { ChevronIcon } from "./icons";
+import { listChangeLog } from "../api/changeLog";
+import {
+  formatGridNumber,
+  formatPercentOfTotal,
+  isUnusualJump,
+  isValidStockValue,
+  ZERO_DASH,
+} from "../utils/gridFormat";
 
 export interface GridRow {
   product: Product;
@@ -134,6 +144,47 @@ interface StockGridProps {
   /** Forwarded to RowGlowScroll - see its own doc comment. Restores/persists
    *  which product row is click-focused across navigating away and back. */
   focusStorageKey?: string;
+  /**
+   * Column key to show a "% of total" companion column after - each row's
+   * share of that column's grand total. Typically the sheet's bottom-line
+   * figure (Remaining Stock), since a share of an intermediate movement
+   * column rarely means anything. Omit for no percentage column.
+   */
+  percentOfTotalKey?: string;
+  /**
+   * Stages a batch of cell edits as one step - what Quick Fill commits (fill
+   * a value down a column, zero a whole category). Without it the Quick Fill
+   * controls are hidden, since there'd be nowhere to send the result.
+   * Separate from `onCommit` so the page can fold the whole batch into a
+   * single undo step rather than one per cell.
+   */
+  onCommitMany?: (
+    edits: { productId: number; key: string; value: number }[],
+  ) => void;
+  /**
+   * This cell's last-SAVED value, as opposed to `row.entry[key]`, which
+   * already has any staged edit overlaid. Needed to tell a large edit apart
+   * from a large saved figure for the unusual-jump warning, and to give
+   * Quick Fill the baseline that decides whether a filled cell is really a
+   * change. Omit on grids with nothing staged.
+   */
+  getSavedValue?: (productId: number, key: string) => number | undefined;
+  /**
+   * The change_log table name backing this grid ("daily_online_stock",
+   * "daily_offline_stock", ...). Set it to turn on cell history: hovering a
+   * saved cell looks up who last changed it and when. Rows that have never
+   * been saved carry no database id and so have no history to show.
+   */
+  historyTable?: string;
+}
+
+/// Rows the grid renders are the API's, which carry the database row id for
+/// anything already saved - `OnlineEntry`/`OfflineEntry` don't declare it
+/// (the client has never needed it), so it's read structurally here. Absent
+/// means "never saved", which is exactly when there's no history either.
+function recordIdOf(row: GridRow): number | undefined {
+  const id = (row.entry as { id?: unknown }).id;
+  return typeof id === "number" ? id : undefined;
 }
 
 function toNum(v: unknown): number {
@@ -154,6 +205,85 @@ function focusCell(productId: number, key: string) {
   el?.select();
 }
 
+/// Per-record change-log cache, shared by every cell in the table. One
+/// database row holds the whole product/date/shift entry, so all of that
+/// row's cells answer from a single request - hovering across a row costs
+/// one fetch, not one per column. Lives at module scope so it also survives
+/// re-renders and remounts within a session; entries are small and the grid
+/// only ever holds one sheet's worth.
+const historyCache = new Map<string, Promise<ChangeLogEntry[]>>();
+
+function fetchRecordHistory(table: string, recordId: number): Promise<ChangeLogEntry[]> {
+  const key = `${table}:${recordId}`;
+  const hit = historyCache.get(key);
+  if (hit) return hit;
+  const req = listChangeLog({ tableName: table, recordId }).catch(() => {
+    // A failed lookup shouldn't be cached as a permanent "no history" -
+    // drop it so the next hover retries.
+    historyCache.delete(key);
+    return [] as ChangeLogEntry[];
+  });
+  historyCache.set(key, req);
+  return req;
+}
+
+/// change_log stores whole-row snapshots, so "who last touched THIS cell" is
+/// the most recent entry whose value for this column actually moved.
+function lastChangeForColumn(entries: ChangeLogEntry[], colKey: string): ChangeLogEntry | undefined {
+  return entries.find((e) => {
+    const oldV = (e.oldValue as Record<string, unknown> | null)?.[colKey];
+    const newV = (e.newValue as Record<string, unknown> | null)?.[colKey];
+    // A CREATE has no previous row; it counts as setting every non-zero cell.
+    if (e.action === "CREATE") return newV !== undefined && Number(newV) !== 0;
+    return oldV !== undefined && newV !== undefined && Number(oldV) !== Number(newV);
+  });
+}
+
+function describeWhen(iso: string): string {
+  const then = new Date(iso).getTime();
+  if (!Number.isFinite(then)) return "";
+  const mins = Math.round((Date.now() - then) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+/// Hover tooltip for one cell's provenance. Deliberately title-attribute
+/// shaped rather than a positioned popover: it reuses the browser's own
+/// tooltip, so it can't be clipped by the table's scroll container and costs
+/// no layout work in a grid of several hundred cells. The lookup is lazy -
+/// nothing is requested until a cell is actually hovered.
+function useCellHistoryTitle(
+  table: string | undefined,
+  recordId: number | undefined,
+  colKey: string,
+  hovered: boolean,
+): string | undefined {
+  const [title, setTitle] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!hovered || !table || recordId === undefined) return;
+    let cancelled = false;
+    fetchRecordHistory(table, recordId).then((entries) => {
+      if (cancelled) return;
+      const hit = lastChangeForColumn(entries, colKey);
+      if (!hit) {
+        setTitle("No recorded changes to this cell");
+        return;
+      }
+      const who = hit.changedBy?.name ?? "Unknown user";
+      setTitle(`Last changed by ${who} - ${describeWhen(hit.changedAt)}`);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [hovered, table, recordId, colKey]);
+
+  return title;
+}
+
 interface DraftCellProps {
   productId: number;
   colKey: string;
@@ -171,6 +301,12 @@ interface DraftCellProps {
     productId: number,
     key: string,
   ) => void;
+  /** Last-saved value, for the unusual-jump warning. */
+  savedValue?: number;
+  /** change_log table for this grid, if cell history is on. */
+  historyTable?: string;
+  /** This row's database id, absent until the row has been saved once. */
+  recordId?: number;
 }
 
 /**
@@ -188,13 +324,42 @@ const DraftCell = memo(function DraftCell({
   edited,
   onCommit,
   onKeyDown,
+  savedValue,
+  historyTable,
+  recordId,
 }: DraftCellProps) {
   const [draft, setDraft] = useState<string | undefined>(undefined);
+  const [hovered, setHovered] = useState(false);
   const displayValue =
     draft ?? (raw === null || raw === undefined ? "" : String(raw));
 
+  // Rejected outright: stock figures are counts of physical product, so a
+  // negative (or non-numeric) reading is never valid and the server would
+  // refuse it on save anyway. Flagged at the keystroke rather than after a
+  // round trip, and the cell refuses to commit while it holds one.
+  const invalid = draft !== undefined && !isValidStockValue(draft);
+  // Allowed, but called out: a value an order of magnitude off what was last
+  // saved is usually a typo (a stray digit), and occasionally a real
+  // restock - so this warns and never blocks.
+  const suspicious =
+    !invalid &&
+    draft !== undefined &&
+    savedValue !== undefined &&
+    isUnusualJump(toNum(draft), savedValue);
+
+  const historyTitle = useCellHistoryTitle(historyTable, recordId, colKey, hovered);
+  const title = invalid
+    ? "Stock can't be negative - enter 0 or more"
+    : suspicious
+      ? `Unusually large change from the saved value of ${savedValue?.toLocaleString()} - check this is right`
+      : historyTitle;
+
   async function commit() {
     if (draft === undefined) return;
+    // Keep an invalid draft on screen so the encoder sees what they typed
+    // and can correct it, rather than silently snapping back to the old
+    // value as if the keystrokes never happened.
+    if (!isValidStockValue(draft)) return;
     const value = toNum(draft);
     setDraft(undefined);
     await onCommit(productId, colKey, value);
@@ -203,11 +368,23 @@ const DraftCell = memo(function DraftCell({
   return (
     <NumberCellInput
       data-cell={`${productId}:${colKey}`}
-      className={edited ? "ae-input-cell--edited" : undefined}
+      className={
+        [
+          edited ? "ae-input-cell--edited" : "",
+          invalid ? "ae-input-cell--invalid" : "",
+          suspicious ? "ae-input-cell--suspicious" : "",
+        ]
+          .filter(Boolean)
+          .join(" ") || undefined
+      }
       value={displayValue}
       onChange={setDraft}
       onBlur={commit}
       onKeyDown={(e) => onKeyDown(e, productId, colKey)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title={title}
+      aria-invalid={invalid || undefined}
       style={inputStyle}
     />
   );
@@ -227,6 +404,10 @@ export function StockGrid({
   readOnly,
   pending,
   focusStorageKey,
+  percentOfTotalKey,
+  onCommitMany,
+  getSavedValue,
+  historyTable,
 }: StockGridProps) {
   // Explicit expand/collapse choices, keyed by category name - absent means
   // "no choice made yet", which defaults to collapsed (below), not expanded.
@@ -249,6 +430,62 @@ export function StockGrid({
     const list = groups.get(row.product.category) ?? [];
     list.push(row);
     groups.set(row.product.category, list);
+  }
+
+  // Grand total of the percentage column, which every row's share is taken
+  // against. Computed once per render rather than per row.
+  const percentTotal = useMemo(
+    () =>
+      percentOfTotalKey
+        ? rows.reduce((sum, r) => sum + toNum(r.entry[percentOfTotalKey]), 0)
+        : 0,
+    [rows, percentOfTotalKey],
+  );
+  const showPercent = !!percentOfTotalKey;
+
+  // Quick Fill needs somewhere to send a batch and a baseline to compare
+  // each filled cell against, so it's only offered when the page wired both.
+  const canQuickFill = !readOnly && !!onCommitMany && !!getSavedValue;
+
+  /// Expand/collapse every category at once. Categories holding a pending
+  /// edit are force-expanded regardless (see `pending`), so "collapse all"
+  /// genuinely means "collapse everything that is safe to hide".
+  function setAllExpanded(expanded: boolean) {
+    const next: Record<string, boolean> = {};
+    for (const category of groups.keys()) next[category] = expanded;
+    setExpandedOverride(next);
+  }
+  const anyExpanded = [...groups.keys()].some((c) => expandedOverride[c]);
+
+  /// Quick Fill - copy the topmost row's value in this column down every
+  /// other row currently in the grid. "Currently in the grid" matters: the
+  /// page filters `rows` before handing them over, so a fill respects an
+  /// active search or category filter instead of silently touching rows the
+  /// encoder can't see.
+  function fillDown(colKey: string) {
+    if (!onCommitMany || rows.length < 2) return;
+    const value = toNum(rows[0].entry[colKey]);
+    const edits = rows
+      .slice(1)
+      .map((r) => ({ productId: r.product.id, key: colKey, value }));
+    onCommitMany(edits);
+  }
+
+  /// Quick Fill - set every editable cell in one category to zero, for a
+  /// product line that simply didn't move this shift.
+  function zeroCategory(category: string) {
+    if (!onCommitMany) return;
+    const groupRows = groups.get(category) ?? [];
+    const keys = columns
+      .filter((c) => c.editable)
+      .flatMap((c) => [
+        c.key,
+        ...(showExtras && c.subColumns ? c.subColumns.map((sc) => sc.key) : []),
+      ]);
+    const edits = groupRows.flatMap((r) =>
+      keys.map((key) => ({ productId: r.product.id, key, value: 0 })),
+    );
+    onCommitMany(edits);
   }
 
   const showExtras = extrasOpen && !readOnly;
@@ -309,12 +546,38 @@ export function StockGrid({
   );
 
   return (
-    <RowGlowScroll focusStorageKey={focusStorageKey}>
-      <table className="ae-table" style={{ minWidth: 720 }}>
+    <>
+      {groups.size > 0 && (
+        <div className="ae-grid-tools no-print">
+          <button
+            type="button"
+            className="ae-grid-tool-btn"
+            onClick={() => setAllExpanded(!anyExpanded)}
+            title={
+              anyExpanded
+                ? "Collapse every category"
+                : "Expand every category"
+            }
+          >
+            <span
+              style={{
+                display: "inline-flex",
+                transform: anyExpanded ? "none" : "rotate(-90deg)",
+                transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+            >
+              <ChevronIcon />
+            </span>
+            {anyExpanded ? "Collapse all" : "Expand all"}
+          </button>
+        </div>
+      )}
+      <RowGlowScroll focusStorageKey={focusStorageKey}>
+      <table className="ae-table ae-table--sticky-id" style={{ minWidth: 720 }}>
         <thead>
           <tr>
-            <th>SKU</th>
-            <th>Product</th>
+            <th className="ae-sticky-sku">SKU</th>
+            <th className="ae-sticky-name">Product</th>
             {columns.map((c) => (
               <Fragment key={c.key}>
                 <th
@@ -330,6 +593,17 @@ export function StockGrid({
                   }}
                 >
                   {c.label}
+                  {canQuickFill && c.editable && rows.length > 1 && (
+                    <button
+                      type="button"
+                      className="ae-fill-down-btn no-print"
+                      onClick={() => fillDown(c.key)}
+                      title={`Fill the top row's ${c.label} down every row below it`}
+                      aria-label={`Fill ${c.label} down`}
+                    >
+                      &darr;
+                    </button>
+                  )}
                   {c.subColumns && !readOnly && (
                     <button
                       type="button"
@@ -404,6 +678,14 @@ export function StockGrid({
                       />
                     </th>
                   ))}
+                {showPercent && c.key === percentOfTotalKey && (
+                  <th
+                    className="ae-pct-col"
+                    title={`Each row's share of the ${c.label} grand total`}
+                  >
+                    % of total
+                  </th>
+                )}
               </Fragment>
             ))}
           </tr>
@@ -426,12 +708,16 @@ export function StockGrid({
                       fixed per page, so only the vertical stick is needed
                       here. */}
                   <td
-                    colSpan={columns.length + 2 + extraCount}
+                    colSpan={columns.length + 2 + extraCount + (showPercent ? 1 : 0)}
                     style={{
                       padding: 0,
                       position: "sticky",
                       top: HEADER_ROW_HEIGHT,
-                      zIndex: 2,
+                      // Above the sticky SKU/Product columns (z-index 2): the
+                      // bar spans the full width, so when it pins under the
+                      // header the identity cells scrolling beneath it have
+                      // to pass behind, not through.
+                      zIndex: 3,
                     }}
                   >
                     <button
@@ -467,6 +753,30 @@ export function StockGrid({
                         <ChevronIcon />
                       </span>
                       {category}
+                      {canQuickFill && (
+                        // Nested inside the toggle button is invalid HTML, so
+                        // this is a sibling span acting as the click target -
+                        // it stops propagation so zeroing a category doesn't
+                        // also collapse it.
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="ae-cat-zero no-print"
+                          title={`Set every editable cell in ${category} to zero`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            zeroCategory(category);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            e.stopPropagation();
+                            e.preventDefault();
+                            zeroCategory(category);
+                          }}
+                        >
+                          Zero all
+                        </span>
+                      )}
                     </button>
                   </td>
                 </tr>
@@ -484,22 +794,32 @@ export function StockGrid({
                         : undefined
                     }
                   >
-                    <td className="ae-cell-sku">{row.product.sku ?? "—"}</td>
-                    <td className="ae-cell-name">{row.product.name}</td>
+                    <td className="ae-cell-sku ae-sticky-sku">
+                      {row.product.sku ?? ZERO_DASH}
+                    </td>
+                    <td className="ae-cell-name ae-sticky-name">
+                      {row.product.name}
+                    </td>
                     {columns.map((col) => {
                       const raw = row.entry[col.key];
+                      const pct = showPercent &&
+                        col.key === percentOfTotalKey && (
+                          <td key={`${col.key}-pct`} className="ae-pct-col">
+                            {formatPercentOfTotal(toNum(raw), percentTotal)}
+                          </td>
+                        );
+                      const formatted = formatGridNumber(raw);
                       const cell =
                         !col.editable || readOnly ? (
                           <td
                             key={col.key}
+                            className={formatted.isZero ? "ae-num-zero" : undefined}
                             style={{
                               ...(col.editable ? undefined : lockedStyle),
                               ...tintFor(col),
                             }}
                           >
-                            {raw === null || raw === undefined
-                              ? "—"
-                              : Number(raw).toLocaleString()}
+                            {formatted.text}
                           </td>
                         ) : (
                           <td key={col.key} style={tintFor(col)}>
@@ -513,10 +833,21 @@ export function StockGrid({
                               }
                               onCommit={commitCell}
                               onKeyDown={handleKeyDown}
+                              savedValue={getSavedValue?.(row.product.id, col.key)}
+                              historyTable={historyTable}
+                              recordId={recordIdOf(row)}
                             />
                           </td>
                         );
-                      if (!showExtras || !col.subColumns) return cell;
+                      if (!showExtras || !col.subColumns)
+                        return pct ? (
+                          <Fragment key={col.key}>
+                            {cell}
+                            {pct}
+                          </Fragment>
+                        ) : (
+                          cell
+                        );
                       return (
                         <Fragment key={col.key}>
                           {cell}
@@ -536,46 +867,65 @@ export function StockGrid({
                                 }
                                 onCommit={commitCell}
                                 onKeyDown={handleKeyDown}
+                                savedValue={getSavedValue?.(row.product.id, sc.key)}
+                                historyTable={historyTable}
+                                recordId={recordIdOf(row)}
                               />
                             </td>
                           ))}
+                          {pct}
                         </Fragment>
                       );
                     })}
                   </tr>
                 ))}
+                {/* Deliberately NOT marked .ae-cat-row, so it stays visible
+                    when the category is collapsed (collapsing hides only the
+                    product rows) - a collapsed sheet still reads as a list of
+                    per-category totals rather than going blank. */}
                 <tr key={`${category}-subtotal`} className="ae-row-subtotal">
-                  <td colSpan={2}>Subtotal - {category}</td>
-                  {columns.map((col) => (
-                    <Fragment key={col.key}>
-                      <td style={tintFor(col)}>
-                        {groupRows
-                          .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
-                          .toLocaleString()}
-                      </td>
-                      {showExtras &&
-                        col.subColumns?.map((sc, i) => (
-                          <td
-                            key={sc.key}
-                            className={extraCellClass(i)}
-                            style={tintFor(col)}
-                          >
-                            {groupRows
-                              .reduce(
-                                (sum, r) => sum + toNum(r.entry[sc.key]),
-                                0,
-                              )
-                              .toLocaleString()}
+                  <td colSpan={2} className="ae-sticky-subtotal">
+                    Subtotal - {category}
+                  </td>
+                  {columns.map((col) => {
+                    const sum = groupRows.reduce(
+                      (acc, r) => acc + toNum(r.entry[col.key]),
+                      0,
+                    );
+                    return (
+                      <Fragment key={col.key}>
+                        <td style={tintFor(col)}>{sum.toLocaleString()}</td>
+                        {showExtras &&
+                          col.subColumns?.map((sc, i) => (
+                            <td
+                              key={sc.key}
+                              className={extraCellClass(i)}
+                              style={tintFor(col)}
+                            >
+                              {groupRows
+                                .reduce(
+                                  (acc, r) => acc + toNum(r.entry[sc.key]),
+                                  0,
+                                )
+                                .toLocaleString()}
+                            </td>
+                          ))}
+                        {showPercent && col.key === percentOfTotalKey && (
+                          <td className="ae-pct-col">
+                            {formatPercentOfTotal(sum, percentTotal)}
                           </td>
-                        ))}
-                    </Fragment>
-                  ))}
+                        )}
+                      </Fragment>
+                    );
+                  })}
                 </tr>
               </Fragment>
             );
           })}
           <tr className="ae-row-grand">
-            <td colSpan={2}>GRAND TOTAL</td>
+            <td colSpan={2} className="ae-sticky-subtotal">
+              GRAND TOTAL
+            </td>
             {columns.map((col) => (
               <Fragment key={col.key}>
                 <td style={tintFor(col)}>
@@ -595,12 +945,20 @@ export function StockGrid({
                         .toLocaleString()}
                     </td>
                   ))}
+                {showPercent && col.key === percentOfTotalKey && (
+                  // Always 100% by definition - shown so the column has a
+                  // footer and doesn't read as a missing cell.
+                  <td className="ae-pct-col">
+                    {percentTotal ? "100.0%" : ZERO_DASH}
+                  </td>
+                )}
               </Fragment>
             ))}
           </tr>
         </tbody>
       </table>
-    </RowGlowScroll>
+      </RowGlowScroll>
+    </>
   );
 }
 
@@ -610,7 +968,7 @@ const lockedStyle: CSSProperties = {
 };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
-const inputStyle: CSSProperties = { width: 64, textAlign: "center" };
+const inputStyle: CSSProperties = { width: 64, textAlign: "right" };
 // The expand arrow: a small dark tab centered on the Delivery header's right
 // border (half inside the cell, half over the next one). The header cell is
 // position: sticky, so it is the containing block for this absolute button.

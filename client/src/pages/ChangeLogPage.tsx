@@ -6,7 +6,6 @@ import {
   type CSSProperties,
 } from "react";
 import { listChangeLog } from "../api/changeLog";
-import { listSystemLog, type SystemLogEntry } from "../api/systemLog";
 import type { ChangeLogEntry } from "../types";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
@@ -21,29 +20,15 @@ import { TableSkeleton } from "../components/Skeleton";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 
-// System Log (the app's own version/update history - see tauri/updater.ts)
-// shows as one more group alongside the record tables, under this pseudo
-// table key.
-const SYSTEM_TABLE = "system_log";
-// Change-log rows the server writes under tableName "system" (today: Data
-// Reset, see dataReset.service.ts) belong in this same group.
-const SYSTEM_CHANGE_TABLE = "system";
-const SYSTEM_EVENT_LABELS: Record<string, string> = {
-  DESKTOP_UPDATE: "Desktop app updated",
-  data_reset: "All data reset",
-};
-
-type SystemItem =
-  | { kind: "update"; at: number; entry: SystemLogEntry }
-  | { kind: "change"; at: number; entry: ChangeLogEntry };
+const SYSTEM_TABLE = "system";
 
 function changeEventLabel(entry: ChangeLogEntry): string {
   const event = (entry.newValue as { event?: string } | null)?.event;
-  return (event && SYSTEM_EVENT_LABELS[event]) || event || "System event";
+  return event === "data_reset" ? "All data reset" : event || "System event";
 }
 const TABLE_FILTERS = ["", ...Object.keys(TABLE_LABELS), SYSTEM_TABLE];
 const tableLabel = (table: string) =>
-  table === SYSTEM_TABLE ? "System Log" : (TABLE_LABELS[table] ?? table);
+  table === SYSTEM_TABLE ? "System" : (TABLE_LABELS[table] ?? table);
 
 /**
  * Section 4.8 - Change Log (grouped by table): every create/edit to a stock entry, manual
@@ -53,16 +38,10 @@ const tableLabel = (table: string) =>
  * backend has recorded this from day one (recordChange() in every write
  * path); this page is the first place it's actually visible.
  *
- * The System Log - when the app itself was updated to a new version, and on
- * whose device - is the last group here, so everything that was ever changed
- * is in one place. Each list loads independently: if one fails the other
- * still shows, with an error toast for the one that didn't.
+ * System-level events such as data resets are shown alongside record changes.
  */
 export function ChangeLogPage() {
   const [entries, setEntries] = useState<ChangeLogEntry[] | null>(null);
-  const [systemEntries, setSystemEntries] = useState<SystemLogEntry[] | null>(
-    null,
-  );
   const [error, setError] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState("");
   const [query, setQuery] = useState("");
@@ -73,114 +52,38 @@ export function ChangeLogPage() {
 
   useResetOnKeyChange(tableFilter, () => {
     setEntries(null);
-    setSystemEntries(null);
   });
   useEffect(() => {
     let cancelled = false;
-    const wantChanges = tableFilter !== SYSTEM_TABLE;
-    const wantSystem = tableFilter === "" || tableFilter === SYSTEM_TABLE;
-    Promise.allSettled([
-      wantChanges
-        ? listChangeLog({
-            tableName:
-              tableFilter === SYSTEM_TABLE
-                ? SYSTEM_CHANGE_TABLE
-                : tableFilter || undefined,
-          })
-        : Promise.resolve([] as ChangeLogEntry[]),
-      wantSystem ? listSystemLog() : Promise.resolve([] as SystemLogEntry[]),
-    ]).then(([changes, system]) => {
-      if (cancelled) return;
-      const failures: string[] = [];
-      if (changes.status === "fulfilled") setEntries(changes.value);
-      else {
+    listChangeLog({ tableName: tableFilter || undefined })
+      .then((changes) => {
+        if (!cancelled) setEntries(changes);
+      })
+      .catch((reason: unknown) => {
+        if (cancelled) return;
         setEntries([]);
-        failures.push(
-          changes.reason instanceof Error
-            ? changes.reason.message
-            : "Failed to load change log",
+        setError(
+          reason instanceof Error ? reason.message : "Failed to load change log",
         );
-      }
-      if (system.status === "fulfilled") setSystemEntries(system.value);
-      else {
-        setSystemEntries([]);
-        failures.push(
-          system.reason instanceof Error
-            ? system.reason.message
-            : "Failed to load system log",
-        );
-      }
-      if (failures.length) setError(failures.join(" / "));
-    });
+      });
     return () => {
       cancelled = true;
     };
   }, [tableFilter, realtimeVersion]);
 
-  const filtered = entries
-    ?.filter((e) => e.tableName !== SYSTEM_CHANGE_TABLE)
-    .filter((e) =>
+  const filtered = entries?.filter((e) =>
       matchesSearch(
         [
-          TABLE_LABELS[e.tableName] ?? e.tableName,
+          tableLabel(e.tableName),
           e.action,
+          e.tableName === SYSTEM_TABLE ? changeEventLabel(e) : undefined,
           e.changedBy?.name,
           e.changedBy?.username,
           e.recordId,
         ],
         query,
       ),
-    );
-
-  // App updates + the server's own "system" change rows, newest first.
-  const filteredSystem = useMemo(() => {
-    if (!systemEntries || !entries) return undefined;
-    const items: SystemItem[] = [
-      ...systemEntries
-        .filter((e) =>
-          matchesSearch(
-            [
-              "System Log",
-              SYSTEM_EVENT_LABELS[e.event] ?? e.event,
-              e.fromVersion,
-              e.toVersion,
-              e.user?.name,
-              e.user?.username,
-            ],
-            query,
-          ),
-        )
-        .map(
-          (entry): SystemItem => ({
-            kind: "update",
-            at: new Date(entry.occurredAt).getTime(),
-            entry,
-          }),
-        ),
-      ...entries
-        .filter((e) => e.tableName === SYSTEM_CHANGE_TABLE)
-        .filter((e) =>
-          matchesSearch(
-            [
-              "System Log",
-              changeEventLabel(e),
-              e.action,
-              e.changedBy?.name,
-              e.changedBy?.username,
-            ],
-            query,
-          ),
-        )
-        .map(
-          (entry): SystemItem => ({
-            kind: "change",
-            at: new Date(entry.changedAt).getTime(),
-            entry,
-          }),
-        ),
-    ];
-    return items.sort((a, b) => b.at - a.at);
-  }, [systemEntries, entries, query]);
+  );
 
   // Group entries by the table they belong to (Online Stock, Offline Stock,
   // Manual Count, SKUs), in the same fixed order as TABLE_LABELS, with any
@@ -234,15 +137,14 @@ export function ChangeLogPage() {
     );
   }
 
-  const loaded = !!entries && !!systemEntries;
-  const nothingToShow =
-    (filtered?.length ?? 0) === 0 && (filteredSystem?.length ?? 0) === 0;
+  const loaded = !!entries;
+  const nothingToShow = (filtered?.length ?? 0) === 0;
 
   return (
     <div>
       <PageHeader
         title="Change Log"
-        subtitle="Every create/update/delete across the app, plus app updates (System Log) - attributed and timestamped. Click a row to see exactly what changed."
+        subtitle="Every create/update/delete across the app, including system events, is attributed and timestamped. Click a row to see exactly what changed."
       >
         <Toolbar>
           <Dropdown
@@ -294,45 +196,33 @@ export function ChangeLogPage() {
                 <Fragment key={table}>
                   {groupHeading(table, tableEntries.length)}
                   {!collapsed.has(table) &&
-                    tableEntries.map((entry) => (
-                      <ChangeLogRow
-                        key={entry.id}
-                        entry={entry}
-                        expanded={expanded === entry.id}
-                        onToggle={() =>
-                          setExpanded((cur) =>
-                            cur === entry.id ? null : entry.id,
-                          )
-                        }
-                      />
-                    ))}
-                </Fragment>
-              ))}
-              {filteredSystem && filteredSystem.length > 0 && (
-                <Fragment key={SYSTEM_TABLE}>
-                  {groupHeading(SYSTEM_TABLE, filteredSystem.length)}
-                  {!collapsed.has(SYSTEM_TABLE) &&
-                    filteredSystem.map((item) =>
-                      item.kind === "update" ? (
-                        <SystemLogRow
-                          key={`update-${item.entry.id}`}
-                          entry={item.entry}
-                        />
-                      ) : (
+                    tableEntries.map((entry) =>
+                      table === SYSTEM_TABLE ? (
                         <SystemChangeRow
-                          key={`change-${item.entry.id}`}
-                          entry={item.entry}
-                          expanded={expanded === item.entry.id}
+                          key={entry.id}
+                          entry={entry}
+                          expanded={expanded === entry.id}
                           onToggle={() =>
                             setExpanded((cur) =>
-                              cur === item.entry.id ? null : item.entry.id,
+                              cur === entry.id ? null : entry.id,
+                            )
+                          }
+                        />
+                      ) : (
+                        <ChangeLogRow
+                          key={entry.id}
+                          entry={entry}
+                          expanded={expanded === entry.id}
+                          onToggle={() =>
+                            setExpanded((cur) =>
+                              cur === entry.id ? null : entry.id,
                             )
                           }
                         />
                       ),
                     )}
                 </Fragment>
-              )}
+              ))}
             </tbody>
           </table>
         </RowGlowScroll>
@@ -427,31 +317,6 @@ function SystemChangeRow({
         </tr>
       )}
     </>
-  );
-}
-
-/// One app-update entry, in the same columns as a change row: Record shows the
-/// version jump, Action the event, Changed By whoever's device updated.
-function SystemLogRow({ entry }: { entry: SystemLogEntry }) {
-  return (
-    <tr>
-      <td style={{ whiteSpace: "nowrap" }}>
-        {new Date(entry.occurredAt).toLocaleString()}
-      </td>
-      <td style={{ whiteSpace: "nowrap" }}>
-        v{entry.fromVersion} <span style={{ color: colors.subtleInk }}>→</span>{" "}
-        <strong style={{ color: colors.ink }}>v{entry.toVersion}</strong>
-      </td>
-      <td style={{ textAlign: "left", fontWeight: 700, color: colors.ink }}>
-        {SYSTEM_EVENT_LABELS[entry.event] ?? entry.event}
-      </td>
-      <td
-        style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.ink }}
-      >
-        {entry.user?.name ?? "Unknown"}
-      </td>
-      <td />
-    </tr>
   );
 }
 

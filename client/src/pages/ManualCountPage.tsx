@@ -31,7 +31,6 @@ import { Modal } from "../components/Modal";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
-import { confirmDownload } from "../components/DownloadConfirm";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
@@ -504,7 +503,6 @@ export function ManualCountPage() {
       date,
       shift,
     );
-    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({

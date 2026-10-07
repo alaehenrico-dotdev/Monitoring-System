@@ -1,22 +1,16 @@
-/* Service worker for offline use.
+/* Service worker for production static assets.
  *
  * - App shell + every built asset are precached at install (the list below is
  *   injected by the build - see pwaPrecachePlugin in vite.config.ts - so
  *   lazily-loaded page chunks work offline too, not just the ones visited).
  * - Navigations are network-first with the cached index.html as the offline
  *   fallback (the app is a client-side-routed SPA).
- * - Read-only API calls (GET /api/...) are network-first and fall back to the
- *   last response, so grids/reports opened before going offline stay readable.
- *   Writes are never intercepted: offline saves stay staged in the page and
- *   are reconciled on reconnect (see hooks/usePendingEntryChanges.ts).
- * - Auth, backup and data-reset endpoints are never cached.
+ * - API requests always go to the live server and are never cached.
  */
 const VERSION = "__SW_VERSION__";
 const PRECACHE = self.__PRECACHE__ || [];
 const STATIC_CACHE = `ala-eh-static-${VERSION}`;
-const API_CACHE = "ala-eh-api-v1"; // cleared by the page on logout
 const FONT_CACHE = "ala-eh-fonts-v1";
-const NEVER_CACHE = /\/api\/(auth|backup|data-reset)(\/|$)/;
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -34,26 +28,17 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((k) => k.startsWith("ala-eh-static-") && k !== STATIC_CACHE)
+            .filter(
+              (key) =>
+                (key.startsWith("ala-eh-static-") && key !== STATIC_CACHE) ||
+                key === "ala-eh-api-v1",
+            )
             .map((k) => caches.delete(k)),
         ),
       )
       .then(() => self.clients.claim()),
   );
 });
-
-async function networkFirst(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  try {
-    const response = await fetch(request);
-    if (response.ok) cache.put(request, response.clone());
-    return response;
-  } catch (err) {
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    throw err;
-  }
-}
 
 async function staleWhileRevalidate(request, cacheName) {
   const cache = await caches.open(cacheName);
@@ -82,14 +67,6 @@ self.addEventListener("fetch", (event) => {
         // undefined and creating an unhandled FetchEvent rejection.
         return cached || Response.error();
       }),
-    );
-    return;
-  }
-
-  if (url.pathname.includes("/api/")) {
-    if (NEVER_CACHE.test(url.pathname)) return;
-    event.respondWith(
-      networkFirst(request, API_CACHE).catch(() => Response.error()),
     );
     return;
   }

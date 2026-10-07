@@ -102,14 +102,8 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
 /// that race (and why a transaction conflict there is retried, not an
 /// error).
 ///
-/// `db` stays an accepted parameter (same reasoning as saveOfflineEntry's own
-/// doc comment) so a caller that needs this save atomic with its OWN extra
-/// write - sync.service.ts's pushChanges recording a push's idempotency
-/// marker in the same transaction as the delta it guards - can compose it
-/// in rather than this opening a second, nested transaction. Such a caller
-/// is responsible for its OWN transaction's isolation level - pushChanges
-/// also uses serializableTransaction, for the same negative-stock-race
-/// reasoning as here.
+/// `db` stays an accepted parameter so related operations can compose this
+/// save into a caller-owned transaction without opening a nested transaction.
 export async function saveOnlineEntry(
   productId: number,
   entryDate: Date,

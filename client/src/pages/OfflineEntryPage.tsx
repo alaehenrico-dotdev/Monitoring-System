@@ -23,6 +23,7 @@ import {
 } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
+import { RowFilterSelect } from "../components/RowFilterSelect";
 import { ShiftFilter } from "../components/ShiftFilter";
 import { TableSkeleton } from "../components/Skeleton";
 import { LoadingOverlay } from "../components/Spinner";
@@ -51,11 +52,15 @@ import {
   deliverySlotColumns,
   offlineStockColumns as columns,
 } from "../config/stockColumns";
-import { OFFLINE_TRANSFER_FIELDS } from "../tauri/sync/offlineFields";
 import { matchesSearch } from "../utils/search";
+import {
+  matchesRowFilter,
+  useRowFilter,
+  useSavedValueLookup,
+  useUndoRedoKeys,
+} from "../hooks/useGridView";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
-import { confirmDownload } from "../components/DownloadConfirm";
 import { filterNotes, pdfFileName, stockGridSection } from "../utils/pdfTables";
 import {
   getCurrentShiftAndDate,
@@ -72,8 +77,6 @@ import {
 } from "../utils/stockMath";
 import { colors } from "../theme";
 import type { Shift } from "../types";
-
-const isTauri = import.meta.env.MODE === "tauri";
 
 /// Re-derives Offline Stocks + Remaining Stock (+ Delivery (Out), which is
 /// itself the sum of the five delivery columns) from a last-saved entry
@@ -130,6 +133,9 @@ export function OfflineEntryPage() {
   const [zoom, setZoom] = useZoom("offline-entry");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [rowFilter, setRowFilter] = useRowFilter(
+    "ala-eh-rowfilter:offline",
+  );
   const [saving, setSaving] = useState(false);
   // Real per-item percent (see handleSaveAll) for LoadingOverlay's ring -
   // kept local to this page rather than routed through the shared top
@@ -158,11 +164,6 @@ export function OfflineEntryPage() {
     user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
   const { online, reconnects } = useOnlineStatus();
-  // Only the Tauri build can actually save while offline (staged locally,
-  // synced later - see api/offlineStock.ts's saveOfflineEntry) - the plain
-  // web build has no local store to fall back to, so it keeps blocking Save
-  // outright while offline (handleSaveAll, below).
-  const isTauriOffline = isTauri && !online;
   // So handleSaveAll (below) can tell CsvTools its own last import batch is
   // no longer just "pending" once a real Save has committed it - see
   // CsvTools' notifyCommitted doc comment.
@@ -179,10 +180,16 @@ export function OfflineEntryPage() {
     baselines,
     displayRows,
     stage,
+    stageMany,
     clear,
     clearAll,
     resolveConflict,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
     pendingCount,
+    pendingCellCount,
   } = usePendingEntryChanges(
     rows,
     `ala-eh-pending:offline:${date}:${shift}`,
@@ -209,23 +216,7 @@ export function OfflineEntryPage() {
     useEntryManualCounts(date, shift, "OFFLINE");
   const csvRows = useRowsWithManualCounts(rows, manualCounts);
   const csvColumns = useMemo(() => [...columns, manualCountColumn], []);
-  // Transfers can't be saved offline (see isTauriOffline/handleSaveAll) -
-  // locking these two cells in the live grid means an encoder sees it can't
-  // be entered right now, rather than typing it and only finding out at
-  // Save time.
-  const gridColumns = useMemo(
-    () =>
-      isTauriOffline
-        ? columns.map((c) =>
-            OFFLINE_TRANSFER_FIELDS.includes(
-              c.key as (typeof OFFLINE_TRANSFER_FIELDS)[number],
-            )
-              ? { ...c, editable: false }
-              : c,
-          )
-        : columns,
-    [isTauriOffline],
-  );
+  const gridColumns = columns;
 
   // Search and the category dropdown only affect what's displayed in the
   // grid - both are local filters over the same already-loaded rows, not a
@@ -239,8 +230,17 @@ export function OfflineEntryPage() {
         [r.product.sku, r.product.name, r.product.category],
         query,
       ) &&
-      (categoryFilter === "" || r.product.category === categoryFilter),
+      (categoryFilter === "" || r.product.category === categoryFilter) &&
+      matchesRowFilter(r, rowFilter, pending),
   );
+
+  // Last-saved figures, for the grid's unusual-jump warning and for Quick
+  // Fill's "is this actually a change?" test - `displayRows` already has
+  // staged edits overlaid, so it can't answer either question.
+  const getSavedValue = useSavedValueLookup(rows);
+
+  // Ctrl+Z / Ctrl+Shift+Z over staged edits, while any exist to undo.
+  useUndoRedoKeys(undo, redo, canEdit);
 
   useResetOnKeyChange(`${date}:${shift}`, () => {
     setRows(null);
@@ -323,6 +323,21 @@ export function OfflineEntryPage() {
   // usePendingEntryChanges. `rows` (not displayRows) is the source of the
   // last-saved value, so re-editing a cell back to its saved value still
   // correctly drops it from the pending set.
+  /// Quick Fill's batch, staged as a single undo step. Cells whose fill value
+  /// already matches what's saved drop out inside the hook, so filling a
+  /// column that's already correct stages nothing rather than queueing a
+  /// screenful of no-op writes.
+  function handleCommitMany(
+    edits: { productId: number; key: string; value: number }[],
+  ) {
+    stageMany(
+      edits.map((e) => ({
+        ...e,
+        savedValue: getSavedValue(e.productId, e.key) ?? 0,
+      })),
+    );
+  }
+
   function handleCommit(productId: number, key: string, value: number) {
     const savedValue = Number(
       rows?.find((r) => r.product.id === productId)?.entry[key] ?? 0,
@@ -346,13 +361,8 @@ export function OfflineEntryPage() {
   // whether it's safe to let a "Save & Print" through.
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
-    // The plain web build has no local store to fall back to, so it still
-    // blocks Save outright while offline. The Tauri build actually saves
-    // offline (staged locally, synced later) - see api/offlineStock.ts's
-    // saveOfflineEntry - so it's allowed to proceed past this point even
-    // when !online.
-    if (!online && !isTauri) {
-      setError("Offline. Changes stay here; save again when reconnected.");
+    if (!online) {
+      setError("Server unreachable. Reconnect before saving changes.");
       return false;
     }
     if (conflicts.length > 0) {
@@ -632,7 +642,6 @@ export function OfflineEntryPage() {
     // the PDF again until it's saved or discarded.
     if (!visibleRows || pendingCount > 0) return;
     const pdfName = pdfFileName("offline-stock", date, shift);
-    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({
@@ -698,6 +707,11 @@ export function OfflineEntryPage() {
               value={categoryFilter}
               onChange={setCategoryFilter}
             />
+            <RowFilterSelect
+              value={rowFilter}
+              onChange={setRowFilter}
+              changedCount={pendingCount}
+            />
             <DatePicker
               aria-label="Date"
               value={date}
@@ -708,6 +722,29 @@ export function OfflineEntryPage() {
             <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
           </div>
           <ToolbarControls>
+            {/* Counts cells, not products: four edits on one product are four
+                changes to the person who made them, while the Save button's
+                own (N) counts the products it will submit. */}
+            {canEdit && pendingCellCount > 0 && (
+              <span className="ae-unsaved-badge" aria-live="polite">
+                {pendingCellCount} unsaved change
+                {pendingCellCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {canEdit && (canUndo || canRedo) && (
+              <Button
+                className="ae-toolbar-save"
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={undo}
+                disabled={!canUndo}
+                title="Undo the last staged edit (Ctrl+Z)"
+              >
+                <UndoIcon />
+                <span className="ae-toolbar-btn-label">Undo</span>
+              </Button>
+            )}
             {canEdit && (
               <Button
                 className="ae-toolbar-save ae-toolbar-primary"
@@ -839,6 +876,10 @@ export function OfflineEntryPage() {
             readOnly={!canEdit}
             pending={pending}
             focusStorageKey={`ala-eh-focus:offline:${date}:${shift}`}
+            percentOfTotalKey="remainingStock"
+            onCommitMany={canEdit ? handleCommitMany : undefined}
+            getSavedValue={getSavedValue}
+            historyTable="daily_offline_stock"
           />
         </div>
       )}

@@ -7,9 +7,9 @@ const app = createApp();
 const server = createServer(app);
 attachRealtime(server);
 
-server.listen(env.port, () => {
+server.listen(env.port, env.host, () => {
   // eslint-disable-next-line no-console
-  console.log(`Ala Eh Stocks Monitoring System API listening on http://localhost:${env.port} (${env.nodeEnv})`);
+  console.log(`Ala Eh Stocks Monitoring System API listening on http://${env.host}:${env.port} (${env.nodeEnv})`);
 });
 
 // pm2 sends SIGTERM/SIGINT on restart/stop - without this the process (and

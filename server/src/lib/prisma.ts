@@ -6,9 +6,8 @@ export const prisma = new PrismaClient();
 /// A repository/service function that takes this as its last argument (a
 /// `Db`, defaulting to the shared `prisma` singleton) can run either
 /// standalone or inside a caller's `prisma.$transaction(async (tx) => ...)`
-/// - see sync.service.ts's pushChanges for why that matters (a push item's
-/// delta and the idempotency marker that guards it need to commit or roll
-/// back as one unit).
+/// - stock writes can compose repository operations while keeping the
+/// associated stock changes and audit rows atomic.
 export type Db = PrismaClient | Prisma.TransactionClient;
 
 /// Runs `fn` in a SERIALIZABLE transaction, retrying a bounded number of

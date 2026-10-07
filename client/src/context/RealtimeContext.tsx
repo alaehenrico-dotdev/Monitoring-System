@@ -15,9 +15,8 @@ const RealtimeContext = createContext<number>(0);
  * Owns the single WebSocket connection for the whole app and republishes
  * "something changed" as a version number pages already fold into their own
  * fetch effects' dependency arrays (see useRealtimeVersion). Only connects
- * once a user is logged in - there's nothing to sync on the login page - and
- * reconnects with backoff, since the ngrok tunnel this app is normally
- * accessed through can drop a connection without warning.
+ * once a user is logged in and reconnects with backoff if the connection
+ * drops.
  */
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -41,7 +40,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         reconnectDelay = BASE_RECONNECT_MS;
         socket?.send(JSON.stringify({ type: "auth", token: getToken() }));
         // A disconnect may have hidden server changes while the socket was
-        // down. Refetch tables and wake the desktop sync as soon as it returns.
+        // down. Refetch tables as soon as it returns.
         if (hasConnected) setVersion((v) => v + 1);
         hasConnected = true;
       };

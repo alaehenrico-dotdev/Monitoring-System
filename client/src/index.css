@@ -1967,35 +1967,6 @@ table input[type="number"] {
   flex-shrink: 0;
   gap: 2px;
 }
-.ae-header-tabs-settings {
-  display: flex;
-  align-items: center;
-  flex-shrink: 0;
-  margin-left: auto;
-  padding-left: 12px;
-}
-.ae-server-settings-link {
-  padding: 6px 4px 7px;
-  border: 0;
-  background: transparent;
-  color: var(--ae-text);
-  font: inherit;
-  font-size: 12px;
-  opacity: 0.72;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.ae-server-settings-link:hover,
-.ae-server-settings-link:focus-visible {
-  opacity: 1;
-}
-.ae-server-settings-link:focus-visible {
-  outline: 2px solid var(--ae-glass-accent);
-  outline-offset: 2px;
-  border-radius: 3px;
-}
 .ae-header-tabs-divider {
   width: 1px;
   height: 14px;
@@ -2283,38 +2254,39 @@ table input[type="number"] {
   /* Padding (not a margin) so it collapses away with the row. */
   padding-top: 3px;
 }
-/* Bottom-center collapse tab - a small nub straddling the card's own
-   bottom border (half in, half out, via the negative bottom offset) so it
-   reads as an edge affordance rather than a toolbar button. Hidden until
-   the header itself is hovered, then fades and nudges into view; stays
-   reachable by keyboard (button :focus-visible) even without a pointer. Rendered as a direct child of .ae-page-header (not the toolbar
-   row) so it always has a fixed spot regardless of collapsed state - the
-   collapsed header (title row alone) can still be hovered to bring it
-   back, since there'd otherwise be no way to expand again. */
+/* Bottom-center collapse ribbon - a bare white chevron sitting just above
+   the header's bottom edge (no circle, no fill, no glow). Hidden until the
+   header itself is hovered, then fades and nudges into view; stays
+   reachable by keyboard (button :focus-visible) even without a pointer.
+   Rendered as a direct child of .ae-page-header (not the toolbar row) so it
+   always has a fixed spot regardless of collapsed state - the collapsed
+   header (title row alone) can still be hovered to bring it back, since
+   there'd otherwise be no way to expand again. */
 .ae-page-header-collapse-btn {
   position: absolute;
-  left: 50%;
-  bottom: -11px;
-  transform: translate(-50%, -4px);
+  /* --ae-ribbon-x is set by PageHeader's mousemove handler so the ribbon
+     tracks the cursor; falls back to center (e.g. keyboard focus). */
+  left: var(--ae-ribbon-x, 50%);
+  bottom: 0;
+  transform: translate(-50%, 3px);
   z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 18px;
   padding: 0;
-  border: 1px solid var(--ae-toolbar-border);
-  border-radius: 50%;
-  background: var(--ae-glass-solid);
-  color: var(--ae-glass-accent);
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #ffffff;
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
   transition:
     opacity 140ms ease,
     transform 140ms ease,
-    background-color 120ms ease,
-    box-shadow 120ms ease,
+    left 80ms ease-out,
     color 120ms ease;
 }
 /* Hover only (plus keyboard focus on the button itself). No :focus-within on
@@ -2327,18 +2299,16 @@ table input[type="number"] {
   transform: translate(-50%, 0);
   z-index: 2;
 }
-/* Glowing yellow fill, arrow flips to black - same brand yellow as the
-   toolbar's own buttons. */
 .ae-page-header-collapse-btn:hover {
-  background: #f5c000;
-  color: #0c0c0c;
-  box-shadow:
-    0 0 8px 2px rgba(245, 192, 0, 0.55),
-    0 0 18px 4px rgba(245, 192, 0, 0.25);
+  color: #f5c000;
+}
+.ae-page-header-collapse-btn:focus-visible {
+  outline: 1px solid #f5c000;
+  outline-offset: -1px;
 }
 .ae-page-header-collapse-btn svg {
-  width: 9px;
-  height: 9px;
+  width: 20px;
+  height: 20px;
   transform: rotate(180deg);
   transition: transform var(--ae-collapse-dur) var(--ae-collapse-ease);
 }
@@ -2590,6 +2560,17 @@ table input[type="number"] {
      a silent data gap, not just a display convenience. */
   .ae-cat-row.ae-row-collapsed {
     visibility: visible !important;
+  }
+
+  /* Sticky identity columns are a screen-scrolling affordance; on paper they
+     would only paint a frosted panel over the printed grid. */
+  .ae-table--sticky-id .ae-sticky-sku,
+  .ae-table--sticky-id .ae-sticky-name,
+  .ae-table--sticky-id .ae-sticky-subtotal {
+    position: static !important;
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
   }
 
   body,
@@ -3340,21 +3321,6 @@ table input[type="number"] {
   height: 22px;
 }
 
-/* Header Sync button (desktop app) - icon spins while a sync is running. */
-@keyframes ae-sync-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.ae-sync-spin {
-  animation: ae-sync-spin 900ms linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .ae-sync-spin {
-    animation-duration: 2.4s;
-  }
-}
-
 /* =========================================================================
    Toolbar alignment correction
    - Keeps every left-side filter and right-side action on the same optical
@@ -3432,10 +3398,170 @@ table input[type="number"] {
   top: 1px;
 }
 
-/* Preserve the sync/undo icon's own rotation animation while applying the
-   same 1px optical correction. */
-.ae-toolbar .ae-btn > svg.ae-sync-spin,
-.ae-toolbar .ae-toolbar-save > svg.ae-sync-spin,
-.ae-toolbar .ae-segment-btn > svg.ae-sync-spin {
-  top: 1px;
+/* ---------------------------------------------------------------------------
+   Stock grid: readability additions (StockGrid.tsx)
+   --------------------------------------------------------------------------- */
+
+/* Numbers right-align so digits line up column-wise and magnitudes are
+   comparable down the column; .ae-table already sets tabular-nums, so the
+   glyphs are the same width too. The two identity columns keep their own
+   left alignment - the :not() pair is what gives this the specificity to
+   beat the generic `.ae-table td { text-align: center }` above. */
+.ae-table--sticky-id td:not(.ae-cell-sku):not(.ae-cell-name),
+.ae-table--sticky-id th:not(.ae-sticky-sku):not(.ae-sticky-name) {
+  text-align: right;
+}
+
+/* A cell holding nothing (zero / null) prints a dash instead of "0", dimmed
+   so a sheet of untouched cells recedes and real figures carry the eye. */
+.ae-table .ae-num-zero {
+  color: var(--ae-text-muted);
+  opacity: 0.55;
+}
+
+/* Share-of-total column: secondary information, so it sits visually behind
+   the figure it describes rather than competing with it. */
+.ae-table .ae-pct-col {
+  color: var(--ae-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ae-table tr.ae-row-grand .ae-pct-col {
+  color: #0c0c0c;
+}
+
+/* SKU + Product stay put while the movement columns scroll sideways, so a
+   row never becomes anonymous once it's scrolled past the name. Frosted
+   rather than transparent (the same treatment and variables as the sticky
+   header, including its solid @supports fallback) so scrolled cells pass
+   behind them instead of showing through. */
+.ae-table--sticky-id .ae-sticky-sku,
+.ae-table--sticky-id .ae-sticky-name,
+.ae-table--sticky-id .ae-sticky-subtotal {
+  position: sticky;
+  background: var(--ae-header-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+}
+.ae-table--sticky-id .ae-sticky-sku {
+  left: 0;
+  width: 86px;
+  min-width: 86px;
+  z-index: 2;
+}
+.ae-table--sticky-id .ae-sticky-name {
+  left: 86px;
+  z-index: 2;
+}
+/* The subtotal/grand-total label spans both identity columns, so it pins at
+   the left edge as one cell. */
+.ae-table--sticky-id .ae-sticky-subtotal {
+  left: 0;
+  text-align: left;
+  z-index: 2;
+}
+/* Header corners are sticky on both axes and must sit above both the sticky
+   header row (z-index 1) and the sticky body columns (2). */
+.ae-table--sticky-id th.ae-sticky-sku,
+.ae-table--sticky-id th.ae-sticky-name {
+  z-index: 4;
+}
+/* Invalid entry (negative / non-numeric): the cell refuses to commit while
+   this shows, so it needs to read as blocking, not decorative. */
+.ae-input-cell--invalid {
+  border-color: var(--ae-danger, #d64545) !important;
+  background-color: color-mix(
+    in srgb,
+    var(--ae-danger, #d64545) 14%,
+    transparent
+  ) !important;
+}
+/* Allowed but unusual - an order-of-magnitude jump from the saved value.
+   Warns only; the value still saves. */
+.ae-input-cell--suspicious {
+  border-color: #e0a800 !important;
+  background-color: color-mix(in srgb, #e0a800 16%, transparent) !important;
+}
+
+/* Expand/collapse-all bar above the grid. */
+.ae-grid-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 6px;
+}
+.ae-grid-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ae-text);
+  background: var(--ae-surface-glass);
+  border: 1px solid var(--ae-border);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.ae-grid-tool-btn:hover {
+  background: var(--ae-surface-hover);
+}
+.ae-grid-tool-btn:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: 1px;
+}
+
+/* Quick Fill: fill this column down, from the column header. */
+.ae-fill-down-btn {
+  margin-left: 4px;
+  padding: 0 4px;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.55;
+  cursor: pointer;
+}
+.ae-fill-down-btn:hover {
+  opacity: 1;
+}
+
+/* Quick Fill: zero a whole category, from its bar. */
+.ae-cat-zero {
+  margin-left: auto;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  opacity: 0.6;
+  cursor: pointer;
+}
+.ae-cat-zero:hover {
+  opacity: 1;
+}
+.ae-cat-zero:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: 1px;
+}
+
+/* "N unsaved changes" beside the Save button. Deliberately a quiet badge,
+   not an alert: unsaved work is the normal state while encoding a shift,
+   and the cells themselves are already tinted green. */
+.ae-unsaved-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ae-text-muted);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  border-radius: 999px;
 }

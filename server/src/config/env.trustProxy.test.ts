@@ -29,7 +29,7 @@ afterEach(() => {
 });
 
 describe("TRUST_PROXY", () => {
-  it("defaults to loopback only - the local ngrok agent, not any hop", async () => {
+  it("defaults to loopback only - the local reverse proxy, not any hop", async () => {
     expect((await loadEnv(undefined)).trustProxy).toEqual(["loopback"]);
   });
 

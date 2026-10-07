@@ -52,7 +52,7 @@ function duration(name: string, fallback: string, maxSeconds: number): string {
 /// Express's `trust proxy`, as an address allowlist rather than a hop count.
 ///
 /// server.ts listens directly, so the API is reachable both through the
-/// reverse proxy (ngrok, per PRODUCTION.md) and straight on its port. A hop
+/// reverse proxy (Nginx, per PRODUCTION.md) and straight on its port. A hop
 /// *count* like `1` trusts whatever the nearest sender claims, so a client
 /// connecting directly could forge `X-Forwarded-For`, change `req.ip` at
 /// will, and rotate its way around every IP-keyed limiter in
@@ -60,7 +60,7 @@ function duration(name: string, fallback: string, maxSeconds: number): string {
 /// guards. Trusting addresses instead means a forged header coming from an
 /// untrusted peer is ignored and `req.ip` stays the real socket address.
 ///
-/// Default "loopback": the ngrok agent / local reverse proxy runs on this
+/// Default "loopback": the local reverse proxy (Nginx) runs on this
 /// same host, so it connects from 127.0.0.1 or ::1. Set TRUST_PROXY only if
 /// a proxy fronts this API from a different address.
 ///
@@ -82,7 +82,7 @@ function trustProxySetting(): boolean | string[] {
   // reintroducing the forgeable-header hole.
   if (/^\d+$/.test(raw)) {
     throw new Error(
-      `TRUST_PROXY must name the proxy's address, not a hop count ("${raw}"). Use "loopback" for a local reverse proxy/ngrok agent, or the proxy's IP/CIDR.`,
+      `TRUST_PROXY must name the proxy's address, not a hop count ("${raw}"). Use "loopback" for a local reverse proxy such as Nginx, or the proxy's IP/CIDR.`,
     );
   }
   const values = raw.split(",").map((v) => v.trim()).filter(Boolean);
@@ -117,6 +117,7 @@ function positivePort(): number {
 
 export const env = {
   port: positivePort(),
+  host: process.env.HOST?.trim() || "127.0.0.1",
   nodeEnv: process.env.NODE_ENV ?? "development",
   trustProxy: trustProxySetting(),
   rateLimit: {
@@ -137,14 +138,6 @@ export const env = {
   // instead of failing open. See .env.example for what to set locally.
   jwtSecret: requiredSecret("JWT_SECRET"),
   jwtExpiresIn: duration("JWT_EXPIRES_IN", "8h", 30 * 24 * 60 * 60),
-  // The Tauri desktop app gets a much longer-lived token than the web login
-  // (auth.service.ts's login() picks between the two based on the request's
-  // Origin - see app.ts's own Tauri-origin allowlist for the same three
-  // values) - it's an installed app on a known company PC, not a browser tab
-  // that might be on a shared/public machine, so staying logged in across
-  // days/weeks is the actually-wanted behavior there, not a risk tradeoff
-  // the short web expiry is protecting against.
-  desktopJwtExpiresIn: duration("DESKTOP_JWT_EXPIRES_IN", "90d", 180 * 24 * 60 * 60),
   clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
   // Full path to the mysqldump binary, for hosts (notably Windows) where the

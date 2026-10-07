@@ -7,20 +7,11 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "build:tauri": "tsc -b && vite build --mode tauri",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
-    "tauri:build:local": "tauri build --config src-tauri/tauri.local.conf.json"
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.12.1",
-    "@tauri-apps/plugin-process": "^2.4.0",
-    "@tauri-apps/plugin-sql": "^2.5.0",
-    "@tauri-apps/plugin-updater": "^2.13.1",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "motion": "^13.4.0",
@@ -30,7 +21,6 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@tauri-apps/cli": "^2.12.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

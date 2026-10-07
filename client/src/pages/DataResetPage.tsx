@@ -4,7 +4,6 @@ import { resetAllData, verifyResetPasscode } from "../api/dataReset";
 import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
-import { confirmDownload } from "../components/DownloadConfirm";
 import { colors } from "../theme";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 import { InlineLoading, Spinner } from "../components/Spinner";
@@ -127,11 +126,6 @@ export function DataResetPage() {
       // produces - before anything is wiped server-side. If the backup
       // itself fails (e.g. mysqldump isn't installed), the reset is
       // aborted rather than proceeding without a safety copy.
-      if (!(await confirmDownload("Database backup"))) {
-        throw new Error(
-          "Reset was cancelled - the safety backup wasn't downloaded, so nothing was changed.",
-        );
-      }
       try {
         await downloadDatabaseBackup();
       } catch (err) {

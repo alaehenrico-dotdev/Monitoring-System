@@ -9,7 +9,7 @@ import type { AddressInfo } from "net";
  * real client:
  *
  *  1. `trust proxy` - which peers are allowed to tell us the client's IP.
- *     server.ts listens directly as well as behind ngrok, so a forged
+ *     server.ts listens directly as well as behind Nginx, so a forged
  *     X-Forwarded-For from a direct connection must not be able to change
  *     `req.ip` (and so must not be able to hand its sender a fresh rate
  *     limit bucket per request).
@@ -44,7 +44,7 @@ function ipEchoApp(trustProxy: boolean | string | string[]): Express {
 
 describe("trust proxy - whose X-Forwarded-For is believed", () => {
   it("uses the forwarded client IP when the request really does come from a trusted proxy", async () => {
-    // "loopback" is the shipped default: the ngrok agent runs on this same
+    // "loopback" is the shipped default: the reverse proxy runs on this same
     // machine, so it reaches the API over 127.0.0.1 and its X-Forwarded-For
     // carries the real visitor.
     await withServer(ipEchoApp("loopback"), async (baseUrl) => {

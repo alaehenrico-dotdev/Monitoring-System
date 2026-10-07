@@ -16,7 +16,6 @@ import {
 import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
-import { confirmDownload } from "../components/DownloadConfirm";
 import {
   filterNotes,
   pdfFileName,
@@ -280,7 +279,6 @@ export function DailyReportPage() {
     // thing.
     if (reportSection === "all") {
       const allName = `daily-report-${report.date}.xls`;
-      if (!(await confirmDownload("Excel", allName))) return;
       downloadExcel(allName, [online, offline, total].join(""));
       return;
     }
@@ -290,7 +288,6 @@ export function DailyReportPage() {
       total,
     };
     const sectionName = `daily-report-${reportSection}-${report.date}.xls`;
-    if (!(await confirmDownload("Excel", sectionName))) return;
     downloadExcel(sectionName, bySection[reportSection]);
   }
 
@@ -330,7 +327,6 @@ export function DailyReportPage() {
       reportSection === "all" ? undefined : reportSection,
       report.date,
     );
-    if (!(await confirmDownload("PDF", pdfName))) return;
     try {
       await progress.track(() =>
         downloadTablePdf({

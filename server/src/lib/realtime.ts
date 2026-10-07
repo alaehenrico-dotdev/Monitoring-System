@@ -10,7 +10,7 @@ import { verifyToken } from "../utils/jwt";
  *
  * The browser WebSocket API can't set an Authorization header, and this
  * codebase's only auth precedent is that header (middleware/auth.ts) - rather
- * than inventing a query-string token (which ngrok's local inspector and any
+ * than inventing a query-string token (which proxy logs and any
  * access log would then capture), a connection is accepted un-authenticated
  * and must send `{"type":"auth","token":"<jwt>"}` as its first message within
  * AUTH_TIMEOUT_MS or it's closed. Only authenticated sockets receive
@@ -59,7 +59,7 @@ export function attachRealtime(server: HttpServer): void {
     });
   });
 
-  // Standard ws dead-connection reaping (ping/pong) - ngrok and other
+  // Standard ws dead-connection reaping (ping/pong) - Nginx and other
   // proxies in front of this server commonly drop idle connections without
   // ever sending a close frame, so a missed pong is the only signal.
   const heartbeat = setInterval(() => {

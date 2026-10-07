@@ -100,8 +100,7 @@ describe("CsvTools - export/import round trip", () => {
     const { onImportRow } = renderCsvTools();
 
     fireEvent.click(screen.getByRole("button", { name: "Export" }));
-    // Export now awaits the download confirmation (which resolves straight
-    // away outside the desktop app), so the download lands a tick later.
+    // The browser download is triggered asynchronously by the export action.
     await waitFor(() => expect(downloadCsv).toHaveBeenCalledTimes(1));
     const [, content] = vi.mocked(downloadCsv).mock.calls[0];
 

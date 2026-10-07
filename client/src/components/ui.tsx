@@ -25,6 +25,12 @@ interface NumberCellInputProps {
   className?: string;
   style?: CSSProperties;
   "data-cell"?: string;
+  /** Native tooltip - StockGrid uses it for cell history and validation hints. */
+  title?: string;
+  "aria-invalid"?: boolean;
+  /** Hover is tracked on the wrapper, so it still fires over the stepper buttons. */
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }
 
 /**
@@ -37,12 +43,12 @@ interface NumberCellInputProps {
  * These replacement buttons only ever run onChange - never onBlur's commit
  * directly - so a click steps the draft value exactly like typing would.
  */
-export function NumberCellInput({ value, onChange, onBlur, onKeyDown, step = 1, className = "", style, ...rest }: NumberCellInputProps) {
+export function NumberCellInput({ value, onChange, onBlur, onKeyDown, step = 1, className = "", style, onMouseEnter, onMouseLeave, ...rest }: NumberCellInputProps) {
   function stepBy(delta: number) {
     onChange(String((Number(value) || 0) + delta));
   }
   return (
-    <span className="ae-number-cell" style={style}>
+    <span className="ae-number-cell" style={style} onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}>
       <input
         className={`ae-input ae-input-cell ${className}`.trim()}
         type="number"

@@ -4,7 +4,6 @@ import { downloadDatabaseBackup, restoreDatabaseBackup } from "../api/backup";
 import { verifyResetPasscode } from "../api/dataReset";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
-import { confirmDownload } from "../components/DownloadConfirm";
 import { InlineLoading } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { colors } from "../theme";
@@ -69,11 +68,6 @@ export function DatabaseRestoreCard() {
     setUploaded(0);
     setStatus("backing-up");
     try {
-      if (!(await confirmDownload("Database backup"))) {
-        throw new Error(
-          "Restore was cancelled - the safety backup of the current data wasn't downloaded, so nothing was changed.",
-        );
-      }
       try {
         await downloadDatabaseBackup();
       } catch (err) {
