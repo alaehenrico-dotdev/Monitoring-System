@@ -734,19 +734,21 @@ export function ManualCountPage() {
                             }
                             className="ae-cat-toggle"
                           >
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                transform: isCollapsed
-                                  ? "rotate(-90deg)"
-                                  : "none",
-                                transition:
-                                  "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
-                              }}
-                            >
-                              <ChevronIcon />
+                            <span className="ae-cat-label">
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  transform: isCollapsed
+                                    ? "rotate(-90deg)"
+                                    : "none",
+                                  transition:
+                                    "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                                }}
+                              >
+                                <ChevronIcon />
+                              </span>
+                              {category}
                             </span>
-                            {category}
                           </button>
                         </td>
                       </tr>

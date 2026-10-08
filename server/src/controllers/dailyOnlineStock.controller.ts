@@ -3,8 +3,25 @@ import { z } from "zod";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
+import { MAX_EXTRAS_PER_COLUMN } from "../utils/stockExtras";
 import { healOpeningStocks } from "../services/manualCounts.service";
 import { getOnlineGrid, saveOnlineEntry } from "../services/dailyOnlineStock.service";
+
+// Added columns' individual amounts ("Save individually" - see
+// utils/stockExtras.ts). Which column keys are allowed, and that the column
+// they belong to ends up equal to their sum, are the service's call: those
+// are rules about the stock model, not about the request's shape.
+const extrasSchema = z
+  .array(
+    z.object({
+      columnKey: z.string().min(1).max(64),
+      slotIndex: z.number().int().min(1).max(MAX_EXTRAS_PER_COLUMN),
+      amount: z.number().min(0),
+    }),
+  )
+  .max(600)
+  .optional();
+const clearExtraColumnsSchema = z.array(z.string().min(1).max(64)).max(32).optional();
 
 const entrySchema = z.object({
   stockInOffToOl: z.number().min(0).optional(),
@@ -17,6 +34,8 @@ const entrySchema = z.object({
   // balance on a file's first date - no .min(0), a negative opening stock
   // is a real thing a business's own external sheet can already show.
   openingStock: z.number().optional(),
+  extras: extrasSchema,
+  clearExtraColumns: clearExtraColumnsSchema,
 });
 
 export async function getOnlineStockGrid(req: Request, res: Response) {

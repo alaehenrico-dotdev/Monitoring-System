@@ -1,9 +1,8 @@
 import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
-import { colors } from "../theme";
 
-export type ToastVariant = "info" | "error" | "warning";
+export type ToastVariant = "info" | "success" | "error" | "warning";
 
 interface ToastProps {
   /// String or JSX; null hides the toast.
@@ -30,10 +29,53 @@ interface ToastProps {
   offset?: number;
 }
 
-const ACCENT: Record<ToastVariant, string> = {
-  info: colors.gold,
-  error: colors.danger,
-  warning: colors.warningText,
+/**
+ * One hue per variant, used for both the icon tile's fill and its glyph (see
+ * ToastIcon below). Fixed hex rather than the theme tokens: the tile is a
+ * small saturated badge that has to read as "good / bad / careful" at a
+ * glance in both light and dark mode, and `colors.danger`/`warningText` are
+ * body-text colors tuned for contrast against the page, not for this.
+ */
+const HUE: Record<ToastVariant, string> = {
+  info: "#4C8DF6",
+  success: "#27A567",
+  error: "#E03E52",
+  warning: "#E0A800",
+};
+
+/// 16px glyphs, drawn rather than typed: the check/cross/bang in the system
+/// font sit off-centre at this size and shift between platforms.
+function ToastIcon({ variant }: { variant: ToastVariant }) {
+  const stroke = {
+    strokeWidth: 2,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    fill: "none",
+    stroke: "currentColor",
+  };
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
+      {variant === "success" && <path d="M3.5 8.5 6.5 11.5 12.5 5" {...stroke} />}
+      {variant === "error" && <path d="M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5" {...stroke} />}
+      {variant !== "success" && variant !== "error" && (
+        <>
+          <circle cx="8" cy="8" r="5.75" {...stroke} />
+          {variant === "warning" ? (
+            <path d="M8 5.25V8.5M8 10.75v.01" {...stroke} />
+          ) : (
+            <path d="M8 7.5v3.25M8 5.25v.01" {...stroke} />
+          )}
+        </>
+      )}
+    </svg>
+  );
+}
+
+const VARIANT_LABEL: Record<ToastVariant, string> = {
+  info: "Information",
+  success: "Success",
+  error: "Error",
+  warning: "Warning",
 };
 
 /**
@@ -113,42 +155,31 @@ export function Toast({
           exit={{ opacity: 0, y: 8, scale: 0.98 }}
           transition={{ duration: 0.2 }}
           role="status"
-          style={{
-            pointerEvents: "auto",
-            background: colors.surface,
-            color: colors.ink,
-            border: `1px solid ${colors.border}`,
-            borderLeft: `3px solid ${ACCENT[variant]}`,
-            borderRadius: 6,
-            boxShadow: "0 8px 28px rgba(12, 12, 12, 0.28)",
-            padding: "12px 14px",
-            fontSize: 12.5,
-            lineHeight: 1.45,
-            display: "flex",
-            gap: 10,
-            alignItems: "flex-start",
-          }}
+          className="ae-toast"
+          style={{ pointerEvents: "auto" }}
         >
-          <div style={{ flex: 1, minWidth: 0, wordBreak: "break-word" }}>
-            {message}
-          </div>
+          {/* The variant reads as a coloured badge rather than an edge stripe:
+              at a glance it is the only thing that has to be seen, and it
+              carries the same meaning to someone who can't separate a 3px
+              red border from a 3px amber one. */}
+          <span
+            className="ae-toast-icon"
+            role="img"
+            aria-label={VARIANT_LABEL[variant]}
+            style={{
+              color: HUE[variant],
+              background: `color-mix(in srgb, ${HUE[variant]} 20%, var(--ae-surface))`,
+              borderColor: `color-mix(in srgb, ${HUE[variant]} 40%, transparent)`,
+            }}
+          >
+            <ToastIcon variant={variant} />
+          </span>
+          <div className="ae-toast-message">{message}</div>
           {action && (
             <button
               type="button"
               onClick={action.onClick}
-              style={{
-                border: "none",
-                background: "transparent",
-                cursor: "pointer",
-                fontSize: 12.5,
-                fontWeight: 700,
-                lineHeight: 1.45,
-                textDecoration: "underline",
-                color: colors.ink,
-                padding: 2,
-                flexShrink: 0,
-                whiteSpace: "nowrap",
-              }}
+              className="ae-toast-action"
             >
               {action.label}
             </button>
@@ -158,18 +189,17 @@ export function Toast({
             onClick={onDismiss}
             aria-label="Dismiss"
             title="Dismiss"
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-              fontSize: 14,
-              lineHeight: 1,
-              color: colors.subtleInk,
-              padding: 2,
-              flexShrink: 0,
-            }}
+            className="ae-toast-close"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+              <path
+                d="M4 4 12 12M12 4 4 12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.75}
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
         </motion.div>
       )}

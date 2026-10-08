@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   dailyOnlineStock: [] as Record<string, unknown>[],
   dailyOfflineStock: [] as Record<string, unknown>[],
+  dailyStockExtra: [] as Record<string, unknown>[],
   manualCount: [] as Record<string, unknown>[],
   importBatch: [] as Record<string, unknown>[],
   changeLog: [] as Record<string, unknown>[],
@@ -36,6 +37,7 @@ vi.mock("../lib/prisma", () => ({
       cb({
         dailyOnlineStock: makeModel(db.dailyOnlineStock),
         dailyOfflineStock: makeModel(db.dailyOfflineStock),
+        dailyStockExtra: makeModel(db.dailyStockExtra),
         manualCount: makeModel(db.manualCount),
         importBatch: makeModel(db.importBatch),
         changeLog: makeModel(db.changeLog),
@@ -59,6 +61,9 @@ describe("resetAllData", () => {
     // upsellOut lives directly on the Offline entry row - deleting the row
     // is all that's needed to reset it too, nothing separate to assert.
     db.dailyOfflineStock.push({ id: 10, productId: 1, entryDate: new Date("2026-06-01"), shift: "NIGHT", deliveryOut: 12, upsellOut: 5 });
+    // The individual amounts behind a column that was given extra input
+    // columns belong to that entry, so they go with it.
+    db.dailyStockExtra.push({ id: 1, location: "OFFLINE", productId: 1, entryDate: new Date("2026-06-01"), shift: "NIGHT", columnKey: "backloads", slotIndex: 1, amount: 12 });
 
     const token = verifyPasscode(env.dataResetPasscode, USER);
     if (!token) throw new Error("test setup: passcode didn't verify against env.dataResetPasscode");
@@ -66,5 +71,6 @@ describe("resetAllData", () => {
     await resetAllData(token, USER);
 
     expect(db.dailyOfflineStock).toHaveLength(0);
+    expect(db.dailyStockExtra).toHaveLength(0);
   });
 });

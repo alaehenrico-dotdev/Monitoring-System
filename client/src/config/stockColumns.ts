@@ -66,10 +66,6 @@ export const onlineStockColumns: GridColumn[] = [
   { key: "remainingStock", label: "Remaining Stocks", editable: false },
 ];
 
-/// The five input columns behind Delivery (Out) - shown when its header arrow
-/// is opened. Delivery (Out) is their sum and nothing else reads them.
-export const deliverySlotColumns = [1, 2, 3, 4, 5].map((n) => ({ key: `delivery${n}`, label: `Delivery ${n}` }));
-
 /// Offline grid columns (Section 4.3).
 export const offlineStockColumns: GridColumn[] = [
     // Not editable in the live grid (Section 4.6 auto-carries it forward from
@@ -111,11 +107,16 @@ export const offlineStockColumns: GridColumn[] = [
     {
       key: "deliveryOut",
       label: "Delivery (Out)",
-      // Locked: it is the total of the five Delivery columns the header arrow
-      // reveals (StockGrid `subColumns`), which belong to this column only.
-      editable: false,
+      // Directly editable, and - like every other editable column - able to be
+      // broken down into as many extra input columns as a shift actually
+      // needs (right-click the header; see hooks/useExtraColumns.ts). It used
+      // to be locked behind exactly five fixed "Delivery 1..5" sub-columns
+      // revealed by a header arrow, which was both a second mechanism doing
+      // the same job and a hard limit on a figure that has no natural limit.
+      // Those five are still the storage behind the first five added columns
+      // (server: resolveDelivery), so nothing already entered was lost.
+      editable: true,
       tone: "delivery",
-      subColumns: deliverySlotColumns,
       importable: true,
       aliases: ["Delivery(Out)"],
     },

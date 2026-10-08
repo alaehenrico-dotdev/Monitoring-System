@@ -308,7 +308,10 @@ export function VarianceReportPage() {
       {rows && (
         <>
           <RowGlowScroll>
-            <table className="ae-table" style={{ minWidth: 640 }}>
+            <table
+              className="ae-table ae-table--center-head"
+              style={{ minWidth: 640 }}
+            >
               <thead>
                 <tr>
                   {[

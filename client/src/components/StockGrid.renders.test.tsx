@@ -47,7 +47,8 @@ describe("StockGrid render cost", () => {
       <StockGrid rows={rows} columns={columns} onCommit={onCommit} />,
     );
 
-    const cells = container.querySelectorAll<HTMLInputElement>("input[data-cell]");
+    const cells =
+      container.querySelectorAll<HTMLInputElement>("input[data-cell]");
     expect(cells.length).toBe(ROWS * 2);
 
     counter.renders = 0;
@@ -56,7 +57,9 @@ describe("StockGrid render cost", () => {
 
     // Report the number so before/after is visible in the test log.
     // eslint-disable-next-line no-console -- deliberate benchmark output, see comment above
-    console.log(`cell renders for one keystroke: ${afterOneKeystroke} (grid has ${cells.length} editable cells)`);
+    console.log(
+      `cell renders for one keystroke: ${afterOneKeystroke} (grid has ${cells.length} editable cells)`,
+    );
 
     expect(cells[0].value).toBe("12");
     expect(afterOneKeystroke).toBeLessThanOrEqual(2);
@@ -68,7 +71,9 @@ describe("StockGrid render cost", () => {
     const { container } = render(
       <StockGrid rows={rows} columns={columns} onCommit={onCommit} />,
     );
-    const cell = container.querySelector<HTMLInputElement>('input[data-cell="1:stockIn"]')!;
+    const cell = container.querySelector<HTMLInputElement>(
+      'input[data-cell="1:stockIn"]',
+    )!;
     fireEvent.change(cell, { target: { value: "42" } });
     expect(cell.value).toBe("42");
     fireEvent.blur(cell);
@@ -105,7 +110,9 @@ describe("StockGrid render cost", () => {
       <StockGrid rows={rows} columns={columns} onCommit={first} />,
     );
     rerender(<StockGrid rows={rows} columns={columns} onCommit={second} />);
-    const cell = container.querySelector<HTMLInputElement>('input[data-cell="3:stockOut"]')!;
+    const cell = container.querySelector<HTMLInputElement>(
+      'input[data-cell="3:stockOut"]',
+    )!;
     fireEvent.change(cell, { target: { value: "7" } });
     fireEvent.blur(cell);
     expect(first).not.toHaveBeenCalled();
@@ -131,9 +138,18 @@ describe("StockGrid display additions", () => {
     );
   }
 
-  function row(id: number, category: string, entry: Record<string, unknown>): GridRow {
+  function row(
+    id: number,
+    category: string,
+    entry: Record<string, unknown>,
+  ): GridRow {
     return {
-      product: { id, sku: `AFP00${id}`, name: `Product ${id}`, category } as Product,
+      product: {
+        id,
+        sku: `AFP00${id}`,
+        name: `Product ${id}`,
+        category,
+      } as Product,
       entry,
     };
   }
@@ -175,15 +191,33 @@ describe("StockGrid display additions", () => {
     expect(pcts.filter((p) => p === "100.0%").length).toBe(2);
   });
 
-  it("offers a single expand/collapse control for every category", () => {
-    const { getByText } = renderGrid([
+  it("expands and collapses every category on the page's command", () => {
+    const rows = [
       row(1, "Sauces", { openingStock: 1, remainingStock: 1 }),
       row(2, "Vinegars", { openingStock: 1, remainingStock: 1 }),
-    ]);
-    // Categories default to collapsed, so the control offers to expand.
-    const toggle = getByText("Expand all");
-    fireEvent.click(toggle);
-    expect(getByText("Collapse all")).toBeTruthy();
+    ];
+    const seen: boolean[] = [];
+    const onAny = (v: boolean) => seen.push(v);
+    const { container, rerender } = renderGrid(rows, {
+      onAnyExpandedChange: onAny,
+    });
+    const collapsed = () =>
+      container.querySelectorAll("tr.ae-cat-row.ae-row-collapsed").length;
+    // Categories default to collapsed.
+    expect(seen.at(-1)).toBe(false);
+    expect(collapsed()).toBe(2);
+    rerender(
+      <StockGrid
+        rows={rows}
+        columns={readOnlyColumns}
+        onCommit={vi.fn()}
+        readOnly
+        onAnyExpandedChange={onAny}
+        expandAllCommand={{ expanded: true, id: 1 }}
+      />,
+    );
+    expect(seen.at(-1)).toBe(true);
+    expect(collapsed()).toBe(0);
   });
 
   it("keeps subtotal rows out of the collapsed-row class, so totals survive collapsing", () => {

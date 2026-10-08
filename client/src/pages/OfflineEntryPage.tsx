@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StockGrid, type GridRow } from "../components/StockGrid";
-import {
-  computeDeliverySlots,
-  getOfflineGrid,
-  saveOfflineEntry,
-} from "../api/offlineStock";
+import { getOfflineGrid, saveOfflineEntry } from "../api/offlineStock";
 import { getOnlineGrid } from "../api/onlineStock";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui";
@@ -20,6 +16,8 @@ import {
   ReportIcon,
   SaveIcon,
   UndoIcon,
+  CollapseAllIcon,
+  ExpandAllIcon,
 } from "../components/icons";
 import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
@@ -40,18 +38,23 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
+import { ExtraSaveModes } from "../components/ExtraSaveModes";
 import { ConflictResolution } from "../components/ConflictResolution";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
   describePendingChanges,
   detectConflicts,
   usePendingEntryChanges,
-  type LastSavedBatch,
 } from "../hooks/usePendingEntryChanges";
+import { offlineStockColumns as columns } from "../config/stockColumns";
 import {
-  deliverySlotColumns,
-  offlineStockColumns as columns,
-} from "../config/stockColumns";
+  columnsWithExtras,
+  flattenExtraPayload,
+  MAX_EXTRAS_PER_COLUMN,
+  useExtraSaveModes,
+  useGridExtraColumns,
+  withoutExtraColumns,
+} from "../hooks/useExtraColumns";
 import { matchesSearch } from "../utils/search";
 import {
   matchesRowFilter,
@@ -78,8 +81,7 @@ import {
 import { colors } from "../theme";
 import type { Shift } from "../types";
 
-/// Re-derives Offline Stocks + Remaining Stock (+ Delivery (Out), which is
-/// itself the sum of the five delivery columns) from a last-saved entry
+/// Re-derives Offline Stocks + Remaining Stock from a last-saved entry
 /// plus a staged (not-yet-saved) diff on top of it - shared by the live grid
 /// preview (usePendingEntryChanges' `recompute`, below) and validateImportRow's
 /// advisory negative-stock pre-check, so the two never drift apart on what
@@ -96,10 +98,10 @@ function computeOfflineFigures(
   const productionIn = changes.productionIn ?? Number(entry.productionIn ?? 0);
   const backloads = changes.backloads ?? Number(entry.backloads ?? 0);
   const upsellOut = changes.upsellOut ?? Number(entry.upsellOut ?? 0);
-  const { deliveryOut, ...deliverySlots } = computeDeliverySlots(
-    entry,
-    changes,
-  );
+  // Read straight off the column, same as every other figure here. Any extra
+  // columns it was broken into stage their own total into it (see
+  // useGridExtraColumns.commitExtraCell), so this is already their sum.
+  const deliveryOut = changes.deliveryOut ?? Number(entry.deliveryOut ?? 0);
 
   const offlineStock = calculateOfflineStock(
     openingStock,
@@ -113,7 +115,7 @@ function computeOfflineFigures(
     backloads,
     upsellOut,
   );
-  return { ...deliverySlots, deliveryOut, offlineStock, remainingStock };
+  return { deliveryOut, offlineStock, remainingStock };
 }
 
 export function OfflineEntryPage() {
@@ -133,9 +135,7 @@ export function OfflineEntryPage() {
   const [zoom, setZoom] = useZoom("offline-entry");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [rowFilter, setRowFilter] = useRowFilter(
-    "ala-eh-rowfilter:offline",
-  );
+  const [rowFilter, setRowFilter] = useRowFilter("ala-eh-rowfilter:offline");
   const [saving, setSaving] = useState(false);
   // Real per-item percent (see handleSaveAll) for LoadingOverlay's ring -
   // kept local to this page rather than routed through the shared top
@@ -145,16 +145,15 @@ export function OfflineEntryPage() {
   const [savePercent, setSavePercent] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  // One level of Undo for the most recent Save - the pre-save value of
-  // every field (and manual count) that batch touched, keyed the same way as
-  // pending edits. Undoing re-submits those old values through the same save
-  // endpoints (so it shows up in the Change Log like any other edit, not a
-  // silent rewrite) and is itself one-shot: undoing clears this, it doesn't
-  // turn into a redo stack.
-  const [lastSavedBatch, setLastSavedBatch] = useState<LastSavedBatch | null>(
-    null,
-  );
-  const [undoing, setUndoing] = useState(false);
+  // Expand/collapse-all for the grid's category rows. The grid owns the
+  // per-category state; this is the toolbar icon's side of it - a command
+  // (id makes repeat clicks distinct) going in, and whether anything is
+  // currently expanded coming back out so the icon can flip.
+  const [catCommand, setCatCommand] = useState<{
+    expanded: boolean;
+    id: number;
+  } | null>(null);
+  const [anyCatExpanded, setAnyCatExpanded] = useState(false);
   // productId -> the Import History batch its still-staged Manual Count came
   // from - see OnlineEntryPage.tsx's matching state for the full reasoning.
   const [importedBatchByProduct, setImportedBatchByProduct] = useState<
@@ -201,11 +200,7 @@ export function OfflineEntryPage() {
   // resolution and blocking Save until decided.
   const conflicts = useMemo(
     () =>
-      detectConflicts(rows, pending, baselines, [
-        ...columns,
-        ...deliverySlotColumns,
-        manualCountColumn,
-      ]),
+      detectConflicts(rows, pending, baselines, [...columns, manualCountColumn]),
     [rows, pending, baselines],
   );
 
@@ -239,6 +234,47 @@ export function OfflineEntryPage() {
   // staged edits overlaid, so it can't answer either question.
   const getSavedValue = useSavedValueLookup(rows);
 
+  // Extra input columns added from a column header's right-click menu. Their
+  // amounts stage through the same pending set as any other cell; the column
+  // they were added to carries their total, which is what Remaining Stock,
+  // the totals rows, the variance and the % column all keep reading.
+  const {
+    extras,
+    addColumns,
+    removeColumns,
+    clearColumns,
+    commitExtraCell,
+    withExtraTotals,
+    buildSavePayload,
+    saveColumns: extraSaveColumns,
+    extraColumnDefs,
+  } = useGridExtraColumns({
+    storageKey: `ala-eh-extracols:offline:${date}:${shift}`,
+    rows,
+    pending,
+    stageMany,
+    getSavedValue,
+    columns,
+  });
+  const { getMode: getExtraSaveMode, setMode: setExtraSaveMode } =
+    useExtraSaveModes("offline");
+
+  function handleAddExtraColumns(mainKey: string, count: number) {
+    if (addColumns(mainKey, count) === 0)
+      setError(
+        `A column can have at most ${MAX_EXTRAS_PER_COLUMN} extra columns.`,
+      );
+  }
+
+  // Column labels the Preview/Discard dialogs resolve a staged edit's key
+  // against - the grid's own columns plus whichever extra columns currently
+  // exist, so an added column's amount reads as "Stocks In (Off-Ol) +2"
+  // rather than its raw storage key.
+  const previewColumns = useMemo(
+    () => [...csvColumns, ...extraColumnDefs],
+    [csvColumns, extraColumnDefs],
+  );
+
   // Ctrl+Z / Ctrl+Shift+Z over staged edits, while any exist to undo.
   useUndoRedoKeys(undo, redo, canEdit);
 
@@ -249,7 +285,6 @@ export function OfflineEntryPage() {
     // changes, so the shift being left keeps whatever it had staged (still
     // there if switched back to) and the one being loaded picks up whatever
     // it already had staged (if any), instead of both always starting empty.
-    setLastSavedBatch(null); // Undo has no such persistence - it can only ever apply to the shift it was saved on
   });
   useEffect(() => {
     getOfflineGrid(date, shift)
@@ -330,15 +365,23 @@ export function OfflineEntryPage() {
   function handleCommitMany(
     edits: { productId: number; key: string; value: number }[],
   ) {
+    // withExtraTotals re-totals any main column whose added columns this
+    // batch touched (Zero all over a category), so the sum can never drift
+    // from the amounts behind it.
     stageMany(
-      edits.map((e) => ({
-        ...e,
-        savedValue: getSavedValue(e.productId, e.key) ?? 0,
-      })),
+      withExtraTotals(
+        edits.map((e) => ({
+          ...e,
+          savedValue: getSavedValue(e.productId, e.key) ?? 0,
+        })),
+      ),
     );
   }
 
   function handleCommit(productId: number, key: string, value: number) {
+    // An added column's cell re-stages its main column's total alongside it,
+    // as a single undo step - see hooks/useExtraColumns.ts.
+    if (commitExtraCell(productId, key, value)) return;
     const savedValue = Number(
       rows?.find((r) => r.product.id === productId)?.entry[key] ?? 0,
     );
@@ -397,39 +440,46 @@ export function OfflineEntryPage() {
     // visible once Save has actually started.
     setShowPreview(false);
     const failed: string[] = [];
-    const revertTo: LastSavedBatch = {};
     const savedManualCountIds: number[] = [];
     const entries = Object.entries(pending);
     for (let i = 0; i < entries.length; i++) {
       const [productIdStr, changes] = entries[i];
       const productId = Number(productIdStr);
-      // Snapshot each field's pre-save value before overwriting it, so
-      // Undo has something to put back - taken from `rows` (last-saved
-      // truth), same source handleCommit uses to decide what counts as
-      // "changed" in the first place.
       const priorRow = rows?.find((r) => r.product.id === productId);
-      const oldValues: Record<string, number> = {};
-      for (const key of Object.keys(changes))
-        if (key !== MANUAL_COUNT_KEY)
-          oldValues[key] = Number(priorRow?.entry[key] ?? 0);
-      // Manual count's own prior value, from the same state handleCommit
-      // reads to stage it in the first place - captured here too (even
-      // though it's `null` whenever this save is the one creating the
-      // count) so Undo can revert it instead of silently leaving it in
-      // place. Read before this product's own save below overwrites it.
-      const hadManualCountChange = MANUAL_COUNT_KEY in changes;
-      const priorManualCount = manualCounts[productId] ?? null;
 
       try {
-        const { [MANUAL_COUNT_KEY]: manualCount, ...entryChanges } = changes;
-        if (Object.keys(entryChanges).length > 0) {
-          const saved = await saveOfflineEntry(
-            productId,
-            date,
-            shift,
-            entryChanges,
-          );
-          mergeEntry(productId, saved);
+        const { [MANUAL_COUNT_KEY]: manualCount, ...staged } = changes;
+        // "Save total only": an added column's own amount is draft state, and
+        // the main column is already staged as the sum of them, so only that
+        // sum is submitted. (Storing the amounts individually is Phase 2 -
+        // see ExtraSaveModes' disabled option.)
+        const entryChanges = withoutExtraColumns(staged);
+        // Per-column choice from the Save dialog: "individually" sends each
+        // added column's amount so it comes back after a reload, "total
+        // only" names the column so any amounts the server still holds for
+        // it are dropped. The main column's total is in entryChanges either
+        // way, and the server recomputes it from these amounts regardless.
+        const { extras: extraPayload, clearExtraColumns } = buildSavePayload(
+          productId,
+          (mainKey) => getExtraSaveMode(mainKey) === "individual",
+        );
+        if (
+          Object.keys(entryChanges).length > 0 ||
+          extraPayload.length > 0 ||
+          clearExtraColumns.length > 0
+        ) {
+          const saved = await saveOfflineEntry(productId, date, shift, {
+            ...entryChanges,
+            extras: extraPayload,
+            clearExtraColumns,
+          });
+          // The endpoint returns the daily row, which carries only each
+          // column's total - folding the amounts back on keeps the added
+          // columns showing their figures without a second round trip.
+          mergeEntry(productId, {
+            ...(saved as unknown as Record<string, unknown>),
+            ...flattenExtraPayload(extraPayload),
+          });
         }
         // After the entry itself, so the count's variance is measured
         // against the freshly saved Remaining Stock.
@@ -445,12 +495,6 @@ export function OfflineEntryPage() {
           savedManualCountIds.push(productId);
         }
         clear(productId);
-        if (Object.keys(oldValues).length > 0 || hadManualCountChange) {
-          revertTo[productId] = {
-            fields: oldValues,
-            ...(hadManualCountChange ? { manualCount: priorManualCount } : {}),
-          };
-        }
       } catch (e) {
         const name = priorRow?.product.name ?? `#${productId}`;
         // The server's own message (e.g. the negative-stock guard's "would
@@ -470,7 +514,6 @@ export function OfflineEntryPage() {
         return next;
       });
     }
-    if (Object.keys(revertTo).length > 0) setLastSavedBatch(revertTo);
     if (failed.length) {
       setError(`Failed to save: ${failed.join("; ")}`);
     }
@@ -479,6 +522,15 @@ export function OfflineEntryPage() {
     // this Save (see CsvTools' notifyCommitted doc comment). Safe to call
     // even when nothing was actually imported - it's a no-op then.
     csvToolsRef.current?.notifyCommitted();
+    // "Save total only": the amounts are now part of the saved main
+    // column, so the columns that held them have nothing left to show.
+    // Columns saved individually keep theirs - that is the whole point.
+    if (failed.length === 0)
+      clearColumns(
+        extraSaveColumns
+          .filter((c) => getExtraSaveMode(c.mainKey) !== "individual")
+          .map((c) => c.mainKey),
+      );
     return failed.length === 0;
   }
 
@@ -487,7 +539,7 @@ export function OfflineEntryPage() {
   // any of this", so an encoder doesn't have to hand-revert each cell (or
   // reload the page and lose the sessionStorage-persisted draft some other
   // way). Never touches the server - there's nothing to undo once this
-  // runs, unlike handleUndoLastSave.
+  // runs.
   function handleClearAll() {
     clearAll();
     setShowClearConfirm(false);
@@ -584,55 +636,6 @@ export function OfflineEntryPage() {
     return undefined;
   }
 
-  // Re-submits the pre-save values captured above through the same save
-  // endpoints - an undo is its own tracked edit (shows up in the Change Log
-  // like any other save), not a silent rewrite of history. One level only:
-  // undoing consumes lastSavedBatch rather than pushing onto a redo stack.
-  async function handleUndoLastSave() {
-    if (!lastSavedBatch) return;
-    setError(null);
-    setUndoing(true);
-    const failed: string[] = [];
-    for (const [productIdStr, revert] of Object.entries(lastSavedBatch)) {
-      const productId = Number(productIdStr);
-      try {
-        if (Object.keys(revert.fields).length > 0) {
-          const saved = await saveOfflineEntry(
-            productId,
-            date,
-            shift,
-            revert.fields,
-          );
-          mergeEntry(productId, saved);
-        }
-        // After the entry fields, same order Save itself uses - the
-        // restored count's variance is measured against the Remaining Stock
-        // this just put back, not the one Save overwrote it with. `null`
-        // here means the count didn't exist before Save created it -
-        // saveManualCount clears it back to absent rather than restoring a
-        // number.
-        if ("manualCount" in revert) {
-          await saveManualCount(
-            productId,
-            date,
-            shift,
-            "OFFLINE",
-            revert.manualCount ?? null,
-          );
-        }
-      } catch (e) {
-        const name =
-          rows?.find((r) => r.product.id === productId)?.product.name ??
-          `#${productId}`;
-        const reason = e instanceof Error ? e.message : "unknown error";
-        failed.push(`${name} (${reason})`);
-      }
-    }
-    setUndoing(false);
-    setLastSavedBatch(null);
-    if (failed.length) setError(`Failed to undo: ${failed.join("; ")}`);
-  }
-
   // PDF of the grid as currently filtered (search / category), with every
   // category fully listed. Built from the row data by utils/tablePdf.ts - not
   // by printing the page - so the layout is the same on every page and
@@ -649,7 +652,12 @@ export function OfflineEntryPage() {
           title: "Daily Offline Stock Monitoring",
           subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`,
           notes: filterNotes({ category: categoryFilter, query }),
-          sections: [stockGridSection(visibleRows, columns)],
+          // Added columns print beside the column they add up to; with
+          // none, this is the same column list - and the same PDF - as
+          // before.
+          sections: [
+            stockGridSection(visibleRows, columnsWithExtras(columns, extras)),
+          ],
         }),
       );
     } catch (e) {
@@ -678,25 +686,28 @@ export function OfflineEntryPage() {
               minWidth: 0,
             }}
           >
-            {canEdit && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleUndoLastSave}
-                disabled={!lastSavedBatch || undoing}
-                aria-label="Undo last save"
-                title="Undo last save"
-                className="ae-tap-target ae-toolbar-icon-btn"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <UndoIcon />
-              </Button>
-            )}
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                setCatCommand({ expanded: !anyCatExpanded, id: Date.now() })
+              }
+              disabled={!visibleRows}
+              aria-label={
+                anyCatExpanded
+                  ? "Collapse every category"
+                  : "Expand every category"
+              }
+              title={
+                anyCatExpanded
+                  ? "Collapse every category"
+                  : "Expand every category"
+              }
+              className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
+            >
+              {anyCatExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
+            </Button>
             <SearchInput
               value={query}
               onChange={setQuery}
@@ -879,6 +890,11 @@ export function OfflineEntryPage() {
             percentOfTotalKey="remainingStock"
             onCommitMany={canEdit ? handleCommitMany : undefined}
             getSavedValue={getSavedValue}
+            expandAllCommand={catCommand}
+            onAnyExpandedChange={setAnyCatExpanded}
+            extraColumns={extras}
+            onAddExtraColumns={canEdit ? handleAddExtraColumns : undefined}
+            onRemoveExtraColumns={canEdit ? removeColumns : undefined}
             historyTable="daily_offline_stock"
           />
         </div>
@@ -891,10 +907,13 @@ export function OfflineEntryPage() {
       {showPreview && (
         <Modal title="Unsaved changes" onClose={() => setShowPreview(false)}>
           <PendingChangesPreview
-            items={describePendingChanges(rows, pending, [
-              ...csvColumns,
-              ...deliverySlotColumns,
-            ])}
+            items={describePendingChanges(rows, pending, previewColumns)}
+          />
+          <ExtraSaveModes
+            columns={extraSaveColumns}
+            getMode={getExtraSaveMode}
+            onChange={setExtraSaveMode}
+            individualEnabled
           />
           <div
             style={{
@@ -929,10 +948,7 @@ export function OfflineEntryPage() {
           onClose={() => setShowClearConfirm(false)}
         >
           <PendingChangesPreview
-            items={describePendingChanges(rows, pending, [
-              ...csvColumns,
-              ...deliverySlotColumns,
-            ])}
+            items={describePendingChanges(rows, pending, previewColumns)}
           />
           <p
             style={{

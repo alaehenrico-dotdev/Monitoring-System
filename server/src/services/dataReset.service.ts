@@ -87,6 +87,11 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     const result = await prisma.$transaction(async (tx) => {
     const onlineStock = await tx.dailyOnlineStock.deleteMany();
     const offlineStock = await tx.dailyOfflineStock.deleteMany();
+    // The individual amounts behind any grid column that was given extra
+    // input columns (daily_stock_extra) - transactional data belonging to the
+    // rows deleted just above, so it goes with them rather than being left
+    // pointing at dates that no longer have entries.
+    const stockExtras = await tx.dailyStockExtra.deleteMany();
     const manualCounts = await tx.manualCount.deleteMany();
     // Import History (Section: CSV import into Manual Count) - deleted
     // before change_log below, since its own rows reference change_log
@@ -106,6 +111,7 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     const deleted = {
       onlineStock: onlineStock.count,
       offlineStock: offlineStock.count,
+      stockExtras: stockExtras.count,
       manualCounts: manualCounts.count,
       importBatches: importBatches.count,
       changeLog: changeLog.count,

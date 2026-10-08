@@ -1,4 +1,11 @@
-import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { motion, MotionConfig } from "motion/react";
 import { toolbarLayoutTransition } from "../motion";
 
@@ -47,7 +54,13 @@ const ToolbarModeContext = createContext<ToolbarMode>("full");
  * Within a tier the search box / selects / date pickers are elastic in
  * CSS, so any leftover room is absorbed by the filters - no blank gap.
  */
-export function Toolbar({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Toolbar({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   const rowRef = useRef<HTMLDivElement>(null);
   const fullSizerRef = useRef<HTMLDivElement>(null);
   const compactSizerRef = useRef<HTMLDivElement>(null);
@@ -73,8 +86,10 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
       // while a layout animation is running. The sizers are `.ae-toolbar`
       // too, so their border-box width is directly comparable.
       const available = row.offsetWidth;
-      const fullNeeded = Math.ceil(fullSizer.getBoundingClientRect().width) + FIT_SLACK;
-      const compactNeeded = Math.ceil(compactSizer.getBoundingClientRect().width) + FIT_SLACK;
+      const fullNeeded =
+        Math.ceil(fullSizer.getBoundingClientRect().width) + FIT_SLACK;
+      const compactNeeded =
+        Math.ceil(compactSizer.getBoundingClientRect().width) + FIT_SLACK;
 
       // Hysteresis per edge, evaluated relative to the CURRENT tier, so a
       // width sitting right at a boundary settles into one state instead
@@ -100,7 +115,12 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
           break;
         case "full":
         default:
-          next = available >= fullNeeded ? "full" : available >= compactNeeded ? "compact" : "circle";
+          next =
+            available >= fullNeeded
+              ? "full"
+              : available >= compactNeeded
+                ? "compact"
+                : "circle";
           break;
       }
 
@@ -175,13 +195,26 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
          decision could flip back and forth. With zero-duration transitions
          the clones always sit at their final size. Only the visible row
          (outside this MotionConfig) animates. */}
-      <div aria-hidden style={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          width: 0,
+          height: 0,
+          overflow: "hidden",
+        }}
+      >
         <MotionConfig transition={{ duration: 0 }}>
           <ToolbarModeContext.Provider value="full">
             <div
               ref={fullSizerRef}
-              className="ae-toolbar"
-              style={{ position: "absolute", visibility: "hidden", flexWrap: "nowrap", width: "max-content" }}
+              className="ae-toolbar ae-toolbar--sizer"
+              style={{
+                position: "absolute",
+                visibility: "hidden",
+                flexWrap: "nowrap",
+                width: "max-content",
+              }}
             >
               {children}
             </div>
@@ -189,8 +222,13 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
           <ToolbarModeContext.Provider value="compact">
             <div
               ref={compactSizerRef}
-              className="ae-toolbar ae-toolbar--compact"
-              style={{ position: "absolute", visibility: "hidden", flexWrap: "nowrap", width: "max-content" }}
+              className="ae-toolbar ae-toolbar--sizer ae-toolbar--compact"
+              style={{
+                position: "absolute",
+                visibility: "hidden",
+                flexWrap: "nowrap",
+                width: "max-content",
+              }}
             >
               {children}
             </div>
@@ -198,8 +236,13 @@ export function Toolbar({ children, className = "" }: { children: ReactNode; cla
           <ToolbarModeContext.Provider value="circle">
             <div
               ref={circleSizerRef}
-              className="ae-toolbar ae-toolbar--compact ae-toolbar--circle"
-              style={{ position: "absolute", visibility: "hidden", flexWrap: "nowrap", width: "max-content" }}
+              className="ae-toolbar ae-toolbar--sizer ae-toolbar--compact ae-toolbar--circle"
+              style={{
+                position: "absolute",
+                visibility: "hidden",
+                flexWrap: "nowrap",
+                width: "max-content",
+              }}
             >
               {children}
             </div>
@@ -218,7 +261,11 @@ export function ToolbarControls({ children }: { children: ReactNode }) {
   useContext(ToolbarModeContext);
 
   return (
-    <motion.div layout transition={toolbarLayoutTransition} className="ae-toolbar-controls">
+    <motion.div
+      layout
+      transition={toolbarLayoutTransition}
+      className="ae-toolbar-controls"
+    >
       {children}
     </motion.div>
   );
