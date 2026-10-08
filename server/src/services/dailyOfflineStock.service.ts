@@ -3,10 +3,21 @@ import { prisma, serializableTransaction, type Db } from "../lib/prisma";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { productRepository } from "../repositories/productRepository";
+import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
 import { recordChange } from "./changeLog.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { propagateOpeningStock } from "./manualCounts.service";
 import { HttpError } from "../utils/HttpError";
+import {
+  columnKeysOf,
+  DELIVERY_COLUMN,
+  deliveryExtrasFromLegacy,
+  flattenExtras,
+  splitDeliveryExtras,
+  totalsFromExtras,
+  validateExtras,
+  type StockExtraInput,
+} from "../utils/stockExtras";
 import {
   calculateOfflineRemaining,
   calculateOfflineStock,
@@ -36,7 +47,15 @@ export interface OfflineEntryInput {
   /// See OnlineEntryInput's own doc comment (dailyOnlineStock.service.ts) -
   /// same reasoning, same CSV-import-only exception to auto-carry-forward.
   openingStock?: number;
+  /// Added columns' individual amounts, and the columns whose stored amounts
+  /// to drop - see OnlineEntryInput, which documents both in full.
+  extras?: StockExtraInput[];
+  clearExtraColumns?: string[];
 }
+
+/// Every stock figure of one Offline row, with none of the inputs that are
+/// about HOW it is being saved rather than what it holds.
+type OfflineFigures = Required<Omit<OfflineEntryInput, "openingStock" | "extras" | "clearExtraColumns">>;
 
 const DELIVERY_SLOTS = ["delivery1", "delivery2", "delivery3", "delivery4", "delivery5"] as const;
 
@@ -62,7 +81,7 @@ export function computeOpeningStock(productId: number, entryDate: Date, shift: S
   return dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 }
 
-function calculate(opening: number, input: Required<Omit<OfflineEntryInput, "openingStock">>) {
+function calculate(opening: number, input: OfflineFigures) {
   const offlineStock = calculateOfflineStock(opening, input.stockInOlToOff, input.stockOutOffToOl);
   const remainingStock = calculateOfflineRemaining(offlineStock, input.productionIn, input.deliveryOut, input.backloads, input.upsellOut);
   return { offlineStock, remainingStock };
@@ -75,15 +94,29 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
   const rows = await dailyOfflineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
 
+  // Added columns for the whole sheet in one query - see the matching comment
+  // in dailyOnlineStock.service.ts's getOnlineGrid.
+  const extraRows = await dailyStockExtraRepository.findAllForDate("OFFLINE", entryDate, shift);
+  const extrasByProduct = new Map<number, typeof extraRows>();
+  for (const e of extraRows) extrasByProduct.set(e.productId, [...(extrasByProduct.get(e.productId) ?? []), e]);
+
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
   const openingStockByProduct = await dailyOfflineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
 
   return products.map((product) => {
+    const stored = extrasByProduct.get(product.id) ?? [];
     const existing = rowByProduct.get(product.id);
-    if (existing) return { product, entry: { ...existing, ...resolveDelivery(existing, {}) }, isSaved: true };
+    if (existing) {
+      // Delivery (Out)'s first five added columns are the legacy slot columns
+      // on this row, not daily_stock_extra rows - so they're read from there
+      // and the stored overflow (slots 6+) sits on top.
+      const extras = [...deliveryExtrasFromLegacy(existing), ...stored];
+      return { product, entry: { ...existing, ...resolveDelivery(existing, {}), ...flattenExtras(extras) }, isSaved: true };
+    }
+    const extras = stored;
 
     const openingStock = openingStockByProduct.get(product.id) ?? 0;
-    const zero: Required<Omit<OfflineEntryInput, "openingStock">> = {
+    const zero: OfflineFigures = {
       stockInOlToOff: 0,
       stockOutOffToOl: 0,
       productionIn: 0,
@@ -99,7 +132,7 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
     const { offlineStock, remainingStock } = calculate(openingStock, zero);
     return {
       product,
-      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, offlineStock, remainingStock },
+      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, offlineStock, remainingStock, ...flattenExtras(extras) },
       isSaved: false,
     };
   });
@@ -135,15 +168,39 @@ export async function saveOfflineEntry(
   if (!product) throw HttpError.notFound("Active product not found");
   const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
 
+  const extras = input.extras ?? [];
+  const extrasError = validateExtras("OFFLINE", extras);
+  if (extrasError) throw HttpError.badRequest(extrasError);
+  // Recomputed here, not trusted from the request - see the matching comment
+  // in dailyOnlineStock.service.ts's saveOnlineEntry.
+  const extraTotals = totalsFromExtras(extras);
+
   const openingStock =
     input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift, db));
-  const merged: Required<Omit<OfflineEntryInput, "openingStock">> = {
-    stockInOlToOff: input.stockInOlToOff ?? toNum(existing?.stockInOlToOff),
-    stockOutOffToOl: input.stockOutOffToOl ?? toNum(existing?.stockOutOffToOl),
-    productionIn: input.productionIn ?? toNum(existing?.productionIn),
-    ...resolveDelivery(existing, input),
-    backloads: input.backloads ?? toNum(existing?.backloads),
-    upsellOut: input.upsellOut ?? toNum(existing?.upsellOut),
+  // Delivery (Out) resolves from its added columns when it has any (their
+  // first five being the legacy slot columns), and otherwise exactly as it
+  // always has - a flat figure, typed or imported, landing in slot 1.
+  const deliveryExtras = splitDeliveryExtras(extras);
+  const resolvedDelivery =
+    extraTotals[DELIVERY_COLUMN] === undefined
+      ? resolveDelivery(existing, input)
+      : { ...deliveryExtras.legacy, deliveryOut: extraTotals[DELIVERY_COLUMN] };
+  // "Save total only" on Delivery (Out) collapses the legacy slot columns back
+  // into slot 1 as well. Without this the next load would read the stale
+  // breakdown off them and re-create the very columns just folded up.
+  const clearingDelivery =
+    extraTotals[DELIVERY_COLUMN] === undefined && (input.clearExtraColumns ?? []).includes(DELIVERY_COLUMN);
+  const delivery = clearingDelivery
+    ? { delivery1: resolvedDelivery.deliveryOut, delivery2: 0, delivery3: 0, delivery4: 0, delivery5: 0, deliveryOut: resolvedDelivery.deliveryOut }
+    : resolvedDelivery;
+
+  const merged: OfflineFigures = {
+    stockInOlToOff: extraTotals.stockInOlToOff ?? input.stockInOlToOff ?? toNum(existing?.stockInOlToOff),
+    stockOutOffToOl: extraTotals.stockOutOffToOl ?? input.stockOutOffToOl ?? toNum(existing?.stockOutOffToOl),
+    productionIn: extraTotals.productionIn ?? input.productionIn ?? toNum(existing?.productionIn),
+    ...(delivery as ReturnType<typeof resolveDelivery>),
+    backloads: extraTotals.backloads ?? input.backloads ?? toNum(existing?.backloads),
+    upsellOut: extraTotals.upsellOut ?? input.upsellOut ?? toNum(existing?.upsellOut),
   };
   const { offlineStock, remainingStock } = calculate(openingStock, merged);
 
@@ -158,14 +215,28 @@ export async function saveOfflineEntry(
   const data = { productId, entryDate, shift, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOfflineStockRepository.upsert(existing?.id, data, db);
 
+  // Columns whose stored amounts this save replaces - see the matching
+  // comment in dailyOnlineStock.service.ts's saveOnlineEntry.
+  const touchedColumns = [...new Set([...columnKeysOf(extras), ...(input.clearExtraColumns ?? [])])];
+  const priorExtras = touchedColumns.length
+    ? await dailyStockExtraRepository.findForProduct("OFFLINE", productId, entryDate, shift, db)
+    : [];
+  // Delivery (Out)'s first five amounts are already saved, as the row's own
+  // legacy slot columns - only its overflow becomes daily_stock_extra rows.
+  const storedExtras = [
+    ...extras.filter((e) => e.columnKey !== DELIVERY_COLUMN),
+    ...deliveryExtras.overflow,
+  ];
+  await dailyStockExtraRepository.replaceColumns("OFFLINE", productId, entryDate, shift, touchedColumns, storedExtras, userId, db);
+
   await recordChange(
     {
       tableName: TABLE,
       recordId: saved.id,
       action: existing ? "UPDATE" : "CREATE",
       changedById: userId,
-      oldValue: existing,
-      newValue: saved,
+      oldValue: existing ? { ...existing, ...flattenExtras(priorExtras) } : existing,
+      newValue: { ...saved, ...flattenExtras(extras) },
     },
     db,
   );

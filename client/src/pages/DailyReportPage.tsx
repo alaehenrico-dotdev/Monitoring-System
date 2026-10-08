@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { Button } from "../components/ui";
 import { Dropdown } from "../components/Dropdown";
@@ -9,6 +9,10 @@ import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { CategoryFilter } from "../components/CategoryFilter";
+import {
+  columnsWithExtras,
+  extraColumnsFromRows,
+} from "../hooks/useExtraColumns";
 import {
   onlineStockColumns,
   offlineStockColumns,
@@ -253,19 +257,35 @@ export function DailyReportPage() {
       ? rows.filter((r) => r.product.category === categoryFilter)
       : rows;
 
+  // Columns an encoder added to the live grids and saved individually come
+  // back flattened onto these rows (server: utils/stockExtras.ts), so the
+  // report can show the breakdown beside each total it adds up to. A date
+  // with none of them leaves every column list - and so every table, PDF and
+  // export - exactly as it was.
+  const onlineExtras = useMemo(
+    () => extraColumnsFromRows(report?.online as unknown as GridRow[] | null, onlineStockColumns),
+    [report],
+  );
+  const offlineExtras = useMemo(
+    () => extraColumnsFromRows(report?.offline as unknown as GridRow[] | null, offlineStockColumns),
+    [report],
+  );
+  const onlineColumns = useMemo(() => columnsWithExtras(onlineStockColumns, onlineExtras), [onlineExtras]);
+  const offlineColumns = useMemo(() => columnsWithExtras(offlineStockColumns, offlineExtras), [offlineExtras]);
+
   async function handleExport() {
     if (!report) return;
     const online = section(
       "ONLINE STOCK MONITORING",
       report.date,
       byCategory(report.online) as unknown as CsvSectionRow[],
-      onlineStockColumns,
+      onlineColumns,
     );
     const offline = section(
       "OFFLINE STOCK MONITORING",
       report.date,
       byCategory(report.offline) as unknown as CsvSectionRow[],
-      offlineStockColumns,
+      offlineColumns,
     );
     const total = totalSection(report.date, byCategory(report.total));
 
@@ -301,7 +321,7 @@ export function DailyReportPage() {
       sections.push(
         stockGridSection(
           byCategory(report.online) as unknown as GridRow[],
-          onlineStockColumns,
+          onlineColumns,
           { title: `ONLINE STOCK MONITORING - ${report.date}` },
         ),
       );
@@ -310,7 +330,7 @@ export function DailyReportPage() {
       sections.push(
         stockGridSection(
           byCategory(report.offline) as unknown as GridRow[],
-          offlineStockColumns,
+          offlineColumns,
           { title: `OFFLINE STOCK MONITORING - ${report.date}` },
         ),
       );
@@ -440,6 +460,7 @@ export function DailyReportPage() {
                   key={`online-${reportVersion}`}
                   rows={byCategory(report.online) as unknown as GridRow[]}
                   columns={onlineStockColumns}
+                  extraColumns={onlineExtras}
                   onCommit={noop}
                   readOnly
                 />
@@ -455,6 +476,7 @@ export function DailyReportPage() {
                   key={`offline-${reportVersion}`}
                   rows={byCategory(report.offline) as unknown as GridRow[]}
                   columns={offlineStockColumns}
+                  extraColumns={offlineExtras}
                   onCommit={noop}
                   readOnly
                 />

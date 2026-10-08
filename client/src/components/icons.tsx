@@ -496,3 +496,42 @@ export function CheckIcon() {
     </svg>
   );
 }
+
+/// Collapse every category (StockGrid's page-level toolbar button): two
+/// chevrons pointing in toward each other.
+export function CollapseAllIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4.5 2.5 8 6l3.5-3.5" />
+      <path d="M4.5 13.5 8 10l3.5 3.5" />
+    </svg>
+  );
+}
+
+/// Expand every category: two chevrons pointing out, away from each other.
+export function ExpandAllIcon() {
+  return (
+    <svg
+      width="15"
+      height="15"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4.5 6 8 2.5 11.5 6" />
+      <path d="M4.5 10 8 13.5 11.5 10" />
+    </svg>
+  );
+}

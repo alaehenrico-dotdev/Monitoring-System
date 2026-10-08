@@ -47,40 +47,42 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  onlineEntries    DailyOnlineStock[]  @relation("OnlineEncodedBy")
-  offlineEntries   DailyOfflineStock[] @relation("OfflineEncodedBy")
-  manualCounts     ManualCount[]       @relation("CountedBy")
-  changeLogEntries ChangeLog[]         @relation("ChangedBy")
-  importBatches    ImportBatch[]       @relation("ImportedBy")
+  onlineEntries    DailyOnlineStock[]   @relation("OnlineEncodedBy")
+  offlineEntries   DailyOfflineStock[]  @relation("OfflineEncodedBy")
+  manualCounts     ManualCount[]        @relation("CountedBy")
+  changeLogEntries ChangeLog[]          @relation("ChangedBy")
+  importBatches    ImportBatch[]        @relation("ImportedBy")
   reportHistory    ReportHistoryEntry[] @relation("GeneratedBy")
-  systemLogEntries SystemLogEntry[]    @relation("UpdatedOn")
+  systemLogEntries SystemLogEntry[]     @relation("UpdatedOn")
+  stockExtras      DailyStockExtra[]    @relation("ExtraEncodedBy")
 
   @@map("users")
 }
 
 /// 5.1 products - master product list shared by every table in the system
 model Product {
-  id        Int      @id @default(autoincrement())
+  id                Int      @id @default(autoincrement())
   // The actual SKU code (e.g. "AFP007"), separate from `name` - nullable
   // since not every product has been assigned one yet (see seed.ts), unique
   // when present so two products can never claim the same code.
-  sku       String?  @unique
-  name      String
-  category  String
-  unit      String
-  isActive  Boolean  @default(true)
-  sortOrder Int      @default(0)
+  sku               String?  @unique
+  name              String
+  category          String
+  unit              String
+  isActive          Boolean  @default(true)
+  sortOrder         Int      @default(0)
   // Section 4.1/4.5 - Low Stock. Null means "no alert configured" for this
   // SKU (most products, until an admin sets one) rather than "alert at
   // zero" - Total Stocks/Dashboard only flag a product once this is set.
   // Compared against Total Stocks' remainingStock, same unit as `unit`.
   lowStockThreshold Decimal? @db.Decimal(14, 2)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   onlineStocks  DailyOnlineStock[]
   offlineStocks DailyOfflineStock[]
   manualCounts  ManualCount[]
+  stockExtras   DailyStockExtra[]
 
   // Retained for compatibility with existing databases; the client no
   // longer exposes a sync endpoint.
@@ -90,23 +92,23 @@ model Product {
 
 /// 5.2 daily_online_stock - one row per product, per date (Online Monitoring table)
 model DailyOnlineStock {
-  id                Int      @id @default(autoincrement())
-  productId         Int
-  product           Product  @relation(fields: [productId], references: [id])
-  entryDate         DateTime @db.Date
-  shift             Shift    @default(NIGHT)
-  openingStock      Decimal  @default(0) @db.Decimal(14, 2)
-  stockInOffToOl    Decimal  @default(0) @db.Decimal(14, 2)
-  stockOutOlToOff   Decimal  @default(0) @db.Decimal(14, 2)
-  onlineStock       Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
-  productionIn      Decimal  @default(0) @db.Decimal(14, 2)
-  fulfillmentOut    Decimal  @default(0) @db.Decimal(14, 2)
-  rts               Decimal  @default(0) @db.Decimal(14, 2)
-  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
-  encodedById       Int?
-  encodedBy         User?    @relation("OnlineEncodedBy", fields: [encodedById], references: [id])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  product         Product  @relation(fields: [productId], references: [id])
+  entryDate       DateTime @db.Date
+  shift           Shift    @default(NIGHT)
+  openingStock    Decimal  @default(0) @db.Decimal(14, 2)
+  stockInOffToOl  Decimal  @default(0) @db.Decimal(14, 2)
+  stockOutOlToOff Decimal  @default(0) @db.Decimal(14, 2)
+  onlineStock     Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
+  productionIn    Decimal  @default(0) @db.Decimal(14, 2)
+  fulfillmentOut  Decimal  @default(0) @db.Decimal(14, 2)
+  rts             Decimal  @default(0) @db.Decimal(14, 2)
+  remainingStock  Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
+  encodedById     Int?
+  encodedBy       User?    @relation("OnlineEncodedBy", fields: [encodedById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([productId, entryDate, shift])
   // Serves cross-product lookups (findAllForDate, dashboard monthly
@@ -123,29 +125,29 @@ model DailyOnlineStock {
 
 /// 5.3 daily_offline_stock - one row per product, per date (Offline Monitoring table)
 model DailyOfflineStock {
-  id                Int      @id @default(autoincrement())
-  productId         Int
-  product           Product  @relation(fields: [productId], references: [id])
-  entryDate         DateTime @db.Date
-  shift             Shift    @default(NIGHT)
-  openingStock      Decimal  @default(0) @db.Decimal(14, 2)
-  stockInOlToOff    Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockOutOlToOff
-  stockOutOffToOl   Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockInOffToOl
-  offlineStock      Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
-  productionIn      Decimal  @default(0) @db.Decimal(14, 2)
-  deliveryOut       Decimal  @default(0) @db.Decimal(14, 2) // calc: sum of delivery1..delivery5
-  delivery1         Decimal  @default(0) @db.Decimal(14, 2)
-  delivery2         Decimal  @default(0) @db.Decimal(14, 2)
-  delivery3         Decimal  @default(0) @db.Decimal(14, 2)
-  delivery4         Decimal  @default(0) @db.Decimal(14, 2)
-  delivery5         Decimal  @default(0) @db.Decimal(14, 2)
-  backloads         Decimal  @default(0) @db.Decimal(14, 2)
-  upsellOut         Int      @default(0)
-  remainingStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
-  encodedById       Int?
-  encodedBy         User?    @relation("OfflineEncodedBy", fields: [encodedById], references: [id])
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  product         Product  @relation(fields: [productId], references: [id])
+  entryDate       DateTime @db.Date
+  shift           Shift    @default(NIGHT)
+  openingStock    Decimal  @default(0) @db.Decimal(14, 2)
+  stockInOlToOff  Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockOutOlToOff
+  stockOutOffToOl Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockInOffToOl
+  offlineStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
+  productionIn    Decimal  @default(0) @db.Decimal(14, 2)
+  deliveryOut     Decimal  @default(0) @db.Decimal(14, 2) // calc: sum of delivery1..delivery5
+  delivery1       Decimal  @default(0) @db.Decimal(14, 2)
+  delivery2       Decimal  @default(0) @db.Decimal(14, 2)
+  delivery3       Decimal  @default(0) @db.Decimal(14, 2)
+  delivery4       Decimal  @default(0) @db.Decimal(14, 2)
+  delivery5       Decimal  @default(0) @db.Decimal(14, 2)
+  backloads       Decimal  @default(0) @db.Decimal(14, 2)
+  upsellOut       Int      @default(0)
+  remainingStock  Decimal  @default(0) @db.Decimal(14, 2) // calc: becomes next shift's opening
+  encodedById     Int?
+  encodedBy       User?    @relation("OfflineEncodedBy", fields: [encodedById], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@unique([productId, entryDate, shift])
   // See the matching index on DailyOnlineStock above - same reasoning.
@@ -154,6 +156,50 @@ model DailyOfflineStock {
   // uses this index.
   @@index([updatedAt])
   @@map("daily_offline_stock")
+}
+
+/// Extra input columns an encoder added to one Online/Offline grid column
+/// (client: hooks/useExtraColumns.ts, server: utils/stockExtras.ts). The
+/// column they were added to keeps the total - it is a real column on
+/// daily_online_stock / daily_offline_stock and stays the single source of
+/// truth for Remaining Stock, the totals rows and every report. These are
+/// only the individual amounts behind that total, stored when the encoder
+/// chooses "Save individually" so the columns come back after a reload.
+///
+/// Deliberately a side table rather than more columns on the daily tables:
+/// how many there are is chosen per sheet at runtime, so there is no fixed
+/// column count to add (unlike Delivery (Out)'s five fixed slots, which are
+/// columns on daily_offline_stock).
+model DailyStockExtra {
+  id          Int           @id @default(autoincrement())
+  /// ONLINE or OFFLINE - which grid's column this belongs to. TOTAL is in
+  /// the enum but never used here: Total Stocks is derived, not encoded.
+  location    StockLocation
+  productId   Int
+  product     Product       @relation(fields: [productId], references: [id])
+  entryDate   DateTime      @db.Date
+  shift       Shift         @default(NIGHT)
+  /// The main column's own key, exactly as the grid config spells it
+  /// ("stockInOffToOl", "fulfillmentOut", ...) - see utils/stockExtras.ts,
+  /// which is the only place that decides which keys are accepted.
+  columnKey   String        @db.VarChar(64)
+  /// 1-based, stable for the life of the column: deleting the middle of
+  /// three added columns leaves slots 1 and 3, rather than renumbering.
+  slotIndex   Int
+  amount      Decimal       @default(0) @db.Decimal(14, 2)
+  encodedById Int?
+  encodedBy   User?         @relation("ExtraEncodedBy", fields: [encodedById], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Named explicitly: Prisma's own generated name for a six-column unique
+  // key on this table is 76 characters, and MySQL caps an identifier at 64.
+  @@unique([location, productId, entryDate, shift, columnKey, slotIndex], map: "daily_stock_extra_slot_key")
+  // Serves the grid/report load, which fetches a whole sheet's extras at
+  // once without a productId - the unique key above can't help there, since
+  // productId is not its leftmost column.
+  @@index([location, entryDate, shift])
+  @@map("daily_stock_extra")
 }
 
 /// 5.4 manual_counts - physical count capture; variance is always derived
@@ -286,14 +332,14 @@ model ReportHistoryEntry {
 /// Legacy desktop-updater history. The model remains to preserve records in
 /// existing deployments; current application code no longer uses this table.
 model SystemLogEntry {
-  id            Int      @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   // Kept as a string to preserve historical event values.
-  event         String
-  fromVersion   String
-  toVersion     String
-  userId        Int?
-  user          User?    @relation("UpdatedOn", fields: [userId], references: [id])
-  occurredAt    DateTime @default(now())
+  event       String
+  fromVersion String
+  toVersion   String
+  userId      Int?
+  user        User?    @relation("UpdatedOn", fields: [userId], references: [id])
+  occurredAt  DateTime @default(now())
 
   @@index([occurredAt])
   @@map("system_log_entries")

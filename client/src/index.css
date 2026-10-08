@@ -352,6 +352,17 @@ table input[type="number"] {
 .ae-cat-toggle:hover {
   filter: brightness(1.12);
 }
+/* The bar spans the table's full width, so when the table is scrolled
+   sideways its label would slide away with it. Pinning the label (chevron +
+   category name) to the left edge of the scroll area keeps it readable; the
+   3px offset is the bar's own gold edge, so nothing jumps at scroll 0. */
+.ae-cat-toggle > .ae-cat-label {
+  position: sticky;
+  left: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .ae-cat-toggle:focus-visible {
   outline: 2px solid #f5c000;
   outline-offset: -2px;
@@ -1466,7 +1477,17 @@ table input[type="number"] {
 .ae-toolbar input[type="search"] {
   flex: 0 1 280px;
   width: 280px !important;
-  min-width: 72px;
+  /* The search box is the elastic part of the full tier: it may shrink from
+     280px down to this before the toolbar drops to icons. The hidden
+     measuring clone (.ae-toolbar--sizer, below) sizes it at this same
+     minimum - measuring it at 280px made the toolbar demand room the
+     search box never actually needs, so labels turned into icons while
+     there was still plenty of space. */
+  min-width: 140px;
+}
+.ae-toolbar--sizer:not(.ae-toolbar--compact) input[type="search"] {
+  flex-basis: 140px;
+  width: 140px !important;
 }
 .ae-toolbar .ae-select,
 .ae-toolbar .ae-select-trigger,
@@ -1713,7 +1734,9 @@ table input[type="number"] {
   transform: scaleX(1);
 }
 
-/* Button labels collapse to nothing in compact/circle. */
+/* Button labels are always collapsed: toolbar actions (Undo, Save, Clear,
+   PDF, Report, Import, ...) are icon-only at every tier. The title attribute
+   on each button supplies the hover tooltip. */
 .ae-segment-label,
 .ae-toolbar-btn-label {
   display: inline-block;
@@ -1724,22 +1747,49 @@ table input[type="number"] {
     max-width 220ms ease,
     opacity 160ms ease;
 }
-.ae-toolbar--compact .ae-segment-label,
-.ae-toolbar--compact .ae-toolbar-btn-label {
+.ae-toolbar .ae-segment-label,
+.ae-toolbar .ae-toolbar-btn-label {
   max-width: 0;
   opacity: 0;
 }
 
-/* ---- Compact: icon-only buttons ---------------------------------------- */
-.ae-toolbar--compact .ae-segment-group {
+/* Yellow on hover: every text-style control in the toolbar (category, row
+   filter, date, shift, the other filters and the plain text buttons) turns
+   the theme's gold accent while hovered, keyboard-focused or - for the
+   dropdown/date triggers - open. Solid-yellow primary buttons (Save) and
+   danger buttons keep their own look. The extra :not()s only raise
+   specificity above the base colors set earlier in this section. */
+.ae-toolbar .ae-select-trigger:hover:not(:disabled),
+.ae-toolbar .ae-select-trigger:focus-visible,
+.ae-toolbar .ae-select-trigger[aria-expanded="true"],
+.ae-toolbar .ae-date-trigger:hover:not(:disabled),
+.ae-toolbar .ae-date-trigger:focus-visible,
+.ae-toolbar .ae-date-trigger[aria-expanded="true"],
+.ae-toolbar
+  .ae-btn:not(.ae-btn-danger):not(.ae-btn-primary):not(.ae-toolbar-primary):not(
+    :disabled
+  ):hover,
+.ae-toolbar
+  .ae-btn:not(.ae-btn-danger):not(.ae-btn-primary):not(
+    .ae-toolbar-primary
+  ):focus-visible,
+.ae-toolbar .ae-toolbar-save:not(.ae-toolbar-primary):not(:disabled):hover,
+.ae-toolbar .ae-toolbar-save:not(.ae-toolbar-primary):focus-visible,
+.ae-toolbar .ae-segment-btn:not(:disabled):hover,
+.ae-toolbar .ae-segment-btn:focus-visible {
+  color: var(--ae-glass-accent);
+}
+
+/* ---- Icon-only buttons (every tier) ---------------------------------------- */
+.ae-toolbar .ae-segment-group {
   background: transparent;
   border-color: transparent;
   gap: 4px;
 }
-.ae-toolbar--compact .ae-segment-divider {
+.ae-toolbar .ae-segment-divider {
   display: none;
 }
-.ae-toolbar--compact .ae-segment-btn {
+.ae-toolbar .ae-segment-btn {
   width: var(--tb-h);
   height: var(--tb-h);
   min-width: var(--tb-h);
@@ -1749,19 +1799,19 @@ table input[type="number"] {
   border: none;
   background: var(--tb-field-bg);
 }
-.ae-toolbar--compact .ae-btn {
+.ae-toolbar .ae-btn {
   min-width: var(--tb-h);
   height: var(--tb-h);
   padding: 0 var(--tb-pad-x);
 }
-.ae-toolbar--compact .ae-btn,
-.ae-toolbar--compact .ae-toolbar-save {
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0;
 }
-.ae-toolbar--compact .ae-toolbar-save {
+.ae-toolbar .ae-toolbar-save {
   width: var(--tb-h);
   min-width: var(--tb-h);
   height: var(--tb-h);
@@ -1771,8 +1821,7 @@ table input[type="number"] {
 /* The gap: 0 above exists so an icon whose label collapsed to nothing stays
    centered. A button whose text is NOT in a label span (e.g. "[icon] PDF")
    keeps its text, so it needs its normal icon/text spacing back. */
-.ae-toolbar--compact
-  .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
+.ae-toolbar .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
   gap: 4px;
 }
 
@@ -1876,9 +1925,9 @@ table input[type="number"] {
   padding-right: var(--tb-pad-x);
 }
 /* Icon-only buttons (label collapsed away) are perfect squares. */
-.ae-toolbar--compact .ae-btn:has(.ae-toolbar-btn-label),
-.ae-toolbar--compact .ae-toolbar-save,
-.ae-toolbar--compact .ae-segment-btn {
+.ae-toolbar .ae-btn:has(.ae-toolbar-btn-label),
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-btn {
   width: var(--tb-h);
   min-width: var(--tb-h);
   max-width: var(--tb-h);
@@ -1893,6 +1942,16 @@ table input[type="number"] {
   padding-left: 0;
   padding-right: 0;
   flex: 0 0 var(--tb-h);
+}
+/* Expand/collapse-all categories: a bare icon, no border or box. */
+.ae-toolbar .ae-btn.ae-toolbar-collapse-btn,
+.ae-toolbar .ae-btn.ae-toolbar-collapse-btn:hover:not(:disabled),
+.ae-toolbar .ae-btn.ae-toolbar-collapse-btn:active:not(:disabled) {
+  /* !important: the generic "1px solid on every icon-only toolbar button"
+     rule above uses stacked :not()/:has() selectors that out-rank this one. */
+  border: none !important;
+  box-shadow: none;
+  background: transparent;
 }
 /* One icon size across buttons and dropdown/date leading icons. */
 .ae-toolbar .ae-btn svg,
@@ -2184,7 +2243,7 @@ table input[type="number"] {
   color: var(--ae-glass-text);
   border: none;
   border-radius: 6px;
-  padding: 12px 14px 10px;
+  padding: 9px 14px 6px;
   /* One duration + one curve for everything that moves when the header
      collapses/expands (height, padding, logo size, title spacing, fades), so
      the pieces read as a single motion. Ease-out with a long tail: fast
@@ -2252,7 +2311,7 @@ table input[type="number"] {
 .ae-page-header-toolbar-slot {
   min-width: 0;
   /* Padding (not a margin) so it collapses away with the row. */
-  padding-top: 3px;
+  padding-top: 0;
 }
 /* Bottom-center collapse ribbon - a bare white chevron sitting just above
    the header's bottom edge (no circle, no fill, no glow). Hidden until the
@@ -2422,7 +2481,7 @@ table input[type="number"] {
   margin-bottom: 0;
 }
 .ae-page-header p {
-  margin: 0 0 8px;
+  margin: 0 0 2px;
   color: var(--ae-glass-text-muted);
   font-family:
     "Inter",
@@ -2441,7 +2500,7 @@ table input[type="number"] {
   border: none;
   box-shadow: none;
   margin: 0;
-  padding: 5px;
+  padding: 2px 5px;
   --ae-toolbar-gap: 8px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -3402,14 +3461,14 @@ table input[type="number"] {
    Stock grid: readability additions (StockGrid.tsx)
    --------------------------------------------------------------------------- */
 
-/* Numbers right-align so digits line up column-wise and magnitudes are
-   comparable down the column; .ae-table already sets tabular-nums, so the
-   glyphs are the same width too. The two identity columns keep their own
-   left alignment - the :not() pair is what gives this the specificity to
-   beat the generic `.ae-table td { text-align: center }` above. */
+/* Numbers are centered on their columns (header and cells alike). .ae-table
+   already sets tabular-nums, so the glyphs are the same width too. The two
+   identity columns keep their own left alignment - the :not() pair is what
+   gives this the specificity to beat the generic `.ae-table th { text-align:
+   left }` above. */
 .ae-table--sticky-id td:not(.ae-cell-sku):not(.ae-cell-name),
 .ae-table--sticky-id th:not(.ae-sticky-sku):not(.ae-sticky-name) {
-  text-align: right;
+  text-align: center;
 }
 
 /* A cell holding nothing (zero / null) prints a dash instead of "0", dimmed
@@ -3483,35 +3542,6 @@ table input[type="number"] {
   background-color: color-mix(in srgb, #e0a800 16%, transparent) !important;
 }
 
-/* Expand/collapse-all bar above the grid. */
-.ae-grid-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 0 6px;
-}
-.ae-grid-tool-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--ae-text);
-  background: var(--ae-surface-glass);
-  border: 1px solid var(--ae-border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.ae-grid-tool-btn:hover {
-  background: var(--ae-surface-hover);
-}
-.ae-grid-tool-btn:focus-visible {
-  outline: 2px solid #f5c000;
-  outline-offset: 1px;
-}
-
 /* Quick Fill: fill this column down, from the column header. */
 .ae-fill-down-btn {
   margin-left: 4px;
@@ -3521,7 +3551,7 @@ table input[type="number"] {
   line-height: 1;
   color: inherit;
   background: transparent;
-  border: 1px solid currentColor;
+  border: none;
   border-radius: 4px;
   opacity: 0.55;
   cursor: pointer;
@@ -3532,18 +3562,32 @@ table input[type="number"] {
 
 /* Quick Fill: zero a whole category, from its bar. */
 .ae-cat-zero {
+  display: inline-flex;
+  align-items: center;
   margin-left: auto;
-  padding: 1px 8px;
+  /* Stays reachable at the right edge of the scroll area, like the label
+     stays at the left. */
+  position: sticky;
+  right: 8px;
+  /* A touch more vertical room than the pill this replaced: at 1px the
+     squared corners read as a cramped box rather than a deliberate one. */
+  padding: 2px 8px;
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
   border: 1px solid currentColor;
-  border-radius: 999px;
+  /* Same 6px as .ae-modal-panel / .ae-datepicker / .ae-page-header - every
+     piece of chrome in the app reads as one family of rounded corners. */
+  border-radius: 6px;
   opacity: 0.6;
   cursor: pointer;
 }
 .ae-cat-zero:hover {
   opacity: 1;
+  /* A squared button has the room for a fill the pill didn't; currentColor
+     is the category row's own text, so this works on its green in both
+     themes without naming a second colour. */
+  background: color-mix(in srgb, currentColor 14%, transparent);
 }
 .ae-cat-zero:focus-visible {
   outline: 2px solid #f5c000;
@@ -3564,4 +3608,213 @@ table input[type="number"] {
   background: var(--ae-bg-alt);
   border: 1px solid var(--ae-border);
   border-radius: 999px;
+}
+
+/* ---------------------------------------------------------------------------
+   Extra input columns on the entry grids (StockGrid + ColumnHeaderMenu +
+   ExtraSaveModes). Same floating-panel treatment as .ae-datepicker and
+   .ae-modal-panel - charcoal surface, hairline edge, 8px radius - so the
+   right-click menu reads as the same family of chrome as every other popover.
+   --------------------------------------------------------------------------- */
+.ae-col-menu {
+  position: fixed;
+  z-index: 310; /* above .ae-datepicker (300), which is above Modal (200) */
+  min-width: 204px;
+  padding: 5px;
+  background: #232323;
+  color: #e5e5e5;
+  border: 0.5px solid #525252;
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(12, 12, 12, 0.45);
+  font-size: 12.5px;
+  outline: none;
+  animation: ae-col-menu-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes ae-col-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-col-menu {
+    animation: none;
+  }
+}
+.ae-col-menu-title {
+  padding: 5px 9px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8f8f8f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ae-col-menu-item {
+  display: block;
+  width: 100%;
+  padding: 7px 9px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ae-col-menu-item--active:not(:disabled) {
+  background: #2a2a2a;
+}
+.ae-col-menu-item--danger {
+  color: #f0a3a3;
+}
+.ae-col-menu-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* An added column's header: a name input filling the cell, with its delete
+   control tucked at the right edge. The header keeps its main column's tone
+   fill, so both sit on the pastel in the brand ink, like every other coloured
+   header's text. */
+.ae-added-col-head {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding-right: 2px;
+}
+.ae-added-col-head .ae-extra-head-input {
+  flex: 1;
+  min-width: 0;
+}
+.ae-added-col-del {
+  padding: 0 3px;
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  opacity: 0.5;
+  cursor: pointer;
+}
+.ae-added-col-del:hover {
+  opacity: 1;
+}
+.ae-added-col-del:focus-visible {
+  outline: 2px solid #0c0c0c;
+  outline-offset: 1px;
+}
+
+/* One row per affected column in the "Review and save changes" dialog. */
+.ae-extra-savemode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 9px 0;
+  border-top: 1px solid var(--ae-border);
+}
+.ae-extra-savemode-switch {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+}
+.ae-extra-savemode-opt {
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ae-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ae-extra-savemode-opt--on {
+  color: #0c0c0c;
+  background: #f5c000;
+}
+.ae-extra-savemode-opt:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------------------------------------------------------------------------
+   Toast (components/Toast.tsx). One row: a coloured icon badge, the message,
+   an optional inline action, and the dismiss control - no edge stripe, no
+   heading. The variant lives entirely in the badge, which is the only part
+   that has to be legible at a glance.
+   --------------------------------------------------------------------------- */
+.ae-toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  border: 1px solid var(--ae-border);
+  /* Slightly softer than the 6px dialogs: a toast is a floating pill over the
+     page, not a panel docked into it. */
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(12, 12, 12, 0.28);
+}
+.ae-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+}
+.ae-toast-message {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ae-text-muted);
+  word-break: break-word;
+}
+.ae-toast-action {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ae-toast-action:hover {
+  border-color: var(--ae-text-muted);
+}
+.ae-toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  padding: 0;
+  color: var(--ae-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.ae-toast-close:hover {
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
 }

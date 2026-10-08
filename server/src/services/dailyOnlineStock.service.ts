@@ -3,10 +3,18 @@ import { prisma, serializableTransaction, type Db } from "../lib/prisma";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
+import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
 import { recordChange } from "./changeLog.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { propagateOpeningStock } from "./manualCounts.service";
 import { HttpError } from "../utils/HttpError";
+import {
+  columnKeysOf,
+  flattenExtras,
+  totalsFromExtras,
+  validateExtras,
+  type StockExtraInput,
+} from "../utils/stockExtras";
 import {
   calculateOfflineRemaining,
   calculateOfflineStock,
@@ -30,7 +38,26 @@ export interface OnlineEntryInput {
   /// meant for a CSV import seeding a real starting balance on a product's
   /// very first date, where there's nothing to carry forward from yet.
   openingStock?: number;
+  /**
+   * The individual amounts behind a column that was given extra input columns
+   * ("Save individually" - see utils/stockExtras.ts). The columns they belong
+   * to are NOT taken from whatever this request also sent for them: their
+   * totals are recomputed here from these amounts, so the stored column and
+   * the amounts behind it can never disagree.
+   */
+  extras?: StockExtraInput[];
+  /**
+   * Columns whose stored extras should be dropped - what "Save total only"
+   * sends, so the total survives as the column's own value while the amounts
+   * behind it go away. Columns named in `extras` are replaced regardless and
+   * don't need listing here.
+   */
+  clearExtraColumns?: string[];
 }
+
+/// Every stock figure of one Online row, with none of the inputs that are
+/// about HOW it is being saved rather than what it holds.
+type OnlineFigures = Required<Omit<OnlineEntryInput, "openingStock" | "extras" | "clearExtraColumns">>;
 
 /// Section 4.6 - auto carry-forward (delegated to the repository, which owns
 /// the "immediately preceding shift" query).
@@ -38,7 +65,7 @@ export function computeOpeningStock(productId: number, entryDate: Date, shift: S
   return dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 }
 
-function calculate(opening: number, input: Required<Omit<OnlineEntryInput, "openingStock">>) {
+function calculate(opening: number, input: OnlineFigures) {
   const onlineStock = calculateOnlineStock(opening, input.stockInOffToOl, input.stockOutOlToOff);
   const remainingStock = calculateOnlineRemaining(onlineStock, input.productionIn, input.fulfillmentOut, input.rts);
   return { onlineStock, remainingStock };
@@ -58,15 +85,24 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
   const rows = await dailyOnlineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
 
+  // Added columns (utils/stockExtras.ts) for the whole sheet in one query,
+  // flattened onto each row so the grid reads an added column's cell exactly
+  // like any other. The main column already carries their total, so a client
+  // that ignores these entirely still shows correct figures.
+  const extraRows = await dailyStockExtraRepository.findAllForDate("ONLINE", entryDate, shift);
+  const extrasByProduct = new Map<number, typeof extraRows>();
+  for (const e of extraRows) extrasByProduct.set(e.productId, [...(extrasByProduct.get(e.productId) ?? []), e]);
+
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
   const openingStockByProduct = await dailyOnlineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
 
   return products.map((product) => {
+    const extras = extrasByProduct.get(product.id) ?? [];
     const existing = rowByProduct.get(product.id);
-    if (existing) return { product, entry: existing, isSaved: true };
+    if (existing) return { product, entry: { ...existing, ...flattenExtras(extras) }, isSaved: true };
 
     const openingStock = openingStockByProduct.get(product.id) ?? 0;
-    const zero: Required<Omit<OnlineEntryInput, "openingStock">> = {
+    const zero: OnlineFigures = {
       stockInOffToOl: 0,
       stockOutOlToOff: 0,
       productionIn: 0,
@@ -76,7 +112,7 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
     const { onlineStock, remainingStock } = calculate(openingStock, zero);
     return {
       product,
-      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, onlineStock, remainingStock },
+      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, onlineStock, remainingStock, ...flattenExtras(extras) },
       isSaved: false,
     };
   });
@@ -122,14 +158,23 @@ export async function saveOnlineEntry(
   if (!product) throw HttpError.notFound("Active product not found");
   const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
 
+  const extras = input.extras ?? [];
+  const extrasError = validateExtras("ONLINE", extras);
+  if (extrasError) throw HttpError.badRequest(extrasError);
+  // The server's own arithmetic, not the client's: a column that was given
+  // extra input columns saves the sum of them, whatever this request happened
+  // to send for the column itself. That is what makes it impossible for the
+  // stored total and the amounts behind it to drift apart.
+  const extraTotals = totalsFromExtras(extras);
+
   const openingStock =
     input.openingStock ?? (existing ? toNum(existing.openingStock) : await computeOpeningStock(productId, entryDate, shift, db));
-  const merged: Required<Omit<OnlineEntryInput, "openingStock">> = {
-    stockInOffToOl: input.stockInOffToOl ?? toNum(existing?.stockInOffToOl),
-    stockOutOlToOff: input.stockOutOlToOff ?? toNum(existing?.stockOutOlToOff),
-    productionIn: input.productionIn ?? toNum(existing?.productionIn),
-    fulfillmentOut: input.fulfillmentOut ?? toNum(existing?.fulfillmentOut),
-    rts: input.rts ?? toNum(existing?.rts),
+  const merged: OnlineFigures = {
+    stockInOffToOl: extraTotals.stockInOffToOl ?? input.stockInOffToOl ?? toNum(existing?.stockInOffToOl),
+    stockOutOlToOff: extraTotals.stockOutOlToOff ?? input.stockOutOlToOff ?? toNum(existing?.stockOutOlToOff),
+    productionIn: extraTotals.productionIn ?? input.productionIn ?? toNum(existing?.productionIn),
+    fulfillmentOut: extraTotals.fulfillmentOut ?? input.fulfillmentOut ?? toNum(existing?.fulfillmentOut),
+    rts: extraTotals.rts ?? input.rts ?? toNum(existing?.rts),
   };
   const { onlineStock, remainingStock } = calculate(openingStock, merged);
 
@@ -146,14 +191,26 @@ export async function saveOnlineEntry(
   const data = { productId, entryDate, shift, openingStock, ...merged, onlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOnlineStockRepository.upsert(existing?.id, data, db);
 
+  // Columns whose stored amounts this save replaces: the ones it sent amounts
+  // for, plus the ones it asked to clear ("Save total only").
+  const touchedColumns = [...new Set([...columnKeysOf(extras), ...(input.clearExtraColumns ?? [])])];
+  const priorExtras = touchedColumns.length
+    ? await dailyStockExtraRepository.findForProduct("ONLINE", productId, entryDate, shift, db)
+    : [];
+  await dailyStockExtraRepository.replaceColumns("ONLINE", productId, entryDate, shift, touchedColumns, extras, userId, db);
+
+  // One change-log entry for the whole save, under this grid's existing table -
+  // the extras ride along as extra fields on the same before/after snapshots,
+  // which is also what makes the grid's per-cell history work for an added
+  // column's cell without any special casing.
   await recordChange(
     {
       tableName: TABLE,
       recordId: saved.id,
       action: existing ? "UPDATE" : "CREATE",
       changedById: userId,
-      oldValue: existing,
-      newValue: saved,
+      oldValue: existing ? { ...existing, ...flattenExtras(priorExtras) } : existing,
+      newValue: { ...saved, ...flattenExtras(extras) },
     },
     db,
   );

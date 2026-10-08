@@ -15,6 +15,8 @@ import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { NumberCellInput } from "./ui";
 import { ChevronIcon } from "./icons";
+import { ColumnHeaderMenu, type ColumnMenuTarget } from "./ColumnHeaderMenu";
+import { extraColumnKey } from "../hooks/useExtraColumns";
 import { listChangeLog } from "../api/changeLog";
 import {
   formatGridNumber,
@@ -53,15 +55,11 @@ export interface GridColumn {
    * see columnToneStyle below; unused by CSV/PDF/Excel exports.
    */
   tone?: "in" | "out" | "delivery";
-  /**
-   * Adds an arrow to this column's header that shows/hides these input columns
-   * directly to its right. They are real, saved fields that belong to this
-   * column only (Delivery (Out) is the total of its five Delivery columns) -
-   * nothing else reads them. Ignored on read-only grids, where only the
-   * parent column's total is shown.
-   */
-  subColumns?: { key: string; label: string }[];
 }
+
+// Shared empty list, so a column with no added columns doesn't hand a fresh
+// array to every cell on every render.
+const NO_EXTRAS: number[] = [];
 
 // Grid lines for the sub-columns, header cell through the totals row (see
 // .ae-extra-col in index.css); the first one also gets the left edge.
@@ -69,8 +67,9 @@ function extraCellClass(i: number): string {
   return i === 0 ? "ae-extra-col ae-extra-col--first" : "ae-extra-col";
 }
 
-// Names typed into the sub-columns' header inputs are a per-browser label
-// only (the saved data is keyed by the column, not by its name).
+// Names typed into an added column's header input are a per-browser label
+// only (the saved data is keyed by the column and slot, not by its name) -
+// which is why this is localStorage and not part of the entry at all.
 const NAMES_STORAGE_KEY = "ala-eh-grid-subcolumn-names";
 function loadNames(): Record<string, string> {
   try {
@@ -176,6 +175,30 @@ interface StockGridProps {
    * been saved carry no database id and so have no history to show.
    */
   historyTable?: string;
+  /**
+   * Expand/collapse every category from outside the grid (the page's toolbar
+   * icon). Each new `id` is one command; a command that was already issued
+   * before this grid mounted (e.g. it was re-keyed by a date/shift change) is
+   * not replayed.
+   */
+  expandAllCommand?: { expanded: boolean; id: number } | null;
+  /** Reports whether any category is currently expanded, so the page's
+   *  expand/collapse icon can show the action a click will perform. */
+  onAnyExpandedChange?: (anyExpanded: boolean) => void;
+  /**
+   * Extra input columns added at runtime from an editable column header's
+   * right-click menu, as `main column key -> slot numbers` (see
+   * hooks/useExtraColumns.ts). They render directly after the column that owns
+   * them, carry its tone, and are staged like any other cell; that main column
+   * then shows the read-only sum of them, which is what every total, subtotal,
+   * Remaining Stock and % of total keeps reading. Omit for a grid that doesn't
+   * offer them (the Daily Report and every other read-only table).
+   */
+  extraColumns?: Record<string, number[]>;
+  /** Wire both to turn the header menu on; without them no menu is offered
+   *  and headers keep the browser's own context menu. */
+  onAddExtraColumns?: (mainKey: string, count: number) => void;
+  onRemoveExtraColumns?: (mainKey: string, slots: number[]) => void;
 }
 
 /// Rows the grid renders are the API's, which carry the database row id for
@@ -213,7 +236,10 @@ function focusCell(productId: number, key: string) {
 /// only ever holds one sheet's worth.
 const historyCache = new Map<string, Promise<ChangeLogEntry[]>>();
 
-function fetchRecordHistory(table: string, recordId: number): Promise<ChangeLogEntry[]> {
+function fetchRecordHistory(
+  table: string,
+  recordId: number,
+): Promise<ChangeLogEntry[]> {
   const key = `${table}:${recordId}`;
   const hit = historyCache.get(key);
   if (hit) return hit;
@@ -229,13 +255,18 @@ function fetchRecordHistory(table: string, recordId: number): Promise<ChangeLogE
 
 /// change_log stores whole-row snapshots, so "who last touched THIS cell" is
 /// the most recent entry whose value for this column actually moved.
-function lastChangeForColumn(entries: ChangeLogEntry[], colKey: string): ChangeLogEntry | undefined {
+function lastChangeForColumn(
+  entries: ChangeLogEntry[],
+  colKey: string,
+): ChangeLogEntry | undefined {
   return entries.find((e) => {
     const oldV = (e.oldValue as Record<string, unknown> | null)?.[colKey];
     const newV = (e.newValue as Record<string, unknown> | null)?.[colKey];
     // A CREATE has no previous row; it counts as setting every non-zero cell.
     if (e.action === "CREATE") return newV !== undefined && Number(newV) !== 0;
-    return oldV !== undefined && newV !== undefined && Number(oldV) !== Number(newV);
+    return (
+      oldV !== undefined && newV !== undefined && Number(oldV) !== Number(newV)
+    );
   });
 }
 
@@ -347,7 +378,12 @@ const DraftCell = memo(function DraftCell({
     savedValue !== undefined &&
     isUnusualJump(toNum(draft), savedValue);
 
-  const historyTitle = useCellHistoryTitle(historyTable, recordId, colKey, hovered);
+  const historyTitle = useCellHistoryTitle(
+    historyTable,
+    recordId,
+    colKey,
+    hovered,
+  );
   const title = invalid
     ? "Stock can't be negative - enter 0 or more"
     : suspicious
@@ -408,6 +444,11 @@ export function StockGrid({
   onCommitMany,
   getSavedValue,
   historyTable,
+  expandAllCommand,
+  onAnyExpandedChange,
+  extraColumns,
+  onAddExtraColumns,
+  onRemoveExtraColumns,
 }: StockGridProps) {
   // Explicit expand/collapse choices, keyed by category name - absent means
   // "no choice made yet", which defaults to collapsed (below), not expanded.
@@ -418,12 +459,54 @@ export function StockGrid({
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
-  // Whether the sub-columns after the `subColumns` column (Delivery (Out))
-  // are showing. Not persisted - it's a view toggle, like the category
-  // collapse above.
-  const [extrasOpen, setExtrasOpen] = useState(false);
   const [extraNames, setExtraNames] =
     useState<Record<string, string>>(loadNames);
+  // Which header's right-click menu is open, if any (null = none). Held here
+  // rather than per-header so only one can ever be open at a time.
+  const [menu, setMenu] = useState<ColumnMenuTarget | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+
+  // The added columns (hooks/useExtraColumns.ts) belonging to one column.
+  // Never undefined, so callers can map over it without a guard.
+  const addedOf = (key: string): number[] => extraColumns?.[key] ?? NO_EXTRAS;
+  // The menu is only offered when the page wired both handlers - a read-only
+  // grid (Daily Report) leaves the browser's own context menu alone.
+  const canAddColumns =
+    !readOnly && !!onAddExtraColumns && !!onRemoveExtraColumns;
+  /// A main column holding added columns is their read-only total, so its own
+  /// cell stops being an input - the sum is what Remaining Stock, the
+  /// subtotals and the % column all go on reading.
+  const isEditable = (col: GridColumn) =>
+    !!col.editable && addedOf(col.key).length === 0;
+
+  /// The added columns that render directly after `col` (header right-click
+  /// menu), in display order - which is also the arrow-key navigation order.
+  /// Declared before use by the totals rows further down.
+  function trailingKeys(col: GridColumn): string[] {
+    return addedOf(col.key).map((slot) => extraColumnKey(col.key, slot));
+  }
+
+  function renameExtraColumn(key: string, value: string) {
+    setExtraNames((n) => {
+      const next = { ...n, [key]: value };
+      try {
+        localStorage.setItem(NAMES_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // label only - fine to lose
+      }
+      return next;
+    });
+  }
+
+  function openMenu(col: GridColumn, x: number, y: number) {
+    setMenu({
+      mainKey: col.key,
+      label: col.label,
+      x,
+      y,
+      added: addedOf(col.key),
+    });
+  }
 
   const groups = new Map<string, GridRow[]>();
   for (const row of rows) {
@@ -456,6 +539,17 @@ export function StockGrid({
     setExpandedOverride(next);
   }
   const anyExpanded = [...groups.keys()].some((c) => expandedOverride[c]);
+  const appliedCommandId = useRef(expandAllCommand?.id);
+  useEffect(() => {
+    if (!expandAllCommand || expandAllCommand.id === appliedCommandId.current)
+      return;
+    appliedCommandId.current = expandAllCommand.id;
+    setAllExpanded(expandAllCommand.expanded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandAllCommand]);
+  useEffect(() => {
+    onAnyExpandedChange?.(anyExpanded);
+  }, [anyExpanded, onAnyExpandedChange]);
 
   /// Quick Fill - copy the topmost row's value in this column down every
   /// other row currently in the grid. "Currently in the grid" matters: the
@@ -478,27 +572,21 @@ export function StockGrid({
     const groupRows = groups.get(category) ?? [];
     const keys = columns
       .filter((c) => c.editable)
-      .flatMap((c) => [
-        c.key,
-        ...(showExtras && c.subColumns ? c.subColumns.map((sc) => sc.key) : []),
-      ]);
+      .flatMap((c) => [...(isEditable(c) ? [c.key] : []), ...trailingKeys(c)]);
     const edits = groupRows.flatMap((r) =>
       keys.map((key) => ({ productId: r.product.id, key, value: 0 })),
     );
     onCommitMany(edits);
   }
 
-  const showExtras = extrasOpen && !readOnly;
-  const extraCount = showExtras
-    ? columns.reduce((n, c) => n + (c.subColumns?.length ?? 0), 0)
-    : 0;
+  const extraCount = columns.reduce((n, c) => n + addedOf(c.key).length, 0);
 
   const allProductIds = rows.map((r) => r.product.id);
   // Arrow-key navigation order: the sub-columns sit right after the
   // column that owns them, so they're stepped through like any other cell.
   const editableColKeys = columns.flatMap((c) => [
-    ...(c.editable ? [c.key] : []),
-    ...(showExtras && c.subColumns ? c.subColumns.map((sc) => sc.key) : []),
+    ...(isEditable(c) ? [c.key] : []),
+    ...trailingKeys(c),
   ]);
 
   // The page hands over a fresh `onCommit` (and this render a fresh id/column
@@ -547,159 +635,130 @@ export function StockGrid({
 
   return (
     <>
-      {groups.size > 0 && (
-        <div className="ae-grid-tools no-print">
-          <button
-            type="button"
-            className="ae-grid-tool-btn"
-            onClick={() => setAllExpanded(!anyExpanded)}
-            title={
-              anyExpanded
-                ? "Collapse every category"
-                : "Expand every category"
-            }
-          >
-            <span
-              style={{
-                display: "inline-flex",
-                transform: anyExpanded ? "none" : "rotate(-90deg)",
-                transition: "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
-              }}
-            >
-              <ChevronIcon />
-            </span>
-            {anyExpanded ? "Collapse all" : "Expand all"}
-          </button>
-        </div>
-      )}
       <RowGlowScroll focusStorageKey={focusStorageKey}>
-      <table className="ae-table ae-table--sticky-id" style={{ minWidth: 720 }}>
-        <thead>
-          <tr>
-            <th className="ae-sticky-sku">SKU</th>
-            <th className="ae-sticky-name">Product</th>
-            {columns.map((c) => (
-              <Fragment key={c.key}>
-                <th
-                  style={{
-                    ...(c.tone ? columnToneStyle[c.tone] : undefined),
-                    // The arrow straddles this cell's right border, so this
-                    // header sits above its neighbour (which would otherwise
-                    // paint over the half of the arrow that overhangs it) and
-                    // keeps its label clear of the arrow's inner half.
-                    ...(c.subColumns && !readOnly
-                      ? { zIndex: 2, paddingRight: 14 }
-                      : undefined),
-                  }}
-                >
-                  {c.label}
-                  {canQuickFill && c.editable && rows.length > 1 && (
-                    <button
-                      type="button"
-                      className="ae-fill-down-btn no-print"
-                      onClick={() => fillDown(c.key)}
-                      title={`Fill the top row's ${c.label} down every row below it`}
-                      aria-label={`Fill ${c.label} down`}
-                    >
-                      &darr;
-                    </button>
-                  )}
-                  {c.subColumns && !readOnly && (
-                    <button
-                      type="button"
-                      onClick={() => setExtrasOpen((o) => !o)}
-                      aria-expanded={extrasOpen}
-                      title={
-                        extrasOpen
-                          ? `Hide the ${c.label} columns`
-                          : `Show the ${c.label} columns`
-                      }
-                      aria-label={
-                        extrasOpen
-                          ? `Hide the columns behind ${c.label}`
-                          : `Show the columns behind ${c.label}`
-                      }
-                      style={headerArrowStyle}
-                    >
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          // Chevron points down by default: right when
-                          // closed (expands sideways), left when open.
-                          transform: extrasOpen
-                            ? "rotate(90deg)"
-                            : "rotate(-90deg)",
-                          transition:
-                            "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
-                        }}
+        <table
+          className="ae-table ae-table--sticky-id"
+          style={{ minWidth: 720 }}
+        >
+          <thead>
+            <tr>
+              <th className="ae-sticky-sku">SKU</th>
+              <th className="ae-sticky-name">Product</th>
+              {columns.map((c) => (
+                <Fragment key={c.key}>
+                  <th
+                    tabIndex={canAddColumns && c.editable ? 0 : undefined}
+                    title={
+                      canAddColumns && c.editable
+                        ? `Right-click to add or remove extra ${c.label} columns`
+                        : undefined
+                    }
+                    onContextMenu={
+                      canAddColumns && c.editable
+                        ? (e) => {
+                            e.preventDefault();
+                            openMenu(c, e.clientX, e.clientY);
+                          }
+                        : undefined
+                    }
+                    onKeyDown={
+                      canAddColumns && c.editable
+                        ? (e) => {
+                            // Shift+F10 and the dedicated ContextMenu key are
+                            // the platform conventions for "open the context
+                            // menu for what's focused".
+                            if (
+                              e.key !== "ContextMenu" &&
+                              !(e.key === "F10" && e.shiftKey)
+                            )
+                              return;
+                            e.preventDefault();
+                            const r = e.currentTarget.getBoundingClientRect();
+                            openMenu(c, r.left, r.bottom);
+                          }
+                        : undefined
+                    }
+                    style={c.tone ? columnToneStyle[c.tone] : undefined}
+                  >
+                    {c.label}
+                    {canQuickFill && isEditable(c) && rows.length > 1 && (
+                      <button
+                        type="button"
+                        className="ae-fill-down-btn no-print"
+                        onClick={() => fillDown(c.key)}
+                        title={`Fill the top row's ${c.label} down every row below it`}
+                        aria-label={`Fill ${c.label} down`}
                       >
-                        <ChevronIcon />
-                      </span>
-                    </button>
-                  )}
-                </th>
-                {showExtras &&
-                  c.subColumns?.map((sc, i) => (
+                        &darr;
+                      </button>
+                    )}
+                  </th>
+                  {addedOf(c.key).map((slot, i) => (
                     <th
-                      key={sc.key}
+                      key={extraColumnKey(c.key, slot)}
                       className={extraCellClass(i)}
-                      aria-label={sc.label}
                       style={{
                         ...(c.tone ? columnToneStyle[c.tone] : undefined),
                         minWidth: 96,
+                        // Dropped so the name input fills the cell edge to
+                        // edge, same as the fixed Delivery headers it replaces.
                         padding: 0,
                       }}
                     >
-                      {/* Full-cell text input: the header cell's own padding
-                          is dropped so the input fills it edge to edge. */}
-                      <input
-                        type="text"
-                        className="ae-extra-head-input"
-                        value={extraNames[sc.key] ?? ""}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setExtraNames((n) => {
-                            const next = { ...n, [sc.key]: value };
-                            try {
-                              localStorage.setItem(
-                                NAMES_STORAGE_KEY,
-                                JSON.stringify(next),
-                              );
-                            } catch {
-                              // label only - fine to lose
-                            }
-                            return next;
-                          });
-                        }}
-                        placeholder={sc.label}
-                        aria-label={`${sc.label} name`}
-                        spellCheck={false}
-                        autoComplete="off"
-                      />
+                      <span className="ae-added-col-head">
+                        {/* Nameable, the way the fixed Delivery columns this
+                            replaced were - a per-browser label, so one shift
+                            can call its added columns by route or customer
+                            without that becoming saved data. */}
+                        <input
+                          type="text"
+                          className="ae-extra-head-input"
+                          value={extraNames[extraColumnKey(c.key, slot)] ?? ""}
+                          onChange={(e) =>
+                            renameExtraColumn(
+                              extraColumnKey(c.key, slot),
+                              e.target.value,
+                            )
+                          }
+                          placeholder={`+${slot}`}
+                          aria-label={`${c.label} +${slot} name`}
+                          spellCheck={false}
+                          autoComplete="off"
+                        />
+                        <button
+                          type="button"
+                          className="ae-added-col-del no-print"
+                          onClick={() => onRemoveExtraColumns?.(c.key, [slot])}
+                          title={`Delete this added ${c.label} column`}
+                          aria-label={`Delete added ${c.label} column +${slot}`}
+                        >
+                          &times;
+                        </button>
+                      </span>
                     </th>
                   ))}
-                {showPercent && c.key === percentOfTotalKey && (
-                  <th
-                    className="ae-pct-col"
-                    title={`Each row's share of the ${c.label} grand total`}
-                  >
-                    % of total
-                  </th>
-                )}
-              </Fragment>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {[...groups.entries()].map(([category, groupRows]) => {
-            const hasPending =
-              !!pending && groupRows.some((row) => pending[row.product.id]);
-            const isExpanded = hasPending || !!expandedOverride[category];
-            const isCollapsed = !isExpanded;
-            return (
-              <Fragment key={category}>
-                <tr key={`${category}-header`}>
-                  {/* Sticky Scroll (CSS-only, no JS): pinned right under the
+                  {showPercent && c.key === percentOfTotalKey && (
+                    <th
+                      className="ae-pct-col"
+                      title={`Each row's share of the ${c.label} grand total`}
+                    >
+                      % of total
+                    </th>
+                  )}
+                </Fragment>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {[...groups.entries()].map(([category, groupRows]) => {
+              const hasPending =
+                !!pending && groupRows.some((row) => pending[row.product.id]);
+              const isExpanded = hasPending || !!expandedOverride[category];
+              const isCollapsed = !isExpanded;
+              return (
+                <Fragment key={category}>
+                  <tr key={`${category}-header`}>
+                    {/* Sticky Scroll (CSS-only, no JS): pinned right under the
                       header while this category's rows scroll by; once they
                       scroll past, the next category's own row reaches the
                       same top offset and, being later in the DOM (painted
@@ -707,257 +766,280 @@ export function StockGrid({
                       header handoff. This grid's column count is
                       fixed per page, so only the vertical stick is needed
                       here. */}
-                  <td
-                    colSpan={columns.length + 2 + extraCount + (showPercent ? 1 : 0)}
-                    style={{
-                      padding: 0,
-                      position: "sticky",
-                      top: HEADER_ROW_HEIGHT,
-                      // Above the sticky SKU/Product columns (z-index 2): the
-                      // bar spans the full width, so when it pins under the
-                      // header the identity cells scrolling beneath it have
-                      // to pass behind, not through.
-                      zIndex: 3,
-                    }}
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setExpandedOverride((e) => ({
-                          ...e,
-                          [category]: !isExpanded,
-                        }))
+                    <td
+                      colSpan={
+                        columns.length + 2 + extraCount + (showPercent ? 1 : 0)
                       }
-                      aria-expanded={!isCollapsed}
-                      aria-controls={groupRows
-                        .map((row) => `ae-stockgrid-row-${row.product.id}`)
-                        .join(" ")}
-                      aria-disabled={hasPending || undefined}
-                      title={
-                        hasPending
-                          ? `${category} has unsaved edits, so it stays expanded`
-                          : isCollapsed
-                            ? `Expand ${category}`
-                            : `Collapse ${category}`
-                      }
-                      className="ae-cat-toggle"
+                      style={{
+                        padding: 0,
+                        position: "sticky",
+                        top: HEADER_ROW_HEIGHT,
+                        // Above the sticky SKU/Product columns (z-index 2): the
+                        // bar spans the full width, so when it pins under the
+                        // header the identity cells scrolling beneath it have
+                        // to pass behind, not through.
+                        zIndex: 3,
+                      }}
                     >
-                      <span
-                        style={{
-                          display: "inline-flex",
-                          transform: isCollapsed ? "rotate(-90deg)" : "none",
-                          transition:
-                            "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
-                        }}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedOverride((e) => ({
+                            ...e,
+                            [category]: !isExpanded,
+                          }))
+                        }
+                        aria-expanded={!isCollapsed}
+                        aria-controls={groupRows
+                          .map((row) => `ae-stockgrid-row-${row.product.id}`)
+                          .join(" ")}
+                        aria-disabled={hasPending || undefined}
+                        title={
+                          hasPending
+                            ? `${category} has unsaved edits, so it stays expanded`
+                            : isCollapsed
+                              ? `Expand ${category}`
+                              : `Collapse ${category}`
+                        }
+                        className="ae-cat-toggle"
                       >
-                        <ChevronIcon />
-                      </span>
-                      {category}
-                      {canQuickFill && (
-                        // Nested inside the toggle button is invalid HTML, so
-                        // this is a sibling span acting as the click target -
-                        // it stops propagation so zeroing a category doesn't
-                        // also collapse it.
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          className="ae-cat-zero no-print"
-                          title={`Set every editable cell in ${category} to zero`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            zeroCategory(category);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return;
-                            e.stopPropagation();
-                            e.preventDefault();
-                            zeroCategory(category);
-                          }}
-                        >
-                          Zero all
-                        </span>
-                      )}
-                    </button>
-                  </td>
-                </tr>
-                {groupRows.map((row) => (
-                  <tr
-                    key={row.product.id}
-                    id={`ae-stockgrid-row-${row.product.id}`}
-                    data-row-id={row.product.id}
-                    className={
-                      isCollapsed ? "ae-cat-row ae-row-collapsed" : "ae-cat-row"
-                    }
-                    style={
-                      row.isFlagged
-                        ? { background: colors.warningBg }
-                        : undefined
-                    }
-                  >
-                    <td className="ae-cell-sku ae-sticky-sku">
-                      {row.product.sku ?? ZERO_DASH}
-                    </td>
-                    <td className="ae-cell-name ae-sticky-name">
-                      {row.product.name}
-                    </td>
-                    {columns.map((col) => {
-                      const raw = row.entry[col.key];
-                      const pct = showPercent &&
-                        col.key === percentOfTotalKey && (
-                          <td key={`${col.key}-pct`} className="ae-pct-col">
-                            {formatPercentOfTotal(toNum(raw), percentTotal)}
-                          </td>
-                        );
-                      const formatted = formatGridNumber(raw);
-                      const cell =
-                        !col.editable || readOnly ? (
-                          <td
-                            key={col.key}
-                            className={formatted.isZero ? "ae-num-zero" : undefined}
+                        <span className="ae-cat-label">
+                          <span
                             style={{
-                              ...(col.editable ? undefined : lockedStyle),
-                              ...tintFor(col),
+                              display: "inline-flex",
+                              transform: isCollapsed
+                                ? "rotate(-90deg)"
+                                : "none",
+                              transition:
+                                "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
                             }}
                           >
-                            {formatted.text}
-                          </td>
-                        ) : (
-                          <td key={col.key} style={tintFor(col)}>
-                            <DraftCell
-                              productId={row.product.id}
-                              colKey={col.key}
-                              raw={raw}
-                              edited={
-                                pending?.[row.product.id]?.[col.key] !==
-                                undefined
-                              }
-                              onCommit={commitCell}
-                              onKeyDown={handleKeyDown}
-                              savedValue={getSavedValue?.(row.product.id, col.key)}
-                              historyTable={historyTable}
-                              recordId={recordIdOf(row)}
-                            />
-                          </td>
-                        );
-                      if (!showExtras || !col.subColumns)
-                        return pct ? (
-                          <Fragment key={col.key}>
-                            {cell}
-                            {pct}
-                          </Fragment>
-                        ) : (
-                          cell
-                        );
-                      return (
-                        <Fragment key={col.key}>
-                          {cell}
-                          {col.subColumns.map((sc, i) => (
+                            <ChevronIcon />
+                          </span>
+                          {category}
+                        </span>
+                        {canQuickFill && (
+                          // Nested inside the toggle button is invalid HTML, so
+                          // this is a sibling span acting as the click target -
+                          // it stops propagation so zeroing a category doesn't
+                          // also collapse it.
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className="ae-cat-zero no-print"
+                            title={`Set every editable cell in ${category} to zero`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              zeroCategory(category);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              e.stopPropagation();
+                              e.preventDefault();
+                              zeroCategory(category);
+                            }}
+                          >
+                            Zero all
+                          </span>
+                        )}
+                      </button>
+                    </td>
+                  </tr>
+                  {groupRows.map((row) => (
+                    <tr
+                      key={row.product.id}
+                      id={`ae-stockgrid-row-${row.product.id}`}
+                      data-row-id={row.product.id}
+                      className={
+                        isCollapsed
+                          ? "ae-cat-row ae-row-collapsed"
+                          : "ae-cat-row"
+                      }
+                      style={
+                        row.isFlagged
+                          ? { background: colors.warningBg }
+                          : undefined
+                      }
+                    >
+                      <td className="ae-cell-sku ae-sticky-sku">
+                        {row.product.sku ?? ZERO_DASH}
+                      </td>
+                      <td className="ae-cell-name ae-sticky-name">
+                        {row.product.name}
+                      </td>
+                      {columns.map((col) => {
+                        const raw = row.entry[col.key];
+                        const pct = showPercent &&
+                          col.key === percentOfTotalKey && (
+                            <td key={`${col.key}-pct`} className="ae-pct-col">
+                              {formatPercentOfTotal(toNum(raw), percentTotal)}
+                            </td>
+                          );
+                        const formatted = formatGridNumber(raw);
+                        const cell =
+                          !isEditable(col) || readOnly ? (
                             <td
-                              key={sc.key}
-                              className={extraCellClass(i)}
-                              style={tintFor(col)}
+                              key={col.key}
+                              className={
+                                formatted.isZero ? "ae-num-zero" : undefined
+                              }
+                              style={{
+                                ...(isEditable(col) ? undefined : lockedStyle),
+                                ...tintFor(col),
+                              }}
                             >
+                              {formatted.text}
+                            </td>
+                          ) : (
+                            <td key={col.key} style={tintFor(col)}>
                               <DraftCell
                                 productId={row.product.id}
-                                colKey={sc.key}
-                                raw={row.entry[sc.key]}
+                                colKey={col.key}
+                                raw={raw}
                                 edited={
-                                  pending?.[row.product.id]?.[sc.key] !==
+                                  pending?.[row.product.id]?.[col.key] !==
                                   undefined
                                 }
                                 onCommit={commitCell}
                                 onKeyDown={handleKeyDown}
-                                savedValue={getSavedValue?.(row.product.id, sc.key)}
+                                savedValue={getSavedValue?.(
+                                  row.product.id,
+                                  col.key,
+                                )}
                                 historyTable={historyTable}
                                 recordId={recordIdOf(row)}
                               />
                             </td>
-                          ))}
-                          {pct}
-                        </Fragment>
-                      );
-                    })}
-                  </tr>
-                ))}
-                {/* Deliberately NOT marked .ae-cat-row, so it stays visible
+                          );
+                        const trailing = trailingKeys(col);
+                        if (trailing.length === 0)
+                          return pct ? (
+                            <Fragment key={col.key}>
+                              {cell}
+                              {pct}
+                            </Fragment>
+                          ) : (
+                            cell
+                          );
+                        return (
+                          <Fragment key={col.key}>
+                            {cell}
+                            {trailing.map((key, i) => (
+                              <td
+                                key={key}
+                                className={extraCellClass(i)}
+                                style={tintFor(col)}
+                              >
+                                <DraftCell
+                                  productId={row.product.id}
+                                  colKey={key}
+                                  raw={row.entry[key]}
+                                  edited={
+                                    pending?.[row.product.id]?.[key] !==
+                                    undefined
+                                  }
+                                  onCommit={commitCell}
+                                  onKeyDown={handleKeyDown}
+                                  savedValue={getSavedValue?.(
+                                    row.product.id,
+                                    key,
+                                  )}
+                                  historyTable={historyTable}
+                                  recordId={recordIdOf(row)}
+                                />
+                              </td>
+                            ))}
+                            {pct}
+                          </Fragment>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                  {/* Deliberately NOT marked .ae-cat-row, so it stays visible
                     when the category is collapsed (collapsing hides only the
                     product rows) - a collapsed sheet still reads as a list of
                     per-category totals rather than going blank. */}
-                <tr key={`${category}-subtotal`} className="ae-row-subtotal">
-                  <td colSpan={2} className="ae-sticky-subtotal">
-                    Subtotal - {category}
-                  </td>
-                  {columns.map((col) => {
-                    const sum = groupRows.reduce(
-                      (acc, r) => acc + toNum(r.entry[col.key]),
-                      0,
-                    );
-                    return (
-                      <Fragment key={col.key}>
-                        <td style={tintFor(col)}>{sum.toLocaleString()}</td>
-                        {showExtras &&
-                          col.subColumns?.map((sc, i) => (
+                  <tr key={`${category}-subtotal`} className="ae-row-subtotal">
+                    <td colSpan={2} className="ae-sticky-subtotal">
+                      Subtotal - {category}
+                    </td>
+                    {columns.map((col) => {
+                      const sum = groupRows.reduce(
+                        (acc, r) => acc + toNum(r.entry[col.key]),
+                        0,
+                      );
+                      return (
+                        <Fragment key={col.key}>
+                          <td style={tintFor(col)}>{sum.toLocaleString()}</td>
+                          {trailingKeys(col).map((key, i) => (
                             <td
-                              key={sc.key}
+                              key={key}
                               className={extraCellClass(i)}
                               style={tintFor(col)}
                             >
                               {groupRows
                                 .reduce(
-                                  (acc, r) => acc + toNum(r.entry[sc.key]),
+                                  (acc, r) => acc + toNum(r.entry[key]),
                                   0,
                                 )
                                 .toLocaleString()}
                             </td>
                           ))}
-                        {showPercent && col.key === percentOfTotalKey && (
-                          <td className="ae-pct-col">
-                            {formatPercentOfTotal(sum, percentTotal)}
-                          </td>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tr>
-              </Fragment>
-            );
-          })}
-          <tr className="ae-row-grand">
-            <td colSpan={2} className="ae-sticky-subtotal">
-              GRAND TOTAL
-            </td>
-            {columns.map((col) => (
-              <Fragment key={col.key}>
-                <td style={tintFor(col)}>
-                  {rows
-                    .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
-                    .toLocaleString()}
-                </td>
-                {showExtras &&
-                  col.subColumns?.map((sc, i) => (
+                          {showPercent && col.key === percentOfTotalKey && (
+                            <td className="ae-pct-col">
+                              {formatPercentOfTotal(sum, percentTotal)}
+                            </td>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tr>
+                </Fragment>
+              );
+            })}
+            <tr className="ae-row-grand">
+              <td colSpan={2} className="ae-sticky-subtotal">
+                GRAND TOTAL
+              </td>
+              {columns.map((col) => (
+                <Fragment key={col.key}>
+                  <td style={tintFor(col)}>
+                    {rows
+                      .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
+                      .toLocaleString()}
+                  </td>
+                  {trailingKeys(col).map((key, i) => (
                     <td
-                      key={sc.key}
+                      key={key}
                       className={extraCellClass(i)}
                       style={tintFor(col)}
                     >
                       {rows
-                        .reduce((sum, r) => sum + toNum(r.entry[sc.key]), 0)
+                        .reduce((sum, r) => sum + toNum(r.entry[key]), 0)
                         .toLocaleString()}
                     </td>
                   ))}
-                {showPercent && col.key === percentOfTotalKey && (
-                  // Always 100% by definition - shown so the column has a
-                  // footer and doesn't read as a missing cell.
-                  <td className="ae-pct-col">
-                    {percentTotal ? "100.0%" : ZERO_DASH}
-                  </td>
-                )}
-              </Fragment>
-            ))}
-          </tr>
-        </tbody>
-      </table>
+                  {showPercent && col.key === percentOfTotalKey && (
+                    // Always 100% by definition - shown so the column has a
+                    // footer and doesn't read as a missing cell.
+                    <td className="ae-pct-col">
+                      {percentTotal ? "100.0%" : ZERO_DASH}
+                    </td>
+                  )}
+                </Fragment>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       </RowGlowScroll>
+      {menu && onAddExtraColumns && onRemoveExtraColumns && (
+        <ColumnHeaderMenu
+          target={menu}
+          onAdd={onAddExtraColumns}
+          onRemove={onRemoveExtraColumns}
+          onClose={closeMenu}
+        />
+      )}
     </>
   );
 }
@@ -968,25 +1050,4 @@ const lockedStyle: CSSProperties = {
 };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
-const inputStyle: CSSProperties = { width: 64, textAlign: "right" };
-// The expand arrow: a small dark tab centered on the Delivery header's right
-// border (half inside the cell, half over the next one). The header cell is
-// position: sticky, so it is the containing block for this absolute button.
-const headerArrowStyle: CSSProperties = {
-  position: "absolute",
-  top: "50%",
-  right: -9,
-  transform: "translateY(-50%)",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  width: 18,
-  height: 18,
-  padding: 0,
-  border: "none",
-  borderRadius: 6,
-  background: colors.black,
-  color: colors.yellow,
-  cursor: "pointer",
-  lineHeight: 0,
-};
+const inputStyle: CSSProperties = { width: 64, textAlign: "center" };
