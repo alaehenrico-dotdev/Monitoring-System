@@ -71,6 +71,16 @@ const VarianceReportHistoryPage = lazy(() =>
     default: m.VarianceReportHistoryPage,
   })),
 );
+const VarianceLedgerPage = lazy(() =>
+  import("./pages/VarianceLedgerPage").then((m) => ({
+    default: m.VarianceLedgerPage,
+  })),
+);
+const AuditHistoryPage = lazy(() =>
+  import("./pages/AuditHistoryPage").then((m) => ({
+    default: m.AuditHistoryPage,
+  })),
+);
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -96,6 +106,10 @@ export default function App() {
                     <Route path="/offline" element={<OfflineEntryPage />} />
                     <Route path="/total-stocks" element={<TotalStocksPage />} />
                     <Route path="/manual-count" element={<ManualCountPage />} />
+                    <Route
+                      path="/audit-history"
+                      element={<AuditHistoryPage />}
+                    />
                     {/* Every role can read the report (the server already allows it); the entry pages link here. */}
                     <Route path="/daily-report" element={<DailyReportPage />} />
 
@@ -114,6 +128,10 @@ export default function App() {
                       <Route
                         path="/variance-report"
                         element={<VarianceReportPage />}
+                      />
+                      <Route
+                        path="/variance-ledger"
+                        element={<VarianceLedgerPage />}
                       />
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />

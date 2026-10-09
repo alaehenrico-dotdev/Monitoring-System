@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { GridRow } from "../components/StockGrid";
-import { detectConflicts, usePendingEntryChanges } from "./usePendingEntryChanges";
+import { detectConflicts, dropNoOpChanges, usePendingEntryChanges } from "./usePendingEntryChanges";
 
 const product = { id: 1, sku: "AFP001", name: "Sweet A", category: "Class A (Liter)", unit: "Liter", isActive: true, sortOrder: 0, lowStockThreshold: 0 };
 
@@ -198,5 +198,34 @@ describe("usePendingEntryChanges - pendingCellCount", () => {
 
     expect(result.current.pendingCount).toBe(1);
     expect(result.current.pendingCellCount).toBe(2);
+  });
+});
+
+describe("dropNoOpChanges - a staged value equal to the saved one is not a change", () => {
+  it("drops a 0 staged over a saved 0, and keeps real edits", () => {
+    expect(dropNoOpChanges(rows, { 1: { productionIn: 0, openingStock: 150 } })).toEqual({ 1: { openingStock: 150 } });
+  });
+
+  it("drops the product entirely when nothing real is left", () => {
+    expect(dropNoOpChanges(rows, { 1: { productionIn: 0, stockInOlToOff: 0 } })).toEqual({});
+  });
+
+  it("keeps cells the row has no figure to compare against", () => {
+    expect(dropNoOpChanges(rows, { 1: { manualCount: 0 } })).toEqual({ 1: { manualCount: 0 } });
+  });
+
+  it("leaves everything alone before the rows have loaded", () => {
+    const pending = { 1: { productionIn: 0 } };
+    expect(dropNoOpChanges(null, pending)).toBe(pending);
+  });
+});
+
+describe("usePendingEntryChanges - no-op cells do not count as unsaved", () => {
+  it("does not report a pending change for a stale staged 0 that equals the saved value", () => {
+    sessionStorage.setItem("noop-key", JSON.stringify({ 1: { productionIn: 0 } }));
+    const { result } = renderHook(() => usePendingEntryChanges(rows, "noop-key"));
+    expect(result.current.pendingCount).toBe(0);
+    expect(result.current.pendingCellCount).toBe(0);
+    expect(result.current.pending).toEqual({});
   });
 });

@@ -226,6 +226,10 @@ export function DailyReportPage() {
             type: "Daily Report",
             scope: nextReport.date,
             route: `/daily-report?history=1&date=${nextReport.date}`,
+            section:
+              reportSection === "online" || reportSection === "offline"
+                ? reportSection
+                : "all",
           }).catch(() => {});
         }
       })

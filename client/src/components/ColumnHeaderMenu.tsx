@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { MAX_EXTRAS_PER_COLUMN } from "../hooks/useExtraColumns";
+import { ColorSwatches } from "./ColorSwatches";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 
 export interface ColumnMenuTarget {
@@ -11,6 +12,12 @@ export interface ColumnMenuTarget {
   y: number;
   /// Slot numbers of the columns already added after this one.
   added: number[];
+  /// The column's current header color (a custom pick or its default tone),
+  /// if it has one - what the picker opens on.
+  color?: string;
+  /// Whether `color` is a custom pick, i.e. whether there is anything for
+  /// "Reset color" to undo.
+  customColor: boolean;
 }
 
 /**
@@ -25,11 +32,14 @@ export const ColumnHeaderMenu = memo(function ColumnHeaderMenu({
   target,
   onAdd,
   onRemove,
+  onColorChange,
   onClose,
 }: {
   target: ColumnMenuTarget;
   onAdd: (mainKey: string, count: number) => void;
   onRemove: (mainKey: string, slots: number[]) => void;
+  /// `null` puts the column back to its default tone.
+  onColorChange: (mainKey: string, color: string | null) => void;
   onClose: () => void;
 }) {
   const added = target.added;
@@ -64,7 +74,15 @@ export const ColumnHeaderMenu = memo(function ColumnHeaderMenu({
           },
         ]
       : []),
+    {
+      id: "reset-color",
+      label: "Reset color",
+      disabled: !target.customColor,
+      run: () => onColorChange(target.mainKey, null),
+    },
   ];
+
+  const current = (target.color ?? "").toLowerCase();
 
   return (
     <ContextMenu
@@ -72,6 +90,15 @@ export const ColumnHeaderMenu = memo(function ColumnHeaderMenu({
       title={target.label}
       ariaLabel={`${target.label} column options`}
       items={items}
+      footer={
+        <ColorSwatches
+          heading="Header color"
+          subject={`${target.label} header color`}
+          current={target.color}
+          onChange={(hex) => onColorChange(target.mainKey, hex)}
+          onClose={onClose}
+        />
+      }
       onClose={onClose}
     />
   );

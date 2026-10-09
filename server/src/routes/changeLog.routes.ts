@@ -1,12 +1,15 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { getCellHistoryHandler, getChangeLog } from "../controllers/changeLog.controller";
+import { exportChangeLog, getCellHistoryHandler, getChangeLog } from "../controllers/changeLog.controller";
 
 const router = Router();
 
 // Section 3.2 - only the Supervisor/Admin reviews the log.
 router.get("/", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getChangeLog));
+
+// Same Supervisor/Admin rule: the export is the full list, just as a file.
+router.get("/export", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(exportChangeLog));
 
 // Section 3.1 - "who last changed this cell" is part of encoding, not
 // auditing: an encoder correcting a figure needs to see whether someone else

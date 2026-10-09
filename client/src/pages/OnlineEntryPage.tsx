@@ -661,7 +661,9 @@ export function OnlineEntryPage() {
                 columns={gridColumns}
                 rows={rows}
                 fetchPeriod={(d, s) =>
-                  getOnlineGrid(d, s).then((data) => data as unknown as GridRow[])
+                  getOnlineGrid(d, s).then(
+                    (data) => data as unknown as GridRow[],
+                  )
                 }
                 pending={pending}
                 getSavedValue={getSavedValue}
@@ -798,6 +800,7 @@ export function OnlineEntryPage() {
             onAddExtraColumns={canEdit ? handleAddExtraColumns : undefined}
             onRemoveExtraColumns={canEdit ? removeColumns : undefined}
             historyTable="daily_online_stock"
+            colorScope="online"
           />
         </div>
       )}

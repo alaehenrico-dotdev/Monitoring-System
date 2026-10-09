@@ -18,11 +18,11 @@ export async function getUsers(_req: Request, res: Response) {
 export async function postUser(req: Request, res: Response) {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid user payload", parsed.error.flatten());
-  res.status(201).json(await createUser(parsed.data));
+  res.status(201).json(await createUser(parsed.data, req.user?.id));
 }
 
 export async function patchUserActive(req: Request, res: Response) {
   const userId = Number(req.params.id);
   const isActive = Boolean(req.body?.isActive);
-  res.json(await setUserActive(userId, isActive));
+  res.json(await setUserActive(userId, isActive, req.user?.id));
 }

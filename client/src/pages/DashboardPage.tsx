@@ -21,6 +21,7 @@ import {
 import { DatePicker } from "../components/DatePicker";
 import { Toolbar } from "../components/Toolbar";
 import { Button } from "../components/ui";
+import { EndOfDayPackDialog } from "../components/EndOfDayPackDialog";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import {
@@ -197,9 +198,11 @@ export function DashboardPage() {
   // `null` = follow today. Kept as "no pick" rather than a copy of today's
   // date so a dashboard left open still rolls over at midnight/shift change.
   const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const [showPack, setShowPack] = useState(false);
   const viewDate = pickedDate ?? today;
   // Fetched once here and handed to both restock cards - see useDaysOfStock.
-  const { rows: daysOfStock, failed: daysOfStockFailed } = useDaysOfStock(viewDate);
+  const { rows: daysOfStock, failed: daysOfStockFailed } =
+    useDaysOfStock(viewDate);
   const isToday = viewDate === today;
   const realtimeVersion = useRealtimeVersion();
 
@@ -374,9 +377,25 @@ export function DashboardPage() {
                 Back to today
               </Button>
             )}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowPack(true)}
+              title="Daily Report + Variance Report + database backup, saved as one .zip"
+            >
+              End-of-day pack
+            </Button>
           </div>
         </Toolbar>
       </PageHeader>
+
+      {showPack && (
+        <EndOfDayPackDialog
+          defaultDate={viewDate}
+          todayValue={today}
+          onClose={() => setShowPack(false)}
+        />
+      )}
 
       <Toast
         message={error}
@@ -609,6 +628,7 @@ function describeRecord(
 ): string {
   const label = TABLE_LABELS[entry.tableName] ?? entry.tableName;
   const payload = entry.newValue ?? entry.oldValue;
+  if (entry.tableName === "reports" && entry.summary) return `${label} · ${entry.summary}`;
   const fields =
     payload && typeof payload === "object"
       ? (payload as Record<string, unknown>)

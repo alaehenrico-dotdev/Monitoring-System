@@ -1,5 +1,5 @@
 import { Role } from "@prisma/client";
-import { prisma } from "../lib/prisma";
+import { prisma, type Db } from "../lib/prisma";
 
 export const PUBLIC_USER_SELECT = {
   id: true,
@@ -38,11 +38,11 @@ export const userRepository = {
     return prisma.user.findMany({ select: PUBLIC_USER_SELECT, orderBy: { name: "asc" } });
   },
 
-  create(data: UserCreateData) {
-    return prisma.user.create({ data, select: PUBLIC_USER_SELECT });
+  create(data: UserCreateData, db: Db = prisma) {
+    return db.user.create({ data, select: PUBLIC_USER_SELECT });
   },
 
-  setActive(id: number, isActive: boolean) {
-    return prisma.user.update({ where: { id }, data: { isActive }, select: PUBLIC_USER_SELECT });
+  setActive(id: number, isActive: boolean, db: Db = prisma) {
+    return db.user.update({ where: { id }, data: { isActive }, select: PUBLIC_USER_SELECT });
   },
 };

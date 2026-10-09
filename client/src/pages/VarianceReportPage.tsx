@@ -38,6 +38,7 @@ interface VarianceRow {
   variance: string;
   product: { id: number; sku: string | null; name: string; category: string };
   countedBy: { name: string } | null;
+  remarks?: string | null;
 }
 
 // Same columns, in the same order, as the on-screen table below.
@@ -51,6 +52,7 @@ const VARIANCE_PDF_COLUMNS: PdfColumn[] = [
   { header: "Manual Count", align: "right" },
   { header: "Variance", align: "right" },
   { header: "Counted By" },
+  { header: "Remarks" },
 ];
 
 // Built from local date parts (never `.toISOString()`, which reads the UTC
@@ -220,6 +222,7 @@ export function VarianceReportPage() {
                   tone: Number(r.variance) < 0 ? "danger" : "warning",
                 },
                 r.countedBy?.name ?? "\u2014",
+                r.remarks?.trim() ? r.remarks : "\u2014",
               ]),
               { emptyMessage: "No flagged variances on this date." },
             ),
@@ -278,6 +281,14 @@ export function VarianceReportPage() {
               </Button>
             )}
             <Link
+              to="/variance-ledger"
+              className="ae-btn ae-btn-secondary"
+              style={{ textDecoration: "none" }}
+              title="Which SKUs keep coming up off, by how much and who was counting"
+            >
+              <HistoryIcon /> Ledger
+            </Link>
+            <Link
               to="/variance-report-history"
               className="ae-btn ae-btn-secondary"
               style={{ textDecoration: "none" }}
@@ -324,6 +335,7 @@ export function VarianceReportPage() {
                     "Manual Count",
                     "Variance",
                     "Counted By",
+                    "Remarks",
                   ].map((h) => (
                     <th key={h}>{h}</th>
                   ))}
@@ -370,6 +382,9 @@ export function VarianceReportPage() {
                       {r.variance}
                     </td>
                     <td>{r.countedBy?.name ?? "—"}</td>
+                    <td style={{ textAlign: "left", color: r.remarks ? colors.ink : colors.subtleInk }}>
+                      {r.remarks?.trim() ? r.remarks : "No reason recorded"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

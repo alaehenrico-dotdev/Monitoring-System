@@ -31,10 +31,7 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 
 const REQUEST_TIMEOUT_MS = 4_000;
 
-async function request<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -63,8 +60,13 @@ async function request<T>(
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => ({ error: response.statusText }));
-    if (response.status === 401) {
+    const body = await response
+      .json()
+      .catch(() => ({ error: response.statusText }));
+    // A wrong password on the login form (or the re-login dialog) is also a
+    // 401, but it isn't an expired session - it must not clear the token or
+    // trip the global handler.
+    if (response.status === 401 && !path.startsWith("/auth/login")) {
       setToken(null);
       onUnauthorized?.();
     }

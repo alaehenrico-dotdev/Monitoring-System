@@ -1,8 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { Product } from "../types";
 import { StockGrid, type GridColumn, type GridRow } from "./StockGrid";
-import { extraColumnKey, MAX_EXTRAS_PER_COLUMN } from "../hooks/useExtraColumns";
+import {
+  extraColumnKey,
+  MAX_EXTRAS_PER_COLUMN,
+} from "../hooks/useExtraColumns";
 import { offlineStockColumns } from "../config/stockColumns";
 
 const columns: GridColumn[] = [
@@ -36,7 +39,10 @@ function renderGrid(extra: Record<string, unknown> = {}) {
   );
 }
 
-function headerFor(container: HTMLElement, label: string): HTMLTableCellElement {
+function headerFor(
+  container: HTMLElement,
+  label: string,
+): HTMLTableCellElement {
   const th = [...container.querySelectorAll("th")].find((el) =>
     el.textContent?.startsWith(label),
   );
@@ -45,8 +51,9 @@ function headerFor(container: HTMLElement, label: string): HTMLTableCellElement 
 }
 
 const menu = () => document.querySelector('[role="menu"]');
-const menuItems = () =>
-  [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+const menuItems = () => [
+  ...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+];
 
 describe("StockGrid extra-column header menu", () => {
   it("opens only on editable headers, and never on calculated ones", () => {
@@ -143,13 +150,15 @@ describe("StockGrid extra columns", () => {
   it("renders one input per added column and locks the main column", () => {
     const { container } = renderGrid({ extraColumns: { stockIn: [1, 3] } });
 
-    expect(
-      container.querySelector(`input[data-cell="1:stockIn"]`),
-    ).toBeNull();
+    expect(container.querySelector(`input[data-cell="1:stockIn"]`)).toBeNull();
     for (const slot of [1, 3]) {
       const key = extraColumnKey("stockIn", slot);
-      expect(container.querySelector(`input[data-cell="1:${key}"]`)).not.toBeNull();
-      expect(container.querySelector(`input[data-cell="2:${key}"]`)).not.toBeNull();
+      expect(
+        container.querySelector(`input[data-cell="1:${key}"]`),
+      ).not.toBeNull();
+      expect(
+        container.querySelector(`input[data-cell="2:${key}"]`),
+      ).not.toBeNull();
     }
     // The main column still shows its (now read-only) figure, which the
     // totals, Remaining Stock and % column all go on reading.
@@ -163,7 +172,9 @@ describe("StockGrid extra columns", () => {
     const first = cell(`1:${extraColumnKey("stockIn", 1)}`);
     first.focus();
     fireEvent.keyDown(first, { key: "ArrowRight" });
-    expect(document.activeElement).toBe(cell(`1:${extraColumnKey("stockIn", 2)}`));
+    expect(document.activeElement).toBe(
+      cell(`1:${extraColumnKey("stockIn", 2)}`),
+    );
   });
 
   it("deletes one added column from the x in its header", () => {
@@ -204,12 +215,14 @@ describe("StockGrid extra columns", () => {
     );
     const grand = container.querySelector("tr.ae-row-grand")!;
     // The main column's 12 and its single added column's 12, side by side.
-    expect([...grand.querySelectorAll("td")].map((td) => td.textContent)).toContain(
-      "12",
-    );
+    expect(
+      [...grand.querySelectorAll("td")].map((td) => td.textContent),
+    ).toContain("12");
     const subtotal = container.querySelector("tr.ae-row-subtotal")!;
     expect(
-      [...subtotal.querySelectorAll("td.ae-extra-col")].map((td) => td.textContent),
+      [...subtotal.querySelectorAll("td.ae-extra-col")].map(
+        (td) => td.textContent,
+      ),
     ).toEqual(["12"]);
   });
 });
@@ -229,7 +242,12 @@ describe("Delivery (Out) uses the same added-column mechanism", () => {
       <StockGrid
         rows={[
           {
-            product: { id: 1, sku: "A", name: "A", category: "Sauces" } as Product,
+            product: {
+              id: 1,
+              sku: "A",
+              name: "A",
+              category: "Sauces",
+            } as Product,
             entry: { deliveryOut: 25 },
           },
         ]}
@@ -260,5 +278,61 @@ describe("Delivery (Out) uses the same added-column mechanism", () => {
     expect(localStorage.getItem("ala-eh-grid-subcolumn-names")).toContain(
       "Batangas run",
     );
+  });
+});
+
+describe("StockGrid header color picker", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("recolors the header (and persists it) from the right-click menu", () => {
+    const { container } = renderGrid();
+    fireEvent.contextMenu(headerFor(container, "Stocks In"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /header color to #F6E58D/i }),
+    );
+    expect(headerFor(container, "Stocks In").style.background).toMatch(
+      /f6e58d|246, 229, 141/i,
+    );
+    expect(localStorage.getItem("ala-eh-grid-column-colors")).toContain(
+      "#f6e58d",
+    );
+  });
+
+  it("resets back to the default tone", () => {
+    const { container } = renderGrid();
+    fireEvent.contextMenu(headerFor(container, "Stocks In"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /header color to #F6E58D/i }),
+    );
+    fireEvent.contextMenu(headerFor(container, "Stocks In"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reset color" }));
+    expect(localStorage.getItem("ala-eh-grid-column-colors")).not.toContain(
+      "f6e58d",
+    );
+  });
+});
+
+describe("StockGrid category row color", () => {
+  beforeEach(() => localStorage.clear());
+
+  const catButton = (container: HTMLElement) =>
+    container.querySelector<HTMLButtonElement>(".ae-cat-toggle")!;
+
+  it("recolors a category row from its right-click menu and can reset it", () => {
+    const { container } = renderGrid();
+    fireEvent.contextMenu(catButton(container));
+    fireEvent.click(
+      screen.getByRole("button", { name: /category color to #A8E6A1/i }),
+    );
+    expect(catButton(container).style.background).toMatch(
+      /a8e6a1|168, 230, 161/i,
+    );
+    expect(localStorage.getItem("ala-eh-grid-category-colors")).toContain(
+      "#a8e6a1",
+    );
+
+    fireEvent.contextMenu(catButton(container));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Reset color" }));
+    expect(catButton(container).style.background).toBe("");
   });
 });

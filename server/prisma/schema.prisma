@@ -213,6 +213,15 @@ model ManualCount {
   systemRemainingStock Decimal       @db.Decimal(14, 2)
   manualCount          Decimal       @db.Decimal(14, 2)
   variance             Decimal       @db.Decimal(14, 2) // calc: system - manual
+  // Why the count differs from the system figure - free text, optional (the
+  // Audit page's Variance details). Edited on its own, never by a count save.
+  remarks              String?       @db.VarChar(500)
+  // A count only becomes the next period's opening stock once it is published
+  // (the Audit page's Publish button). Null = saved but not yet published;
+  // saving a count again un-publishes it, so what was approved is always what
+  // carried forward. Counts that existed before this column were published.
+  publishedAt          DateTime?
+  publishedById        Int?
   countedById          Int?
   countedBy            User?         @relation("CountedBy", fields: [countedById], references: [id])
   createdAt            DateTime      @default(now())
@@ -250,8 +259,17 @@ model ChangeLog {
   // trail Section 5.8 exists for.
   importBatchId Int?
   importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  // The change_log row that triggered this one automatically - set on the
+  // follow-on writes a manual count or an entry save makes to later periods
+  // (carried-forward opening stock), so they read as consequences rather
+  // than as someone's own edit. A plain id, not a relation: it only ever
+  // points at an older row of this append-only table.
+  causedById    Int?
 
   @@index([importBatchId])
+  // The Change Log's date-range filter (and its newest-first ordering) -
+  // without this a date range reads every row ever written.
+  @@index([changedAt])
   // change_log is append-only and grows with every stock write, while both
   // of its read paths filter on (tableName, recordId): the Change Log page
   // (changeLogRepository.findMany) and, far more costly,
@@ -327,6 +345,10 @@ model ReportHistoryEntry {
   // snapshot, so a reopened report always reflects the current numbers
   // (including anything corrected since it was first generated).
   route         String
+  // "online" / "offline" / "all" - which section of the report was generated.
+  // Null on entries from before this column (and for reports with no such
+  // split, like the Variance Report).
+  section       String?
   generatedById Int?
   generatedBy   User?    @relation("GeneratedBy", fields: [generatedById], references: [id])
   generatedAt   DateTime @default(now())

@@ -93,6 +93,11 @@ export interface ManualCountEntry {
   systemRemainingStock: number;
   manualCount: number | null;
   variance: number | null;
+  /// Why the count differs from the system figure (free text).
+  remarks?: string | null;
+  /// When the count was published (it then carries into the next shift's opening
+  /// stock); null = saved but not yet published.
+  publishedAt?: string | null;
 }
 
 export interface ManualCountGridRow {
@@ -100,6 +105,9 @@ export interface ManualCountGridRow {
   entry: ManualCountEntry;
   isSaved: boolean;
   isFlagged: boolean;
+  /// This period's opening stock is not what the previous period carries
+  /// forward (a CSV import set it) - null when it matches or can't be compared.
+  openingBreak?: { expected: number; actual: number } | null;
 }
 
 export interface TotalStockRow {
@@ -120,4 +128,23 @@ export interface ChangeLogEntry {
   changedBy: { id: number; name: string; username: string; role: Role } | null;
   oldValue: unknown;
   newValue: unknown;
+  /// Added by GET /change-log - absent on rows from anything older.
+  context?: ChangeLogContext | null;
+  source?: "import" | "reset" | null;
+  /// One-line "what changed" with friendly field names; null for system rows.
+  summary?: string | null;
+  /// Set on a follow-on change the system made because of another one.
+  causedById?: number | null;
+  changes?: { key: string; label: string; before: string; after: string }[];
+}
+
+/// What a change row points at (see server changeLog.service ChangeLogContext).
+export interface ChangeLogContext {
+  productId: number | null;
+  sku: string | null;
+  productName: string | null;
+  /// YYYY-MM-DD
+  entryDate: string | null;
+  shift: "MORNING" | "NIGHT" | null;
+  location: "ONLINE" | "OFFLINE" | "TOTAL" | null;
 }

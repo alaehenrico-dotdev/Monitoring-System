@@ -12,7 +12,7 @@ export async function postLogin(req: Request, res: Response) {
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid credentials payload", parsed.error.flatten());
 
-  const result = await login(parsed.data.username, parsed.data.password);
+  const result = await login(parsed.data.username, parsed.data.password, req.ip);
   res.json(result);
 }
 

@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { restoreDatabaseFromStream, streamDatabaseBackup } from "../services/backup.service";
 import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveResetToken } from "../services/dataReset.service";
+import { logSystemEvent } from "../services/changeLog.service";
 import { HttpError } from "../utils/HttpError";
 
 // Matches every other export's filename style across the app (e.g.
@@ -17,9 +18,11 @@ function backupFileName(): string {
   return `ala-eh-backup-${date}-${time}.sql`;
 }
 
-export async function getBackupDownload(_req: Request, res: Response) {
+export async function getBackupDownload(req: Request, res: Response) {
   try {
-    await streamDatabaseBackup(res, backupFileName());
+    const fileName = backupFileName();
+    await streamDatabaseBackup(res, fileName);
+    await logSystemEvent("backup_download", { fileName }, req.user?.id);
   } catch (err) {
     // Once mysqldump has started streaming, the response headers/body are
     // already committed - there's no way to turn that into a clean JSON
@@ -45,6 +48,8 @@ export async function postRestore(req: Request, res: Response) {
   try {
     await restoreDatabaseFromStream(req);
     consumeResetToken(tokenId);
+    // Written into the restored database, so it is the first line of its history.
+    await logSystemEvent("backup_restore", {}, req.user?.id, "UPDATE");
     res.json({ success: true });
   } catch (err) {
     releaseResetToken(tokenId);

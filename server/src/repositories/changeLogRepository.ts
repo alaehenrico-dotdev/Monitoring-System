@@ -1,4 +1,4 @@
-import { ChangeAction } from "@prisma/client";
+import { ChangeAction, Prisma, Shift } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 
 export interface ChangeLogCreateData {
@@ -9,11 +9,72 @@ export interface ChangeLogCreateData {
   oldValue?: unknown;
   newValue?: unknown;
   importBatchId?: number | null;
+  causedById?: number | null;
 }
 
 export interface ChangeLogFilters {
   tableName?: string;
   recordId?: number;
+  dateFrom?: Date;
+  dateTo?: Date;
+  userId?: number;
+  action?: ChangeAction;
+  productId?: number;
+  shift?: Shift;
+  /// Only rows a CSV import wrote (importBatchId set).
+  importOnly?: boolean;
+  /// Generated-report rows only: "Daily Report" / "Variance Report" / "Audit Report".
+  reportType?: string;
+  /// ...and which section: "online" / "offline" / "all".
+  reportSection?: string;
+}
+
+/// Generated-report rows (written by reportHistory.service).
+export const REPORTS_TABLE = "reports";
+
+/// Tables whose snapshots carry a productId; for "products" the record IS the product.
+const STOCK_TABLES = ["daily_online_stock", "daily_offline_stock", "manual_counts"];
+
+/// A snapshot field can sit in either snapshot: DELETE rows have no newValue.
+function snapshotField(path: string, value: string | number): Prisma.ChangeLogWhereInput {
+  return {
+    OR: [
+      { newValue: { path, equals: value } },
+      { oldValue: { path, equals: value } },
+    ],
+  };
+}
+
+export function buildChangeLogWhere(f: ChangeLogFilters): Prisma.ChangeLogWhereInput {
+  const and: Prisma.ChangeLogWhereInput[] = [];
+  if (f.tableName) and.push({ tableName: f.tableName });
+  if (f.recordId) and.push({ recordId: f.recordId });
+  if (f.dateFrom || f.dateTo) and.push({ changedAt: { gte: f.dateFrom, lte: f.dateTo } });
+  if (f.userId) and.push({ changedById: f.userId });
+  if (f.action) and.push({ action: f.action });
+  if (f.importOnly) and.push({ importBatchId: { not: null } });
+  if (f.productId) {
+    and.push({
+      OR: [
+        { tableName: "products", recordId: f.productId },
+        { AND: [{ tableName: { in: STOCK_TABLES } }, snapshotField("$.productId", f.productId)] },
+      ],
+    });
+  }
+  if (f.shift) and.push(snapshotField("$.shift", f.shift));
+  // Report rows only have a newValue (a CREATE), so no old/new split here.
+  if (f.reportType || f.reportSection) {
+    and.push({ tableName: REPORTS_TABLE });
+    if (f.reportType) and.push({ newValue: { path: "$.type", equals: f.reportType } });
+    if (f.reportSection) and.push({ newValue: { path: "$.section", equals: f.reportSection } });
+  }
+  return and.length ? { AND: and } : {};
+}
+
+export interface ChangeLogPageOptions {
+  limit: number;
+  /// Return rows older than this id (the previous page's nextCursor).
+  cursor?: number;
 }
 
 /// Section 5.8 - change_log: accountability and variance tracing.
@@ -28,17 +89,34 @@ export const changeLogRepository = {
         oldValue: data.oldValue === undefined ? undefined : JSON.parse(JSON.stringify(data.oldValue)),
         newValue: data.newValue === undefined ? undefined : JSON.parse(JSON.stringify(data.newValue)),
         importBatchId: data.importBatchId ?? null,
+        causedById: data.causedById ?? null,
       },
     });
   },
 
-  findMany(filters: ChangeLogFilters) {
+  /// One page of the filtered log, newest first. Ordered by id (append-only,
+  /// so id order is time order) so the cursor is stable while new rows arrive.
+  /// Fetches one extra row so the caller can tell whether another page exists.
+  findPage(filters: ChangeLogFilters, { limit, cursor }: ChangeLogPageOptions) {
+    const where = buildChangeLogWhere(filters);
     return prisma.changeLog.findMany({
-      where: { tableName: filters.tableName, recordId: filters.recordId },
+      where: cursor ? { AND: [where, { id: { lt: cursor } }] } : where,
       include: { changedBy: { select: { id: true, name: true, username: true, role: true } } },
-      orderBy: { changedAt: "desc" },
-      take: 500,
+      orderBy: { id: "desc" },
+      take: limit + 1,
     });
+  },
+
+  /// Live records the change rows point at, for labelling. Batched per table.
+  findStockRecordsByIds(tableName: string, ids: number[]) {
+    const select = { id: true, productId: true, entryDate: true, shift: true } as const;
+    if (tableName === "daily_online_stock") return prisma.dailyOnlineStock.findMany({ where: { id: { in: ids } }, select });
+    if (tableName === "daily_offline_stock") return prisma.dailyOfflineStock.findMany({ where: { id: { in: ids } }, select });
+    return prisma.manualCount.findMany({ where: { id: { in: ids } }, select: { ...select, location: true } });
+  },
+
+  findProductsByIds(ids: number[]) {
+    return prisma.product.findMany({ where: { id: { in: ids } }, select: { id: true, sku: true, name: true } });
   },
 
   /// Newest-first history for one record, for the per-cell history endpoint.

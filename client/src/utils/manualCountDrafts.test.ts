@@ -25,10 +25,11 @@ describe("draftAction - setting a count", () => {
     expect(draftAction("  7  ", null)).toEqual({ kind: "set", value: 7 });
   });
 
-  it("re-sends a figure equal to the saved one rather than guessing", () => {
-    // The endpoint is idempotent, and suppressing this would mean a user who
-    // retyped the same number saw their Save silently do nothing.
-    expect(draftAction("40", 40)).toEqual({ kind: "set", value: 40 });
+  it("ignores a figure equal to the saved one, zero included", () => {
+    // Nothing would change, so Save must not be flagged for it.
+    expect(draftAction("40", 40)).toEqual({ kind: "none" });
+    expect(draftAction("0", 0)).toEqual({ kind: "none" });
+    expect(draftAction("12.50", 12.5)).toEqual({ kind: "none" });
   });
 });
 
@@ -37,9 +38,10 @@ describe("draftAction - clearing a count", () => {
     expect(draftAction("", 40)).toEqual({ kind: "clear" });
   });
 
-  it("clears a cell whose saved count is zero", () => {
-    // A saved 0 is a real counted value, so emptying it is still a removal.
-    expect(draftAction("", 0)).toEqual({ kind: "clear" });
+  it("treats clearing a saved zero as no change", () => {
+    // An empty cell and a 0 read the same here, so emptying a 0 must not light
+    // Save; the page snaps the cell back to 0 instead.
+    expect(draftAction("", 0)).toEqual({ kind: "none" });
   });
 
   it("treats whitespace-only as a clear", () => {

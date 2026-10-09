@@ -20,7 +20,8 @@ export type DraftAction =
   | { kind: "set"; value: number }
   /// Sent as manualCount: null, which the server routes to deleteManualCount.
   | { kind: "clear" }
-  /// Not a change - dropped without a request.
+  /// Not a change (an undone typo, or the figure already saved) - dropped
+  /// without a request.
   | { kind: "none" };
 
 /**
@@ -34,10 +35,17 @@ export type DraftAction =
  */
 export function draftAction(draft: string, savedCount: number | null): DraftAction {
   const trimmed = draft.trim();
-  if (trimmed === "") return savedCount === null ? { kind: "none" } : { kind: "clear" };
+  // Emptying a cell removes its count - except a saved 0, which an empty cell
+  // and a 0 both read as "nothing here": clearing it is not a change, so it
+  // must not light Save (see the 0-over-0 rule below).
+  if (trimmed === "") return savedCount === null || savedCount === 0 ? { kind: "none" } : { kind: "clear" };
 
   const value = Number(trimmed);
   if (!Number.isFinite(value) || value < 0) return { kind: "none" };
+  // Typing the figure that is already saved (0 over a saved 0 included) changes
+  // nothing, so it must not light up Save or appear in the confirm list. A
+  // never-counted cell (null) is different: a first count of 0 is a real result.
+  if (savedCount !== null && value === savedCount) return { kind: "none" };
   return { kind: "set", value };
 }
 
