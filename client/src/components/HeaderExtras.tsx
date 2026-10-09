@@ -1,4 +1,6 @@
 import { LiveClock } from "./LiveClock";
+import { openQuickJump } from "./QuickJump";
+import { SearchIcon } from "./icons";
 import { ThemeToggle } from "./ThemeToggle";
 
 /// Clock + dark-mode toggle, sitting at the right end of the header's title
@@ -21,6 +23,17 @@ export function HeaderExtras() {
         flexShrink: 0,
       }}
     >
+      {/* Pointer-reachable twin of Ctrl+K (QuickJump.tsx). The shortcut is
+          the fast path; this is what makes the feature discoverable at all. */}
+      <button
+        type="button"
+        className="ae-header-search-btn"
+        onClick={openQuickJump}
+        aria-label="Quick jump to a page or product (Ctrl+K)"
+        title="Jump to a page or product (Ctrl+K)"
+      >
+        <SearchIcon />
+      </button>
       <LiveClock />
       <ThemeToggle />
     </span>

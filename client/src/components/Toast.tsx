@@ -9,7 +9,8 @@ interface ToastProps {
   message: ReactNode | null;
   onDismiss: () => void;
   variant?: ToastVariant;
-  /// ms before auto-dismissing; null keeps it up until the user closes it
+  /// ms before auto-dismissing (capped at TOAST_MS, 3s, so every timed toast
+  /// leaves at the same pace); null keeps it up until the user closes it
   /// (or a later action replaces the message) - used for anything worth
   /// reading in full rather than glancing past, e.g. an import that failed
   /// or turned up unmatched rows.
@@ -20,6 +21,11 @@ interface ToastProps {
   /// specific toast it belongs to - this component doesn't try to guess
   /// that on its own.
   action?: { label: string; onClick: () => void };
+  /// Native tooltip on the message text - for detail that belongs with the
+  /// toast but would bury its one-line summary if shown inline (the paste
+  /// summary's per-cell skip reasons). Scoped to this toast, so it can't
+  /// outlive the message it explains.
+  title?: string;
   /// Identity of the message, used to restart the entrance animation and the
   /// auto-dismiss timer when the message changes. Defaults to the message
   /// itself when it's a string; pass one when `message` is JSX.
@@ -36,6 +42,9 @@ interface ToastProps {
  * glance in both light and dark mode, and `colors.danger`/`warningText` are
  * body-text colors tuned for contrast against the page, not for this.
  */
+/// Every timed toast hides after this long, then fades out smoothly.
+const TOAST_MS = 3000;
+
 const HUE: Record<ToastVariant, string> = {
   info: "#4C8DF6",
   success: "#27A567",
@@ -54,9 +63,19 @@ function ToastIcon({ variant }: { variant: ToastVariant }) {
     stroke: "currentColor",
   };
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden focusable="false">
-      {variant === "success" && <path d="M3.5 8.5 6.5 11.5 12.5 5" {...stroke} />}
-      {variant === "error" && <path d="M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5" {...stroke} />}
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden
+      focusable="false"
+    >
+      {variant === "success" && (
+        <path d="M3.5 8.5 6.5 11.5 12.5 5" {...stroke} />
+      )}
+      {variant === "error" && (
+        <path d="M4.5 4.5 11.5 11.5M11.5 4.5 4.5 11.5" {...stroke} />
+      )}
       {variant !== "success" && variant !== "error" && (
         <>
           <circle cx="8" cy="8" r="5.75" {...stroke} />
@@ -118,8 +137,9 @@ export function Toast({
   message,
   onDismiss,
   variant = "info",
-  duration = 6000,
+  duration = TOAST_MS,
   action,
+  title,
   id,
 }: ToastProps) {
   const dismissRef = useRef(onDismiss);
@@ -140,7 +160,10 @@ export function Toast({
   // arrow) so a parent re-render doesn't keep restarting the timer.
   useEffect(() => {
     if (!hasMessage || duration === null) return;
-    const timer = setTimeout(() => dismissRef.current(), duration);
+    const timer = setTimeout(
+      () => dismissRef.current(),
+      Math.min(duration, TOAST_MS),
+    );
     return () => clearTimeout(timer);
   }, [hasMessage, key, duration]);
 
@@ -152,8 +175,13 @@ export function Toast({
           layout
           initial={{ opacity: 0, y: 16, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={{ duration: 0.2 }}
+          exit={{
+            opacity: 0,
+            y: 4,
+            scale: 0.98,
+            transition: { duration: 0.6, ease: "easeInOut" },
+          }}
+          transition={{ duration: 0.25, ease: "easeOut" }}
           role="status"
           className="ae-toast"
           style={{ pointerEvents: "auto" }}
@@ -174,7 +202,9 @@ export function Toast({
           >
             <ToastIcon variant={variant} />
           </span>
-          <div className="ae-toast-message">{message}</div>
+          <div className="ae-toast-message" title={title}>
+            {message}
+          </div>
           {action && (
             <button
               type="button"
@@ -191,7 +221,13 @@ export function Toast({
             title="Dismiss"
             className="ae-toast-close"
           >
-            <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              aria-hidden
+              focusable="false"
+            >
               <path
                 d="M4 4 12 12M12 4 4 12"
                 fill="none"
@@ -215,6 +251,7 @@ interface PendingToast {
   message: string;
   variant: ToastVariant;
   duration: number | null;
+  title?: string;
 }
 let current: PendingToast | null = null;
 let nextId = 1;
@@ -223,9 +260,10 @@ const listeners = new Set<() => void>();
 export function showToast(
   message: string,
   variant: ToastVariant = "info",
-  duration: number | null = 10000,
+  duration: number | null = TOAST_MS,
+  title?: string,
 ) {
-  current = { id: nextId++, message, variant, duration };
+  current = { id: nextId++, message, variant, duration, title };
   listeners.forEach((l) => l());
 }
 
@@ -247,7 +285,8 @@ export function ToastHost() {
       message={t?.message ?? null}
       id={t ? String(t.id) : undefined}
       variant={t?.variant}
-      duration={t?.duration ?? 10000}
+      duration={t?.duration ?? TOAST_MS}
+      title={t?.title}
       onDismiss={clearToast}
     />
   );

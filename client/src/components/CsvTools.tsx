@@ -43,6 +43,7 @@ import {
 } from "../api/importBatches";
 import { Toast, type ToastVariant } from "./Toast";
 import { useTopProgress } from "../hooks/useTopProgress";
+import { LoadingOverlay } from "./Spinner";
 import { Modal } from "./Modal";
 import { PendingChangesPreview } from "./PendingChangesPreview";
 import type { PendingChangeDetail } from "../hooks/usePendingEntryChanges";
@@ -429,6 +430,12 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
     // own in-flight flag rather than one covering both.
     const [importReview, setImportReview] = useState<ImportReview | null>(null);
     const [savingImport, setSavingImport] = useState(false);
+    // Same full-screen percent ring the pages' own Save uses (LoadingOverlay),
+    // so importing, undoing an import and saving all look identical.
+    const [overlay, setOverlay] = useState<{
+      label: string;
+      percent: number;
+    } | null>(null);
     const importContextRef = useRef<ImportParseContext | null>(null);
     // The most recent review-modal Save, revertible via "Undo Import" until
     // either a second import overwrites it (one level only, same rule as the
@@ -796,7 +803,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
     async function handleConfirmImport() {
       if (!importReview || importReview.matchedRows.length === 0) return;
       setSavingImport(true);
-      progress.start();
+      setOverlay({ label: "Importing…", percent: 0 });
       try {
         // Import History (Section: CSV import into Manual Count) - registered
         // up front so every row below can be tagged with it. Best-effort: a
@@ -837,7 +844,10 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
           }
           batchEntries[row.productId] = fields;
 
-          progress.set(Math.round(((i + 1) / total) * 100));
+          setOverlay({
+            label: "Importing…",
+            percent: Math.round(((i + 1) / total) * 100),
+          });
         }
 
         if (historyBatchId !== undefined)
@@ -867,7 +877,6 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
         // rather than auto-clearing while there's something unresolved (rows
         // that still didn't match anything even after the review modal).
         setMessageVariant(stillUnmatched ? "error" : "info");
-        progress.done();
         setImportReview(null);
       } catch (err) {
         setMessage(
@@ -877,9 +886,9 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
         );
         setMessageVariant("error");
         setShowUndoImport(false);
-        progress.fail();
       } finally {
         setSavingImport(false);
+        setOverlay(null);
       }
     }
 
@@ -896,7 +905,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
       if (!batch) return;
       undoInFlightRef.current = true;
       setShowUndoImport(false);
-      progress.start();
+      setOverlay({ label: "Undoing import…", percent: 0 });
       try {
         const cells = Object.entries(batch.entries).flatMap(
           ([productIdStr, fields]) =>
@@ -917,7 +926,10 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
           } else {
             skipped++;
           }
-          progress.set(Math.round(((i + 1) / cells.length) * 100));
+          setOverlay({
+            label: "Undoing import…",
+            percent: Math.round(((i + 1) / cells.length) * 100),
+          });
         }
 
         setLastImportBatch(null);
@@ -930,15 +942,14 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
           );
         setMessage(`${parts.join(", ")}.`);
         setMessageVariant(skipped ? "error" : "info");
-        progress.done();
       } catch (err) {
         setMessage(
           err instanceof Error ? `Undo failed: ${err.message}` : "Undo failed",
         );
         setMessageVariant("error");
-        progress.fail();
       } finally {
         undoInFlightRef.current = false;
+        setOverlay(null);
       }
     }
 
@@ -1219,6 +1230,9 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             </div>
           </Modal>
         )}
+        {overlay && (
+          <LoadingOverlay label={overlay.label} percent={overlay.percent} />
+        )}
         {importReview && (
           <Modal
             title={
@@ -1229,6 +1243,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
           >
             {reviewLabel && <ImportTargetBanner label={reviewLabel} />}
             <PendingChangesPreview
+              showTotal
               items={importReview.matchedRows.flatMap(
                 (row): PendingChangeDetail[] =>
                   Object.entries(row.changes).map(([key, newValue]) => ({

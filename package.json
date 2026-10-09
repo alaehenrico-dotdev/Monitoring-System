@@ -14,9 +14,9 @@
     "build": "npm run build --workspace server && npm run build --workspace client",
     "db:migrate:deploy": "npm run backup:snapshot && npm run prisma:migrate:deploy --workspace server",
     "seed": "npm run seed --workspace server",
-    "backup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup.ps1",
-    "backup:snapshot": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/backup.ps1 -Mode snapshot -Label pre-migration",
-    "restore": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/restore.ps1",
+    "backup": "node scripts/backup.mjs backup",
+    "backup:snapshot": "node scripts/backup.mjs backup --mode snapshot --label pre-migration",
+    "restore": "node scripts/backup.mjs restore",
     "lint": "eslint .",
     "test": "npm run test --workspaces --if-present",
     "e2e": "node scripts/e2e.mjs"
@@ -25,11 +25,11 @@
     "concurrently": "^9.0.1"
   },
   "allowScripts": {
-    "@prisma/client@5.22.0": true,
-    "@prisma/engines@5.22.0": true,
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
     "esbuild@0.28.2": true,
     "esbuild@0.21.5": true,
-    "prisma@5.22.0": true,
+    "prisma@6.19.3": true,
     "core-js@3.50.0": true
   }
 }

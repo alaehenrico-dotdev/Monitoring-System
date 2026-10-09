@@ -28,7 +28,12 @@ import { ShiftFilter } from "../components/ShiftFilter";
 import { StockSourceFilter } from "../components/StockSourceFilter";
 import { ChevronIcon, PrinterIcon, SaveIcon } from "../components/icons";
 import { Modal } from "../components/Modal";
+import { LoadingOverlay } from "../components/Spinner";
 import { matchesSearch } from "../utils/search";
+import {
+  draftAction,
+  isRealChange as isRealDraftChange,
+} from "../utils/manualCountDrafts";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
@@ -178,6 +183,9 @@ export function ManualCountPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [saving, setSaving] = useState(false);
+  // Real per-item percent for LoadingOverlay's ring (see handleSaveAll) - same
+  // overlay Online/Offline Entry and CSV import use, so all saves look alike.
+  const [savePercent, setSavePercent] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
   const realtimeVersion = useRealtimeVersion();
   const progress = useTopProgress();
@@ -211,8 +219,30 @@ export function ManualCountPage() {
     }
   }, [drafts, date, shift]);
 
-  const pendingCount =
-    Object.keys(drafts.ONLINE).length + Object.keys(drafts.OFFLINE).length;
+  /// This product's last-SAVED count at one location, or null when nothing
+  /// has been counted there yet. Read off `gridRows` (the server's rows), not
+  /// the drafts overlaid on top of them.
+  function savedCountOf(loc: CountLocation, productId: number): number | null {
+    const raw = gridRows?.[loc].find((r) => r.product.id === productId)?.entry
+      .manualCount;
+    return raw === null || raw === undefined ? null : Number(raw);
+  }
+
+  /// Whether a staged draft would actually change anything (see
+  /// utils/manualCountDrafts.ts - "" means clear when there is something
+  /// saved, and nothing at all when there isn't).
+  function isRealChange(loc: CountLocation, productId: number, draft: string) {
+    return isRealDraftChange(draft, savedCountOf(loc, productId));
+  }
+
+  const pendingCount = COUNT_LOCATIONS.reduce(
+    (n, loc) =>
+      n +
+      Object.entries(drafts[loc]).filter(([id, draft]) =>
+        isRealChange(loc, Number(id), draft),
+      ).length,
+    0,
+  );
 
   // Warn before navigating/closing the tab with staged-but-unsaved counts -
   // same guard as Online/Offline Entry, now that a typed count no longer
@@ -251,22 +281,39 @@ export function ManualCountPage() {
   async function handleSaveAll() {
     setError(null);
     setSaving(true);
+    setSavePercent(0);
+    // Close the confirm dialog now so only the percent overlay is on screen
+    // while the save runs (same as Online/Offline Entry).
+    setShowConfirm(false);
+    const totalToSave = pendingCount;
+    let processed = 0;
     const failed: string[] = [];
     const succeeded: { loc: CountLocation; productId: number }[] = [];
     for (const loc of COUNT_LOCATIONS) {
       for (const [productIdStr, draft] of Object.entries(drafts[loc])) {
         const productId = Number(productIdStr);
-        if (draft === "") {
+        // An empty draft on a cell that was never counted is not a change -
+        // drop it without a round trip.
+        if (!isRealChange(loc, productId, draft)) {
           succeeded.push({ loc, productId });
           continue;
         }
+        processed++;
+        setSavePercent(Math.round((processed / totalToSave) * 100));
+        // An empty draft on a cell that HAS a saved count means "remove this
+        // count", which the endpoint expresses as manualCount: null (the
+        // controller routes that to deleteManualCount). This used to be
+        // skipped entirely: the draft was dropped, the cell snapped back to
+        // the old figure, and the count stayed in the database still driving
+        // the variance - a cleared audit count that silently never cleared.
+        const action = draftAction(draft, savedCountOf(loc, productId));
         try {
           const saved = await saveManualCount(
             productId,
             date,
             shift,
             loc,
-            Number(draft),
+            action.kind === "set" ? action.value : null,
             importedBatchByProduct[loc][productId],
           );
           // Merge the recalculated row (system remaining stock + variance) in
@@ -399,18 +446,28 @@ export function ManualCountPage() {
 
   // What the confirm modal lists - one row per staged (non-blank) draft,
   // resolved against the last-loaded rows for the product name/old count.
+  // Clearing a count is a change like any other and has to appear here -
+  // this used to filter empty drafts out, so a cleared cell showed up in the
+  // Save count but not in the dialog meant to list exactly what Save writes.
   const pendingChanges = COUNT_LOCATIONS.flatMap((loc) =>
     Object.entries(drafts[loc])
-      .filter(([, draft]) => draft !== "")
+      .filter(([productIdStr, draft]) =>
+        isRealChange(loc, Number(productIdStr), draft),
+      )
       .map(([productIdStr, draft]) => {
         const productId = Number(productIdStr);
         const row = auditRows?.find((r) => r.product.id === productId);
+        // Same decision the save loop makes, from the same module - the two
+        // cannot disagree about whether a row is a clear or a set.
+        const cleared =
+          draftAction(draft, savedCountOf(loc, productId)).kind === "clear";
         return {
           key: `${loc}-${productId}`,
           name: row?.product.name ?? `#${productId}`,
           location: LOCATION_LABEL[loc],
           oldValue: row?.entries[loc].manualCount ?? "—",
           newValue: draft,
+          cleared,
         };
       }),
   );
@@ -837,32 +894,96 @@ export function ManualCountPage() {
               No unsaved changes.
             </p>
           ) : (
-            <table className="ae-table" style={{ minWidth: 0 }}>
-              <thead>
-                <tr>
-                  <th>SKU</th>
-                  <th>Location</th>
-                  <th>Old count</th>
-                  <th>New count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendingChanges.map((c) => (
-                  <tr key={c.key}>
-                    <td style={{ textAlign: "left", color: colors.ink }}>
-                      {c.name}
+            // Own bounded scroll box (ae-table-wrap) so the sticky header
+            // tracks this table's columns instead of the whole dialog's
+            // scroll - without it the header floated mid-list over the rows.
+            <div
+              className="ae-table-wrap"
+              style={{ maxHeight: "50vh", overflowY: "auto" }}
+            >
+              <table className="ae-table" style={{ minWidth: 0 }}>
+                <thead>
+                  <tr>
+                    <th style={{ textAlign: "left" }}>SKU</th>
+                    <th style={{ textAlign: "left" }}>Location</th>
+                    <th>Old count</th>
+                    <th>New count</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingChanges.map((c) => (
+                    <tr key={c.key}>
+                      <td style={{ textAlign: "left", color: colors.ink }}>
+                        {c.name}
+                      </td>
+                      <td style={{ textAlign: "left", color: colors.ink }}>
+                        {c.location}
+                      </td>
+                      <td>{c.oldValue}</td>
+                      {/* A clear has no new figure to show, and a blank cell
+                          here would read as "nothing happens to this row" -
+                          the opposite of what Save is about to do. */}
+                      <td
+                        style={{
+                          fontWeight: 700,
+                          color: c.cleared ? colors.danger : colors.yellow,
+                        }}
+                      >
+                        {c.cleared ? "Cleared" : c.newValue}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td
+                      colSpan={2}
+                      style={{
+                        textAlign: "left",
+                        fontWeight: 700,
+                        color: colors.ink,
+                        position: "sticky",
+                        bottom: 0,
+                        background: colors.paperAlt,
+                      }}
+                    >
+                      Total ({pendingChanges.length} count
+                      {pendingChanges.length === 1 ? "" : "s"})
                     </td>
-                    <td style={{ textAlign: "left", color: colors.ink }}>
-                      {c.location}
+                    <td
+                      style={{
+                        fontWeight: 700,
+                        position: "sticky",
+                        bottom: 0,
+                        background: colors.paperAlt,
+                      }}
+                    >
+                      {pendingChanges
+                        .reduce(
+                          (sum, c) =>
+                            sum +
+                            (typeof c.oldValue === "number" ? c.oldValue : 0),
+                          0,
+                        )
+                        .toLocaleString()}
                     </td>
-                    <td>{c.oldValue}</td>
-                    <td style={{ fontWeight: 700, color: colors.yellow }}>
-                      {c.newValue}
+                    <td
+                      style={{
+                        fontWeight: 700,
+                        color: colors.yellow,
+                        position: "sticky",
+                        bottom: 0,
+                        background: colors.paperAlt,
+                      }}
+                    >
+                      {pendingChanges
+                        .reduce((sum, c) => sum + Number(c.newValue), 0)
+                        .toLocaleString()}
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </tfoot>
+              </table>
+            </div>
           )}
           <div
             style={{
@@ -890,6 +1011,9 @@ export function ManualCountPage() {
             </Button>
           </div>
         </Modal>
+      )}
+      {saving && (
+        <LoadingOverlay label="Saving changes…" percent={savePercent} />
       )}
     </div>
   );

@@ -41,6 +41,28 @@
    stay fixed on the sidebar, dashboard, login screen, and table headers,
    which are permanently dark by design in both modes. */
 :root {
+  /* ---- Motion -----------------------------------------------------------
+     One vocabulary for interaction timing. These durations were already in
+     the file as ad-hoc 100/120/150/180/220/240ms values picked per rule;
+     naming the three that actually carry meaning is what stops a hover here
+     and a hover there drifting a frame apart.
+
+       --ae-dur-micro  a state change on something already under the pointer
+                       (hover, press, focus). Has to land before the eye
+                       settles on it, or the control feels laggy.
+       --ae-dur-enter  something arriving or leaving (menu, popover, row).
+       --ae-dur-move   something travelling across the layout.
+
+     One decelerating curve throughout - the same one .ae-col-menu-in and the
+     header chevron already use. Interface elements should arrive quickly and
+     settle, never accelerate away from the pointer that summoned them.
+     Everything timed with these animates transform/opacity/colour only, so
+     none of it touches layout mid-interaction. */
+  --ae-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ae-dur-micro: 120ms;
+  --ae-dur-enter: 160ms;
+  --ae-dur-move: 240ms;
+
   --ae-bg: #fffcf5;
   --ae-bg-alt: #f3ecd8;
   --ae-surface: #ffffff;
@@ -2926,26 +2948,6 @@ table input[type="number"] {
 :root[data-theme="dark"] .ae-dash-stat--alert .ae-dash-stat-label {
   color: #ef5a5f;
 }
-/* Dot pager under RotatingStockCard's crossfading value/label - which of
-   the two channels (Online/Offline) is currently on screen. */
-.ae-dash-stat-dots {
-  display: flex;
-  gap: 5px;
-}
-.ae-dash-stat-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--ae-border);
-  transition:
-    background-color 0.25s ease,
-    transform 0.25s ease;
-}
-.ae-dash-stat-dot--active {
-  background: #d4a000;
-  transform: scale(1.3);
-}
-
 /* Dashboard "Quick Access" - one-click shortcuts to the app's major
    Data Entry pages, so a supervisor lands here and can jump straight to
    the page they actually need instead of opening the nav drawer first. */
@@ -3070,6 +3072,296 @@ table input[type="number"] {
 .ae-dash-cell-link:focus-visible {
   outline: 2px solid #d4a000;
   outline-offset: 2px;
+}
+
+/* ---- Dashboard additions: insights row, linked/delta stat tiles, pools ---- */
+
+/* Stat tiles that are links (Active SKUs, remaining stock, Variance flags). */
+.ae-dash-stat--link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ae-dash-stat--link:focus-visible,
+.ae-dash-entry:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
+.ae-dash-stats-error {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--ae-danger-text);
+  background: var(--ae-surface-glass);
+  border: 0.3px solid var(--ae-danger-text);
+  border-radius: 6px;
+}
+.ae-dash-inline-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ae-warning-text);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* "vs prev day" change under a figure (neutral - stock has no good/bad direction). */
+.ae-dash-stat-delta {
+  position: relative;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ae-text-muted);
+}
+
+/* Top-align the content of every tile in the stat row so the icons line up
+   (a tile without a "vs prev day" line, like Active SKUs, used to sit lower
+   than its neighbours because the content was vertically centred). */
+.ae-dash-hero-left .ae-dash-stat {
+  justify-content: flex-start;
+}
+
+/* Insights row: Entry status / Top variances / Low & negative stock. */
+.ae-dash-insights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0 0;
+  flex-shrink: 0;
+}
+@media (min-width: 1500px) {
+  .ae-dash-insights {
+    gap: 14px;
+  }
+}
+@media (max-width: 1100px) {
+  .ae-dash-insights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .ae-dash-insights {
+    grid-template-columns: 1fr;
+  }
+}
+.ae-dash-insight {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Same heading height on all three cards (Entry status carries a toggle
+   that is taller than a link), so the cards below start on one line. */
+.ae-dash-insight .ae-dash-heading {
+  align-items: center;
+  min-height: 24px;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.ae-dash-insight .ae-dash-link {
+  font-size: 11px;
+}
+.ae-dash-insight .ae-dash-card {
+  flex: 1;
+}
+.ae-dash-empty {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--ae-text-muted);
+}
+/* "All clear" state: centred in the (row-stretched) card with a check mark,
+   instead of a line of text stranded in the top-left of a mostly blank box. */
+.ae-dash-empty--ok {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--ae-success-text);
+}
+.ae-dash-empty--ok svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* Ranked lists (top variances, low stock). */
+.ae-dash-list {
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+}
+.ae-dash-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  font-size: 12px;
+  border-bottom: 0.3px solid var(--ae-border);
+}
+.ae-dash-list-item:last-child {
+  border-bottom: none;
+}
+.ae-dash-list-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ae-dash-list-name,
+.ae-dash-list-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-dash-list-name {
+  font-weight: 600;
+  color: var(--ae-text);
+}
+.ae-dash-list-sub {
+  font-size: 11px;
+  color: var(--ae-text-muted);
+}
+.ae-dash-list-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ae-text);
+}
+.ae-dash-list-value--neg {
+  color: var(--ae-danger-text);
+}
+.ae-dash-list-more {
+  padding: 4px 12px 8px;
+}
+
+/* Small status pills (entry progress, stock alerts). */
+.ae-dash-chip {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.5;
+  border-radius: 4px;
+  white-space: nowrap;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.ae-dash-chip--done {
+  color: var(--ae-success-text);
+}
+.ae-dash-chip--progress {
+  color: var(--ae-warning-text);
+}
+.ae-dash-chip--idle {
+  color: var(--ae-text-muted);
+}
+.ae-dash-chip--bad {
+  color: var(--ae-danger-text);
+}
+
+/* Entry status rows: label + chip + count over a progress bar. */
+.ae-dash-entry {
+  display: block;
+  padding: 7px 12px 8px;
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 0.3px solid var(--ae-border);
+}
+.ae-dash-entry:last-child {
+  border-bottom: none;
+}
+.ae-dash-entry:hover {
+  background: color-mix(in srgb, #d4a000 8%, transparent);
+}
+.ae-dash-entry-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-dash-entry-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ae-text-muted);
+}
+.ae-dash-progress {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--ae-border);
+}
+.ae-dash-progress > span {
+  display: block;
+  height: 100%;
+  background: #d4a000;
+  transition: width 0.3s ease;
+}
+.ae-dash-progress--done > span {
+  background: var(--ae-success-text);
+}
+
+/* Morning / Night toggle in the Entry status heading. */
+.ae-dash-seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 0.3px solid #525252;
+  border-radius: 4px;
+}
+.ae-dash-seg button {
+  padding: 2px 9px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ae-text-muted);
+  cursor: pointer;
+}
+.ae-dash-seg button.ae-dash-seg-btn--active {
+  color: var(--ae-text);
+  background: color-mix(in srgb, #d4a000 20%, transparent);
+}
+.ae-dash-seg button:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: -2px;
+}
+
+/* Slimmer quick-access tiles - the row sits above the new insights row, so
+   every pixel of height here pushes the stat cards and chart down. */
+.ae-dash-quicklink {
+  padding: 10px 14px;
+}
+.ae-dash-quicklink-icon {
+  width: 28px;
+  height: 28px;
+}
+
+/* Recent Activity: record name truncates, "by <name>" sits underneath. */
+.ae-dash-cell-record {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-dash-cell-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  color: var(--ae-text-muted);
 }
 
 /* =========================================================================
@@ -3663,6 +3955,7 @@ table input[type="number"] {
   border: none;
   border-radius: 8px;
   cursor: pointer;
+  transition: background-color var(--ae-dur-micro) var(--ae-ease-out);
 }
 .ae-col-menu-item--active:not(:disabled) {
   background: #2a2a2a;
@@ -3817,4 +4110,317 @@ table input[type="number"] {
 .ae-toast-close:hover {
   color: var(--ae-text);
   background: var(--ae-bg-alt);
+}
+
+/* ---- Ctrl+K quick jump (components/QuickJump.tsx) --------------------- */
+/* Same charcoal surface, 0.5px edge and 8px radius as .ae-col-menu - this is
+   another floating panel, not a new surface treatment. Sits above the column
+   menu (310) since it can be opened from anywhere, including over one. */
+.ae-quickjump-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: flex;
+  justify-content: center;
+  /* Near the top rather than dead centre: the list grows downward, so a
+     centred panel would jump around as results come and go. */
+  padding-top: 12vh;
+}
+.ae-quickjump {
+  display: flex;
+  flex-direction: column;
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  overflow: hidden;
+  background: #232323;
+  color: #e5e5e5;
+  border: 0.5px solid #525252;
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(12, 12, 12, 0.45);
+  animation: ae-quickjump-in var(--ae-dur-enter) var(--ae-ease-out);
+}
+/* Rises and settles rather than just fading: the panel is summoned by a
+   keystroke with no pointer to anchor it, so a little travel tells the eye
+   where it came from. Transform + opacity only - no layout, no paint of the
+   page behind it. */
+@keyframes ae-quickjump-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+}
+.ae-quickjump-input {
+  flex-shrink: 0;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 14px;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-bottom: 0.5px solid #3a3a3a;
+  border-radius: 0;
+  outline: none;
+}
+.ae-quickjump-input::placeholder {
+  color: #8f8f8f;
+}
+.ae-quickjump-list {
+  overflow-y: auto;
+  padding: 5px;
+}
+.ae-quickjump-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  /* The highlight follows the arrow keys rather than jumping between rows.
+     Deliberately NOT an entrance animation on the rows themselves: the list
+     re-filters on every keystroke, so anything that animated per row would
+     be re-running continuously while someone types. */
+  transition:
+    background-color var(--ae-dur-micro) var(--ae-ease-out),
+    color var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-quickjump-item--active {
+  background: #2a2a2a;
+}
+.ae-quickjump-item:active {
+  background: #303030;
+}
+.ae-quickjump-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ae-quickjump-item-hint {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: #8f8f8f;
+}
+.ae-quickjump-empty {
+  padding: 14px 9px;
+  font-size: 12.5px;
+  color: #8f8f8f;
+  text-align: center;
+}
+
+/* The quick-jump trigger beside the clock in the page header's title row
+   (components/HeaderExtras.tsx). Inherits the header's glass text colour so
+   it reads correctly in both themes, like its neighbours. */
+.ae-header-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  opacity: 0.7;
+  cursor: pointer;
+  transition:
+    opacity var(--ae-dur-micro) var(--ae-ease-out),
+    background-color var(--ae-dur-micro) var(--ae-ease-out),
+    transform var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-header-search-btn:hover,
+.ae-header-search-btn:focus-visible {
+  opacity: 1;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.ae-header-search-btn:active {
+  /* Same press feedback .ae-btn gets from whileTap, expressed in CSS since
+     this one isn't a motion component. */
+  transform: scale(0.92);
+}
+
+/* "Copy previous" popover (components/CopyPreviousButton.tsx). Inherits the
+   whole panel treatment from .ae-col-menu - this only adds the row/action
+   layout the column menu has no need for. */
+.ae-copy-prev {
+  min-width: 232px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.ae-copy-prev-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-copy-prev-row:hover {
+  background: #2a2a2a;
+}
+.ae-copy-prev-row input {
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: #c9a227;
+}
+.ae-copy-prev-from {
+  padding: 2px 9px 7px;
+  font-size: 11px;
+  color: #8f8f8f;
+}
+.ae-copy-prev-overwrite {
+  margin-top: 4px;
+  border-top: 0.5px solid #3a3a3a;
+  border-radius: 0;
+  padding-top: 8px;
+}
+.ae-copy-prev-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 9px 9px 4px;
+}
+
+/* Cell history popover (components/CellHistoryPopover.tsx). Panel chrome is
+   .ae-col-menu; only the entry rows are specific to it. */
+.ae-cell-history {
+  min-width: 228px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.ae-cell-history-note {
+  padding: 8px 9px;
+  font-size: 12px;
+  color: #8f8f8f;
+}
+.ae-cell-history-row {
+  padding: 6px 9px;
+  border-radius: 8px;
+  /* Entries arrive one after another instead of appearing as a block. Safe
+     to stagger here, unlike the quick-jump list: this renders once when the
+     popover opens and the server caps it at ten rows, so the whole sequence
+     is over in ~220ms and never re-runs under the user's hands. */
+  animation: ae-cell-history-row-in var(--ae-dur-enter) var(--ae-ease-out)
+    both;
+}
+@keyframes ae-cell-history-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+}
+.ae-cell-history-row:nth-child(2) { animation-delay: 20ms; }
+.ae-cell-history-row:nth-child(3) { animation-delay: 40ms; }
+.ae-cell-history-row:nth-child(4) { animation-delay: 60ms; }
+.ae-cell-history-row:nth-child(5) { animation-delay: 80ms; }
+.ae-cell-history-row:nth-child(6) { animation-delay: 100ms; }
+.ae-cell-history-row:nth-child(7) { animation-delay: 120ms; }
+.ae-cell-history-row:nth-child(8) { animation-delay: 140ms; }
+.ae-cell-history-row:nth-child(9) { animation-delay: 160ms; }
+.ae-cell-history-row:nth-child(n + 10) { animation-delay: 180ms; }
+.ae-cell-history-row + .ae-cell-history-row {
+  border-top: 0.5px solid #3a3a3a;
+  border-radius: 0;
+}
+.ae-cell-history-change {
+  font-variant-numeric: tabular-nums;
+}
+.ae-cell-history-meta {
+  margin-top: 1px;
+  font-size: 11px;
+  color: #8f8f8f;
+}
+
+/* Days-left urgency band between "fine" and "negative" - the existing
+   warning token, same one the unusual-jump cell and warning toasts use. */
+.ae-dash-list-value--warn {
+  color: var(--ae-warning-text);
+}
+
+/* A dashboard list row that jumps to its product (components/RestockCards.tsx).
+   A button so it is keyboard-reachable and announced as an action, styled to
+   stay visually identical to the static rows beside it. */
+.ae-dash-list-jump {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  /* Leans toward the direction it will navigate. 2px is enough to read as
+     "this responds" without shifting the row's neighbours - it's a transform,
+     so nothing around it reflows. */
+  transition: transform var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-dash-list-jump:hover,
+.ae-dash-list-jump:focus-visible {
+  transform: translateX(2px);
+}
+.ae-dash-list-jump:active {
+  transform: translateX(1px) scale(0.995);
+}
+.ae-dash-list-jump:hover .ae-dash-list-name,
+.ae-dash-list-jump:focus-visible .ae-dash-list-name {
+  text-decoration: underline;
+}
+
+/* These panels float over a grid of several hundred cells. Each already
+   clips its own content (overflow: hidden/auto above), so declaring
+   containment costs nothing visually but tells the browser that scrolling or
+   hovering inside one cannot affect layout or paint outside it - without it,
+   moving the pointer down a long result list invites the engine to consider
+   the table underneath. Deliberately on the panels only: `contain` on a
+   grid row would break the sticky SKU/Product columns. */
+.ae-quickjump,
+.ae-col-menu,
+.ae-cell-history,
+.ae-copy-prev {
+  contain: layout paint;
+}
+
+/* Everything added in the motion pass, switched off together. The
+   transitions are dropped rather than shortened because each one only
+   conveys a state the element already shows statically (highlighted row,
+   hovered row, pressed button) - there is nothing left unsaid without them.
+   The history rows need their end state restored explicitly, since
+   `animation: ... both` otherwise holds them at the keyframe's opacity: 0. */
+@media (prefers-reduced-motion: reduce) {
+  .ae-quickjump,
+  .ae-cell-history-row {
+    animation: none;
+  }
+  .ae-cell-history-row {
+    opacity: 1;
+    transform: none;
+  }
+  .ae-quickjump-item,
+  .ae-copy-prev-row,
+  .ae-col-menu-item,
+  .ae-header-search-btn,
+  .ae-dash-list-jump {
+    transition: none;
+  }
+  .ae-header-search-btn:active,
+  .ae-dash-list-jump:hover,
+  .ae-dash-list-jump:focus-visible,
+  .ae-dash-list-jump:active {
+    transform: none;
+  }
 }

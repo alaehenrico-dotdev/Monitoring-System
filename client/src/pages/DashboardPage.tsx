@@ -1,26 +1,33 @@
 import { Link, useNavigate } from "react-router-dom";
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { getTotalStocks } from "../api/totalStocks";
 import { listProducts } from "../api/products";
 import { listChangeLog } from "../api/changeLog";
-import type { ChangeLogEntry } from "../types";
+import type { ChangeLogEntry, Product, TotalStockRow } from "../types";
 import { ACTION_COLOR, TABLE_LABELS } from "../config/changeLog";
 import { formatRelativeTime } from "../utils/dateFormat";
 import { StatCardsSkeleton, TableSkeleton } from "../components/Skeleton";
 import { MonthlyMonitoring } from "../components/MonthlyMonitoring";
+import {
+  EntryStatusCard,
+  LowStockCard,
+  VarianceTopCard,
+} from "../components/DashboardInsights";
+import {
+  LowestDaysLeftCard,
+  NeedsRestockCard,
+  useDaysOfStock,
+} from "../components/RestockCards";
+import { DatePicker } from "../components/DatePicker";
+import { Toolbar } from "../components/Toolbar";
+import { Button } from "../components/ui";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import {
   TagIcon,
   BoxIcon,
   LayersIcon,
-  AlertTriangleIcon,
+  ReportIcon,
   ChevronRightIcon,
 } from "../components/icons";
 import { colors } from "../theme";
@@ -28,22 +35,25 @@ import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { getCurrentShiftAndDate } from "../utils/shift";
 
-type Analytics = {
-  activeProducts: number;
-  /// Online and Offline are separate stock pools (Section 2.1) - shown as
-  /// one rotating stat card (RotatingStockCard) rather than a combined sum,
-  /// since summing them implies a single pool that doesn't really exist.
-  onlineRemaining: number;
-  offlineRemaining: number;
-  varianceFlags: number;
+type Totals = {
+  /// Online and Offline are separate stock pools (Section 2.1) - each gets
+  /// its own card rather than a combined sum, since summing them implies a
+  /// single pool that doesn't really exist.
+  online: number;
+  offline: number;
 };
 
 // Fetched 8; CSS shows 5 on short windows and all 8 on tall ones.
 const RECENT_ACTIVITY_LIMIT = 8;
 const COUNT_UP_DURATION_MS = 700;
-// How long each face (Online, then Offline) stays on screen before the
-// rotating stat card crossfades to the next one.
-const STOCK_ROTATE_MS = 3500;
+// The active-SKU count barely ever changes, so realtime ticks (one per
+// burst of encoder saves) reuse the last answer instead of re-requesting the
+// whole product list every time.
+const PRODUCTS_REFRESH_MS = 60_000;
+// The change log endpoint returns the whole log (the dashboard keeps only
+// the newest few), so realtime refreshes of the feed wait for a burst of
+// saves to settle instead of re-downloading it on every tick.
+const ACTIVITY_REFRESH_DELAY_MS = 3_000;
 
 // The app's major day-to-day pages (mirrors the nav drawer's own "Data
 // Entry" section, minus Dashboard itself) - one-click shortcuts so landing
@@ -53,12 +63,13 @@ const QUICK_LINKS: { to: string; label: string; icon: ReactNode }[] = [
   { to: "/offline", label: "Offline Entry", icon: <BoxIcon /> },
   { to: "/manual-count", label: "Manual Count", icon: <LayersIcon /> },
   { to: "/total-stocks", label: "Total Stocks", icon: <LayersIcon /> },
+  { to: "/daily-report", label: "Daily Report", icon: <ReportIcon /> },
 ];
 
 // Animates a displayed number from its previous value up (or down) to
 // `target` whenever `target` changes, instead of the digits just snapping
-// in - used by `StatCard` so the headline numbers count up on first load and
-// re-count if a value changes underneath them.
+// in - used by the stat cards so the headline numbers count up on first load
+// and re-count if a value changes underneath them.
 //
 // `prevRef` (not `useState`) holds the animation's start point: it has to
 // survive across renders without triggering one. It is updated on every
@@ -66,7 +77,7 @@ const QUICK_LINKS: { to: string; label: string; icon: ReactNode }[] = [
 // what's on screen rather than jumping back to the last finished value.
 //
 // `target === undefined` (data hasn't loaded yet) leaves the displayed value
-// alone - `StatCard` renders "—" for that case instead.
+// alone - the cards render "—" for that case instead.
 function useCountUp(
   target: number | undefined,
   duration = COUNT_UP_DURATION_MS,
@@ -121,6 +132,41 @@ function useCountUp(
   return display;
 }
 
+function summarize(rows: TotalStockRow[]): Totals {
+  return {
+    online: rows.reduce(
+      (sum, row) => sum + Number(row.onlineRemainingStock || 0),
+      0,
+    ),
+    offline: rows.reduce(
+      (sum, row) => sum + Number(row.offlineRemainingStock || 0),
+      0,
+    ),
+  };
+}
+
+/// "YYYY-MM-DD" shifted by whole days, built from local date parts (never
+/// `new Date("YYYY-MM-DD")`, which is UTC midnight and lands on the wrong
+/// day in timezones behind UTC).
+function addDays(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const date = new Date(y, m - 1, d + days);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+type Delta = { diff: number };
+
+/// Change since the previous day (stock levels have no good/bad direction,
+/// so it is shown neutrally).
+function makeDelta(
+  current: number,
+  previous: number | undefined,
+): Delta | undefined {
+  if (previous === undefined) return undefined;
+  return { diff: current - previous };
+}
+
 /**
  * Landing page. Uses the same page chrome as every other screen (h2 +
  * subtitle on the themed paper background, surface cards with the toolbar's
@@ -129,7 +175,12 @@ function useCountUp(
  * styling lives in the .ae-dash-* rules in index.css.
  */
 export function DashboardPage() {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [stocks, setStocks] = useState<TotalStockRow[] | null>(null);
+  // The previous day's rows, only used for the "vs prev day" deltas - a
+  // failed fetch just means no deltas are shown.
+  const [prevStocks, setPrevStocks] = useState<TotalStockRow[] | null>(null);
+  const [activeProducts, setActiveProducts] = useState<number | undefined>();
+  const [stocksFailed, setStocksFailed] = useState(false);
   const [recentActivity, setRecentActivity] = useState<ChangeLogEntry[] | null>(
     null,
   );
@@ -138,9 +189,18 @@ export function DashboardPage() {
   // "No activity recorded yet." message, silently hiding an actual outage.
   const [recentActivityError, setRecentActivityError] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the Retry button to re-run every fetch below.
+  const [reloadKey, setReloadKey] = useState(0);
   // The current BUSINESS date, same as the entry pages default to - Night
   // runs past midnight, so just after 12am it's still yesterday's date.
-  const today = getCurrentShiftAndDate().date;
+  const { date: today, shift: currentShift } = getCurrentShiftAndDate();
+  // `null` = follow today. Kept as "no pick" rather than a copy of today's
+  // date so a dashboard left open still rolls over at midnight/shift change.
+  const [pickedDate, setPickedDate] = useState<string | null>(null);
+  const viewDate = pickedDate ?? today;
+  // Fetched once here and handed to both restock cards - see useDaysOfStock.
+  const { rows: daysOfStock, failed: daysOfStockFailed } = useDaysOfStock(viewDate);
+  const isToday = viewDate === today;
   const realtimeVersion = useRealtimeVersion();
 
   // `today` (above) is recomputed on every render, so it's never itself
@@ -150,67 +210,173 @@ export function DashboardPage() {
   // it would keep showing whatever business date was current the last time
   // something else re-rendered it, straight through the actual midnight/
   // shift rollover. This checks every minute - cheap, and only ever forces
-  // a re-render on the one tick where the business date has genuinely
-  // changed, not on every tick.
+  // a re-render on the one tick where the business date or shift has
+  // genuinely changed, not on every tick.
   const todayRef = useRef(today);
+  const shiftRef = useRef(currentShift);
   useEffect(() => {
     todayRef.current = today;
+    shiftRef.current = currentShift;
   });
   const [, forceRerenderOnDateChange] = useState(0);
   useEffect(() => {
     const id = setInterval(() => {
-      if (getCurrentShiftAndDate().date !== todayRef.current)
+      const now = getCurrentShiftAndDate();
+      if (now.date !== todayRef.current || now.shift !== shiftRef.current)
         forceRerenderOnDateChange((n) => n + 1);
     }, 60_000);
     return () => clearInterval(id);
   }, []);
 
-  useResetOnKeyChange(today, () => setRecentActivityError(false));
+  // Stock figures for the viewed date: live (re-runs on every realtime tick).
+  useResetOnKeyChange(viewDate, () => {
+    setStocks(null);
+    setPrevStocks(null);
+    setStocksFailed(false);
+    setError(null);
+  });
   useEffect(() => {
-    Promise.all([listProducts(), getTotalStocks(today)])
-      .then(([products, stocks]) => {
-        setAnalytics({
-          activeProducts: products.filter((product) => product.isActive).length,
-          onlineRemaining: stocks.reduce(
-            (sum, row) => sum + Number(row.onlineRemainingStock || 0),
-            0,
-          ),
-          offlineRemaining: stocks.reduce(
-            (sum, row) => sum + Number(row.offlineRemainingStock || 0),
-            0,
-          ),
-          varianceFlags: stocks.filter(
-            (row) => Number(row.totalVariance || 0) !== 0,
-          ).length,
-        });
+    let cancelled = false;
+    getTotalStocks(viewDate)
+      .then((rows) => {
+        if (cancelled) return;
+        setStocks(rows);
+        setStocksFailed(false);
       })
-      .catch((e) =>
+      .catch((e) => {
+        if (cancelled) return;
+        setStocksFailed(true);
         setError(
           e instanceof Error ? e.message : "Unable to load dashboard analytics",
-        ),
-      );
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewDate, realtimeVersion, reloadKey]);
 
-    // The endpoint already comes back newest-first (Section 5.8) - just
-    // take the first few for a glanceable feed instead of the full log.
-    listChangeLog()
-      .then((entries) =>
-        setRecentActivity(entries.slice(0, RECENT_ACTIVITY_LIMIT)),
+  // The previous day is history, not live - fetched once per viewed date
+  // rather than on every realtime tick.
+  useEffect(() => {
+    let cancelled = false;
+    getTotalStocks(addDays(viewDate, -1))
+      .then((rows) => {
+        if (!cancelled) setPrevStocks(rows);
+      })
+      .catch(() => {
+        // Deltas are a nicety - their absence is the only symptom.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewDate, reloadKey]);
+
+  // Active SKU count, throttled (see PRODUCTS_REFRESH_MS). Deliberately no
+  // cancellation flag: a tick that arrives while the first request is still
+  // in flight is skipped by the throttle, so cancelling would drop the only
+  // answer that is coming.
+  const productsFetchedAt = useRef(0);
+  useEffect(() => {
+    if (Date.now() - productsFetchedAt.current < PRODUCTS_REFRESH_MS) return;
+    productsFetchedAt.current = Date.now();
+    listProducts()
+      .then((products) =>
+        setActiveProducts(products.filter((p) => p.isActive).length),
       )
       .catch(() => {
-        setRecentActivityError(true);
-        setRecentActivity([]);
+        productsFetchedAt.current = 0; // let the next tick/Retry try again
       });
-  }, [today, realtimeVersion]);
+  }, [realtimeVersion, reloadKey]);
 
-  const hasVariance = !!analytics && analytics.varianceFlags > 0;
+  // Recent activity: the endpoint already comes back newest-first (Section
+  // 5.8) - just take the first few for a glanceable feed instead of the full
+  // log. The first load is immediate; realtime refreshes are delayed.
+  const activityLoadedRef = useRef(false);
+  useEffect(() => {
+    const timer = setTimeout(
+      () => {
+        listChangeLog()
+          .then((entries) => {
+            activityLoadedRef.current = true;
+            setRecentActivityError(false);
+            setRecentActivity(entries.slice(0, RECENT_ACTIVITY_LIMIT));
+          })
+          .catch(() => {
+            // Keep showing the last good feed if a refresh fails.
+            if (activityLoadedRef.current) return;
+            setRecentActivityError(true);
+            setRecentActivity([]);
+          });
+      },
+      activityLoadedRef.current ? ACTIVITY_REFRESH_DELAY_MS : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [realtimeVersion, reloadKey]);
+
+  const totals = useMemo(() => (stocks ? summarize(stocks) : null), [stocks]);
+  // An empty/all-zero previous day means "nothing was recorded", not "stock
+  // fell to zero" - showing that as a delta would be misleading.
+  const prevTotals = useMemo(() => {
+    if (!prevStocks || prevStocks.length === 0) return null;
+    const t = summarize(prevStocks);
+    return t.online + t.offline === 0 ? null : t;
+  }, [prevStocks]);
+  // Used to turn the change log's raw "#id" records into product names.
+  const productsById = useMemo(
+    () => new Map((stocks ?? []).map((r) => [r.product.id, r.product])),
+    [stocks],
+  );
+
+  const showStatsError = stocks === null && stocksFailed;
+
+  function retry() {
+    productsFetchedAt.current = 0;
+    activityLoadedRef.current = false;
+    setStocksFailed(false);
+    setError(null);
+    setReloadKey((k) => k + 1);
+  }
 
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        subtitle={`Here's where things stand for ${formatDate(today)}.`}
+        subtitle={
+          isToday
+            ? `Here's where things stand for ${formatDate(viewDate)}.`
+            : `Here's how things stood on ${formatDate(viewDate)}.`
+        }
         subtitleClassName="ae-dash-subtitle"
-      />
+      >
+        <Toolbar className="no-print">
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "nowrap",
+              minWidth: 0,
+            }}
+          >
+            <DatePicker
+              aria-label="Dashboard date"
+              value={viewDate}
+              onChange={(d) => setPickedDate(d === today ? null : d)}
+              todayValue={today}
+              style={{ maxWidth: 180 }}
+            />
+            {!isToday && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setPickedDate(null)}
+              >
+                Back to today
+              </Button>
+            )}
+          </div>
+        </Toolbar>
+      </PageHeader>
 
       <Toast
         message={error}
@@ -233,6 +399,23 @@ export function DashboardPage() {
         ))}
       </div>
 
+      {/* "What needs attention" row: entry progress for the shift, the
+          biggest variances, and low/negative stock. The last two reuse the
+          Total Stocks rows already fetched for the stat cards. */}
+      <div className="ae-dash-insights">
+        <EntryStatusCard date={viewDate} defaultShift={currentShift} />
+        <VarianceTopCard
+          rows={stocks}
+          date={viewDate}
+          failed={showStatsError}
+        />
+        <LowStockCard rows={stocks} failed={showStatsError} />
+        {/* Both read one shared fetch (see useDaysOfStock) - "Needs restock"
+            hides itself entirely when nothing is below its alert level. */}
+        <NeedsRestockCard rows={daysOfStock} failed={daysOfStockFailed} />
+        <LowestDaysLeftCard rows={daysOfStock} failed={daysOfStockFailed} />
+      </div>
+
       {/* Two columns: the monitoring stat cards with Recent Activity
           stacked directly beneath them (same width/grid, reduced size) on
           the left, and the Monthly Monitoring graph on the right - the
@@ -242,31 +425,39 @@ export function DashboardPage() {
         <div className="ae-dash-hero-left">
           <div
             className="ae-dash-stats"
-            role={analytics ? undefined : "status"}
-            aria-busy={analytics ? undefined : "true"}
+            role={stocks || showStatsError ? undefined : "status"}
+            aria-busy={stocks || showStatsError ? undefined : "true"}
           >
-            {analytics ? (
+            {totals ? (
               <>
                 <StatCard
                   icon={<TagIcon />}
                   label="Active SKUs"
-                  value={analytics.activeProducts}
-                />
-                <RotatingStockCard
-                  online={analytics.onlineRemaining}
-                  offline={analytics.offlineRemaining}
+                  value={activeProducts}
+                  to="/products"
                 />
                 <StatCard
-                  icon={<AlertTriangleIcon />}
-                  label={
-                    hasVariance
-                      ? "Variance flags — needs review"
-                      : "Variance flags"
-                  }
-                  value={analytics.varianceFlags}
-                  alert={hasVariance}
+                  icon={<BoxIcon />}
+                  label="Online remaining stock"
+                  value={totals.online}
+                  to="/total-stocks"
+                  delta={makeDelta(totals.online, prevTotals?.online)}
+                />
+                <StatCard
+                  icon={<BoxIcon />}
+                  label="Offline remaining stock"
+                  value={totals.offline}
+                  to="/total-stocks"
+                  delta={makeDelta(totals.offline, prevTotals?.offline)}
                 />
               </>
+            ) : showStatsError ? (
+              <div className="ae-dash-stats-error" role="alert">
+                <span>Couldn't load the stock figures.</span>
+                <Button variant="ghost" size="sm" onClick={retry}>
+                  Retry
+                </Button>
+              </div>
             ) : (
               <StatCardsSkeleton count={3} />
             )}
@@ -287,7 +478,7 @@ export function DashboardPage() {
             <div className="ae-dash-card">
               {recentActivity === null ? (
                 <TableSkeleton
-                  headers={["Action", "Record", "Changed by", "When"]}
+                  headers={["Action", "Record", "When"]}
                   minWidth={320}
                   rows={5}
                   cellPadding="8px 12px"
@@ -295,7 +486,14 @@ export function DashboardPage() {
                 />
               ) : recentActivityError ? (
                 <CardMessage>
-                  Couldn't load recent activity - try refreshing the page.
+                  Couldn't load recent activity.{" "}
+                  <button
+                    type="button"
+                    className="ae-dash-inline-btn"
+                    onClick={retry}
+                  >
+                    Retry
+                  </button>
                 </CardMessage>
               ) : recentActivity.length === 0 ? (
                 <CardMessage>No activity recorded yet.</CardMessage>
@@ -314,7 +512,11 @@ export function DashboardPage() {
                     </thead>
                     <tbody>
                       {recentActivity.map((entry) => (
-                        <ActivityRow key={entry.id} entry={entry} />
+                        <ActivityRow
+                          key={entry.id}
+                          entry={entry}
+                          productsById={productsById}
+                        />
                       ))}
                     </tbody>
                   </table>
@@ -340,28 +542,43 @@ function CardMessage({ children }: { children: ReactNode }) {
   );
 }
 
-/// A stat tile (Active SKUs, Variance flags, ...). Same surface + gold
-/// hairline as Toolbar's card.
+/// "▲ 120 vs prev day" under a figure. Hidden when there is no previous day
+/// to compare against.
+function DeltaBadge({ delta }: { delta: Delta | undefined }) {
+  if (!delta) return null;
+  const text =
+    delta.diff === 0
+      ? "No change"
+      : `${delta.diff > 0 ? "▲" : "▼"} ${Math.abs(delta.diff).toLocaleString()} vs prev day`;
+  return (
+    <span className="ae-dash-stat-delta" title="Compared with the previous day">
+      {text}
+    </span>
+  );
+}
+
+/// A stat tile (Active SKUs, Online/Offline remaining stock). Same surface + gold
+/// hairline as Toolbar's card. With `to` the whole tile is a link.
 function StatCard({
   icon,
   label,
   value,
-  alert,
+  to,
+  delta,
 }: {
   icon: ReactNode;
   label: string;
   value: number | undefined;
-  alert?: boolean;
+  to?: string;
+  delta?: Delta;
 }) {
-
   // Counts up from the previous displayed value to `value` any time it
   // changes (including the first time it resolves from `undefined`).
   const animatedValue = useCountUp(value);
 
-  return (
-    <div
-      className={`ae-dash-stat${alert ? " ae-dash-stat--alert" : ""}`}
-    >
+  const className = `ae-dash-stat${to ? " ae-dash-stat--link" : ""}`;
+  const body = (
+    <>
       <div aria-hidden className="ae-dash-stat-icon">
         {icon}
       </div>
@@ -369,96 +586,78 @@ function StatCard({
         {value !== undefined ? animatedValue.toLocaleString() : "—"}
       </div>
       <div className="ae-dash-stat-label">{label}</div>
-    </div>
+      <DeltaBadge delta={delta} />
+    </>
+  );
+
+  return to ? (
+    <Link to={to} className={className}>
+      {body}
+    </Link>
+  ) : (
+    <div className={className}>{body}</div>
   );
 }
 
-/// Replaces separate "Online remaining stock" / "Offline remaining stock"
-/// cards (and the combined-sum one) with a single tile that crossfades
-/// between the two channels every few seconds - summing them into one
-/// number would imply a single stock pool that doesn't actually exist
-/// (Section 2.1), so this shows each in turn instead of adding them
-/// together. Same surface chrome as StatCard, just with an
-/// animated face instead of a static value + a small dot pager showing
-/// which channel is currently on screen.
-function RotatingStockCard({
-  online,
-  offline,
+/// What a change_log row is about, in words: the product's name when the row
+/// points at one (stock/manual-count rows carry a productId in their stored
+/// values; SKU rows' recordId is the product itself), otherwise the old
+/// "Table #id".
+function describeRecord(
+  entry: ChangeLogEntry,
+  productsById: Map<number, Product>,
+): string {
+  const label = TABLE_LABELS[entry.tableName] ?? entry.tableName;
+  const payload = entry.newValue ?? entry.oldValue;
+  const fields =
+    payload && typeof payload === "object"
+      ? (payload as Record<string, unknown>)
+      : null;
+
+  const productId =
+    entry.tableName === "products"
+      ? entry.recordId
+      : typeof fields?.productId === "number"
+        ? fields.productId
+        : undefined;
+  const product =
+    productId !== undefined ? productsById.get(productId) : undefined;
+  if (product) return `${label} · ${product.name}`;
+  if (entry.tableName === "products" && typeof fields?.name === "string")
+    return `${label} · ${fields.name}`;
+  return `${label} #${entry.recordId}`;
+}
+
+function ActivityRow({
+  entry,
+  productsById,
 }: {
-  online: number | undefined;
-  offline: number | undefined;
+  entry: ChangeLogEntry;
+  productsById: Map<number, Product>;
 }) {
-  const [faceIndex, setFaceIndex] = useState(0);
-  const faces = [
-    { label: "Online remaining stock", value: online },
-    { label: "Offline remaining stock", value: offline },
-  ];
-
-  useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = setInterval(
-      () => setFaceIndex((i) => (i + 1) % faces.length),
-      STOCK_ROTATE_MS,
-    );
-    return () => clearInterval(id);
-    // faces.length is a fixed constant (always 2) - not a real dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const face = faces[faceIndex];
-
-  return (
-    <div
-      className="ae-dash-stat"
-    >
-      <div aria-hidden className="ae-dash-stat-icon">
-        <BoxIcon />
-      </div>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={faceIndex}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-        >
-          <div className="ae-dash-stat-value">
-            {face.value !== undefined ? face.value.toLocaleString() : "—"}
-          </div>
-          <div className="ae-dash-stat-label">{face.label}</div>
-        </motion.div>
-      </AnimatePresence>
-      <div aria-hidden className="ae-dash-stat-dots">
-        {faces.map((f, i) => (
-          <span
-            key={f.label}
-            className={`ae-dash-stat-dot${i === faceIndex ? " ae-dash-stat-dot--active" : ""}`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ActivityRow({ entry }: { entry: ChangeLogEntry }) {
   const navigate = useNavigate();
+  const description = describeRecord(entry, productsById);
   return (
     // The whole row is clickable; the Record cell holds a real link so the
-    // row is also reachable by keyboard. "Changed by" dropped from this
-    // compact version under the stat cards (see .ae-dash-hero-activity) - still on
-    // the full Change Log page this links out to.
+    // row is also reachable by keyboard. Who made the change sits under the
+    // record (a separate "Changed by" column wouldn't fit this compact
+    // version) - the full Change Log page this links to has everything.
     <tr style={{ cursor: "pointer" }} onClick={() => navigate("/change-log")}>
       <td style={{ fontWeight: 700, color: ACTION_COLOR[entry.action] }}>
         {entry.action}
       </td>
-      <td style={{ whiteSpace: "nowrap" }}>
+      <td>
         <Link
           to="/change-log"
-          className="ae-dash-cell-link"
+          className="ae-dash-cell-link ae-dash-cell-record"
+          title={description}
           onClick={(e) => e.stopPropagation()}
         >
-          {TABLE_LABELS[entry.tableName] ?? entry.tableName} #{entry.recordId}
+          {description}
         </Link>
+        <span className="ae-dash-cell-sub">
+          by {entry.changedBy?.name ?? "system"}
+        </span>
       </td>
       <td
         style={{ whiteSpace: "nowrap", color: colors.subtleInk }}

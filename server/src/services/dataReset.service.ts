@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
+import { JWT_SIGN_ALGORITHM, JWT_VERIFY_OPTIONS } from "../utils/jwt";
 import { prisma } from "../lib/prisma";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { HttpError } from "../utils/HttpError";
@@ -34,13 +35,13 @@ function passcodeMatches(input: string, expected: string): boolean {
  */
 export function verifyPasscode(passcode: string, user: AuthUser): string | null {
   if (!passcodeMatches(passcode, env.dataResetPasscode)) return null;
-  return jwt.sign({ scope: RESET_TOKEN_SCOPE, sub: String(user.id) }, env.jwtSecret, { expiresIn: RESET_TOKEN_TTL, jwtid: crypto.randomUUID() });
+  return jwt.sign({ scope: RESET_TOKEN_SCOPE, sub: String(user.id) }, env.jwtSecret, { algorithm: JWT_SIGN_ALGORITHM, expiresIn: RESET_TOKEN_TTL, jwtid: crypto.randomUUID() });
 }
 
 export function assertValidResetToken(token: string, user: AuthUser) {
   let payload: ResetTokenPayload;
   try {
-    payload = jwt.verify(token, env.jwtSecret) as ResetTokenPayload;
+    payload = jwt.verify(token, env.jwtSecret, JWT_VERIFY_OPTIONS) as ResetTokenPayload;
   } catch {
     throw HttpError.unauthorized("Reset passcode has expired - unlock this page again");
   }

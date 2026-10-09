@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, KeyboardEvent, LabelHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, KeyboardEvent, MouseEvent, LabelHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 import { motion } from "motion/react";
 import { colors } from "../theme";
 import { toolbarLayoutTransition } from "../motion";
@@ -28,6 +28,10 @@ interface NumberCellInputProps {
   /** Native tooltip - StockGrid uses it for cell history and validation hints. */
   title?: string;
   "aria-invalid"?: boolean;
+  /** Right-click menu for this cell (StockGrid's cell history / quick actions).
+   *  Bound to the input itself, not the wrapper, so right-clicking the stepper
+   *  buttons still gets the browser's own menu. */
+  onContextMenu?: (e: MouseEvent<HTMLInputElement>) => void;
   /** Hover is tracked on the wrapper, so it still fires over the stepper buttons. */
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;

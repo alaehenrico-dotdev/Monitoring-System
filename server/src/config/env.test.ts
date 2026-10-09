@@ -7,7 +7,8 @@ vi.mock("dotenv/config", () => ({}));
 
 const REQUIRED_VARS = {
   DATABASE_URL: "mysql://root:pw@localhost:3306/test",
-  JWT_SECRET: "a-real-random-secret-value",
+  // At least 32 characters, matching the floor env.ts now enforces.
+  JWT_SECRET: "a-real-random-secret-value-long-enough-to-pass",
   DATA_RESET_PASSCODE: "a-real-passcode-someone-chose",
 };
 
@@ -49,5 +50,65 @@ describe("env", () => {
   it("still rejects a missing required secret (existing behavior)", async () => {
     delete process.env.JWT_SECRET;
     await expect(import("./env.js")).rejects.toThrow(/Missing required environment variable: JWT_SECRET/);
+  });
+});
+
+describe("env - secret strength", () => {
+  it("rejects a JWT_SECRET shorter than 32 characters", async () => {
+    // Every token this signs is handed to a client, so a short secret is
+    // open to unlimited offline guessing.
+    process.env.JWT_SECRET = "a".repeat(31);
+    await expect(import("./env.js")).rejects.toThrow(/at least 32 characters/);
+  });
+
+  it("accepts a JWT_SECRET of exactly 32 characters", async () => {
+    process.env.JWT_SECRET = "b".repeat(32);
+    const { env } = await import("./env.js");
+    expect(env.jwtSecret).toHaveLength(32);
+  });
+
+  it("still allows a short human-typed DATA_RESET_PASSCODE", async () => {
+    // Deliberately NOT held to the JWT secret's length: this is a code an
+    // admin types into the Data Reset screen, defended by the passcode rate
+    // limiter and a single-use token, not by entropy. Holding it to 32
+    // characters would have broken every existing deployment.
+    process.env.DATA_RESET_PASSCODE = "913透";
+    const { env } = await import("./env.js");
+    expect(env.dataResetPasscode).toBe("913透");
+  });
+
+  it("still rejects a 1-2 character passcode", async () => {
+    process.env.DATA_RESET_PASSCODE = "12";
+    await expect(import("./env.js")).rejects.toThrow(/at least 4 characters/);
+  });
+});
+
+describe("env - CLIENT_ORIGIN", () => {
+  it("falls back to the Vite dev server outside production", async () => {
+    delete process.env.CLIENT_ORIGIN;
+    process.env.NODE_ENV = "development";
+    const { env } = await import("./env.js");
+    expect(env.clientOrigin).toBe("http://localhost:5173");
+  });
+
+  it("refuses to boot in production without one", async () => {
+    // The old localhost fallback booted fine and then rejected every request
+    // from the real frontend at the browser's CORS check - a failure that
+    // surfaces as an opaque network error, nowhere near its cause.
+    delete process.env.CLIENT_ORIGIN;
+    process.env.NODE_ENV = "production";
+    await expect(import("./env.js")).rejects.toThrow(/CLIENT_ORIGIN must be set in production/);
+  });
+
+  it("accepts an explicit origin in production", async () => {
+    process.env.NODE_ENV = "production";
+    process.env.CLIENT_ORIGIN = "https://stocks.example.com";
+    const { env } = await import("./env.js");
+    expect(env.clientOrigin).toBe("https://stocks.example.com");
+  });
+
+  it("rejects a trailing slash, which can never match a browser Origin header", async () => {
+    process.env.CLIENT_ORIGIN = "https://stocks.example.com/";
+    await expect(import("./env.js")).rejects.toThrow(/must not end with a slash/);
   });
 });
