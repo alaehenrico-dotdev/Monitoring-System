@@ -10,6 +10,14 @@ module.exports = {
       autorestart: true,
       max_restarts: 10,
       restart_delay: 2000,
+      // Longer than server.ts's own SHUTDOWN_GRACE_MS (8s), so the process
+      // always gets to finish draining and close the database pool itself
+      // rather than being SIGKILLed mid-transaction at pm2's 1.6s default.
+      kill_timeout: 10000,
+      // pm2 waits for process.send("ready") before considering a restart
+      // successful; this app doesn't signal readiness, so listen for the
+      // plain start instead and don't hold reloads open waiting.
+      wait_ready: false,
     },
   ],
 };

@@ -26,11 +26,43 @@ const PLACEHOLDER_SECRETS = new Set([
   "secret",
 ]);
 
+/**
+ * Minimum lengths, per secret - deliberately NOT one shared number.
+ *
+ * JWT_SECRET is machine-generated and never typed by anyone, and every token
+ * it signs is handed to a client, so an attacker gets unlimited offline
+ * guesses at it. 32 characters is cheap insurance there (`openssl rand
+ * -base64 32`).
+ *
+ * DATA_RESET_PASSCODE is the opposite: a short code an admin types into the
+ * Data Reset screen. Holding it to a machine-secret length would be security
+ * theatre that breaks real deployments rather than protecting them - what
+ * actually defends it is that the route is SUPERVISOR_ADMIN-only, the
+ * comparison is timing-safe, the passcode limiter allows 10 attempts per 15
+ * minutes (middleware/rateLimit.ts), and a correct passcode only yields a
+ * short-lived single-use token. The floor here just rules out a 1-2
+ * character code, with the placeholder blocklist above catching "000000".
+ */
+const MIN_LENGTHS: Record<string, number> = {
+  JWT_SECRET: 32,
+  DATA_RESET_PASSCODE: 4,
+};
+const DEFAULT_MIN_SECRET_LENGTH = 8;
+
 function requiredSecret(name: string, fallback?: string): string {
   const value = required(name, fallback);
-  if (PLACEHOLDER_SECRETS.has(value.trim().toLowerCase())) {
+  const trimmed = value.trim();
+  if (PLACEHOLDER_SECRETS.has(trimmed.toLowerCase())) {
     throw new Error(
       `Environment variable ${name} is set to a known placeholder value. Set a real, unique secret before starting the server - see .env.example.`,
+    );
+  }
+  const min = MIN_LENGTHS[name] ?? DEFAULT_MIN_SECRET_LENGTH;
+  if (trimmed.length < min) {
+    throw new Error(
+      `Environment variable ${name} must be at least ${min} characters.${
+        name === "JWT_SECRET" ? " Generate one with: openssl rand -base64 32" : ""
+      }`,
     );
   }
   return value;
@@ -109,6 +141,37 @@ function limitWindowMs(name: string, fallback: number): number {
   return value;
 }
 
+/**
+ * The single browser origin allowed through CORS (app.ts).
+ *
+ * In production this must be set explicitly. It used to fall back to
+ * http://localhost:5173, which fails in the worst possible way on a real
+ * deployment: the server boots perfectly happily and every request from the
+ * actual frontend is rejected by the browser's CORS check, which surfaces
+ * as an opaque network error in the client rather than anything pointing at
+ * a missing variable. Failing at boot names the problem instead.
+ *
+ * The dev fallback stays, because that is the Vite dev server's own default
+ * and requiring it locally would be friction for no safety gain.
+ */
+function clientOrigin(): string {
+  const raw = process.env.CLIENT_ORIGIN?.trim();
+  if (raw) {
+    // A trailing slash never matches a browser's Origin header, which has
+    // none - another silent, hard-to-diagnose CORS rejection.
+    if (raw.endsWith("/")) {
+      throw new Error(`CLIENT_ORIGIN must not end with a slash ("${raw}") - use ${raw.replace(/\/+$/, "")}`);
+    }
+    return raw;
+  }
+  if ((process.env.NODE_ENV ?? "development") === "production") {
+    throw new Error(
+      "CLIENT_ORIGIN must be set in production - it is the only browser origin allowed through CORS. Example: CLIENT_ORIGIN=https://stocks.example.com",
+    );
+  }
+  return "http://localhost:5173";
+}
+
 function positivePort(): number {
   const port = Number(process.env.PORT ?? 4000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("PORT must be an integer from 1 to 65535.");
@@ -138,7 +201,7 @@ export const env = {
   // instead of failing open. See .env.example for what to set locally.
   jwtSecret: requiredSecret("JWT_SECRET"),
   jwtExpiresIn: duration("JWT_EXPIRES_IN", "8h", 30 * 24 * 60 * 60),
-  clientOrigin: process.env.CLIENT_ORIGIN ?? "http://localhost:5173",
+  clientOrigin: clientOrigin(),
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
   // Full path to the mysqldump binary, for hosts (notably Windows) where the
   // MySQL client tools aren't on PATH. Defaults to plain "mysqldump".

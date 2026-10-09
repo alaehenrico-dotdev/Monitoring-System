@@ -287,8 +287,14 @@ model ImportBatch {
   @@map("import_batches")
 }
 
-/// Legacy desktop-sync records. The model remains to preserve data in
-/// existing deployments; current application code no longer uses this table.
+/// DEPRECATED - legacy desktop-sync records, from the Tauri desktop app that
+/// was removed in "feat: remove desktop app". Nothing in server/src or
+/// client/src references this model; it is kept only so the existing rows in
+/// deployed databases are not silently destroyed by a migration.
+///
+/// Safe to drop once someone confirms no out-of-band consumer (BI tool, ad
+/// hoc SQL) still reads sync_push_applications. When dropping, archive first:
+///   CREATE TABLE _archive_sync_push_applications AS SELECT * FROM sync_push_applications;
 model SyncPushApplication {
   id        Int      @id @default(autoincrement())
   localId   String   @unique
@@ -329,8 +335,10 @@ model ReportHistoryEntry {
   @@map("report_history_entries")
 }
 
-/// Legacy desktop-updater history. The model remains to preserve records in
-/// existing deployments; current application code no longer uses this table.
+/// DEPRECATED - legacy desktop-updater history, from the removed Tauri
+/// desktop app. Same situation and same removal conditions as
+/// SyncPushApplication above: unreferenced by any code, retained only to
+/// avoid destroying existing rows.
 model SystemLogEntry {
   id          Int      @id @default(autoincrement())
   // Kept as a string to preserve historical event values.

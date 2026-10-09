@@ -41,6 +41,20 @@ export const changeLogRepository = {
     });
   },
 
+  /// Newest-first history for one record, for the per-cell history endpoint.
+  /// Bounded well above the endpoint's own max limit (50): the service has to
+  /// diff snapshots to find the ones that touched the requested field, so it
+  /// needs more rows than it will return - but not the whole audit trail of a
+  /// heavily-edited sheet. Served by the (tableName, recordId, id) index.
+  findForRecord(tableName: string, recordId: number, take = 300) {
+    return prisma.changeLog.findMany({
+      where: { tableName, recordId },
+      include: { changedBy: { select: { name: true } } },
+      orderBy: { id: "desc" },
+      take,
+    });
+  },
+
   /// Every write a given import batch produced, in the order they were made -
   /// see importBatch.service.ts's revertImportBatch, which reverts each one.
   findByImportBatch(importBatchId: number, db: Db = prisma) {

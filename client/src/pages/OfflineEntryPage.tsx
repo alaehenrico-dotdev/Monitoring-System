@@ -9,7 +9,6 @@ import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
-import { CsvTools, type CsvToolsHandle } from "../components/CsvTools";
 import {
   ClearIcon,
   PrinterIcon,
@@ -38,6 +37,8 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
+import { CopyPreviousButton } from "../components/CopyPreviousButton";
+import { invalidateRecordHistory } from "../utils/cellHistory";
 import { ExtraSaveModes } from "../components/ExtraSaveModes";
 import { ConflictResolution } from "../components/ConflictResolution";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
@@ -163,10 +164,6 @@ export function OfflineEntryPage() {
     user?.role === "OFFLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
   const { online, reconnects } = useOnlineStatus();
-  // So handleSaveAll (below) can tell CsvTools its own last import batch is
-  // no longer just "pending" once a real Save has committed it - see
-  // CsvTools' notifyCommitted doc comment.
-  const csvToolsRef = useRef<CsvToolsHandle>(null);
 
   // Cell edits are staged here instead of hitting the save endpoint
   // immediately - Save (below) flushes them all at once, and Preview shows
@@ -200,13 +197,16 @@ export function OfflineEntryPage() {
   // resolution and blocking Save until decided.
   const conflicts = useMemo(
     () =>
-      detectConflicts(rows, pending, baselines, [...columns, manualCountColumn]),
+      detectConflicts(rows, pending, baselines, [
+        ...columns,
+        manualCountColumn,
+      ]),
     [rows, pending, baselines],
   );
 
-  // Import reads the file's MANUAL COUNTING column and saves it as this
-  // shift's manual count (Save below), the starting point of the next
-  // period's opening stock - same as importing on the Manual Count page.
+  // This shift's manual counts, shown in the MANUAL COUNTING column and saved
+  // with the entry. CSV import is not offered here - opening-stock counts are
+  // only imported on the Manual Count page (the authorized audit source).
   const { counts: manualCounts, loaded: manualCountsLoaded } =
     useEntryManualCounts(date, shift, "OFFLINE");
   const csvRows = useRowsWithManualCounts(rows, manualCounts);
@@ -507,6 +507,11 @@ export function OfflineEntryPage() {
       setSavePercent(Math.round(((i + 1) / entries.length) * 100));
     }
     setSaving(false);
+    // The change-log cache is keyed per saved row and never expires on its
+    // own, so without this a cell's hover tooltip and "View history" popover
+    // would keep showing the state from before this save - i.e. never show
+    // the encoder their own edit.
+    invalidateRecordHistory();
     if (savedManualCountIds.length > 0) {
       setImportedBatchByProduct((prev) => {
         const next = { ...prev };
@@ -517,11 +522,6 @@ export function OfflineEntryPage() {
     if (failed.length) {
       setError(`Failed to save: ${failed.join("; ")}`);
     }
-    // Whatever CsvTools' own "Undo Import" batch might still reference is no
-    // longer just staged - some or all of it just got committed for real by
-    // this Save (see CsvTools' notifyCommitted doc comment). Safe to call
-    // even when nothing was actually imported - it's a no-op then.
-    csvToolsRef.current?.notifyCommitted();
     // "Save total only": the amounts are now part of the saved main
     // column, so the columns that held them have nothing left to show.
     // Columns saved individually keep theirs - that is the whole point.
@@ -543,97 +543,6 @@ export function OfflineEntryPage() {
   function handleClearAll() {
     clearAll();
     setShowClearConfirm(false);
-    // Same reasoning as handleSaveAll's own call: a cleared pending set can
-    // no longer be reverted, so CsvTools' "Undo Import" toast must stop
-    // offering to.
-    csvToolsRef.current?.notifyCommitted();
-  }
-
-  // CSV import (Section 3.1) stages every column it touched exactly like a
-  // manual cell edit - it used to write straight through to the save
-  // endpoint the instant a row was parsed, which meant an imported file's
-  // numbers (and anything mirrored/recalculated from them, like the Online
-  // table or the calculated Offline/Remaining Stock columns) went live
-  // across the system before the user ever got a chance to review or save.
-  // Routing it through `stage` means Save is the same explicit, previewable
-  // step for an import as it already is for a typed edit.
-  async function handleImportRow(
-    productId: number,
-    values: Record<string, number>,
-    batchId?: number,
-  ) {
-    const savedRow = rows?.find((r) => r.product.id === productId);
-    for (const [key, value] of Object.entries(values)) {
-      const savedValue =
-        key === MANUAL_COUNT_KEY
-          ? (manualCounts[productId] ?? Number.NaN)
-          : Number(savedRow?.entry[key] ?? 0);
-      stage(productId, key, value, savedValue);
-    }
-    if (batchId !== undefined && MANUAL_COUNT_KEY in values) {
-      setImportedBatchByProduct((prev) => ({ ...prev, [productId]: batchId }));
-    }
-  }
-
-  // Advisory-only pre-check for CsvTools' Review modal (Option 1 from the
-  // "flagged import" discussion): mirrors the server's own negative-stock
-  // guard and its Offline->Online transfer mirror, using client-side copies
-  // of the same pure formulas (utils/stockMath.ts) - purely to warn before
-  // Save, never to block it. The server remains the only real enforcement;
-  // this can be wrong (stale data, a concurrent edit) without any real risk,
-  // since Save always re-checks for real.
-  function validateImportRow(
-    productId: number,
-    changes: Record<string, number>,
-  ): string | undefined {
-    const row = rows?.find((r) => r.product.id === productId);
-    if (!row) return undefined;
-    const entry = row.entry as unknown as Record<string, unknown>;
-
-    const stockInOlToOff =
-      changes.stockInOlToOff ?? Number(entry.stockInOlToOff ?? 0);
-    const stockOutOffToOl =
-      changes.stockOutOffToOl ?? Number(entry.stockOutOffToOl ?? 0);
-    const { remainingStock } = computeOfflineFigures(entry, changes);
-    if (isNegativeStock(remainingStock)) {
-      return `This would take ${row.product.name}'s Offline stock below zero (would end at ${remainingStock}).`;
-    }
-
-    // Only relevant when the transfer fields themselves changed - an edit
-    // to, say, Production (In) alone never touches the Online side.
-    if (
-      changes.stockInOlToOff !== undefined ||
-      changes.stockOutOffToOl !== undefined
-    ) {
-      const onlineRow = onlineRowsForImportCheck?.find(
-        (r) => r.product.id === productId,
-      );
-      if (onlineRow) {
-        const onlineEntry = onlineRow.entry as unknown as Record<
-          string,
-          unknown
-        >;
-        // Same mapping as mirrorTransferToOnline (dailyOfflineStock.service.ts):
-        // Offline's stockOutOffToOl becomes Online's stockInOffToOl, and
-        // Offline's stockInOlToOff becomes Online's stockOutOlToOff.
-        const onlineStock = calculateOnlineStock(
-          Number(onlineEntry.openingStock ?? 0),
-          stockOutOffToOl,
-          stockInOlToOff,
-        );
-        const onlineRemaining = calculateOnlineRemaining(
-          onlineStock,
-          Number(onlineEntry.productionIn ?? 0),
-          Number(onlineEntry.fulfillmentOut ?? 0),
-          Number(onlineEntry.rts ?? 0),
-        );
-        if (isNegativeStock(onlineRemaining)) {
-          return `This transfer would take ${row.product.name}'s Online stock below zero (would end at ${onlineRemaining}).`;
-        }
-      }
-    }
-
-    return undefined;
   }
 
   // PDF of the grid as currently filtered (search / category), with every
@@ -742,6 +651,19 @@ export function OfflineEntryPage() {
                 {pendingCellCount === 1 ? "" : "s"}
               </span>
             )}
+            {canEdit && (
+              <CopyPreviousButton
+                current={{ date, shift }}
+                columns={gridColumns}
+                rows={rows}
+                fetchPeriod={(d, s) =>
+                  getOfflineGrid(d, s).then((data) => data as unknown as GridRow[])
+                }
+                pending={pending}
+                getSavedValue={getSavedValue}
+                onApply={handleCommitMany}
+              />
+            )}
             {canEdit && (canUndo || canRedo) && (
               <Button
                 className="ae-toolbar-save"
@@ -818,30 +740,6 @@ export function OfflineEntryPage() {
               <ReportIcon />
               <span className="ae-toolbar-btn-label">Report</span>
             </Button>
-            {canEdit && (
-              <CsvTools
-                ref={csvToolsRef}
-                filenamePrefix="offline-entry"
-                date={date}
-                rows={csvRows ?? []}
-                disabled={!rows || !manualCountsLoaded}
-                importTarget={{ date, shift, location: "OFFLINE" }}
-                onImportTargetChange={(t) =>
-                  setDateShift({ date: t.date, shift: t.shift })
-                }
-                importLocations={["OFFLINE"]}
-                importTodayValue={getCurrentShiftAndDate().date}
-                columns={csvColumns}
-                importKeys={[MANUAL_COUNT_KEY]}
-                blankAsZero
-                onImportRow={handleImportRow}
-                getPendingValue={(productId, key) => pending[productId]?.[key]}
-                validateImport={validateImportRow}
-                canImport
-                showExport={false}
-                showPdf={false}
-              />
-            )}
             <ZoomControl zoom={zoom} onChange={setZoom} />
           </ToolbarControls>
         </Toolbar>

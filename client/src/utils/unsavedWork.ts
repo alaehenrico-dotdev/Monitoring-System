@@ -97,3 +97,23 @@ export function findUnsavedWork({ from, to }: { from: string; to: string }): Uns
 
   return found.sort((a, b) => a.date.localeCompare(b.date) || a.page.localeCompare(b.page) || a.shift.localeCompare(b.shift));
 }
+
+/**
+ * Every staged edit still in this browser session, whatever its date.
+ *
+ * findUnsavedWork above is deliberately scoped to a report's own date range.
+ * Logging out is the opposite case: it abandons the session entirely, so the
+ * question is "is there ANY unsaved work", including an edit to a date
+ * nobody is currently looking at.
+ *
+ * The bounds are string comparisons against "YYYY-MM-DD" keys, so these two
+ * sentinels cover every date the app can produce without special-casing.
+ */
+export function findAllUnsavedWork(): UnsavedWorkItem[] {
+  return findUnsavedWork({ from: "0000-01-01", to: "9999-12-31" });
+}
+
+/// Total staged products across every page - what the logout warning counts.
+export function countAllUnsavedWork(): number {
+  return findAllUnsavedWork().reduce((n, item) => n + item.count, 0);
+}

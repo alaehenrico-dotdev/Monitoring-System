@@ -7,6 +7,7 @@ import { Modal } from "../components/Modal";
 import { colors } from "../theme";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 import { InlineLoading, Spinner } from "../components/Spinner";
+import { LockIcon } from "../components/icons";
 
 const COUNTDOWN_SECONDS = 7;
 
@@ -173,117 +174,112 @@ export function DataResetPage() {
 
   if (lockStatus !== "unlocked") {
     return (
-      <div>
-        <p
-          style={{
-            fontSize: 13,
-            color: colors.subtleInk,
-            margin: "0 0 20px",
-            maxWidth: 620,
-          }}
-        >
-          This section is restricted. Enter the reset passcode to continue.
-        </p>
-
+      <div
+        style={{
+          maxWidth: 380,
+          background: PANEL_BG,
+          border: `1px solid ${PANEL_BORDER}`,
+          borderRadius: 6,
+          padding: 28,
+        }}
+      >
         <div
           style={{
-            maxWidth: 360,
-            background: `linear-gradient(180deg, ${PANEL_BG_ALT}, ${PANEL_BG})`,
-            border: `1px solid ${PANEL_BORDER}`,
-            // Same 8px radius as .ae-page-header/Modal/every other card.
-            borderRadius: 6,
-            padding: "32px 32px",
-            boxShadow: "0 14px 34px rgba(12, 12, 12,0.28)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            marginBottom: 22,
           }}
         >
-          <div
+          <span
+            aria-hidden
             style={{
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
-              gap: 10,
-              marginBottom: 18,
+              justifyContent: "center",
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              borderRadius: 6,
+              border: `1px solid ${PANEL_BORDER}`,
+              color: PANEL_TEXT_MUTED,
             }}
           >
-            <span aria-hidden style={{ fontSize: 16, color: PANEL_GOLD }}>
-              🔒
-            </span>
-            <span
-              style={{
-                fontSize: 11.5,
-                fontWeight: 700,
-                letterSpacing: 2.5,
-                color: PANEL_GOLD,
-                textTransform: "uppercase",
-              }}
-            >
+            <LockIcon size={17} />
+          </span>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: PANEL_TEXT }}>
               Restricted
-            </span>
+            </div>
+            <div
+              style={{ fontSize: 12.5, color: PANEL_TEXT_MUTED, marginTop: 2 }}
+            >
+              Enter the reset passcode to continue.
+            </div>
           </div>
-
-          <form onSubmit={handleUnlock}>
-            <label
-              style={{
-                display: "block",
-                fontSize: 12.5,
-                color: PANEL_TEXT_MUTED,
-                marginBottom: 8,
-              }}
-              htmlFor="reset-passcode"
-            >
-              Passcode
-            </label>
-            <input
-              id="reset-passcode"
-              type="password"
-              inputMode="numeric"
-              autoFocus
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-              disabled={lockStatus === "verifying"}
-              placeholder="••••••"
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                fontFamily: "inherit",
-                fontSize: 15,
-                letterSpacing: 3,
-                padding: "10px 12px",
-                // Pill, matching every other text input in the app (.ae-input).
-                borderRadius: 6,
-                border: `1px solid ${PANEL_BORDER}`,
-                background: "rgba(255,255,255,0.05)",
-                color: PANEL_TEXT,
-                marginBottom: 14,
-              }}
-            />
-
-            {lockError && (
-              <p
-                style={{ margin: "0 0 14px", fontSize: 12.5, color: PANEL_RED }}
-              >
-                {lockError}
-              </p>
-            )}
-
-            <Button
-              type="submit"
-              variant="danger"
-              disabled={lockStatus === "verifying" || !passcode}
-              style={{
-                width: "100%",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-              }}
-            >
-              {lockStatus === "verifying" && (
-                <Spinner size="sm" color={PANEL_RED} />
-              )}
-              {lockStatus === "verifying" ? "Verifying…" : "Unlock"}
-            </Button>
-          </form>
         </div>
+
+        <form onSubmit={handleUnlock}>
+          <label
+            style={{
+              display: "block",
+              fontSize: 12.5,
+              color: PANEL_TEXT_MUTED,
+              marginBottom: 8,
+            }}
+            htmlFor="reset-passcode"
+          >
+            Passcode
+          </label>
+          <input
+            id="reset-passcode"
+            type="password"
+            inputMode="numeric"
+            autoFocus
+            value={passcode}
+            onChange={(e) => setPasscode(e.target.value)}
+            disabled={lockStatus === "verifying"}
+            placeholder="••••••"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              fontFamily: "inherit",
+              fontSize: 15,
+              letterSpacing: 3,
+              padding: "10px 12px",
+              // Pill, matching every other text input in the app (.ae-input).
+              borderRadius: 6,
+              border: `1px solid ${PANEL_BORDER}`,
+              background: "rgba(255,255,255,0.05)",
+              color: PANEL_TEXT,
+              marginBottom: 14,
+            }}
+          />
+
+          {lockError && (
+            <p style={{ margin: "0 0 14px", fontSize: 12.5, color: PANEL_RED }}>
+              {lockError}
+            </p>
+          )}
+
+          <Button
+            type="submit"
+            variant="danger"
+            disabled={lockStatus === "verifying" || !passcode}
+            style={{
+              width: "100%",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            {lockStatus === "verifying" && (
+              <Spinner size="sm" color={PANEL_RED} />
+            )}
+            {lockStatus === "verifying" ? "Verifying…" : "Unlock"}
+          </Button>
+        </form>
       </div>
     );
   }

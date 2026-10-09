@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   getMonthlyOverview,
   type MonthlyOverviewEntry,
 } from "../api/dashboard";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Button } from "./ui";
 import { BarsSkeleton } from "./Skeleton";
 import { colors } from "../theme";
@@ -62,20 +63,41 @@ export function MonthlyMonitoring() {
   const [year, setYear] = useState(currentYear);
   const [data, setData] = useState<MonthlyOverviewEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const realtimeVersion = useRealtimeVersion();
+  // Lets the fetch below tell "nothing to show yet" (surface the error)
+  // from "a refresh failed but the bars are already on screen" (ignore it).
+  const hasDataRef = useRef(false);
+  useEffect(() => {
+    hasDataRef.current = data !== null;
+  });
 
   useResetOnKeyChange(String(year), () => {
     setData(null);
     setError(null);
   });
   useEffect(() => {
+    // Also re-runs on every realtime "data changed" tick so the current
+    // month's bars follow the stat cards instead of going stale while the
+    // page stays open. A refetch keeps the old bars on screen (only a year
+    // change resets to the skeleton), and a failed refetch is ignored when
+    // there is already data to show.
+    let cancelled = false;
     getMonthlyOverview(year)
-      .then(setData)
-      .catch((e) =>
+      .then((d) => {
+        if (cancelled) return;
+        setData(d);
+        setError(null);
+      })
+      .catch((e) => {
+        if (cancelled || hasDataRef.current) return;
         setError(
           e instanceof Error ? e.message : "Unable to load monthly monitoring",
-        ),
-      );
-  }, [year]);
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [year, realtimeVersion]);
 
   // One shared scale for both series, so an Online bar and an Offline bar
   // in the same (or a different) month are visually comparable to each
@@ -186,6 +208,10 @@ export function MonthlyMonitoring() {
                     entry={entry}
                     year={year}
                     max={max}
+                    isCurrent={
+                      year === currentYear() &&
+                      entry.month === new Date().getMonth() + 1
+                    }
                   />
                 ))}
               </div>
@@ -240,10 +266,12 @@ function MonthBars({
   entry,
   year,
   max,
+  isCurrent,
 }: {
   entry: MonthlyOverviewEntry;
   year: number;
   max: number;
+  isCurrent: boolean;
 }) {
   const hasData =
     entry.onlineRemainingStock !== null && entry.offlineRemainingStock !== null;
@@ -255,8 +283,13 @@ function MonthBars({
     : `${monthName} — No entries recorded yet`;
 
   return (
+    // Focusable + labelled so the per-month figures (otherwise only a
+    // mouse-hover tooltip) are reachable by keyboard and screen readers.
     <div
       title={title}
+      tabIndex={0}
+      role="img"
+      aria-label={title}
       style={{
         flex: "1 1 0",
         minWidth: MONTH_MIN_WIDTH,
@@ -301,7 +334,12 @@ function MonthBars({
       <span
         style={{
           fontSize: 11,
-          color: colors.subtleInk,
+          // The month still in progress reads as "now" in the same gold as
+          // the rest of the dashboard's accents.
+          fontWeight: isCurrent ? 800 : undefined,
+          color: isCurrent ? colors.ink : colors.subtleInk,
+          borderBottom: isCurrent ? `2px solid ${colors.gold}` : undefined,
+          paddingBottom: isCurrent ? 1 : undefined,
           marginTop: entry.varianceFlags ? 3 : 6,
         }}
       >

@@ -64,7 +64,7 @@ Example:
 NODE_ENV=production
 HOST=127.0.0.1
 PORT=4000
-DATABASE_URL="mysql://alaeh_app:URL_ENCODED_PASSWORD@127.0.0.1:3306/ala_eh_stocks"
+DATABASE_URL="mysql://alaeh_app:URL_ENCODED_PASSWORD@127.0.0.1:3306/ala_eh_stocks?connection_limit=10&pool_timeout=20"
 JWT_SECRET="REPLACE_WITH_A_UNIQUE_RANDOM_SECRET"
 DATA_RESET_PASSCODE="REPLACE_WITH_A_DIFFERENT_RANDOM_SECRET"
 JWT_EXPIRES_IN=8h
@@ -72,8 +72,23 @@ CLIENT_ORIGIN=https://monitor.example.com
 TRUST_PROXY=loopback
 ```
 
-Keep `server/.env` readable only by the deployment account. Do not use the
-seeded demonstration passwords in production.
+The server validates this at boot and refuses to start rather than running
+misconfigured:
+
+| Variable | Rule |
+| --- | --- |
+| `JWT_SECRET` | At least 32 characters, and not a known placeholder. Every token it signs is handed to a client, so a short secret is open to unlimited offline guessing. |
+| `DATA_RESET_PASSCODE` | At least 4 characters, and not a known placeholder. Deliberately short-friendly: it is typed into the Data Reset screen, and it is defended by the passcode rate limiter plus a single-use token, not by length. |
+| `CLIENT_ORIGIN` | **Required when `NODE_ENV=production`**, with no trailing slash. It is the only browser origin allowed through CORS. Previously it silently defaulted to `http://localhost:5173`, which booted fine and then had the browser reject every request from the real frontend. |
+| `TRUST_PROXY` | An address or preset, never a hop count. See `server/.env.example`. |
+
+`connection_limit` on `DATABASE_URL` is worth setting explicitly on a VPS:
+Prisma otherwise sizes its pool as (CPUs x 2 + 1) *per process*, and a few
+pm2 restarts or a second service on the same MySQL can exhaust
+`max_connections` (151 by default).
+
+Keep `server/.env` readable only by the deployment account (`chmod 600`). Do
+not use the seeded demonstration passwords in production.
 
 ## 3. Back up, migrate, build, and seed
 
@@ -89,11 +104,58 @@ password=YOUR_DATABASE_PASSWORD
 host=127.0.0.1
 ```
 
-Then create a compressed pre-deploy dump:
+Then create a compressed pre-deploy dump. The repository ships a script that
+does this with verification and retention, and works on both Linux and
+Windows (`scripts/backup.sh` / `scripts/backup.ps1`, selected automatically):
 
 ```bash
 sudo install -d -m 700 /var/backups/ala-eh
-sudo bash -o pipefail -c 'mysqldump --defaults-extra-file=/root/.my.cnf --single-transaction --routines --triggers ala_eh_stocks | gzip > "/var/backups/ala-eh/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz"'
+sudo chown "$USER" /var/backups/ala-eh
+
+# Timestamped, gzipped, and verified before it is kept. Writes to
+# $BACKUP_DIR (default /var/backups/ala-eh), reading DATABASE_URL from
+# server/.env. Retains 7 days of daily dumps, always keeping the newest.
+npm run backup
+
+# Before a schema migration specifically - kept in snapshots/ so the daily
+# purge never removes it:
+npm run backup:snapshot
+```
+
+The script writes to `*.sql.gz.partial` and only renames it into place once
+the dump has been verified to carry both the MySQL header and the
+`-- Dump completed` trailer, so a dump truncated by a full disk or a dropped
+connection can never be mistaken for a good backup or kept by retention.
+
+To restore (this REPLACES the database, and takes its own safety snapshot
+of the current data first):
+
+```bash
+npm run restore -- --latest --yes
+npm run restore -- --file /var/backups/ala-eh/daily/db_backup_....sql.gz --yes
+```
+
+The equivalent raw command, if you would rather not use the script:
+
+```bash
+sudo bash -o pipefail -c 'mysqldump --defaults-extra-file=/root/.my.cnf --single-transaction --routines --triggers --no-tablespaces ala_eh_stocks | gzip > "/var/backups/ala-eh/pre-deploy-$(date +%Y%m%d-%H%M%S).sql.gz"'
+```
+
+Schedule the daily backup with cron (the Windows equivalent is
+`scripts/install-backup-task.ps1`):
+
+```cron
+# crontab -e, as the user that owns /var/www/ala-eh
+# 02:15 daily. Logs to syslog; the script exits non-zero on any failure, so
+# cron's MAILTO will surface a broken backup instead of it failing silently.
+15 2 * * * cd /var/www/ala-eh && /usr/bin/npm run backup >> /var/log/ala-eh-backup.log 2>&1
+```
+
+A backup that is never restored is a guess, not a backup - rehearse a restore
+into a scratch database periodically:
+
+```bash
+BACKUP_DIR=/var/backups/ala-eh DATABASE_URL="mysql://user:pw@127.0.0.1:3306/ala_eh_restore_test"   npm run restore -- --latest --yes --no-safety-snapshot
 ```
 
 Install the MySQL client tools on the VPS; the Settings > Backup & Restore
@@ -178,16 +240,27 @@ cd /var/www/ala-eh
 git pull --ff-only
 npm ci
 npm run build
-# Take and verify a database backup here.
-npm run prisma:migrate:deploy --workspace server
+
+# Takes a verified pre-migration snapshot, then migrates - and stops before
+# migrating if the snapshot fails.
+npm run db:migrate:deploy
+
 pm2 restart ala-eh-api
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-The root `npm run db:migrate:deploy` helper also runs the repository's
-PowerShell snapshot script and is intended for Windows. On Linux, use the
-workspace migration command above after taking the explicit VPS backup.
+`npm run db:migrate:deploy` is now cross-platform: `scripts/backup.mjs`
+dispatches to `backup.sh` on Linux and `backup.ps1` on Windows, so the same
+command is correct on the VPS and on a developer machine. (It previously
+invoked PowerShell directly, which made it fail outright on Linux.)
+
+To migrate without the automatic snapshot - only if you have just taken one
+by hand:
+
+```bash
+npm run prisma:migrate:deploy --workspace server
+```
 
 ## Data preservation
 

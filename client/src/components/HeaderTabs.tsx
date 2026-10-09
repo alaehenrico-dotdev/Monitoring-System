@@ -2,58 +2,7 @@ import { useLayoutEffect, useRef } from "react";
 import { animate } from "motion/react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-
-interface NavLinkDef {
-  to: string;
-  label: string;
-  roles: string[];
-}
-
-const ALL_ROLES = ["ONLINE_ENCODER", "OFFLINE_ENCODER", "SUPERVISOR_ADMIN"];
-
-// Same groups + role filtering the sidebar drawer used to have. The group
-// headings are gone (a ribbon has no room for them); groups are separated
-// by a thin divider instead.
-const groups: { heading: string; links: NavLinkDef[] }[] = [
-  {
-    heading: "Data Entry",
-    links: [
-      { to: "/dashboard", label: "Dashboard", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/manual-count", label: "Audit", roles: ALL_ROLES },
-      { to: "/online", label: "Online Entry", roles: ALL_ROLES },
-      { to: "/offline", label: "Offline Entry", roles: ALL_ROLES },
-      { to: "/total-stocks", label: "Total Stocks", roles: ALL_ROLES },
-    ],
-  },
-  {
-    heading: "Reports",
-    links: [
-      {
-        to: "/variance-report",
-        label: "Variance Report",
-        roles: ["SUPERVISOR_ADMIN"],
-      },
-      {
-        to: "/daily-report",
-        label: "Daily Report",
-        roles: ["SUPERVISOR_ADMIN"],
-      },
-    ],
-  },
-  {
-    heading: "Admin",
-    links: [
-      { to: "/change-log", label: "Change Log", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/products", label: "SKUs", roles: ["SUPERVISOR_ADMIN"] },
-    ],
-  },
-  {
-    heading: "Settings",
-    links: [
-      { to: "/settings", label: "Settings", roles: ["SUPERVISOR_ADMIN"] },
-    ],
-  },
-];
+import { navGroups } from "../config/navigation";
 
 // Horizontal extent (px from the strip's left edge) of the gold underline.
 // Kept at module level because every page renders its own HeaderTabs (inside
@@ -189,7 +138,7 @@ export function HeaderTabs() {
     };
   }, [pathname, user?.role]);
 
-  const visibleGroups = groups
+  const visibleGroups = navGroups
     .map((g) => ({
       ...g,
       links: g.links.filter((l) => !user || l.roles.includes(user.role)),

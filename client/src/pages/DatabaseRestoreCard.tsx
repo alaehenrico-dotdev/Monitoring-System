@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { ApiError } from "../api/http";
 import { downloadDatabaseBackup, restoreDatabaseBackup } from "../api/backup";
 import { verifyResetPasscode } from "../api/dataReset";
@@ -6,6 +6,7 @@ import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { InlineLoading } from "../components/Spinner";
 import { Toast } from "../components/Toast";
+import { UploadIcon } from "../components/icons";
 import { colors } from "../theme";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
 
@@ -16,6 +17,17 @@ type Status =
   | "restoring"
   | "done"
   | "error";
+
+// The passcode field, Choose file and Restore take turns in one slot, so they
+// share one width/height - the row never jumps between steps.
+const slotStyle: CSSProperties = {
+  width: 150,
+  height: 32,
+  boxSizing: "border-box",
+  padding: "0 10px",
+  fontSize: 12.5,
+  flexShrink: 0,
+};
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -97,127 +109,120 @@ export function DatabaseRestoreCard() {
   }
 
   return (
-    <div
-      style={{
-        maxWidth: 760,
-        marginTop: 24,
-        background: "var(--ae-surface-glass)",
-        backdropFilter: "var(--ae-glass-blur)",
-        WebkitBackdropFilter: "var(--ae-glass-blur)",
-        border: `1px solid ${colors.border}`,
-        borderRadius: 6,
-        padding: "32px 36px",
-      }}
-    >
-      <h3
+    <div style={{ padding: "14px 18px" }}>
+      <div
         style={{
-          margin: "0 0 10px",
-          fontSize: 19,
-          fontWeight: 700,
-          color: colors.ink,
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          flexWrap: "wrap",
         }}
       >
-        Restore from a backup
-      </h3>
-      <p
-        style={{
-          margin: "0 0 20px",
-          fontSize: 13.5,
-          lineHeight: 1.6,
-          color: colors.subtleInk,
-          maxWidth: 560,
-        }}
-      >
-        Replaces <strong>everything</strong> in the live database - products,
-        entries, counts, reports and accounts - with the contents of a{" "}
-        <code>.sql</code> file made by Download Backup. Anything entered since
-        that backup is lost. A backup of the current data is downloaded to this
-        device first.
-      </p>
+        <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>
+            Restore
+          </div>
+          <div
+            style={{ fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}
+          >
+            Replaces all live data with a <code>.sql</code> backup. Current data
+            is saved to this device first.
+          </div>
+        </div>
 
-      {!resetToken ? (
-        <form
-          onSubmit={handleUnlock}
-          style={{
-            display: "flex",
-            gap: 10,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <input
-            type="password"
-            inputMode="numeric"
-            aria-label="Restore passcode"
-            placeholder="Passcode"
-            value={passcode}
-            onChange={(e) => setPasscode(e.target.value)}
-            disabled={verifying}
-            className="ae-input"
-            style={{ maxWidth: 200 }}
-          />
-          <Button
-            type="submit"
-            variant="secondary"
-            disabled={verifying || !passcode}
-          >
-            {verifying ? "Verifying…" : "Unlock restore"}
-          </Button>
-          {passcodeError && (
-            <span style={{ fontSize: 12.5, color: colors.danger }}>
-              {passcodeError}
-            </span>
-          )}
-          <span
-            style={{ flexBasis: "100%", fontSize: 12, color: colors.subtleInk }}
-          >
-            Uses the same passcode as Data Reset.
-          </span>
-        </form>
-      ) : (
+        {/* One slot, one control at a time: passcode field (Enter to
+            unlock) -> Choose file -> Restore. All three share one size. */}
+        {!resetToken ? (
+          <form onSubmit={handleUnlock} style={{ display: "flex" }}>
+            <input
+              type="password"
+              inputMode="numeric"
+              autoComplete="off"
+              aria-label="Restore passcode - press Enter to unlock"
+              placeholder={verifying ? "Verifying…" : "Passcode"}
+              title="Same passcode as Data Reset. Press Enter to unlock."
+              value={passcode}
+              onChange={(e) => setPasscode(e.target.value)}
+              disabled={verifying}
+              className="ae-input"
+              style={slotStyle}
+            />
+          </form>
+        ) : (
+          <>
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".sql,application/sql,text/plain"
+              hidden
+              onChange={(e) => {
+                setFile(e.target.files?.[0] ?? null);
+                setStatus("idle");
+                setError(null);
+              }}
+            />
+            {!file ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => fileInput.current?.click()}
+                disabled={busy}
+                style={{
+                  ...slotStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 6,
+                }}
+              >
+                <UploadIcon />
+                Choose file
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                disabled={busy}
+                onClick={() => {
+                  setError(null);
+                  setStatus("confirming");
+                }}
+                style={{
+                  ...slotStyle,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                Restore
+              </Button>
+            )}
+          </>
+        )}
+      </div>
+
+      {resetToken && file && (
         <div
+          title="Click to choose a different file"
+          onClick={() => !busy && fileInput.current?.click()}
           style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 14,
-            flexWrap: "wrap",
+            marginTop: 8,
+            fontSize: 12,
+            color: colors.subtleInk,
+            cursor: busy ? "default" : "pointer",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".sql,application/sql,text/plain"
-            hidden
-            onChange={(e) => {
-              setFile(e.target.files?.[0] ?? null);
-              setStatus("idle");
-              setError(null);
-            }}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => fileInput.current?.click()}
-            disabled={busy}
-          >
-            Choose backup file…
-          </Button>
-          {file && (
-            <span style={{ fontSize: 12.5, color: colors.ink }}>
-              {file.name} ({formatBytes(file.size)})
-            </span>
-          )}
-          <Button
-            type="button"
-            variant="danger"
-            disabled={!file || busy}
-            onClick={() => {
-              setError(null);
-              setStatus("confirming");
-            }}
-          >
-            Restore…
-          </Button>
+          {file.name} ({formatBytes(file.size)})
+        </div>
+      )}
+      {!resetToken && passcodeError && (
+        <div style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>
+          {passcodeError}
         </div>
       )}
 

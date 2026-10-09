@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
 import { CursorAura } from "./CursorAura";
 import { Toast, ToastHost } from "./Toast";
+import { QuickJump } from "./QuickJump";
 import { NavDrawerProvider } from "../context/NavDrawerContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import { colors, fonts } from "../theme";
@@ -35,6 +36,9 @@ export function Layout() {
       >
         <CursorAura />
         <Sidebar />
+        {/* Ctrl+K from anywhere - mounted here, not per page, so the
+            shortcut and the header's search button work on every route. */}
+        <QuickJump />
 
         <main
           ref={mainRef}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
+import { DownloadIcon } from "../components/icons";
 import { Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { DatabaseRestoreCard } from "./DatabaseRestoreCard";
@@ -64,102 +65,91 @@ export function DatabaseBackupPage() {
       : 0;
 
   return (
-    <div>
+    <div
+      style={{
+        maxWidth: 640,
+        background: "var(--ae-surface-glass)",
+        backdropFilter: "var(--ae-glass-blur)",
+        WebkitBackdropFilter: "var(--ae-glass-blur)",
+        border: `1px solid ${colors.border}`,
+        borderRadius: 6,
+        overflow: "hidden",
+      }}
+    >
       <div
         style={{
-          maxWidth: 760,
-          background: "var(--ae-surface-glass)",
-          backdropFilter: "var(--ae-glass-blur)",
-          WebkitBackdropFilter: "var(--ae-glass-blur)",
-          border: `1px solid ${colors.border}`,
-          borderRadius: 6,
-          padding: "32px 36px",
+          position: "relative",
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          padding: "14px 18px",
         }}
       >
-        <h3
-          style={{
-            margin: "0 0 10px",
-            fontSize: 19,
-            fontWeight: 700,
-            color: colors.ink,
-          }}
-        >
-          Download a full database backup
-        </h3>
-        <p
-          style={{
-            margin: "0 0 24px",
-            fontSize: 13.5,
-            lineHeight: 1.6,
-            color: colors.subtleInk,
-            maxWidth: 560,
-          }}
-        >
-          Generates a complete SQL dump of the live database - every product,
-          entry, count, receipt, report, and account - as a single{" "}
-          <code>.sql</code> file you can store off-site. Restoring from it
-          requires a developer to load it back into a MySQL server.
-        </p>
-
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <Button
-            variant="primary"
-            onClick={handleDownload}
-            disabled={downloading}
-            style={{
-              padding: "10px 22px",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              color: colors.yellow,
-            }}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>
+            Backup
+          </div>
+          <div
+            style={{ fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}
           >
-            {downloading && <Spinner size="sm" color={colors.cream} />}
-            {downloading ? "Downloading…" : "Download Backup"}
-          </Button>
-
-          {downloading && (
-            <span
-              role="status"
-              aria-live="polite"
-              style={{ fontSize: 12.5, color: colors.subtleInk }}
-            >
-              {formatBytes(bytes)} received
-            </span>
-          )}
-          <Toast
-            id="backup-done"
-            message={
-              status === "done" && !doneDismissed
-                ? `Backup downloaded (${formatBytes(bytes)}).`
-                : null
-            }
-            onDismiss={() => setDoneDismissed(true)}
-          />
-          <Toast
-            message={status === "error" ? error : null}
-            onDismiss={() => setError(null)}
-            variant="error"
-            duration={null}
-          />
+            Download the whole database as a <code>.sql</code> file.
+          </div>
         </div>
+
+        {downloading && (
+          <span
+            role="status"
+            aria-live="polite"
+            style={{ fontSize: 12, color: colors.subtleInk, flexShrink: 0 }}
+          >
+            {formatBytes(bytes)}
+          </span>
+        )}
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={handleDownload}
+          disabled={downloading}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            flexShrink: 0,
+          }}
+        >
+          {downloading ? (
+            <Spinner size="sm" color={colors.cream} />
+          ) : (
+            <DownloadIcon />
+          )}
+          {downloading ? "Downloading…" : "Download"}
+        </Button>
+        <Toast
+          id="backup-done"
+          message={
+            status === "done" && !doneDismissed
+              ? `Backup downloaded (${formatBytes(bytes)}).`
+              : null
+          }
+          onDismiss={() => setDoneDismissed(true)}
+        />
+        <Toast
+          message={status === "error" ? error : null}
+          onDismiss={() => setError(null)}
+          variant="error"
+          duration={null}
+        />
 
         {(downloading || status === "done") && (
           <div
             aria-hidden="true"
             style={{
-              marginTop: 18,
-              height: 4,
-              borderRadius: 2,
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 2,
               background: colors.paperAlt,
-              overflow: "hidden",
             }}
           >
             <div
@@ -175,6 +165,8 @@ export function DatabaseBackupPage() {
           </div>
         )}
       </div>
+
+      <div style={{ height: 1, background: colors.border }} />
       <DatabaseRestoreCard />
     </div>
   );

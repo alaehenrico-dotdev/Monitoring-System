@@ -10,14 +10,33 @@ import {
   type CSSProperties,
   type KeyboardEvent,
 } from "react";
-import type { ChangeLogEntry, Product } from "../types";
+import type { Product } from "../types";
 import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { NumberCellInput } from "./ui";
 import { ChevronIcon } from "./icons";
 import { ColumnHeaderMenu, type ColumnMenuTarget } from "./ColumnHeaderMenu";
-import { extraColumnKey } from "../hooks/useExtraColumns";
-import { listChangeLog } from "../api/changeLog";
+import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import {
+  CellHistoryPopover,
+  type CellHistoryTarget,
+} from "./CellHistoryPopover";
+import { extraColumnKey, parseExtraColumnKey } from "../hooks/useExtraColumns";
+import {
+  describeWhen,
+  fetchCellHistory,
+  lastChange,
+} from "../utils/cellHistory";
+import { consumeQuickJump, subscribeQuickJump } from "../utils/quickJumpTarget";
+import {
+  describePasteResult,
+  describePasteSkips,
+  MAX_PASTE_CELLS,
+  parseClipboardGrid,
+  planPaste,
+  type PasteTargetColumn,
+} from "../utils/gridPaste";
+import { showToast } from "./Toast";
 import {
   formatGridNumber,
   formatPercentOfTotal,
@@ -228,59 +247,6 @@ function focusCell(productId: number, key: string) {
   el?.select();
 }
 
-/// Per-record change-log cache, shared by every cell in the table. One
-/// database row holds the whole product/date/shift entry, so all of that
-/// row's cells answer from a single request - hovering across a row costs
-/// one fetch, not one per column. Lives at module scope so it also survives
-/// re-renders and remounts within a session; entries are small and the grid
-/// only ever holds one sheet's worth.
-const historyCache = new Map<string, Promise<ChangeLogEntry[]>>();
-
-function fetchRecordHistory(
-  table: string,
-  recordId: number,
-): Promise<ChangeLogEntry[]> {
-  const key = `${table}:${recordId}`;
-  const hit = historyCache.get(key);
-  if (hit) return hit;
-  const req = listChangeLog({ tableName: table, recordId }).catch(() => {
-    // A failed lookup shouldn't be cached as a permanent "no history" -
-    // drop it so the next hover retries.
-    historyCache.delete(key);
-    return [] as ChangeLogEntry[];
-  });
-  historyCache.set(key, req);
-  return req;
-}
-
-/// change_log stores whole-row snapshots, so "who last touched THIS cell" is
-/// the most recent entry whose value for this column actually moved.
-function lastChangeForColumn(
-  entries: ChangeLogEntry[],
-  colKey: string,
-): ChangeLogEntry | undefined {
-  return entries.find((e) => {
-    const oldV = (e.oldValue as Record<string, unknown> | null)?.[colKey];
-    const newV = (e.newValue as Record<string, unknown> | null)?.[colKey];
-    // A CREATE has no previous row; it counts as setting every non-zero cell.
-    if (e.action === "CREATE") return newV !== undefined && Number(newV) !== 0;
-    return (
-      oldV !== undefined && newV !== undefined && Number(oldV) !== Number(newV)
-    );
-  });
-}
-
-function describeWhen(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (!Number.isFinite(then)) return "";
-  const mins = Math.round((Date.now() - then) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return new Date(iso).toLocaleDateString();
-}
-
 /// Hover tooltip for one cell's provenance. Deliberately title-attribute
 /// shaped rather than a positioned popover: it reuses the browser's own
 /// tooltip, so it can't be clipped by the table's scroll container and costs
@@ -297,15 +263,14 @@ function useCellHistoryTitle(
   useEffect(() => {
     if (!hovered || !table || recordId === undefined) return;
     let cancelled = false;
-    fetchRecordHistory(table, recordId).then((entries) => {
+    fetchCellHistory(table, recordId, colKey).then((entries) => {
       if (cancelled) return;
-      const hit = lastChangeForColumn(entries, colKey);
+      const hit = lastChange(entries);
       if (!hit) {
         setTitle("No recorded changes to this cell");
         return;
       }
-      const who = hit.changedBy?.name ?? "Unknown user";
-      setTitle(`Last changed by ${who} - ${describeWhen(hit.changedAt)}`);
+      setTitle(`Last changed by ${hit.who ?? "Unknown user"} - ${describeWhen(hit.changedAt)}`);
     });
     return () => {
       cancelled = true;
@@ -338,6 +303,9 @@ interface DraftCellProps {
   historyTable?: string;
   /** This row's database id, absent until the row has been saved once. */
   recordId?: number;
+  /** Opens the cell menu. Omitted on a grid that doesn't offer one, which
+   *  leaves the browser's own context menu in place. */
+  onCellMenu?: (productId: number, key: string, x: number, y: number) => void;
 }
 
 /**
@@ -358,6 +326,7 @@ const DraftCell = memo(function DraftCell({
   savedValue,
   historyTable,
   recordId,
+  onCellMenu,
 }: DraftCellProps) {
   const [draft, setDraft] = useState<string | undefined>(undefined);
   const [hovered, setHovered] = useState(false);
@@ -416,7 +385,26 @@ const DraftCell = memo(function DraftCell({
       value={displayValue}
       onChange={setDraft}
       onBlur={commit}
-      onKeyDown={(e) => onKeyDown(e, productId, colKey)}
+      onKeyDown={(e) => {
+        // Shift+F10 and the dedicated ContextMenu key are the platform
+        // conventions for "open the context menu for what's focused" - the
+        // same pair the column headers already answer to.
+        if (onCellMenu && (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey))) {
+          e.preventDefault();
+          const r = e.currentTarget.getBoundingClientRect();
+          onCellMenu(productId, colKey, r.left, r.bottom);
+          return;
+        }
+        onKeyDown(e, productId, colKey);
+      }}
+      onContextMenu={
+        onCellMenu
+          ? (e) => {
+              e.preventDefault();
+              onCellMenu(productId, colKey, e.clientX, e.clientY);
+            }
+          : undefined
+      }
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title={title}
@@ -465,6 +453,18 @@ export function StockGrid({
   // rather than per-header so only one can ever be open at a time.
   const [menu, setMenu] = useState<ColumnMenuTarget | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  // The cell right-click menu, and the history popover it can open. Held
+  // here rather than per cell so only one of each can ever be open, and so a
+  // memoized DraftCell doesn't have to carry any of this state.
+  const [cellMenu, setCellMenu] = useState<{
+    productId: number;
+    colKey: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const closeCellMenu = useCallback(() => setCellMenu(null), []);
+  const [history, setHistory] = useState<CellHistoryTarget | null>(null);
+  const closeHistory = useCallback(() => setHistory(null), []);
 
   // The added columns (hooks/useExtraColumns.ts) belonging to one column.
   // Never undefined, so callers can map over it without a guard.
@@ -551,6 +551,57 @@ export function StockGrid({
     onAnyExpandedChange?.(anyExpanded);
   }, [anyExpanded, onAnyExpandedChange]);
 
+  /// Ctrl+K quick jump (utils/quickJumpTarget.ts): the palette parks a
+  /// product id, and whichever grid actually has that product claims it.
+  /// Nothing here is a new highlight - expanding the category reuses the
+  /// same `expandedOverride` map the category bars write, and focusing the
+  /// row's first editable cell is what RowGlowScroll already watches to pin
+  /// its focus ring, so a jumped-to row ends up marked exactly like one
+  /// clicked into by hand.
+  ///
+  /// `rows` is in the dep list, not just the subscription: a request made
+  /// while the page was still fetching has no row to land on yet, and must
+  /// be retried once the rows arrive.
+  const rowsRef = useRef(rows);
+  // Written in a layout effect, never during render (same rule the
+  // onCommitRef/navRef pair below follows), and before the jump effect runs.
+  useLayoutEffect(() => {
+    rowsRef.current = rows;
+  });
+  useEffect(() => {
+    function tryJump() {
+      const current = rowsRef.current;
+      const productId = consumeQuickJump((id) =>
+        current.some((r) => r.product.id === id),
+      );
+      if (productId === null) return;
+      const row = current.find((r) => r.product.id === productId);
+      if (!row) return;
+
+      // Expanded before the scroll, not after: a collapsed category's rows
+      // are hidden, and scrolling to a hidden row lands nowhere.
+      setExpandedOverride((prev) =>
+        prev[row.product.category] ? prev : { ...prev, [row.product.category]: true },
+      );
+
+      // One frame later, so the row has been laid out at its real position.
+      requestAnimationFrame(() => {
+        const el = document.getElementById(`ae-stockgrid-row-${productId}`);
+        el?.scrollIntoView({ block: "center", behavior: "smooth" });
+        // Focusing the row's first editable cell pins RowGlowScroll's ring
+        // (its onFocus handler) and leaves the encoder ready to type. Read
+        // off the DOM rather than the column list: a read-only grid simply
+        // has no input to find, and the scroll alone is the whole gesture
+        // there.
+        const input = el?.querySelector<HTMLInputElement>("input[data-cell]");
+        input?.focus();
+        input?.select();
+      });
+    }
+    tryJump();
+    return subscribeQuickJump(tryJump);
+  }, [rows]);
+
   /// Quick Fill - copy the topmost row's value in this column down every
   /// other row currently in the grid. "Currently in the grid" matters: the
   /// page filters `rows` before handing them over, so a fill respects an
@@ -606,6 +657,189 @@ export function StockGrid({
     [],
   );
 
+  /**
+   * Ctrl+V of a spreadsheet selection, anchored at whichever cell has focus
+   * and flowing right across editable columns and down across visible rows.
+   *
+   * Listens on the <table> rather than each input: the paste event bubbles
+   * from the focused cell, so one handler covers every cell (including extra
+   * columns) and costs nothing per cell to attach.
+   *
+   * A 1x1 paste is deliberately left alone - no preventDefault - so pasting a
+   * single figure into a single cell still just fills the input and commits
+   * on blur, exactly as it always has, including the invalid/suspicious
+   * styling DraftCell applies while the draft is in progress.
+   */
+  function handlePaste(e: React.ClipboardEvent<HTMLTableElement>) {
+    if (readOnly || !onCommitMany) return;
+    const focused = document.activeElement;
+    const cell =
+      focused instanceof HTMLElement ? focused.getAttribute("data-cell") : null;
+    if (!cell) return;
+    // Column keys can themselves contain the separator (extra columns are
+    // "stockIn__x1"), so only the first colon splits off the product id.
+    const colon = cell.indexOf(":");
+    if (colon === -1) return;
+    const productId = Number(cell.slice(0, colon));
+    const key = cell.slice(colon + 1);
+    if (!Number.isFinite(productId)) return;
+
+    const text = e.clipboardData.getData("text/plain");
+    const grid = parseClipboardGrid(text);
+    if (grid.length === 0) return;
+    if (grid.length === 1 && grid[0].length === 1) return; // today's behavior
+
+    e.preventDefault();
+
+    // Display order, so a pasted block flows across extra columns exactly as
+    // it looks on screen. A main column holding extras is reported as
+    // non-editable *with* the reason, since its cell is the read-only sum.
+    const targetColumns: PasteTargetColumn[] = columns.flatMap((c) => {
+      const extras = addedOf(c.key);
+      return [
+        {
+          key: c.key,
+          label: c.label,
+          editable: isEditable(c),
+          hasExtraColumns: !!c.editable && extras.length > 0,
+        },
+        ...extras.map((slot) => ({
+          key: extraColumnKey(c.key, slot),
+          label: `${c.label} +${slot}`,
+          editable: true,
+        })),
+      ];
+    });
+
+    const plan = planPaste(
+      grid,
+      { productId, key },
+      rows.map((r) => ({ productId: r.product.id, name: r.product.name })),
+      targetColumns,
+      (id, k) => {
+        const row = rows.find((r) => r.product.id === id);
+        return row ? toNum(row.entry[k]) : undefined;
+      },
+    );
+
+    if (plan.tooLarge) {
+      showToast(
+        `That paste is ${plan.tooLarge.cells.toLocaleString()} cells - the limit is ${MAX_PASTE_CELLS}. Nothing was pasted.`,
+        "error",
+      );
+      return;
+    }
+
+    if (plan.edits.length === 0 && plan.skipped.length === 0) return;
+
+    // One call, so the whole paste is a single Ctrl+Z - stageMany takes a
+    // snapshot per call, not per cell.
+    if (plan.edits.length > 0) onCommitMany(plan.edits);
+
+    // Body stays a one-line summary; the per-cell reasons hang off its own
+    // tooltip, so a 40-skip paste explains itself without filling the screen.
+    // Carried on the toast itself rather than written onto the shared toast
+    // stack, so it disappears with the message it belongs to.
+    showToast(
+      describePasteResult(plan),
+      plan.edits.length === 0 ? "warning" : "success",
+      undefined,
+      describePasteSkips(plan) || undefined,
+    );
+  }
+
+  // Stable identity (the cells are memoized), so opening a menu never costs
+  // a re-render of the other several hundred cells.
+  const openCellMenu = useCallback(
+    (productId: number, key: string, x: number, y: number) =>
+      setCellMenu({ productId, colKey: key, x, y }),
+    [],
+  );
+
+  /// "Sweet A - Stocks In", the cell menu's heading.
+  function cellMenuTitle(productId: number, colKey: string): string {
+    const row = rows.find((r) => r.product.id === productId);
+    const label =
+      columns.find((c) => c.key === colKey)?.label ??
+      (() => {
+        const parsed = parseExtraColumnKey(colKey);
+        const main = parsed && columns.find((c) => c.key === parsed.mainKey);
+        return main ? `${main.label} +${parsed!.slot}` : colKey;
+      })();
+    return `${row?.product.name ?? "Row"} - ${label}`;
+  }
+
+  /**
+   * The editable cell's right-click menu.
+   *
+   * "View history" is always offered - an empty history is itself an answer,
+   * and hiding the item on rows that happen to have none would make the
+   * menu's shape depend on data the user can't see. "Set to 0" and "Copy
+   * value down" only appear when the page wired a batch handler, since
+   * without one there is nowhere to send the result.
+   */
+  function cellMenuItems(target: {
+    productId: number;
+    colKey: string;
+  }): ContextMenuItem[] {
+    const { productId, colKey } = target;
+    const row = rows.find((r) => r.product.id === productId);
+    const current = row ? toNum(row.entry[colKey]) : 0;
+
+    const items: ContextMenuItem[] = [
+      {
+        id: "history",
+        label: "View history",
+        run: () => {
+          if (!historyTable || !row) return;
+          setHistory({
+            x: cellMenu?.x ?? 0,
+            y: cellMenu?.y ?? 0,
+            table: historyTable,
+            recordId: recordIdOf(row),
+            colKey,
+            columnLabel: cellMenuTitle(productId, colKey),
+            productName: row.product.name,
+          });
+        },
+        disabled: !historyTable,
+        title: historyTable
+          ? undefined
+          : "This table doesn't keep a change history",
+      },
+    ];
+
+    if (onCommitMany) {
+      items.push({
+        id: "zero",
+        label: "Set to 0",
+        disabled: current === 0,
+        title: current === 0 ? "Already 0" : undefined,
+        run: () => onCommitMany([{ productId, key: colKey, value: 0 }]),
+      });
+      items.push({
+        id: "fill-down",
+        label: "Copy value down",
+        // Copies to every row BELOW this one in the current (filtered) view,
+        // which is the narrower, more predictable sibling of the header's
+        // own fill-down-from-the-top arrow.
+        disabled: rows.findIndex((r) => r.product.id === productId) >= rows.length - 1,
+        title: "Copy this value into every row below it",
+        run: () => {
+          const from = rows.findIndex((r) => r.product.id === productId);
+          if (from === -1) return;
+          onCommitMany(
+            rows
+              .slice(from + 1)
+              .map((r) => ({ productId: r.product.id, key: colKey, value: current })),
+          );
+        },
+      });
+    }
+
+    return items;
+  }
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>, productId: number, key: string) => {
       const { rowIds, colKeys } = navRef.current;
@@ -639,6 +873,7 @@ export function StockGrid({
         <table
           className="ae-table ae-table--sticky-id"
           style={{ minWidth: 720 }}
+          onPaste={handlePaste}
         >
           <thead>
             <tr>
@@ -908,6 +1143,7 @@ export function StockGrid({
                                 )}
                                 historyTable={historyTable}
                                 recordId={recordIdOf(row)}
+                                onCellMenu={openCellMenu}
                               />
                             </td>
                           );
@@ -946,6 +1182,7 @@ export function StockGrid({
                                   )}
                                   historyTable={historyTable}
                                   recordId={recordIdOf(row)}
+                                  onCellMenu={openCellMenu}
                                 />
                               </td>
                             ))}
@@ -1039,6 +1276,18 @@ export function StockGrid({
           onRemove={onRemoveExtraColumns}
           onClose={closeMenu}
         />
+      )}
+      {cellMenu && (
+        <ContextMenu
+          anchor={{ x: cellMenu.x, y: cellMenu.y }}
+          title={cellMenuTitle(cellMenu.productId, cellMenu.colKey)}
+          ariaLabel={`${cellMenuTitle(cellMenu.productId, cellMenu.colKey)} cell options`}
+          items={cellMenuItems(cellMenu)}
+          onClose={closeCellMenu}
+        />
+      )}
+      {history && (
+        <CellHistoryPopover target={history} onClose={closeHistory} />
       )}
     </>
   );

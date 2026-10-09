@@ -1,7 +1,31 @@
 import { Prisma, PrismaClient } from "@prisma/client";
 
-// Single shared Prisma client instance for the whole API process.
-export const prisma = new PrismaClient();
+/**
+ * Single shared Prisma client instance for the whole API process.
+ *
+ * CONNECTION POOL. Prisma sizes its pool as (physical CPUs * 2 + 1) unless
+ * told otherwise, and that default is set from the *container/VM* CPU count.
+ * On a small VPS sharing one MySQL server with anything else, several pm2
+ * restarts or a second service can add up to more connections than MySQL's
+ * own `max_connections` (151 by default) allows, and the symptom is
+ * "Too many connections" at the worst moment rather than a slow queue.
+ * Prisma takes this from the connection string, not from here, so it is set
+ * in DATABASE_URL - see .env.example:
+ *
+ *     DATABASE_URL="mysql://user:pass@host:3306/db?connection_limit=10&pool_timeout=20"
+ *
+ * LOGGING. Warnings and errors are always surfaced so a failing query cannot
+ * disappear silently. Full query logging is development-only: it prints every
+ * statement with its parameters, which on this schema means stock figures and
+ * usernames in the log, and it is far too noisy to leave on under real
+ * traffic.
+ */
+export const prisma = new PrismaClient({
+  log:
+    process.env.NODE_ENV === "production"
+      ? [{ emit: "stdout", level: "warn" }, { emit: "stdout", level: "error" }]
+      : [{ emit: "stdout", level: "warn" }, { emit: "stdout", level: "error" }, { emit: "event", level: "query" }],
+});
 
 /// A repository/service function that takes this as its last argument (a
 /// `Db`, defaulting to the shared `prisma` singleton) can run either

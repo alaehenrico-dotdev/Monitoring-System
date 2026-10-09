@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useAuth } from "../context/AuthContext";
 import { useNavDrawer } from "../context/NavDrawerContext";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
+import { findAllUnsavedWork } from "../utils/unsavedWork";
 import { sidebarSpring } from "../motion";
 
 const PANEL_WIDTH = 256;
@@ -22,6 +25,31 @@ const PANEL_BOTTOM_MARGIN = 16;
 export function Sidebar() {
   const { user, logout } = useAuth();
   const { open, anchor, close } = useNavDrawer();
+  // Staged edits found when the confirm opened. Snapshotted rather than read
+  // during render: it's a sessionStorage scan, and it must describe the
+  // moment the user asked to log out, not re-run on every re-render.
+  const [pendingLogout, setPendingLogout] = useState<
+    ReturnType<typeof findAllUnsavedWork> | null
+  >(null);
+
+  /// Logging out used to be instant and irreversible from the pointer's
+  /// point of view - one mis-click on a panel opened to read the app version
+  /// ended the session, and on these pages that can mean abandoning a
+  /// half-encoded shift. The confirm step names what would be lost.
+  function requestLogout() {
+    setPendingLogout(findAllUnsavedWork());
+  }
+
+  function confirmLogout() {
+    // Staged edits live in sessionStorage, which logout() does not touch -
+    // so without this they would be waiting in the grid for whoever logs in
+    // next on this browser, under their name. The user has just been told
+    // these will be discarded, so discard them.
+    clearAllPendingEntryState();
+    setPendingLogout(null);
+    close();
+    logout();
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -125,7 +153,7 @@ export function Sidebar() {
               </div>
 
               <button
-                onClick={logout}
+                onClick={requestLogout}
                 title="Log out"
                 style={{
                   width: "auto",
@@ -165,6 +193,45 @@ export function Sidebar() {
           Ala Eh Stocks Monitoring System · v{__APP_VERSION__}
         </div>
       </motion.div>
+
+      {pendingLogout && (
+        <ConfirmDialog
+          title="Log out?"
+          confirmLabel="Log out"
+          onConfirm={confirmLogout}
+          onCancel={() => setPendingLogout(null)}
+        >
+          {pendingLogout.length === 0 ? (
+            <p style={{ margin: 0 }}>
+              You&rsquo;ll need to sign in again to continue encoding.
+            </p>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 10px" }}>
+                You have unsaved work. Logging out{" "}
+                <strong>discards</strong> it:
+              </p>
+              <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
+                {pendingLogout.map((item) => (
+                  <li
+                    key={`${item.page}-${item.date}-${item.shift}-${item.location ?? ""}`}
+                    style={{ marginBottom: 2 }}
+                  >
+                    <strong>{item.page}</strong>
+                    {item.location ? ` (${item.location})` : ""} &mdash;{" "}
+                    {item.count} product{item.count === 1 ? "" : "s"} on{" "}
+                    {item.date} {item.shift}
+                  </li>
+                ))}
+              </ul>
+              <p style={{ margin: 0 }}>
+                Cancel and use <strong>Save</strong> on those pages first if
+                you want to keep them.
+              </p>
+            </>
+          )}
+        </ConfirmDialog>
+      )}
     </>
   );
 }

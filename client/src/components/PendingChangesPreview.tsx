@@ -6,9 +6,16 @@ import { colors } from "../theme";
 /// batch of changes over before Save actually submits them.
 export function PendingChangesPreview({
   items,
+  showTotal = false,
 }: {
   items: PendingChangeDetail[];
+  /// Adds a pinned Total row (changes count, summed old/new values) - used by
+  /// the CSV Review Import dialog so a whole file can be sanity-checked at a
+  /// glance before it is saved.
+  showTotal?: boolean;
 }) {
+  const totalOld = items.reduce((sum, i) => sum + i.oldValue, 0);
+  const totalNew = items.reduce((sum, i) => sum + i.newValue, 0);
   if (items.length === 0) {
     return (
       <p style={{ margin: 0, color: colors.subtleInk, fontSize: 13 }}>
@@ -60,6 +67,46 @@ export function PendingChangesPreview({
             </tr>
           ))}
         </tbody>
+        {showTotal && (
+          <tfoot>
+            <tr>
+              <td
+                colSpan={3}
+                style={{
+                  textAlign: "left",
+                  fontWeight: 700,
+                  color: colors.ink,
+                  position: "sticky",
+                  bottom: 0,
+                  background: colors.paperAlt,
+                }}
+              >
+                Total ({items.length} change{items.length === 1 ? "" : "s"})
+              </td>
+              <td
+                style={{
+                  fontWeight: 700,
+                  position: "sticky",
+                  bottom: 0,
+                  background: colors.paperAlt,
+                }}
+              >
+                {totalOld.toLocaleString()}
+              </td>
+              <td
+                style={{
+                  fontWeight: 700,
+                  color: colors.yellow,
+                  position: "sticky",
+                  bottom: 0,
+                  background: colors.paperAlt,
+                }}
+              >
+                {totalNew.toLocaleString()}
+              </td>
+            </tr>
+          </tfoot>
+        )}
       </table>
     </div>
   );
