@@ -7,6 +7,7 @@ import {
 } from "react";
 import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
+import { importHistoryCsv } from "../utils/importHistoryCsv";
 import {
   categoryKey,
   findHeaderRowIndex,
@@ -1390,6 +1391,24 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>
                 No imports recorded yet.
               </p>
+            )}
+            {historyBatches && historyBatches.length > 0 && (
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    downloadCsv(
+                      `import-history-${new Date().toISOString().slice(0, 10)}.csv`,
+                      importHistoryCsv(historyBatches),
+                    )
+                  }
+                  title="Download this list as a CSV file"
+                >
+                  Download CSV
+                </Button>
+              </div>
             )}
             {historyBatches && historyBatches.length > 0 && (
               <div

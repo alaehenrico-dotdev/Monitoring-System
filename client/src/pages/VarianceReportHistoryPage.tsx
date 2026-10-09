@@ -1,4 +1,4 @@
-import { ReportHistoryPage } from "../components/ReportHistoryPage";
+import { ReportHistoryPage } from "./ReportHistoryPage";
 
 export function VarianceReportHistoryPage() {
   return (

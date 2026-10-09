@@ -554,3 +554,14 @@ export function LockIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+/// Publish: an arrow leaving a tray (a count released to the next shift).
+export function PublishIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M8 10.5V2.5" />
+      <path d="M5 5.5l3-3 3 3" />
+      <path d="M2.5 9.5v2.75c0 .69.56 1.25 1.25 1.25h8.5c.69 0 1.25-.56 1.25-1.25V9.5" />
+    </svg>
+  );
+}

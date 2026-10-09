@@ -3,6 +3,7 @@ import { userRepository } from "../repositories/userRepository";
 import { signToken } from "../utils/jwt";
 import { HttpError } from "../utils/HttpError";
 import { env } from "../config/env";
+import { logSystemEvent } from "./changeLog.service";
 
 /**
  * A real bcrypt hash of a value nobody can log in with, compared against
@@ -24,7 +25,7 @@ import { env } from "../config/env";
  */
 const DUMMY_HASH = bcrypt.hashSync("password-that-matches-no-account", 10);
 
-export async function login(username: string, password: string) {
+export async function login(username: string, password: string, ip?: string) {
   const user = await userRepository.findByUsername(username);
 
   // Always spend the bcrypt cost, even on a miss or a deactivated account,
@@ -35,10 +36,14 @@ export async function login(username: string, password: string) {
   // Checked only after the comparison above, so an inactive account is not
   // distinguishable from a wrong password by timing either.
   if (!user || !user.isActive || !valid) {
+    // Only the attempted username and the address - never the password. Kept
+    // short so a junk username cannot bloat the log.
+    await logSystemEvent("login_failed", { username: username.slice(0, 64), ip: ip ?? null });
     throw HttpError.unauthorized("Invalid username or password");
   }
 
   const authUser = { id: user.id, username: user.username, name: user.name, role: user.role };
   const token = signToken(authUser, env.jwtExpiresIn);
+  await logSystemEvent("login", { username: user.username, ip: ip ?? null }, user.id);
   return { token, user: authUser };
 }

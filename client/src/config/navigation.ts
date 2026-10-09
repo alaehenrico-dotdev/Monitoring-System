@@ -51,6 +51,11 @@ export const navGroups: NavGroup[] = [
         roles: ["SUPERVISOR_ADMIN"],
       },
       {
+        to: "/variance-ledger",
+        label: "Variance Ledger",
+        roles: ["SUPERVISOR_ADMIN"],
+      },
+      {
         to: "/daily-report",
         label: "Daily Report",
         roles: ["SUPERVISOR_ADMIN"],

@@ -16,12 +16,21 @@ import { RowGlowScroll } from "./RowGlowScroll";
 import { NumberCellInput } from "./ui";
 import { ChevronIcon } from "./icons";
 import { ColumnHeaderMenu, type ColumnMenuTarget } from "./ColumnHeaderMenu";
+import {
+  CategoryColorMenu,
+  type CategoryMenuTarget,
+} from "./CategoryColorMenu";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import {
   CellHistoryPopover,
   type CellHistoryTarget,
 } from "./CellHistoryPopover";
 import { extraColumnKey, parseExtraColumnKey } from "../hooks/useExtraColumns";
+import {
+  inkFor,
+  useCategoryColors,
+  useColumnColors,
+} from "../hooks/useColumnColors";
 import {
   describeWhen,
   fetchCellHistory,
@@ -132,7 +141,8 @@ function tintLayer(color: string): CSSProperties {
   const tint = `color-mix(in srgb, ${color} 22%, transparent)`;
   return { backgroundImage: `linear-gradient(${tint}, ${tint})` };
 }
-function tintFor(col: GridColumn): CSSProperties | undefined {
+function tintFor(col: GridColumn, custom?: string): CSSProperties | undefined {
+  if (custom) return tintLayer(custom);
   return col.tone ? columnTintStyle[col.tone] : undefined;
 }
 
@@ -218,6 +228,12 @@ interface StockGridProps {
    *  and headers keep the browser's own context menu. */
   onAddExtraColumns?: (mainKey: string, count: number) => void;
   onRemoveExtraColumns?: (mainKey: string, slots: number[]) => void;
+  /**
+   * Namespaces the header colors picked from the same right-click menu
+   * (hooks/useColumnColors.ts) - "online" and "offline" share column keys,
+   * so without it a color picked on one sheet would paint the other.
+   */
+  colorScope?: string;
 }
 
 /// Rows the grid renders are the API's, which carry the database row id for
@@ -270,7 +286,9 @@ function useCellHistoryTitle(
         setTitle("No recorded changes to this cell");
         return;
       }
-      setTitle(`Last changed by ${hit.who ?? "Unknown user"} - ${describeWhen(hit.changedAt)}`);
+      setTitle(
+        `Last changed by ${hit.who ?? "Unknown user"} - ${describeWhen(hit.changedAt)}`,
+      );
     });
     return () => {
       cancelled = true;
@@ -389,7 +407,10 @@ const DraftCell = memo(function DraftCell({
         // Shift+F10 and the dedicated ContextMenu key are the platform
         // conventions for "open the context menu for what's focused" - the
         // same pair the column headers already answer to.
-        if (onCellMenu && (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey))) {
+        if (
+          onCellMenu &&
+          (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey))
+        ) {
           e.preventDefault();
           const r = e.currentTarget.getBoundingClientRect();
           onCellMenu(productId, colKey, r.left, r.bottom);
@@ -437,6 +458,7 @@ export function StockGrid({
   extraColumns,
   onAddExtraColumns,
   onRemoveExtraColumns,
+  colorScope = "grid",
 }: StockGridProps) {
   // Explicit expand/collapse choices, keyed by category name - absent means
   // "no choice made yet", which defaults to collapsed (below), not expanded.
@@ -473,6 +495,27 @@ export function StockGrid({
   // grid (Daily Report) leaves the browser's own context menu alone.
   const canAddColumns =
     !readOnly && !!onAddExtraColumns && !!onRemoveExtraColumns;
+  // Header colors picked from the right-click menu (per browser, see
+  // hooks/useColumnColors.ts). A pick overrides the column's `tone`; resetting
+  // it falls back to the tone, or to no color at all for an untoned column.
+  const { getColor, setColor } = useColumnColors(colorScope);
+  const colorOf = (col: GridColumn): string | undefined =>
+    getColor(col.key) ?? (col.tone ? TONE_COLOR[col.tone] : undefined);
+  const headerStyleFor = (col: GridColumn): CSSProperties | undefined => {
+    const c = colorOf(col);
+    return c ? { background: c, color: inkFor(c) } : undefined;
+  };
+  const tint = (col: GridColumn) => tintFor(col, getColor(col.key));
+  // Category header rows get the same treatment from their own right-click
+  // menu: a pick replaces the default bar color for that category.
+  const { getColor: getCategoryColor, setColor: setCategoryColor } =
+    useCategoryColors(colorScope);
+  const [catMenu, setCatMenu] = useState<CategoryMenuTarget | null>(null);
+  const closeCatMenu = useCallback(() => setCatMenu(null), []);
+  const categoryStyleFor = (category: string): CSSProperties | undefined => {
+    const c = getCategoryColor(category);
+    return c ? { background: c, color: inkFor(c) } : undefined;
+  };
   /// A main column holding added columns is their read-only total, so its own
   /// cell stops being an input - the sum is what Remaining Stock, the
   /// subtotals and the % column all go on reading.
@@ -505,6 +548,8 @@ export function StockGrid({
       x,
       y,
       added: addedOf(col.key),
+      color: colorOf(col),
+      customColor: getColor(col.key) !== undefined,
     });
   }
 
@@ -581,7 +626,9 @@ export function StockGrid({
       // Expanded before the scroll, not after: a collapsed category's rows
       // are hidden, and scrolling to a hidden row lands nowhere.
       setExpandedOverride((prev) =>
-        prev[row.product.category] ? prev : { ...prev, [row.product.category]: true },
+        prev[row.product.category]
+          ? prev
+          : { ...prev, [row.product.category]: true },
       );
 
       // One frame later, so the row has been laid out at its real position.
@@ -823,7 +870,8 @@ export function StockGrid({
         // Copies to every row BELOW this one in the current (filtered) view,
         // which is the narrower, more predictable sibling of the header's
         // own fill-down-from-the-top arrow.
-        disabled: rows.findIndex((r) => r.product.id === productId) >= rows.length - 1,
+        disabled:
+          rows.findIndex((r) => r.product.id === productId) >= rows.length - 1,
         title: "Copy this value into every row below it",
         run: () => {
           const from = rows.findIndex((r) => r.product.id === productId);
@@ -831,7 +879,11 @@ export function StockGrid({
           onCommitMany(
             rows
               .slice(from + 1)
-              .map((r) => ({ productId: r.product.id, key: colKey, value: current })),
+              .map((r) => ({
+                productId: r.product.id,
+                key: colKey,
+                value: current,
+              })),
           );
         },
       });
@@ -885,7 +937,7 @@ export function StockGrid({
                     tabIndex={canAddColumns && c.editable ? 0 : undefined}
                     title={
                       canAddColumns && c.editable
-                        ? `Right-click to add or remove extra ${c.label} columns`
+                        ? `Right-click to add or remove extra ${c.label} columns, or change its color`
                         : undefined
                     }
                     onContextMenu={
@@ -913,7 +965,7 @@ export function StockGrid({
                           }
                         : undefined
                     }
-                    style={c.tone ? columnToneStyle[c.tone] : undefined}
+                    style={headerStyleFor(c)}
                   >
                     {c.label}
                     {canQuickFill && isEditable(c) && rows.length > 1 && (
@@ -933,7 +985,7 @@ export function StockGrid({
                       key={extraColumnKey(c.key, slot)}
                       className={extraCellClass(i)}
                       style={{
-                        ...(c.tone ? columnToneStyle[c.tone] : undefined),
+                        ...headerStyleFor(c),
                         minWidth: 96,
                         // Dropped so the name input fills the cell edge to
                         // edge, same as the fixed Delivery headers it replaces.
@@ -1037,6 +1089,15 @@ export function StockGrid({
                               : `Collapse ${category}`
                         }
                         className="ae-cat-toggle"
+                        style={categoryStyleFor(category)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setCatMenu({
+                            category,
+                            x: e.clientX,
+                            y: e.clientY,
+                          });
+                        }}
                       >
                         <span className="ae-cat-label">
                           <span
@@ -1120,13 +1181,13 @@ export function StockGrid({
                               }
                               style={{
                                 ...(isEditable(col) ? undefined : lockedStyle),
-                                ...tintFor(col),
+                                ...tint(col),
                               }}
                             >
                               {formatted.text}
                             </td>
                           ) : (
-                            <td key={col.key} style={tintFor(col)}>
+                            <td key={col.key} style={tint(col)}>
                               <DraftCell
                                 productId={row.product.id}
                                 colKey={col.key}
@@ -1164,7 +1225,7 @@ export function StockGrid({
                               <td
                                 key={key}
                                 className={extraCellClass(i)}
-                                style={tintFor(col)}
+                                style={tint(col)}
                               >
                                 <DraftCell
                                   productId={row.product.id}
@@ -1207,12 +1268,12 @@ export function StockGrid({
                       );
                       return (
                         <Fragment key={col.key}>
-                          <td style={tintFor(col)}>{sum.toLocaleString()}</td>
+                          <td style={tint(col)}>{sum.toLocaleString()}</td>
                           {trailingKeys(col).map((key, i) => (
                             <td
                               key={key}
                               className={extraCellClass(i)}
-                              style={tintFor(col)}
+                              style={tint(col)}
                             >
                               {groupRows
                                 .reduce(
@@ -1240,7 +1301,7 @@ export function StockGrid({
               </td>
               {columns.map((col) => (
                 <Fragment key={col.key}>
-                  <td style={tintFor(col)}>
+                  <td style={tint(col)}>
                     {rows
                       .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
                       .toLocaleString()}
@@ -1249,7 +1310,7 @@ export function StockGrid({
                     <td
                       key={key}
                       className={extraCellClass(i)}
-                      style={tintFor(col)}
+                      style={tint(col)}
                     >
                       {rows
                         .reduce((sum, r) => sum + toNum(r.entry[key]), 0)
@@ -1274,7 +1335,17 @@ export function StockGrid({
           target={menu}
           onAdd={onAddExtraColumns}
           onRemove={onRemoveExtraColumns}
+          onColorChange={setColor}
           onClose={closeMenu}
+        />
+      )}
+      {catMenu && (
+        <CategoryColorMenu
+          target={catMenu}
+          color={getCategoryColor(catMenu.category)}
+          customColor={getCategoryColor(catMenu.category) !== undefined}
+          onColorChange={setCategoryColor}
+          onClose={closeCatMenu}
         />
       )}
       {cellMenu && (

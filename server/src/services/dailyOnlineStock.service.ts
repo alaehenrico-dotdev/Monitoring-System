@@ -203,7 +203,7 @@ export async function saveOnlineEntry(
   // the extras ride along as extra fields on the same before/after snapshots,
   // which is also what makes the grid's per-cell history work for an added
   // column's cell without any special casing.
-  await recordChange(
+  const changeId = await recordChange(
     {
       tableName: TABLE,
       recordId: saved.id,
@@ -232,8 +232,8 @@ export async function saveOnlineEntry(
   // A correction to this period changes the next saved Online opening
   // balance. Transfers are mirrored to Offline in this same transaction,
   // so propagate that side too before the transaction commits.
-  await propagateOpeningStock(productId, entryDate, shift, "ONLINE", userId, db);
-  await propagateOpeningStock(productId, entryDate, shift, "OFFLINE", userId, db);
+  await propagateOpeningStock(productId, entryDate, shift, "ONLINE", userId, db, changeId);
+  await propagateOpeningStock(productId, entryDate, shift, "OFFLINE", userId, db, changeId);
 
   // Not broadcast here - the `!db` branch above does it once the transaction
   // that wraps this whole function has actually committed. A caller that

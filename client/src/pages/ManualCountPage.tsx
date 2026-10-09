@@ -1,11 +1,19 @@
 import {
   Fragment,
   useEffect,
+  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
 } from "react";
-import { getManualCountGrid, saveManualCount } from "../api/manualCounts";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  CategoryColorMenu,
+  type CategoryMenuTarget,
+} from "../components/CategoryColorMenu";
+import { inkFor, useCategoryColors } from "../hooks/useColumnColors";
+import { getManualCountGrid, publishManualCounts, saveManualCount } from "../api/manualCounts";
+import { recordReportHistory } from "../api/reportHistory";
 import type {
   ManualCountEntry,
   ManualCountGridRow,
@@ -26,10 +34,25 @@ import { SearchInput } from "../components/SearchInput";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { ShiftFilter } from "../components/ShiftFilter";
 import { StockSourceFilter } from "../components/StockSourceFilter";
-import { ChevronIcon, PrinterIcon, SaveIcon } from "../components/icons";
+import {
+  ChevronIcon,
+  ClearIcon,
+  CollapseAllIcon,
+  ExpandAllIcon,
+  HistoryIcon,
+  PrinterIcon,
+  ReportIcon,
+  SaveIcon,
+  UndoIcon,
+  PublishIcon,
+} from "../components/icons";
+import { ConfirmDialog } from "../components/ConfirmDialog";
+import { VarianceDetails } from "../components/VarianceDetails";
+import { Dropdown } from "../components/Dropdown";
 import { Modal } from "../components/Modal";
 import { LoadingOverlay } from "../components/Spinner";
 import { matchesSearch } from "../utils/search";
+import { planCountPaste } from "../utils/manualCountPaste";
 import {
   draftAction,
   isRealChange as isRealDraftChange,
@@ -44,7 +67,10 @@ import { TableSkeleton } from "../components/Skeleton";
 import type { Shift } from "../types";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
+import { useUndoRedoKeys } from "../hooks/useGridView";
+import { useAuth } from "../context/AuthContext";
 import { useTopProgress } from "../hooks/useTopProgress";
+import type { ToastVariant } from "../components/Toast";
 
 /// The two places stock is physically counted. Both are entered on this one
 /// page; each is still stored (and its variance computed) per location.
@@ -92,6 +118,16 @@ function toNum(v: number | string | null | undefined): number {
 
 type Drafts = Record<CountLocation, Record<number, string>>;
 
+/// What an undo step restores: the staged counts and which CSV import batch
+/// each one came from.
+interface DraftSnapshot {
+  drafts: Drafts;
+  batches: Record<CountLocation, Record<number, number>>;
+}
+const HISTORY_LIMIT = 100;
+const sameSnapshot = (a: DraftSnapshot, b: DraftSnapshot) =>
+  JSON.stringify(a) === JSON.stringify(b);
+
 /// Same sessionStorage pattern as usePendingEntryChanges (Online/Offline
 /// Entry) - see that file for the fuller rationale. One key per location
 /// (same key shape as before, so utils/unsavedWork.ts still finds them).
@@ -117,6 +153,9 @@ interface AuditRow {
   product: ManualCountGridRow["product"];
   entries: Record<CountLocation, ManualCountEntry>;
   saved: Record<CountLocation, boolean>;
+  /// Opening stock that does not match what the previous period carries
+  /// forward (see ManualCountGridRow.openingBreak), per location.
+  breaks: Record<CountLocation, { expected: number; actual: number } | null>;
 }
 
 interface Figures {
@@ -137,18 +176,49 @@ export function ManualCountPage() {
   // Date and shift default together (see getCurrentShiftAndDate) - Night
   // crosses midnight, so they can't be defaulted independently without
   // risking a wrong-day shift right after 12am.
-  const [{ date, shift }, setDateShift] = useState(getCurrentShiftAndDate);
+  // Opened from Audit History (/audit-history): that link carries the date,
+  // shift and source of the sheet to rebuild, which seed the state below and
+  // trigger the PDF once the counts have loaded (same as the report pages).
+  const [searchParams] = useSearchParams();
+  const openedFromHistory = searchParams.get("history") === "1";
+  const printAfterLoad = useRef(openedFromHistory);
+  const [{ date, shift }, setDateShift] = useState<{
+    date: string;
+    shift: Shift;
+  }>(() => {
+    const now = getCurrentShiftAndDate();
+    const d = searchParams.get("date") ?? "";
+    const s = searchParams.get("shift");
+    if (!openedFromHistory || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return now;
+    return { date: d, shift: s === "MORNING" || s === "NIGHT" ? s : now.shift };
+  });
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
   const setShift = (s: Shift) =>
     setDateShift((prev) => ({ ...prev, shift: s }));
   // Which location(s) the table shows/edits: "TOTAL" = both.
-  const [sourceFilter, setSourceFilter] = useState<StockLocation>("TOTAL");
+  const [sourceFilter, setSourceFilter] = useState<StockLocation>(() => {
+    const src = searchParams.get("source");
+    return openedFromHistory &&
+      (src === "ONLINE" || src === "OFFLINE" || src === "TOTAL")
+      ? src
+      : "TOTAL";
+  });
   // Which location a CSV import goes into when the filter shows both.
   const [importLocation, setImportLocation] = useState<CountLocation>("ONLINE");
   const csvLocation: CountLocation =
     sourceFilter === "TOTAL" ? importLocation : sourceFilter;
   const showOffline = sourceFilter !== "ONLINE";
   const showOnline = sourceFilter !== "OFFLINE";
+  /// The reason(s) recorded for a row in the locations on screen.
+  const remarksOf = (r: AuditRow): string =>
+    visibleLocations
+      .map((l) => r.entries[l].remarks?.trim())
+      .filter((t): t is string => !!t)
+      .join(" / ");
+  const visibleLocations: CountLocation[] = [
+    ...(showOffline ? (["OFFLINE"] as const) : []),
+    ...(showOnline ? (["ONLINE"] as const) : []),
+  ];
 
   const [gridRows, setGridRows] = useState<Record<
     CountLocation,
@@ -179,9 +249,41 @@ export function ManualCountPage() {
     Record<CountLocation, Record<number, number>>
   >({ ONLINE: {}, OFFLINE: {} });
   const [error, setError] = useState<string | null>(null);
+  // Result of a paste or a Zero all - a short timed toast, unlike `error`
+  // (which stays until dismissed).
+  const [notice, setNotice] = useState<{
+    message: string;
+    detail?: string;
+    variant: ToastVariant;
+  } | null>(null);
+  // Right-click a category row to recolor it (per browser, purely visual).
+  const { getColor: getCategoryColor, setColor: setCategoryColor } =
+    useCategoryColors("audit");
+  const [catMenu, setCatMenu] = useState<CategoryMenuTarget | null>(null);
   const [zoom, setZoom] = useZoom("manual-count");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  // Which rows the grid shows: everything, only counts with a non-zero
+  // variance, or only the ones staged but not yet saved.
+  const [rowFilter, setRowFilter] = useState<"all" | "flagged" | "changed">(
+    "all",
+  );
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [publishing, setPublishing] = useState(false);
+  // Publishing is the supervisor's approval step; encoders see the state only.
+  const canPublish = useAuth().user?.role === "SUPERVISOR_ADMIN";
+  // Undo / redo over the staged (unsaved) counts. A step is one cell edit (all
+  // the keystrokes between focusing a count and leaving it), one Zero all, one
+  // paste or one Clear - whole-sheet snapshots, so any of them undoes cleanly.
+  // Not persisted: like any undo stack it belongs to this editing session.
+  const [past, setPast] = useState<DraftSnapshot[]>([]);
+  const [future, setFuture] = useState<DraftSnapshot[]>([]);
+  // Whether the cell being edited has already put its step on the stack.
+  const editStepPushed = useRef(false);
+  // The product whose Variance details panel is open.
+  const [detailsProductId, setDetailsProductId] = useState<number | null>(null);
+  const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   // Real per-item percent for LoadingOverlay's ring (see handleSaveAll) - same
   // overlay Online/Offline Entry and CSV import use, so all saves look alike.
@@ -196,6 +298,9 @@ export function ManualCountPage() {
     // staged (still there if switched back to) and the one being loaded
     // picks up whatever it already had staged.
     setDrafts(loadDrafts(date, shift));
+    // A different sheet: its edits are not reachable from this one's history.
+    setPast([]);
+    setFuture([]);
   });
   useEffect(() => {
     Promise.all([
@@ -269,6 +374,108 @@ export function ManualCountPage() {
       else delete locMap[productId];
       return { ...prev, [loc]: locMap };
     });
+  }
+
+  /// Stages many counts at once (paste, Zero all). Like a typed count, each
+  /// is only a draft until Save, and it detaches the cell from any CSV import
+  /// batch it came from (a hand edit must never be reverted with the import).
+  function setDraftMany(
+    edits: { loc: CountLocation; productId: number; value: string }[],
+  ) {
+    if (edits.length === 0) return;
+    setDrafts((d) => {
+      const next: Drafts = { ONLINE: { ...d.ONLINE }, OFFLINE: { ...d.OFFLINE } };
+      for (const e of edits) next[e.loc][e.productId] = e.value;
+      return next;
+    });
+    setImportedBatchByProduct((prev) => {
+      const next = { ONLINE: { ...prev.ONLINE }, OFFLINE: { ...prev.OFFLINE } };
+      for (const e of edits) delete next[e.loc][e.productId];
+      return next;
+    });
+  }
+
+  const snapshot = (): DraftSnapshot => ({ drafts, batches: importedBatchByProduct });
+
+  /// Records the state about to be replaced, so Undo can put it back. A new
+  /// edit also discards whatever had been undone (the usual undo-stack rule).
+  function pushHistory() {
+    setPast((p) => [...p, snapshot()].slice(-HISTORY_LIMIT));
+    setFuture([]);
+  }
+
+  function undo() {
+    const current = snapshot();
+    // Skip steps that would change nothing (an edit that ended where it began).
+    let i = past.length - 1;
+    while (i >= 0 && sameSnapshot(past[i], current)) i--;
+    if (i < 0) {
+      setPast([]);
+      return;
+    }
+    const previous = past[i];
+    setPast(past.slice(0, i));
+    setFuture((f) => [current, ...f].slice(0, HISTORY_LIMIT));
+    setDrafts(previous.drafts);
+    setImportedBatchByProduct(previous.batches);
+  }
+
+  function redo() {
+    const next = future[0];
+    if (!next) return;
+    setFuture((f) => f.slice(1));
+    setPast((p) => [...p, snapshot()].slice(-HISTORY_LIMIT));
+    setDrafts(next.drafts);
+    setImportedBatchByProduct(next.batches);
+  }
+  // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y while not typing in a field.
+  useUndoRedoKeys(undo, redo, !saving);
+
+  /// When a cell is left, a draft that changes nothing (a cleared 0, or the
+  /// saved figure retyped) is dropped so the cell shows what is saved again
+  /// instead of sitting blank while Save says there is nothing to save.
+  function settleDraft(loc: CountLocation, productId: number) {
+    const draft = drafts[loc][productId];
+    if (draft === undefined || isRealChange(loc, productId, draft)) return;
+    setDrafts((d) => {
+      const next = { ...d[loc] };
+      delete next[productId];
+      return { ...d, [loc]: next };
+    });
+  }
+
+  /// Discards every staged-but-unsaved count on this sheet (both locations).
+  /// Releases this sheet's saved counts to the next shift's opening stock.
+  async function handlePublish() {
+    setPublishing(true);
+    setError(null);
+    try {
+      const { published } = await publishManualCounts(date, shift);
+      setShowPublishConfirm(false);
+      setNotice({
+        message: `Published ${published} count${published === 1 ? "" : "s"} - they are now the next shift's opening stock`,
+        variant: "success",
+      });
+      // The server broadcasts the change; re-read now so the badge and button
+      // do not wait for it.
+      const [ONLINE, OFFLINE] = await Promise.all([
+        getManualCountGrid(date, shift, "ONLINE"),
+        getManualCountGrid(date, shift, "OFFLINE"),
+      ]);
+      setGridRows({ ONLINE, OFFLINE });
+    } catch (e) {
+      setShowPublishConfirm(false);
+      setError(e instanceof Error ? e.message : "Could not publish");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  function clearDrafts() {
+    pushHistory();
+    setDrafts({ ONLINE: {}, OFFLINE: {} });
+    setImportedBatchByProduct({ ONLINE: {}, OFFLINE: {} });
+    setShowClearConfirm(false);
   }
 
   // Typing a count only stages a local draft (see the input's onChange
@@ -360,6 +567,9 @@ export function ManualCountPage() {
       for (const s of succeeded) delete next[s.loc][s.productId];
       return next;
     });
+    // What was staged is now (mostly) saved, so earlier steps no longer apply.
+    setPast([]);
+    setFuture([]);
     setSaving(false);
     setShowConfirm(false);
     if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
@@ -396,6 +606,7 @@ export function ManualCountPage() {
             },
           },
           saved: { ONLINE: on.isSaved, OFFLINE: off?.isSaved ?? false },
+          breaks: { ONLINE: on.openingBreak ?? null, OFFLINE: off?.openingBreak ?? null },
         };
       })
     : null;
@@ -435,6 +646,12 @@ export function ManualCountPage() {
       variance,
     };
   }
+  const hasStagedCount = (r: AuditRow) =>
+    COUNT_LOCATIONS.some(
+      (loc) =>
+        drafts[loc][r.product.id] !== undefined &&
+        isRealChange(loc, r.product.id, drafts[loc][r.product.id]),
+    );
   const isFlagged = (r: AuditRow) => {
     const v = liveFigures(r).variance;
     return v !== null && v !== 0;
@@ -472,6 +689,12 @@ export function ManualCountPage() {
       }),
   );
   const flaggedCount = auditRows?.filter(isFlagged).length ?? 0;
+  // Saved counts on this sheet, across both locations whatever the view shows:
+  // publishing releases the whole sheet, not just what is on screen.
+  const savedCounts = COUNT_LOCATIONS.flatMap((loc) =>
+    (gridRows?.[loc] ?? []).filter((r) => r.isSaved),
+  );
+  const unpublishedCount = savedCounts.filter((r) => !r.entry.publishedAt).length;
 
   // Nulls (not yet counted) export as blank cells rather than "0", which
   // would misleadingly read as a confirmed zero count.
@@ -493,7 +716,9 @@ export function ManualCountPage() {
         [r.product.sku, r.product.name, r.product.category],
         query,
       ) &&
-      (categoryFilter === "" || r.product.category === categoryFilter),
+      (categoryFilter === "" || r.product.category === categoryFilter) &&
+      (rowFilter === "all" ||
+        (rowFilter === "flagged" ? isFlagged(r) : hasStagedCount(r))),
   );
   // Grouped the same way as StockGrid/TotalStocksTable, for the same
   // collapsible-category treatment.
@@ -504,6 +729,14 @@ export function ManualCountPage() {
     groupedRows.set(r.product.category, list);
   }
   const visibleProductIds = (visibleRows ?? []).map((r) => r.product.id);
+  // Categories holding a staged count stay open whatever this says (see
+  // `hasPending` in the table), so "collapse all" hides only what is safe to.
+  const anyExpanded = [...groupedRows.keys()].some((c) => expandedOverride[c]);
+  function setAllExpanded(expanded: boolean) {
+    setExpandedOverride(
+      Object.fromEntries([...groupedRows.keys()].map((c) => [c, expanded])),
+    );
+  }
 
   // Column order: the count inputs, then their Total, then Variance last.
   const headers = [
@@ -514,6 +747,7 @@ export function ManualCountPage() {
     ...(showOnline ? ["Online Count"] : []),
     "Total Count",
     "Variance",
+    "Remarks",
   ];
   const columnCount = headers.length;
 
@@ -544,9 +778,81 @@ export function ManualCountPage() {
     }
   }
 
+  /// Zero all: stage a count of 0 in every visible location column for every
+  /// row of one category - a product line that simply wasn't stocked. Goes
+  /// through the usual draft/Save step, so nothing is written until confirmed.
+  function zeroCategory(category: string) {
+    const ids = (groupedRows.get(category) ?? []).map((r) => r.product.id);
+    const locs = COUNT_LOCATIONS.filter((l) =>
+      l === "ONLINE" ? showOnline : showOffline,
+    );
+    pushHistory();
+    setDraftMany(
+      ids.flatMap((productId) =>
+        locs.map((loc) => ({ loc, productId, value: "0" })),
+      ),
+    );
+    setNotice({
+      message: `${category}: ${ids.length * locs.length} count${ids.length * locs.length === 1 ? "" : "s"} set to 0 (not saved yet)`,
+      variant: "info",
+    });
+  }
+
+  /// Ctrl+V of a spreadsheet block, anchored at the focused count cell (see
+  /// utils/manualCountPaste.ts). A single cell is left to the browser.
+  function handlePaste(e: React.ClipboardEvent<HTMLTableElement>) {
+    const cell =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement.getAttribute("data-cell")
+        : null;
+    const m = cell ? /^manual-count-(ONLINE|OFFLINE)-(\d+)$/.exec(cell) : null;
+    if (!m) return;
+    const outcome = planCountPaste(
+      e.clipboardData.getData("text/plain"),
+      { loc: m[1] as CountLocation, productId: Number(m[2]) },
+      (visibleRows ?? []).map((r) => ({
+        productId: r.product.id,
+        name: r.product.name,
+      })),
+      // On-screen order: Offline first, then Online.
+      (["OFFLINE", "ONLINE"] as CountLocation[]).filter((l) =>
+        l === "ONLINE" ? showOnline : showOffline,
+      ),
+      (loc, productId) => {
+        const draft = drafts[loc][productId];
+        if (draft !== undefined) return draft === "" ? undefined : Number(draft);
+        return savedCountOf(loc, productId) ?? undefined;
+      },
+    );
+    if (!outcome) return;
+    e.preventDefault();
+    pushHistory();
+    setDraftMany(
+      outcome.edits.map((x) => ({ ...x, value: String(x.value) })),
+    );
+    setNotice({
+      message: outcome.message,
+      detail: outcome.detail,
+      variant: outcome.variant,
+    });
+  }
+
   // PDF of the table exactly as filtered on screen (same columns), built from
   // the row data like every other PDF in the app.
-  async function handlePdf() {
+  // Opened from Audit History: build the PDF once the counts for that
+  // date/shift have loaded. Not recorded again - it is already in the history.
+  useEffect(() => {
+    if (!visibleRows || !printAfterLoad.current) return;
+    printAfterLoad.current = false;
+    if (pendingCount > 0) {
+      setError("Save your changes first - the PDF reflects only saved counts.");
+      return;
+    }
+    void handlePdf(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleRows]);
+
+  async function handlePdf(record = true) {
     if (!visibleRows || pendingCount > 0) return;
     const pdfColumns = [
       { key: "system", label: "System Remaining" },
@@ -589,6 +895,27 @@ export function ManualCountPage() {
           ],
         }),
       );
+      if (record) {
+        // Best effort - a failed history write must never read as a failed
+        // PDF (see api/reportHistory.ts).
+        const params = new URLSearchParams({
+          history: "1",
+          date,
+          shift,
+          source: sourceFilter,
+        });
+        recordReportHistory({
+          type: "Audit Report",
+          scope: date,
+          route: `/manual-count?${params}`,
+          section:
+            sourceFilter === "ONLINE"
+              ? "online"
+              : sourceFilter === "OFFLINE"
+                ? "offline"
+                : "all",
+        }).catch(() => {});
+      }
     } catch (e) {
       setError(e instanceof Error ? `PDF failed: ${e.message}` : "PDF failed");
     }
@@ -621,6 +948,22 @@ export function ManualCountPage() {
               minWidth: 0,
             }}
           >
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setAllExpanded(!anyExpanded)}
+              disabled={!auditRows}
+              aria-label={
+                anyExpanded ? "Collapse every category" : "Expand every category"
+              }
+              title={
+                anyExpanded ? "Collapse every category" : "Expand every category"
+              }
+              className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
+            >
+              {anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
+            </Button>
             <DatePicker
               aria-label="Date"
               value={date}
@@ -642,6 +985,28 @@ export function ManualCountPage() {
               value={categoryFilter}
               onChange={setCategoryFilter}
             />
+            <Dropdown
+              aria-label="Filter rows"
+              value={rowFilter}
+              onChange={(v) => setRowFilter(v as typeof rowFilter)}
+              options={[
+                { value: "all", label: "All rows" },
+                {
+                  value: "flagged",
+                  label: flaggedCount
+                    ? `Flagged only (${flaggedCount})`
+                    : "Flagged only",
+                  title: "Only counts whose variance is not zero",
+                },
+                {
+                  value: "changed",
+                  label: pendingCount
+                    ? `Only changed (${pendingCount})`
+                    : "Only changed",
+                  title: "Only counts staged but not saved yet",
+                },
+              ]}
+            />
             {flaggedCount > 0 && (
               <span
                 style={{
@@ -659,6 +1024,38 @@ export function ManualCountPage() {
             )}
           </div>
           <ToolbarControls>
+            {pendingCount > 0 && (
+              <span className="ae-unsaved-badge" aria-live="polite">
+                {pendingCount} unsaved change{pendingCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {(past.length > 0 || future.length > 0) && (
+              <Button
+                className="ae-toolbar-save"
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={undo}
+                disabled={past.length === 0 || saving}
+                title="Undo the last staged edit (Ctrl+Z)"
+              >
+                <UndoIcon />
+                <span className="ae-toolbar-btn-label">Undo</span>
+              </Button>
+            )}
+            {savedCounts.length > 0 && (
+              <span
+                className="ae-unsaved-badge"
+                style={unpublishedCount === 0 ? { color: colors.subtleInk } : undefined}
+                title={
+                  unpublishedCount === 0
+                    ? "These counts are the next shift's opening stock"
+                    : "Saved counts only become the next shift's opening stock once published"
+                }
+              >
+                {unpublishedCount === 0 ? "Published" : `${unpublishedCount} unpublished`}
+              </span>
+            )}
             <Button
               className="ae-toolbar-save ae-toolbar-primary"
               type="button"
@@ -680,7 +1077,19 @@ export function ManualCountPage() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={handlePdf}
+              onClick={() => setShowClearConfirm(true)}
+              disabled={pendingCount === 0 || saving}
+              title="Discard unsaved counts on this sheet"
+            >
+              <ClearIcon />
+              <span className="ae-toolbar-btn-label">Clear</span>
+            </Button>
+            <Button
+              className="ae-toolbar-save"
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => void handlePdf()}
               disabled={pendingCount > 0 || !visibleRows}
               title={
                 pendingCount > 0
@@ -691,6 +1100,51 @@ export function ManualCountPage() {
               <PrinterIcon />
               <span className="ae-toolbar-btn-label">PDF</span>
             </Button>
+            {canPublish && (
+              <Button
+                className="ae-toolbar-save"
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowPublishConfirm(true)}
+                disabled={pendingCount > 0 || unpublishedCount === 0 || publishing || saving}
+                title={
+                  pendingCount > 0
+                    ? "Save your changes first"
+                    : unpublishedCount === 0
+                      ? "Nothing to publish - every saved count is already published"
+                      : "Publish the saved counts: they become the next shift's opening stock"
+                }
+              >
+                <PublishIcon />
+                <span className="ae-toolbar-btn-label">Publish</span>
+              </Button>
+            )}
+            <Button
+              className="ae-toolbar-save"
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(`/variance-report?date=${date}`)}
+              disabled={pendingCount > 0}
+              title={
+                pendingCount > 0
+                  ? "Save your counts first - the report only reads saved data"
+                  : "Open the Variance Report for this date"
+              }
+            >
+              <ReportIcon />
+              <span className="ae-toolbar-btn-label">Report</span>
+            </Button>
+            <Link
+              to="/audit-history"
+              className="ae-btn ae-btn-secondary ae-btn-sm ae-toolbar-save"
+              style={{ textDecoration: "none" }}
+              title="Previously downloaded Audit sheets"
+            >
+              <HistoryIcon />
+              <span className="ae-toolbar-btn-label">History</span>
+            </Link>
             <CsvTools
               filenamePrefix={`manual-count-${csvLocation.toLowerCase()}-${shift.toLowerCase()}`}
               date={date}
@@ -729,11 +1183,26 @@ export function ManualCountPage() {
           </ToolbarControls>
         </Toolbar>
       </PageHeader>
+      {catMenu && (
+        <CategoryColorMenu
+          target={catMenu}
+          color={getCategoryColor(catMenu.category)}
+          customColor={getCategoryColor(catMenu.category) !== undefined}
+          onColorChange={setCategoryColor}
+          onClose={() => setCatMenu(null)}
+        />
+      )}
       <Toast
         message={error}
         onDismiss={() => setError(null)}
         variant="error"
         duration={null}
+      />
+      <Toast
+        message={notice?.message ?? null}
+        title={notice?.detail}
+        onDismiss={() => setNotice(null)}
+        variant={notice?.variant ?? "info"}
       />
       {!auditRows ? (
         <TableSkeleton
@@ -750,7 +1219,10 @@ export function ManualCountPage() {
           <RowGlowScroll
             focusStorageKey={`ala-eh-focus:manual-count:${date}:${shift}`}
           >
-            <table className="ae-table ae-table--center-head ae-table--compact">
+            <table
+              className="ae-table ae-table--center-head ae-table--compact"
+              onPaste={handlePaste}
+            >
               <thead>
                 <tr>
                   {headers.map((h) => (
@@ -790,6 +1262,20 @@ export function ManualCountPage() {
                                   : `Collapse ${category}`
                             }
                             className="ae-cat-toggle"
+                            style={(() => {
+                              const c = getCategoryColor(category);
+                              return c
+                                ? { background: c, color: inkFor(c) }
+                                : undefined;
+                            })()}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setCatMenu({
+                                category,
+                                x: e.clientX,
+                                y: e.clientY,
+                              });
+                            }}
                           >
                             <span className="ae-cat-label">
                               <span
@@ -806,13 +1292,34 @@ export function ManualCountPage() {
                               </span>
                               {category}
                             </span>
+                            {/* A sibling-style click target inside the bar (a
+                                real button can't nest in a button); it stops
+                                propagation so zeroing doesn't also collapse. */}
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              className="ae-cat-zero no-print"
+                              title={`Stage a count of 0 for every product in ${category}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                zeroCategory(category);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key !== "Enter" && e.key !== " ") return;
+                                e.stopPropagation();
+                                e.preventDefault();
+                                zeroCategory(category);
+                              }}
+                            >
+                              Zero all
+                            </span>
                           </button>
                         </td>
                       </tr>
                       {groupRows.map((r) => {
                         const f = liveFigures(r);
                         const countCell = (loc: CountLocation) => (
-                          <td key={loc} style={manualCountTint["Count"]}>
+                          <td key={loc}>
                             <NumberCellInput
                               data-cell={`manual-count-${loc}-${r.product.id}`}
                               value={String(
@@ -820,7 +1327,17 @@ export function ManualCountPage() {
                                   r.entries[loc].manualCount ??
                                   "",
                               )}
-                              onChange={(v) => setDraft(loc, r.product.id, v)}
+                              onChange={(v) => {
+                                if (!editStepPushed.current) {
+                                  pushHistory();
+                                  editStepPushed.current = true;
+                                }
+                                setDraft(loc, r.product.id, v);
+                              }}
+                              onFocus={() => {
+                                editStepPushed.current = false;
+                              }}
+                              onBlur={() => settleDraft(loc, r.product.id)}
                               onKeyDown={(e) =>
                                 handleCountKeyDown(e, loc, r.product.id)
                               }
@@ -845,6 +1362,22 @@ export function ManualCountPage() {
                           >
                             <td className="ae-cell-sku">
                               {r.product.sku ?? "—"}
+                              {visibleLocations.some((l) => r.breaks[l]) && (
+                                <span
+                                  className="no-print"
+                                  style={{ marginLeft: 4, color: colors.warningText, cursor: "help" }}
+                                  title={visibleLocations
+                                    .filter((l) => r.breaks[l])
+                                    .map(
+                                      (l) =>
+                                        `${LOCATION_LABEL[l]}: opening stock is ${r.breaks[l]!.actual.toLocaleString()} but the previous period carries forward ${r.breaks[l]!.expected.toLocaleString()} (set by an import)`,
+                                    )
+                                    .join("\n")}
+                                  aria-label="Opening stock does not carry forward"
+                                >
+                                  ⚠
+                                </span>
+                              )}
                             </td>
                             <td className="ae-cell-name">{r.product.name}</td>
                             <td>{f.system.toLocaleString()}</td>
@@ -865,12 +1398,39 @@ export function ManualCountPage() {
                                 ? "—"
                                 : f.variance.toLocaleString()}
                             </td>
+                            {/* Only where there is something to explain: a
+                                saved count that does not match the system.
+                                The button opens the details panel, where the
+                                reason is written; a recorded reason shows here. */}
+                            <td className="ae-remarks-cell">
+                              {f.variance !== null &&
+                                f.variance !== 0 &&
+                                visibleLocations.some((l) => r.saved[l]) && (
+                                  <span className="ae-remarks-inner">
+                                    <button
+                                      type="button"
+                                      className="ae-variance-details-btn no-print"
+                                      onClick={() => setDetailsProductId(r.product.id)}
+                                      aria-label={`Variance details for ${r.product.name}`}
+                                      title="Who counted, what moved, who changed what - and why it differs"
+                                    >
+                                      {remarksOf(r) ? "✎" : "ⓘ"}
+                                    </button>
+                                    {remarksOf(r) && (
+                                      <span className="ae-remarks-text" title={remarksOf(r)}>
+                                        {remarksOf(r)}
+                                      </span>
+                                    )}
+                                  </span>
+                                )}
+                            </td>
                           </tr>
                         );
                       })}
                       <tr className="ae-row-subtotal">
                         <td colSpan={2}>Subtotal - {category}</td>
                         {renderTotals(groupRows)}
+                        <td />
                       </tr>
                     </Fragment>
                   );
@@ -878,11 +1438,64 @@ export function ManualCountPage() {
                 <tr className="ae-row-grand">
                   <td colSpan={2}>GRAND TOTAL</td>
                   {renderTotals(visibleRows ?? [])}
+                  <td />
                 </tr>
               </tbody>
             </table>
           </RowGlowScroll>
         </div>
+      )}
+      {detailsProductId !== null && (
+        <VarianceDetails
+          productId={detailsProductId}
+          productName={
+            auditRows?.find((r) => r.product.id === detailsProductId)?.product.name ?? ""
+          }
+          sku={auditRows?.find((r) => r.product.id === detailsProductId)?.product.sku ?? null}
+          date={date}
+          shift={shift}
+          locations={visibleLocations}
+          canEdit
+          onClose={() => setDetailsProductId(null)}
+          onRemarksSaved={(loc, remarks) =>
+            setGridRows((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    [loc]: prev[loc].map((row) =>
+                      row.product.id === detailsProductId ? { ...row, entry: { ...row.entry, remarks } } : row,
+                    ),
+                  }
+                : prev,
+            )
+          }
+        />
+      )}
+      {showPublishConfirm && (
+        <ConfirmDialog
+          title="Publish these counts?"
+          confirmLabel={`Publish ${unpublishedCount}`}
+          busy={publishing}
+          onConfirm={() => void handlePublish()}
+          onCancel={() => setShowPublishConfirm(false)}
+        >
+          {unpublishedCount} saved count{unpublishedCount === 1 ? "" : "s"} for{" "}
+          {formatDateDisplay(date)} · {SHIFT_SHORT_LABELS[shift]} Shift will become
+          the next shift&apos;s opening stock, and any later sheet already saved is
+          re-calculated from them. Changing a count afterwards takes it back to
+          unpublished until you publish again.
+        </ConfirmDialog>
+      )}
+      {showClearConfirm && (
+        <ConfirmDialog
+          title="Discard unsaved counts?"
+          confirmLabel="Discard"
+          onConfirm={clearDrafts}
+          onCancel={() => setShowClearConfirm(false)}
+        >
+          {pendingCount} unsaved count{pendingCount === 1 ? "" : "s"} on this
+          sheet will be thrown away. Saved counts are not affected.
+        </ConfirmDialog>
       )}
       {showConfirm && (
         <Modal
@@ -1024,16 +1637,8 @@ export function ManualCountPage() {
     return (
       <>
         <td>{sumLive(list, "system").toLocaleString()}</td>
-        {showOffline && (
-          <td style={manualCountTint["Count"]}>
-            {sumLive(list, "offline").toLocaleString()}
-          </td>
-        )}
-        {showOnline && (
-          <td style={manualCountTint["Count"]}>
-            {sumLive(list, "online").toLocaleString()}
-          </td>
-        )}
+        {showOffline && <td>{sumLive(list, "offline").toLocaleString()}</td>}
+        {showOnline && <td>{sumLive(list, "online").toLocaleString()}</td>}
         <td style={manualCountTint.Total}>
           {sumLive(list, "total").toLocaleString()}
         </td>
@@ -1050,13 +1655,11 @@ export function ManualCountPage() {
   }
 }
 
-// Column color coding for the count grid: the two count inputs in blue,
-// Variance in teal (a cool color that sits next to the blue without being
-// mistaken for it), the Total in the brand gold. Header-only, fixed fills
-// with brand-ink / white labels so they read the same in light and dark mode.
+// Column color coding for the count grid: Variance in teal, the Total in the
+// brand gold. The two count input columns (Offline / Online) are left
+// uncolored. Header-only, fixed fills with brand-ink labels so they read the
+// same in light and dark mode.
 const manualCountHeadStyle: Record<string, CSSProperties | undefined> = {
-  "Offline Count": { background: "#3B82F6", color: "#FFFFFF" },
-  "Online Count": { background: "#3B82F6", color: "#FFFFFF" },
   Variance: { background: "#2DB7A8", color: "#0C0C0C" },
   "Total Count": { background: "#F5C000", color: "#0C0C0C" },
 };
@@ -1068,8 +1671,7 @@ function tintLayer(color: string): CSSProperties {
   const tint = `color-mix(in srgb, ${color} 22%, transparent)`;
   return { backgroundImage: `linear-gradient(${tint}, ${tint})` };
 }
-const manualCountTint: Record<"Count" | "Variance" | "Total", CSSProperties> = {
-  Count: tintLayer("#3B82F6"),
+const manualCountTint: Record<"Variance" | "Total", CSSProperties> = {
   Variance: tintLayer("#2DB7A8"),
   Total: tintLayer("#F5C000"),
 };

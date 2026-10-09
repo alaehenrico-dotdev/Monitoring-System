@@ -20,6 +20,8 @@ interface NumberCellInputProps {
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
+  /** Runs after the built-in select-all on focus. */
+  onFocus?: () => void;
   onKeyDown?: (e: KeyboardEvent<HTMLInputElement>) => void;
   step?: number;
   className?: string;
@@ -47,7 +49,7 @@ interface NumberCellInputProps {
  * These replacement buttons only ever run onChange - never onBlur's commit
  * directly - so a click steps the draft value exactly like typing would.
  */
-export function NumberCellInput({ value, onChange, onBlur, onKeyDown, step = 1, className = "", style, onMouseEnter, onMouseLeave, ...rest }: NumberCellInputProps) {
+export function NumberCellInput({ value, onChange, onBlur, onFocus, onKeyDown, step = 1, className = "", style, onMouseEnter, onMouseLeave, ...rest }: NumberCellInputProps) {
   function stepBy(delta: number) {
     onChange(String((Number(value) || 0) + delta));
   }
@@ -58,7 +60,10 @@ export function NumberCellInput({ value, onChange, onBlur, onKeyDown, step = 1, 
         type="number"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={(e) => e.currentTarget.select()}
+        onFocus={(e) => {
+          e.currentTarget.select();
+          onFocus?.();
+        }}
         onBlur={onBlur}
         onKeyDown={onKeyDown}
         {...rest}

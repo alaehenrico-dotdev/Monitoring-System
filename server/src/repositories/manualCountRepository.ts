@@ -10,6 +10,9 @@ export interface ManualCountData {
   manualCount: number;
   variance: number;
   countedById?: number;
+  /// Set to null on every count save: editing a count un-publishes it.
+  publishedAt?: Date | null;
+  publishedById?: number | null;
 }
 
 export interface VarianceReportFilters {
@@ -38,6 +41,8 @@ export const manualCountRepository = {
       where: {
         productId,
         location,
+        // Only a published count carries forward.
+        publishedAt: { not: null },
         OR: shift === "NIGHT" ? [{ entryDate: { lt: entryDate } }, { entryDate, shift: "MORNING" }] : [{ entryDate: { lt: entryDate } }],
       },
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
@@ -52,12 +57,37 @@ export const manualCountRepository = {
       where: {
         productId: { in: productIds },
         location,
+        publishedAt: { not: null },
         OR: shift === "NIGHT" ? [{ entryDate: { lt: entryDate } }, { entryDate, shift: "MORNING" }] : [{ entryDate: { lt: entryDate } }],
       },
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       distinct: ["productId"],
       select: { productId: true, entryDate: true, shift: true, manualCount: true },
     });
+  },
+
+  /// One count with who last saved it - for the Variance details panel.
+  findOneWithCounter(productId: number, entryDate: Date, shift: Shift, location: StockLocation, db: Db = prisma) {
+    return db.manualCount.findUnique({
+      where: { productId_entryDate_shift_location: { productId, entryDate, shift, location } },
+      include: { countedBy: { select: { name: true } } },
+    });
+  },
+
+  /// Remarks are edited on their own: a count save never touches them, and
+  /// editing them never touches the figures or the carry-forward.
+  updateRemarks(id: number, remarks: string | null, db: Db = prisma) {
+    return db.manualCount.update({ where: { id }, data: { remarks } });
+  },
+
+  /// Saved counts for one sheet (date + shift, every location) that have not
+  /// been published yet - what the Publish button releases.
+  findUnpublishedForPeriod(entryDate: Date, shift: Shift, db: Db = prisma) {
+    return db.manualCount.findMany({ where: { entryDate, shift, publishedAt: null } });
+  },
+
+  markPublished(id: number, userId: number | null, publishedAt: Date, db: Db = prisma) {
+    return db.manualCount.update({ where: { id }, data: { publishedAt, publishedById: userId } });
   },
 
   findAllForDateAndLocation(entryDate: Date, shift: Shift, location: StockLocation) {
@@ -74,7 +104,7 @@ export const manualCountRepository = {
   findManyForKeys(keys: { productId: number; entryDate: Date; shift: Shift }[], location: StockLocation) {
     if (!keys.length) return Promise.resolve([]);
     return prisma.manualCount.findMany({
-      where: { location, OR: keys.map((k) => ({ productId: k.productId, entryDate: k.entryDate, shift: k.shift })) },
+      where: { location, publishedAt: { not: null }, OR: keys.map((k) => ({ productId: k.productId, entryDate: k.entryDate, shift: k.shift })) },
       select: { productId: true, manualCount: true },
     });
   },

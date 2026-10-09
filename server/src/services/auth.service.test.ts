@@ -3,10 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../repositories/userRepository", () => ({
   userRepository: { findByUsername: vi.fn() },
 }));
+vi.mock("./changeLog.service", () => ({ logSystemEvent: vi.fn() }));
 
 import bcrypt from "bcryptjs";
 import { userRepository } from "../repositories/userRepository";
 import { login } from "./auth.service";
+import { logSystemEvent } from "./changeLog.service";
 import { verifyToken } from "../utils/jwt";
 
 const PASSWORD = "correct-horse-battery";
@@ -118,5 +120,33 @@ describe("login - user enumeration", () => {
     for (const attempt of ["", PASSWORD, "password-that-matches-no-account"]) {
       await expect(login("nobody", attempt)).rejects.toThrow();
     }
+  });
+});
+
+describe("login - audit trail", () => {
+  it("logs a successful sign-in against the user", async () => {
+    vi.mocked(userRepository.findByUsername).mockResolvedValue(user() as never);
+
+    await login("ana", PASSWORD, "10.0.0.5");
+
+    expect(logSystemEvent).toHaveBeenCalledWith("login", { username: "ana", ip: "10.0.0.5" }, 7);
+  });
+
+  it("logs a failed attempt with the username and address, never the password", async () => {
+    vi.mocked(userRepository.findByUsername).mockResolvedValue(user() as never);
+
+    await expect(login("ana", "wrong-password", "10.0.0.5")).rejects.toMatchObject({ status: 401 });
+
+    expect(logSystemEvent).toHaveBeenCalledWith("login_failed", { username: "ana", ip: "10.0.0.5" });
+    expect(JSON.stringify(vi.mocked(logSystemEvent).mock.calls)).not.toContain("wrong-password");
+  });
+
+  it("logs an unknown username too, truncated", async () => {
+    vi.mocked(userRepository.findByUsername).mockResolvedValue(null);
+
+    await expect(login("x".repeat(200), "whatever")).rejects.toMatchObject({ status: 401 });
+
+    const [, details] = vi.mocked(logSystemEvent).mock.calls[0];
+    expect((details as { username: string }).username).toHaveLength(64);
   });
 });

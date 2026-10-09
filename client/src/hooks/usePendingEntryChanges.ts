@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { GridRow } from "../components/StockGrid";
 import { ENTRY_PREFIX, MANUAL_COUNT_PREFIX } from "../utils/unsavedWork";
+import { clearDraftBackups } from "../utils/draftBackup";
 import { EXTRA_COLUMNS_PREFIX } from "./useExtraColumns";
 
 /// productId -> { columnKey -> staged value }
@@ -40,7 +41,8 @@ interface Snapshot {
 const HISTORY_LIMIT = 100;
 
 const BASELINE_PREFIX = "ala-eh-baseline:";
-const baselineKeyFor = (storageKey: string | undefined) => (storageKey ? BASELINE_PREFIX + storageKey : undefined);
+const baselineKeyFor = (storageKey: string | undefined) =>
+  storageKey ? BASELINE_PREFIX + storageKey : undefined;
 
 export interface PendingConflict {
   productId: number;
@@ -91,6 +93,31 @@ export function detectConflicts(
         myValue,
       });
     }
+  }
+  return out;
+}
+
+/// Staged cells that would write the value the server already has - a 0 typed
+/// over a 0, or an edit another device has since made redundant after a
+/// refresh. They are not changes: leaving them in keeps Save lit and puts
+/// no-ops in the Preview. Cells the row doesn't carry a figure for (the
+/// manual-count pseudo-column, extra columns) are kept, since there is
+/// nothing to compare against.
+export function dropNoOpChanges(
+  rows: GridRow[] | null,
+  pending: PendingByProduct,
+): PendingByProduct {
+  if (!rows) return pending;
+  const out: PendingByProduct = {};
+  for (const [productIdStr, changes] of Object.entries(pending)) {
+    const row = rows.find((r) => r.product.id === Number(productIdStr));
+    const kept = Object.fromEntries(
+      Object.entries(changes).filter(([key, value]) => {
+        const raw = row?.entry[key];
+        return raw === undefined || raw === null || Number(raw) !== value;
+      }),
+    );
+    if (Object.keys(kept).length > 0) out[Number(productIdStr)] = kept;
   }
   return out;
 }
@@ -164,10 +191,17 @@ export function usePendingEntryChanges(
    * read-only table (Daily Report) with nothing to stage in the first
    * place, or if the caller doesn't have these columns at all.
    */
-  recompute?: (entry: Record<string, unknown>, changes: Record<string, number>) => Record<string, unknown>,
+  recompute?: (
+    entry: Record<string, unknown>,
+    changes: Record<string, number>,
+  ) => Record<string, unknown>,
 ) {
-  const [pending, setPending] = useState<PendingByProduct>(() => loadPending(storageKey));
-  const [baselines, setBaselines] = useState<BaselineByProduct>(() => loadBaselines(storageKey));
+  const [pending, setPending] = useState<PendingByProduct>(() =>
+    loadPending(storageKey),
+  );
+  const [baselines, setBaselines] = useState<BaselineByProduct>(() =>
+    loadBaselines(storageKey),
+  );
   // Ctrl+Z / Ctrl+Shift+Z over the staged (not yet saved) edits. Snapshots
   // are whole pending+baseline sets rather than per-cell diffs, which keeps
   // undo correct for a Quick Fill that touches dozens of cells at once -
@@ -199,7 +233,8 @@ export function usePendingEntryChanges(
     try {
       // No trailing empty `{}` entries left behind once every edit in a
       // given date/shift is saved or discarded.
-      if (Object.keys(pending).length === 0) sessionStorage.removeItem(storageKey);
+      if (Object.keys(pending).length === 0)
+        sessionStorage.removeItem(storageKey);
       else sessionStorage.setItem(storageKey, JSON.stringify(pending));
     } catch {
       // Best effort, per the note above - editing still works either way.
@@ -224,16 +259,23 @@ export function usePendingEntryChanges(
   // e.g. a changed Opening Stock is reflected in Offline/Online Stocks and
   // Remaining Stock right away too - otherwise those would keep showing
   // last-saved figures until the edit is actually Saved.
+  // The set the page sees: staged cells minus any that equal what is saved.
+  const effectivePending = useMemo(
+    () => dropNoOpChanges(rows, pending),
+    [rows, pending],
+  );
   const displayRows = useMemo(() => {
-    if (!rows || Object.keys(pending).length === 0) return rows;
+    if (!rows || Object.keys(effectivePending).length === 0) return rows;
     return rows.map((r) => {
-      const changes = pending[r.product.id];
+      const changes = effectivePending[r.product.id];
       if (!changes) return r;
       const merged = { ...r.entry, ...changes };
-      const entry = recompute ? { ...merged, ...recompute(r.entry, changes) } : merged;
+      const entry = recompute
+        ? { ...merged, ...recompute(r.entry, changes) }
+        : merged;
       return { ...r, entry, isSaved: false };
     });
-  }, [rows, pending, recompute]);
+  }, [rows, effectivePending, recompute]);
 
   /// Stages one cell's edit. Editing a cell back to its last-saved value
   /// removes it from the pending set entirely, rather than leaving a
@@ -253,7 +295,13 @@ export function usePendingEntryChanges(
   /// `stageMany` (Quick Fill, many cells) share the same semantics - notably
   /// "edited back to its saved value" dropping out of the pending set
   /// entirely rather than lingering as a no-op change in Preview/Save.
-  function applyEdit(state: Snapshot, productId: number, key: string, value: number, savedValue: number): Snapshot {
+  function applyEdit(
+    state: Snapshot,
+    productId: number,
+    key: string,
+    value: number,
+    savedValue: number,
+  ): Snapshot {
     const productPending = { ...(state.pending[productId] ?? {}) };
     const productBase = { ...(state.baselines[productId] ?? {}) };
 
@@ -264,7 +312,8 @@ export function usePendingEntryChanges(
       productPending[key] = value;
       // Only the first stage of a key records its baseline - re-editing an
       // already-staged cell must keep the value it originally started from.
-      if (productBase[key] === undefined && Number.isFinite(savedValue)) productBase[key] = savedValue;
+      if (productBase[key] === undefined && Number.isFinite(savedValue))
+        productBase[key] = savedValue;
     }
 
     const nextPending = { ...state.pending };
@@ -278,10 +327,33 @@ export function usePendingEntryChanges(
     return { pending: nextPending, baselines: nextBaselines };
   }
 
-  function stage(productId: number, key: string, value: number, savedValue: number) {
+  function stage(
+    productId: number,
+    key: string,
+    value: number,
+    savedValue: number,
+  ) {
     pushHistory();
-    setPending((prev) => applyEdit({ pending: prev, baselines }, productId, key, value, savedValue).pending);
-    setBaselines((prev) => applyEdit({ pending, baselines: prev }, productId, key, value, savedValue).baselines);
+    setPending(
+      (prev) =>
+        applyEdit(
+          { pending: prev, baselines },
+          productId,
+          key,
+          value,
+          savedValue,
+        ).pending,
+    );
+    setBaselines(
+      (prev) =>
+        applyEdit(
+          { pending, baselines: prev },
+          productId,
+          key,
+          value,
+          savedValue,
+        ).baselines,
+    );
   }
 
   /// Stages a batch of cell edits as ONE undoable step - what Quick Fill
@@ -289,7 +361,14 @@ export function usePendingEntryChanges(
   /// them through applyEdit in sequence means a fill behaves exactly as if
   /// each cell had been typed, including dropping cells whose fill value
   /// happens to equal what was already saved.
-  function stageMany(edits: { productId: number; key: string; value: number; savedValue: number }[]) {
+  function stageMany(
+    edits: {
+      productId: number;
+      key: string;
+      value: number;
+      savedValue: number;
+    }[],
+  ) {
     if (edits.length === 0) return;
     pushHistory();
     const next = edits.reduce(
@@ -353,9 +432,15 @@ export function usePendingEntryChanges(
   /// "mine" re-bases it onto what the server has now (keeping the staged
   /// value, which then saves over the newer one); "server" discards the
   /// staged edit and keeps the server's value.
-  function resolveConflict(c: Pick<PendingConflict, "productId" | "key" | "serverValue">, choice: "mine" | "server") {
+  function resolveConflict(
+    c: Pick<PendingConflict, "productId" | "key" | "serverValue">,
+    choice: "mine" | "server",
+  ) {
     if (choice === "mine") {
-      setBaselines((prev) => ({ ...prev, [c.productId]: { ...(prev[c.productId] ?? {}), [c.key]: c.serverValue } }));
+      setBaselines((prev) => ({
+        ...prev,
+        [c.productId]: { ...(prev[c.productId] ?? {}), [c.key]: c.serverValue },
+      }));
       return;
     }
     for (const setter of [setPending, setBaselines]) {
@@ -371,7 +456,7 @@ export function usePendingEntryChanges(
   }
 
   return {
-    pending,
+    pending: effectivePending,
     baselines,
     displayRows,
     stage,
@@ -384,11 +469,14 @@ export function usePendingEntryChanges(
     canUndo: past.length > 0,
     canRedo: future.length > 0,
     /// Products with at least one staged edit - what Save iterates over.
-    pendingCount: Object.keys(pending).length,
+    pendingCount: Object.keys(effectivePending).length,
     /// Individual cells staged. Always >= pendingCount, and the figure the
     /// "N unsaved changes" indicator shows: an encoder who changed four
     /// cells on one product has made four changes, not one.
-    pendingCellCount: Object.values(pending).reduce((n, changes) => n + Object.keys(changes).length, 0),
+    pendingCellCount: Object.values(effectivePending).reduce(
+      (n, changes) => n + Object.keys(changes).length,
+      0,
+    ),
   };
 }
 
@@ -407,12 +495,24 @@ export function clearAllPendingEntryState() {
     const keys: string[] = [];
     for (let i = 0; i < sessionStorage.length; i++) {
       const k = sessionStorage.key(i);
-      if (k && (k.startsWith(ENTRY_PREFIX) || k.startsWith(MANUAL_COUNT_PREFIX) || k.startsWith(BASELINE_PREFIX) || k.startsWith(EXTRA_COLUMNS_PREFIX) || k.startsWith("ala-eh-focus:"))) keys.push(k);
+      if (
+        k &&
+        (k.startsWith(ENTRY_PREFIX) ||
+          k.startsWith(MANUAL_COUNT_PREFIX) ||
+          k.startsWith(BASELINE_PREFIX) ||
+          k.startsWith(EXTRA_COLUMNS_PREFIX) ||
+          k.startsWith("ala-eh-focus:"))
+      )
+        keys.push(k);
     }
     keys.forEach((k) => sessionStorage.removeItem(k));
   } catch {
     // best-effort, same as the rest of this file
   }
+  // The localStorage mirror of those edits (utils/draftBackup.ts) has to go
+  // too - otherwise the next sign-in would restore what was just discarded
+  // (a confirmed log out) or wiped (Data Reset).
+  clearDraftBackups();
 }
 
 export interface PendingChangeDetail {

@@ -657,7 +657,9 @@ export function OfflineEntryPage() {
                 columns={gridColumns}
                 rows={rows}
                 fetchPeriod={(d, s) =>
-                  getOfflineGrid(d, s).then((data) => data as unknown as GridRow[])
+                  getOfflineGrid(d, s).then(
+                    (data) => data as unknown as GridRow[],
+                  )
                 }
                 pending={pending}
                 getSavedValue={getSavedValue}
@@ -794,6 +796,7 @@ export function OfflineEntryPage() {
             onAddExtraColumns={canEdit ? handleAddExtraColumns : undefined}
             onRemoveExtraColumns={canEdit ? removeColumns : undefined}
             historyTable="daily_offline_stock"
+            colorScope="offline"
           />
         </div>
       )}

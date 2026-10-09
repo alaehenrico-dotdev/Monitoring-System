@@ -1,4 +1,11 @@
-import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 
 export interface ContextMenuItem {
@@ -37,12 +44,16 @@ export const ContextMenu = memo(function ContextMenu({
   title,
   ariaLabel,
   items,
+  footer,
   onClose,
 }: {
   anchor: ContextMenuAnchor;
   title: string;
   ariaLabel: string;
   items: ContextMenuItem[];
+  /// Extra content under the items (ColumnHeaderMenu's color picker). Clicks
+  /// inside it count as inside the menu, so they don't dismiss it.
+  footer?: ReactNode;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -90,6 +101,7 @@ export const ContextMenu = memo(function ContextMenu({
       onClose();
       return;
     }
+    if (items.length === 0) return;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       const step = e.key === "ArrowDown" ? 1 : -1;
@@ -102,6 +114,7 @@ export const ContextMenu = memo(function ContextMenu({
       return;
     }
     if (e.key === "Enter" || e.key === " ") {
+      if (e.target !== e.currentTarget) return; // a footer control has focus
       e.preventDefault();
       const item = items[active];
       if (item) run(item);
@@ -140,6 +153,7 @@ export const ContextMenu = memo(function ContextMenu({
           {item.label}
         </button>
       ))}
+      {footer}
     </div>,
     document.body,
   );

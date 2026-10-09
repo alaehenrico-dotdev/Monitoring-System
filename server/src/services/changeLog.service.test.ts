@@ -1,15 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../repositories/changeLogRepository", () => ({
+  REPORTS_TABLE: "reports",
   changeLogRepository: {
     create: vi.fn(),
-    findMany: vi.fn(),
+    findPage: vi.fn(),
+    findStockRecordsByIds: vi.fn(),
+    findProductsByIds: vi.fn(),
     findForRecord: vi.fn(),
   },
 }));
 
 import { changeLogRepository } from "../repositories/changeLogRepository";
-import { getCellHistory, isCellHistoryTable, listChangeLog, recordChange } from "./changeLog.service";
+import { exportChangeLogCsv, getCellHistory, isCellHistoryTable, listChangeLog, recordChange } from "./changeLog.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -37,13 +40,152 @@ describe("recordChange", () => {
   });
 });
 
+function logRow(over: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    tableName: "manual_counts",
+    recordId: 10,
+    action: "UPDATE",
+    changedById: 7,
+    changedAt: new Date("2026-10-09T08:00:00Z"),
+    oldValue: { productId: 5, entryDate: "2026-10-09T00:00:00.000Z", shift: "NIGHT", location: "ONLINE", manualCount: "12.00" },
+    newValue: { productId: 5, entryDate: "2026-10-09T00:00:00.000Z", shift: "NIGHT", location: "ONLINE", manualCount: "10.00" },
+    importBatchId: null,
+    changedBy: { id: 7, name: "Ana", username: "ana", role: "ENCODER" },
+    ...over,
+  };
+}
+
 describe("listChangeLog", () => {
-  it("delegates the filters straight through to the repository", async () => {
-    vi.mocked(changeLogRepository.findMany).mockResolvedValue([]);
+  beforeEach(() => {
+    vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([] as never);
+    vi.mocked(changeLogRepository.findProductsByIds).mockResolvedValue([{ id: 5, sku: "AFP007", name: "Soy Sauce 1L" }] as never);
+  });
 
-    await listChangeLog({ tableName: "products", recordId: 1 });
+  it("passes the filters and the default page size to the repository", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([]);
 
-    expect(changeLogRepository.findMany).toHaveBeenCalledWith({ tableName: "products", recordId: 1 });
+    await listChangeLog({ tableName: "products", userId: 3 });
+
+    expect(changeLogRepository.findPage).toHaveBeenCalledWith({ tableName: "products", userId: 3 }, { limit: 100, cursor: undefined });
+  });
+
+  it("caps the page size", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([]);
+    await listChangeLog({}, { limit: 99999 });
+    expect(changeLogRepository.findPage).toHaveBeenCalledWith({}, { limit: 500, cursor: undefined });
+  });
+
+  it("returns a nextCursor only when more rows exist, and drops the lookahead row", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow({ id: 30 }), logRow({ id: 29 }), logRow({ id: 28 })] as never);
+
+    const page = await listChangeLog({}, { limit: 2, cursor: 31 });
+
+    expect(page.items.map((i) => i.id)).toEqual([30, 29]);
+    expect(page.nextCursor).toBe(29);
+    expect(changeLogRepository.findPage).toHaveBeenCalledWith({}, { limit: 2, cursor: 31 });
+  });
+
+  it("has no nextCursor on the last page", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow({ id: 5 })] as never);
+    expect((await listChangeLog({}, { limit: 2 })).nextCursor).toBeNull();
+  });
+
+  it("labels a stock row from the live record and its product", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow()] as never);
+    vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([
+      { id: 10, productId: 5, entryDate: new Date("2026-10-09T00:00:00Z"), shift: "NIGHT", location: "ONLINE" },
+    ] as never);
+
+    const [item] = (await listChangeLog({})).items;
+
+    expect(item.context).toEqual({ productId: 5, sku: "AFP007", productName: "Soy Sauce 1L", entryDate: "2026-10-09", shift: "NIGHT", location: "ONLINE" });
+    expect(item.summary).toBe("Manual count 12 → 10");
+    expect(item.source).toBeNull();
+  });
+
+  it("falls back to the snapshot when the record was deleted", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow({ action: "DELETE", newValue: null })] as never);
+
+    const [item] = (await listChangeLog({})).items;
+
+    expect(item.context).toMatchObject({ productId: 5, entryDate: "2026-10-09", shift: "NIGHT", location: "ONLINE", sku: "AFP007" });
+  });
+
+  it("keeps the ids but no names when the product is gone too", async () => {
+    vi.mocked(changeLogRepository.findProductsByIds).mockResolvedValue([] as never);
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow()] as never);
+
+    const [item] = (await listChangeLog({})).items;
+
+    expect(item.context).toMatchObject({ productId: 5, sku: null, productName: null, entryDate: "2026-10-09" });
+  });
+
+  it("uses the table to say Online / Offline for stock rows", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow({ tableName: "daily_offline_stock", newValue: { productId: 5, shift: "MORNING" } })] as never);
+    const [item] = (await listChangeLog({})).items;
+    expect(item.context?.location).toBe("OFFLINE");
+    expect(item.context?.shift).toBe("MORNING");
+  });
+
+  it("describes a generated report with its section, and leaves it out when unrecorded", async () => {
+    const report = (newValue: unknown) =>
+      logRow({ tableName: "reports", recordId: 3, action: "CREATE", oldValue: null, newValue });
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([
+      report({ type: "Daily Report", scope: "2026-10-09", section: "online", route: "/x" }),
+      report({ type: "Variance Report", scope: "2026-10-09", section: null, route: "/y" }),
+    ] as never);
+
+    const items = (await listChangeLog({ tableName: "reports" })).items;
+
+    expect(items.map((i) => i.summary)).toEqual(["Daily Report · Online · 2026-10-09", "Variance Report · 2026-10-09"]);
+    expect(items[0].context).toBeNull();
+    expect(items[0].changes).toEqual([]);
+  });
+
+  it("tags import and data-reset rows", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([
+      logRow({ id: 3, importBatchId: 9 }),
+      logRow({ id: 2, tableName: "system", recordId: 0, oldValue: null, newValue: { event: "data_reset", deleted: {} } }),
+    ] as never);
+
+    const items = (await listChangeLog({})).items;
+
+    expect(items.map((i) => i.source)).toEqual(["import", "reset"]);
+    expect(items[1].context).toBeNull();
+  });
+});
+
+describe("exportChangeLogCsv", () => {
+  beforeEach(() => {
+    vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([] as never);
+    vi.mocked(changeLogRepository.findProductsByIds).mockResolvedValue([{ id: 5, sku: "AFP007", name: 'Soy "Sauce", 1L' }] as never);
+  });
+
+  it("writes a header and one readable, escaped line per row", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow()] as never);
+
+    const lines = (await exportChangeLogCsv({ shift: "NIGHT" })).split("\r\n");
+
+    expect(lines[0]).toContain("When,Table,Action");
+    expect(lines[1]).toBe('2026-10-09T08:00:00.000Z,manual_counts,UPDATE,,Ana,AFP007,"Soy ""Sauce"", 1L",2026-10-09,Night,Online,Manual count 12 → 10,10');
+    expect(changeLogRepository.findPage).toHaveBeenCalledWith({ shift: "NIGHT" }, expect.objectContaining({ limit: 500 }));
+  });
+
+  it("follows the cursor until the last page", async () => {
+    vi.mocked(changeLogRepository.findPage)
+      .mockResolvedValueOnce(Array.from({ length: 501 }, (_, i) => logRow({ id: 2000 - i })) as never)
+      .mockResolvedValueOnce([logRow({ id: 5 })] as never);
+
+    const lines = (await exportChangeLogCsv({})).split("\r\n");
+
+    expect(lines).toHaveLength(1 + 500 + 1);
+    expect(vi.mocked(changeLogRepository.findPage).mock.calls[1][1].cursor).toBe(1501);
+  });
+
+  it("neutralises spreadsheet formulas", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow({ changedBy: { id: 1, name: "=HYPERLINK(1)", username: "x", role: "ENCODER" } })] as never);
+    expect(await exportChangeLogCsv({})).toContain("'=HYPERLINK(1)");
   });
 });
 

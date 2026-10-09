@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "./icons";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { addDays, addMonths, parseISO, sameDay, toISO } from "../utils/calendar";
 
 /**
  * Themed replacement for `<input type="date">`.
@@ -27,42 +28,6 @@ const MONTH_NAMES = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).to
 const MONTH_SHORT_NAMES = Array.from({ length: 12 }, (_, i) => new Date(2000, i, 1).toLocaleDateString(undefined, { month: "short" }));
 // 2023-01-01 was a Sunday, so index 0 is Sunday.
 const WEEKDAY_NAMES = Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(undefined, { weekday: "short" }));
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-function toISO(d: Date): string {
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-// Built from the parts (never `new Date("YYYY-MM-DD")`, which is UTC midnight
-// and shows the previous day in timezones behind UTC) - same reason as
-// utils/dateFormat.ts.
-function parseISO(value: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  if (!m) return null;
-  const y = Number(m[1]);
-  const mo = Number(m[2]);
-  const d = Number(m[3]);
-  const date = new Date(y, mo - 1, d);
-  return date.getFullYear() === y && date.getMonth() === mo - 1 && date.getDate() === d ? date : null;
-}
-
-function addDays(d: Date, n: number): Date {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
-}
-
-/// Clamps the day so Jan 31 + 1 month is Feb 28/29, not a spill into March.
-function addMonths(d: Date, n: number): Date {
-  const target = new Date(d.getFullYear(), d.getMonth() + n, 1);
-  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-  return new Date(target.getFullYear(), target.getMonth(), Math.min(d.getDate(), lastDay));
-}
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
 
 interface DatePickerProps {
   /// "YYYY-MM-DD", or "" for no date yet.

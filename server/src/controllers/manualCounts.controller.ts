@@ -4,7 +4,17 @@ import { StockLocation } from "@prisma/client";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
-import { deleteManualCount, getManualCountGrid, getSystemRemainingStock, getVarianceReport, saveManualCount } from "../services/manualCounts.service";
+import {
+  MAX_REMARKS_LENGTH,
+  deleteManualCount,
+  getManualCountGrid,
+  getSystemRemainingStock,
+  getVarianceReport,
+  getVarianceTrace,
+  publishManualCounts,
+  saveManualCount,
+  setCountRemarks,
+} from "../services/manualCounts.service";
 
 const locationSchema = z.nativeEnum(StockLocation);
 const entrySchema = z.object({
@@ -61,4 +71,40 @@ export async function getVarianceReportHandler(req: Request, res: Response) {
   const flaggedOnly = req.query.flaggedOnly !== "false";
 
   res.json(await getVarianceReport({ startDate, endDate, productId, category, location, shift, flaggedOnly }));
+}
+
+const remarksSchema = z.object({ remarks: z.string().max(MAX_REMARKS_LENGTH).nullable() });
+
+function countKey(req: Request) {
+  const productId = Number(req.params.productId ?? req.query.productId);
+  if (!Number.isSafeInteger(productId) || productId <= 0) throw HttpError.badRequest("Invalid product id");
+  return {
+    productId,
+    entryDate: parseDateOnly(req.query.date),
+    shift: parseShift(req.query.shift),
+    location: locationSchema.parse(req.query.location),
+  };
+}
+
+/// PATCH /manual-counts/:productId/remarks - the reason a saved count differs.
+export async function patchCountRemarks(req: Request, res: Response) {
+  const { productId, entryDate, shift, location } = countKey(req);
+  const parsed = remarksSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest("Invalid remarks", parsed.error.flatten());
+  res.json(await setCountRemarks(productId, entryDate, shift, location, parsed.data.remarks, req.user?.id));
+}
+
+/// GET /manual-counts/trace - everything behind one count's variance.
+export async function getTrace(req: Request, res: Response) {
+  const { productId, entryDate, shift, location } = countKey(req);
+  if (location === "TOTAL") throw HttpError.badRequest("A trace is per location - choose ONLINE or OFFLINE");
+  res.json(await getVarianceTrace(productId, entryDate, shift, location));
+}
+
+/// POST /manual-counts/publish?date&shift - release a sheet's saved counts to
+/// the next period's opening stock. Supervisor/Admin only (see the route).
+export async function postPublish(req: Request, res: Response) {
+  const entryDate = parseDateOnly(req.query.date ?? req.body?.date);
+  const shift = parseShift(req.query.shift ?? req.body?.shift);
+  res.json(await publishManualCounts(entryDate, shift, req.user?.id));
 }
