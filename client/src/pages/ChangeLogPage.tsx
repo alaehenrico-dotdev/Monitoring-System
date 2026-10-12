@@ -23,7 +23,11 @@ import { Dropdown } from "../components/Dropdown";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { Button } from "../components/ui";
 import { matchesSearch } from "../utils/search";
-import { endOfDayIso, recordLabel, startOfDayIso } from "../utils/changeLogLabel";
+import {
+  endOfDayIso,
+  recordLabel,
+  startOfDayIso,
+} from "../utils/changeLogLabel";
 import { saveBlob } from "../utils/saveBlob";
 import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
@@ -58,7 +62,9 @@ function changeEventLabel(entry: ChangeLogEntry): string {
   const event = value?.event;
   const label = (event && EVENT_LABELS[event]) || event || "System event";
   // Who a sign-in was for - the row's own user is empty on a failed attempt.
-  return event === "login" || event === "login_failed" ? `${label}${value?.username ? ` (${value.username})` : ""}` : label;
+  return event === "login" || event === "login_failed"
+    ? `${label}${value?.username ? ` (${value.username})` : ""}`
+    : label;
 }
 const REPORTS_TABLE = "reports";
 const TABLE_FILTERS = ["", ...Object.keys(TABLE_LABELS), SYSTEM_TABLE];
@@ -121,7 +127,18 @@ export function ChangeLogPage() {
           ? ((reportSection || undefined) as ChangeLogFilters["reportSection"])
           : undefined,
     }),
-    [tableFilter, dateFrom, dateTo, userId, action, productId, shift, importOnly, reportType, reportSection],
+    [
+      tableFilter,
+      dateFrom,
+      dateTo,
+      userId,
+      action,
+      productId,
+      shift,
+      importOnly,
+      reportType,
+      reportSection,
+    ],
   );
   const filterKey = JSON.stringify(filters);
 
@@ -146,7 +163,10 @@ export function ChangeLogPage() {
     // first load for a given filter set is immediate.
     const delay = loadedCount.current > 0 ? REFRESH_DEBOUNCE_MS : 0;
     const timer = setTimeout(() => {
-      const limit = Math.min(MAX_REFRESH_ROWS, Math.max(PAGE_SIZE, loadedCount.current));
+      const limit = Math.min(
+        MAX_REFRESH_ROWS,
+        Math.max(PAGE_SIZE, loadedCount.current),
+      );
       listChangeLogPage(filters, { limit })
         .then((page) => {
           if (cancelled) return;
@@ -157,7 +177,9 @@ export function ChangeLogPage() {
           if (cancelled) return;
           setEntries((cur) => cur ?? []);
           setError(
-            reason instanceof Error ? reason.message : "Failed to load change log",
+            reason instanceof Error
+              ? reason.message
+              : "Failed to load change log",
           );
         });
     }, delay);
@@ -175,8 +197,12 @@ export function ChangeLogPage() {
   // The user/product pickers are a convenience - without them the filters
   // just aren't offered, the log itself still works.
   useEffect(() => {
-    listChangeLogUsers().then(setUsers).catch(() => {});
-    listProducts({ includeInactive: true }).then(setProducts).catch(() => {});
+    listChangeLogUsers()
+      .then(setUsers)
+      .catch(() => {});
+    listProducts({ includeInactive: true })
+      .then(setProducts)
+      .catch(() => {});
   }, []);
 
   function loadMore() {
@@ -191,7 +217,9 @@ export function ChangeLogPage() {
       })
       .catch((reason: unknown) => {
         if (gen !== generation.current) return;
-        setError(reason instanceof Error ? reason.message : "Failed to load more");
+        setError(
+          reason instanceof Error ? reason.message : "Failed to load more",
+        );
       })
       .finally(() => setLoadingMore(false));
   }
@@ -201,7 +229,10 @@ export function ChangeLogPage() {
     exportChangeLogCsv(filters)
       .then((blob) =>
         // BOM so Excel reads the "→" in "What changed" as UTF-8.
-        saveBlob(new Blob(["﻿", blob], { type: "text/csv;charset=utf-8" }), "change-log.csv"),
+        saveBlob(
+          new Blob(["﻿", blob], { type: "text/csv;charset=utf-8" }),
+          "change-log.csv",
+        ),
       )
       .catch((reason: unknown) => {
         setError(reason instanceof Error ? reason.message : "Export failed");
@@ -214,21 +245,21 @@ export function ChangeLogPage() {
       entries?.filter((e) =>
         matchesSearch(
           [
-          tableLabel(e.tableName),
-          e.action,
-          e.tableName === SYSTEM_TABLE ? changeEventLabel(e) : undefined,
-          e.changedBy?.name,
-          e.changedBy?.username,
-          e.recordId,
-          e.context?.sku,
-          e.context?.productName,
-          e.summary,
-          e.tableName === "users" ? accountName(e) : undefined,
-          e.source ? SOURCE_TAG[e.source] : undefined,
-        ],
-        query,
+            tableLabel(e.tableName),
+            e.action,
+            e.tableName === SYSTEM_TABLE ? changeEventLabel(e) : undefined,
+            e.changedBy?.name,
+            e.changedBy?.username,
+            e.recordId,
+            e.context?.sku,
+            e.context?.productName,
+            e.summary,
+            e.tableName === "users" ? accountName(e) : undefined,
+            e.source ? SOURCE_TAG[e.source] : undefined,
+          ],
+          query,
+        ),
       ),
-    ),
     [entries, query],
   );
 
@@ -291,12 +322,17 @@ export function ChangeLogPage() {
     <div>
       <PageHeader
         title="Change Log"
-        subtitle="Every create/update/delete across the app, including system events, is attributed and timestamped. Click a row to see exactly what changed."
+        subtitle="See who changed what, and when. Click a row for details."
       >
         <Toolbar>
           {/* The filter cluster must be the toolbar's first child (see
               .ae-toolbar > :first-child in index.css). */}
           <div>
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Search by table, action, user, or SKU…"
+            />
             <Dropdown
               className="ae-fit"
               aria-label="Table"
@@ -401,11 +437,6 @@ export function ChangeLogPage() {
             </label>
           </div>
           <ToolbarControls>
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search by table, action, user, or SKU…"
-            />
             <Button
               variant="secondary"
               onClick={exportCsv}
@@ -712,7 +743,10 @@ function toggleOnKey(onToggle: () => void) {
 
 /// The account a "users" change row is about (names live in the snapshots).
 function accountName(entry: ChangeLogEntry): string {
-  const v = (entry.newValue ?? entry.oldValue) as { username?: string; name?: string } | null;
+  const v = (entry.newValue ?? entry.oldValue) as {
+    username?: string;
+    name?: string;
+  } | null;
   return v?.username ?? v?.name ?? `#${entry.recordId}`;
 }
 
@@ -739,7 +773,8 @@ function diffFields(
   const newObj = (newValue ?? {}) as Record<string, unknown>;
   const keys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
 
-  const diffs: { key: string; label: string; before: string; after: string }[] = [];
+  const diffs: { key: string; label: string; before: string; after: string }[] =
+    [];
   for (const key of keys) {
     if (IGNORED_FIELDS.has(key)) continue;
     const before = oldObj[key];

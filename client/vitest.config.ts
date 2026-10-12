@@ -13,5 +13,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
+    // The Manual Count page tests render a ~1,700-line page with hundreds of
+    // cells; run in parallel with the rest of the suite they can pass 5s
+    // (the default) on a busy machine without anything being wrong.
+    testTimeout: 20_000,
   },
 });

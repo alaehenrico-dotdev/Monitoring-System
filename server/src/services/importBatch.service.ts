@@ -91,5 +91,5 @@ export async function revertImportBatch(id: number, userId?: number) {
 
     await importBatchRepository.delete(id, tx);
     return { reverted, skipped };
-  });
+  }, { timeout: 120_000, maxWait: 10_000 });
 }

@@ -27,6 +27,25 @@ export async function createUser(data: { name: string; username: string; passwor
   });
 }
 
+/// Admin-only password reset (the route sits behind authorize(SUPERVISOR_ADMIN);
+/// encoders cannot change passwords themselves). Only the hash is stored, and
+/// the audit entry records that it happened - never the password or hash.
+export async function resetUserPassword(userId: number, newPassword: string, actorId?: number) {
+  const user = await userRepository.findById(userId);
+  if (!user) throw HttpError.notFound("User not found");
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.$transaction(async (tx) => {
+    await userRepository.setPasswordHash(userId, passwordHash, tx);
+    await recordChange(
+      { tableName: "users", recordId: userId, action: "UPDATE", changedById: actorId, newValue: { username: user.username, event: "password_reset" } },
+      tx,
+    );
+  });
+  // The reset bumped the account's tokenVersion; drop the cached status so the
+  // old sessions are refused immediately instead of after the cache TTL.
+  invalidate(`user-status:${userId}`);
+}
+
 export async function setUserActive(userId: number, isActive: boolean, actorId?: number) {
   const user = await userRepository.findById(userId);
   if (!user) throw HttpError.notFound("User not found");

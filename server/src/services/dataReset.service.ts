@@ -130,7 +130,9 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     });
 
     return { deleted };
-    });
+    // Wiping a large change_log can outlast Prisma's 5s default, which would
+    // roll the whole reset back (and make it impossible to ever finish).
+    }, { timeout: 120_000, maxWait: 10_000 });
 
     consumeResetToken(tokenId);
     broadcastRealtimeEvent();

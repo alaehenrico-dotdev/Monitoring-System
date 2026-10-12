@@ -29,7 +29,19 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
   onUnauthorized = fn;
 }
 
-const REQUEST_TIMEOUT_MS = 4_000;
+// Reads fail fast so a dead server surfaces quickly. Writes get longer: an
+// abort doesn't stop the server committing, so cutting a slow-but-successful
+// save at 4s shows "failed" for data that was in fact written (and invites a
+// duplicate retry). Wipes/publishes touch many rows and get the longest.
+const READ_TIMEOUT_MS = 4_000;
+const WRITE_TIMEOUT_MS = 30_000;
+const BULK_TIMEOUT_MS = 120_000;
+const BULK_PATH = /^\/(data-reset\/|manual-counts\/publish|import-batches)/;
+
+function timeoutFor(path: string, method: string | undefined): number {
+  if (BULK_PATH.test(path)) return BULK_TIMEOUT_MS;
+  return !method || method === "GET" ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS;
+}
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
@@ -40,7 +52,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutFor(path, options.method));
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
@@ -66,7 +78,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // A wrong password on the login form (or the re-login dialog) is also a
     // 401, but it isn't an expired session - it must not clear the token or
     // trip the global handler.
-    if (response.status === 401 && !path.startsWith("/auth/login")) {
+    //
+    // Only act if the token is still the one this request was sent with. A
+    // slow request from before a re-login can come back 401 after the new
+    // token is stored; clearing it then would sign the user straight back out.
+    if (response.status === 401 && !path.startsWith("/auth/login") && getToken() === token) {
       setToken(null);
       onUnauthorized?.();
     }

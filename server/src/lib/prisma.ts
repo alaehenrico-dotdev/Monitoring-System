@@ -55,7 +55,14 @@ export async function serializableTransaction<T>(
 ): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      // timeout: propagating a corrected figure through months of later saved
+      // periods is many sequential queries; the 5s default would roll back a
+      // legitimate edit and surface it as an error.
+      return await prisma.$transaction(fn, {
+        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        timeout: 60_000,
+        maxWait: 10_000,
+      });
     } catch (err) {
       const isConflict = err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2034";
       if (!isConflict || attempt >= attempts) throw err;

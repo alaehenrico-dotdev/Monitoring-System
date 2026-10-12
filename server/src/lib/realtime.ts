@@ -1,3 +1,4 @@
+import { invalidatePrefix } from "./cache";
 import type { Server as HttpServer } from "http";
 import { WebSocket, WebSocketServer } from "ws";
 import { verifyToken } from "../utils/jwt";
@@ -22,7 +23,9 @@ const HEARTBEAT_INTERVAL_MS = 30000;
 const authenticatedClients = new Set<WebSocket>();
 
 export function attachRealtime(server: HttpServer): void {
-  const wss = new WebSocketServer({ noServer: true });
+  const wss = // maxPayload: the only thing a client ever sends is a tiny auth message,
+  // so don't accept the 100 MiB ws default from an unauthenticated peer.
+  new WebSocketServer({ noServer: true, maxPayload: 4096 });
 
   server.on("upgrade", (req, socket, head) => {
     if (!req.url || !req.url.startsWith("/ws")) {
@@ -35,6 +38,11 @@ export function attachRealtime(server: HttpServer): void {
   });
 
   wss.on("connection", (ws: WebSocket) => {
+    // Without an "error" listener, a malformed frame from any peer (even an
+    // unauthenticated one) is an uncaught exception, which server.ts turns
+    // into a full process shutdown.
+    ws.on("error", () => ws.terminate());
+
     const authTimer = setTimeout(() => {
       ws.close(4001, "Auth timeout");
     }, AUTH_TIMEOUT_MS);
@@ -82,7 +90,13 @@ export function attachRealtime(server: HttpServer): void {
   wss.on("close", () => clearInterval(heartbeat));
 }
 
+/// Called after every committed data change (saves, publish, reset, restore).
+/// Also drops the dashboard's cached days-of-stock aggregate: it is a 60s
+/// cache over the stock tables, so without this a reset (or any save) left it
+/// showing the previous data for up to a minute while every other card was
+/// already correct.
 export function broadcastRealtimeEvent(): void {
+  invalidatePrefix("days-of-stock:");
   const message = JSON.stringify({ type: "data-changed", at: new Date().toISOString() });
   for (const ws of authenticatedClients) {
     if (ws.readyState === WebSocket.OPEN) ws.send(message);

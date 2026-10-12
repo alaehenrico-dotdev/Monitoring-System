@@ -162,3 +162,32 @@ describe("errorHandler - unexpected errors", () => {
     expect(sent.status).toBe(500);
   });
 });
+
+describe("errorHandler - input and timeout errors", () => {
+  it("maps a ZodError from .parse() to 400, not 500", async () => {
+    const { z } = await import("zod");
+    const { res, sent } = makeRes();
+    let err: unknown;
+    try {
+      z.enum(["ONLINE", "OFFLINE"]).parse("x");
+    } catch (e) {
+      err = e;
+    }
+    errorHandler(err, makeReq(), res, next);
+    expect(sent.status).toBe(400);
+    expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it.each(["P2000", "P2020"])("maps %s (value too long / out of range) to 400", (code) => {
+    const { res, sent } = makeRes();
+    errorHandler(prismaKnown(code), makeReq(), res, next);
+    expect(sent.status).toBe(400);
+    expect(JSON.stringify(sent.body)).not.toContain("internal prisma text");
+  });
+
+  it("maps a timed-out transaction (P2028) to a retryable 503", () => {
+    const { res, sent } = makeRes();
+    errorHandler(prismaKnown("P2028"), makeReq(), res, next);
+    expect(sent.status).toBe(503);
+  });
+});

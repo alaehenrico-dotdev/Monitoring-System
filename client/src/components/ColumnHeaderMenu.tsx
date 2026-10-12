@@ -82,8 +82,6 @@ export const ColumnHeaderMenu = memo(function ColumnHeaderMenu({
     },
   ];
 
-  const current = (target.color ?? "").toLowerCase();
-
   return (
     <ContextMenu
       anchor={{ x: target.x, y: target.y }}

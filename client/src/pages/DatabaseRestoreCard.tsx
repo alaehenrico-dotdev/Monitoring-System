@@ -165,6 +165,7 @@ export function DatabaseRestoreCard() {
               <Button
                 type="button"
                 variant="secondary"
+                className="ae-btn-solid"
                 size="sm"
                 onClick={() => fileInput.current?.click()}
                 disabled={busy}

@@ -1,117 +1,43 @@
-import { motion, useReducedMotion } from "motion/react";
+import type { CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { colors } from "../theme";
 
-const SIZES = { sm: 16, md: 24, lg: 36 } as const;
+/// The transparent-background Ala Eh! logo, used exactly as supplied (also the
+/// poster frame of LogoMark's video, so it is usually already cached).
+const LOGO_SRC = "/alaeh-logo-3d-poster.png";
 
+const SIZES = { sm: 18, md: 28, lg: 44, xl: 72, xxl: 128 } as const;
+
+/// The app's loading indicator: the logo, unmodified, with a gold arc orbiting
+/// just outside it (the animation lives in index.css, .ae-logo-orbit). Stands
+/// in for a plain spinner everywhere something is waiting. `color` tints the
+/// arc (e.g. red inside a danger button); the logo never changes. Honors
+/// prefers-reduced-motion with a static arc.
 export function Spinner({
   size = "md",
   color = colors.yellow,
-  percent,
 }: {
   size?: keyof typeof SIZES | number;
   color?: string;
-  /// When given (0-100), renders a determinate ring showing that real
-  /// share of work done, with the number in the center, instead of the
-  /// plain indeterminate spin below. Pass this wherever real per-item
-  /// progress already exists (see LoadingOverlay during a multi-row Save)
-  /// so the one animation on screen actually reports progress rather than
-  /// just "something is happening" - same "no fake looping progress" rule
-  /// the top progress bar follows (hooks/useTopProgress.tsx).
-  percent?: number;
 }) {
   const px = typeof size === "number" ? size : SIZES[size];
-  // Framer Motion's `animate`/`repeat` don't honor prefers-reduced-motion on
-  // their own (unlike the plain-CSS shimmer/pulse elsewhere in the loading
-  // system) - `useReducedMotion` reads the OS setting directly so a
-  // continuously-spinning ring doesn't run for someone who's asked their
-  // system to minimize motion. A static ring still reads as "busy" (the
-  // gap in its border) without ever actually moving.
-  const reducedMotion = useReducedMotion();
-
-  if (percent !== undefined) {
-    const clamped = Math.min(100, Math.max(0, percent));
-    const stroke = Math.max(2, Math.round(px / 8));
-    const radius = (px - stroke) / 2;
-    const circumference = 2 * Math.PI * radius;
-    return (
-      <span
-        role="status"
-        aria-live="polite"
-        style={{
-          position: "relative",
-          display: "inline-flex",
-          width: px,
-          height: px,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <svg
-          width={px}
-          height={px}
-          style={{ transform: "rotate(-90deg)" }}
-          aria-hidden
-        >
-          <circle
-            cx={px / 2}
-            cy={px / 2}
-            r={radius}
-            fill="none"
-            stroke={`color-mix(in srgb, ${color} 25%, transparent)`}
-            strokeWidth={stroke}
-          />
-          <circle
-            cx={px / 2}
-            cy={px / 2}
-            r={radius}
-            fill="none"
-            stroke={color}
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            strokeDasharray={circumference}
-            strokeDashoffset={circumference * (1 - clamped / 100)}
-            style={{
-              transition: reducedMotion
-                ? undefined
-                : "stroke-dashoffset 150ms linear",
-            }}
-          />
-        </svg>
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            fontSize: Math.max(9, Math.round(px / 3.2)),
-            fontWeight: 700,
-            color,
-          }}
-        >
-          {Math.round(clamped)}%
-        </span>
-      </span>
-    );
-  }
-
+  const style = { width: px, height: px, "--lp": `${px}px`, "--ring": color } as CSSProperties;
   return (
-    <motion.span
-      aria-hidden
-      animate={reducedMotion ? undefined : { rotate: 360 }}
-      transition={
-        reducedMotion
-          ? undefined
-          : { repeat: Infinity, duration: 0.8, ease: "linear" }
-      }
-      style={{
-        display: "inline-block",
-        width: px,
-        height: px,
-        borderRadius: "50%",
-        border: `${Math.max(2, Math.round(px / 8))}px solid color-mix(in srgb, ${color} 25%, transparent)`,
-        borderTopColor: color,
-        boxSizing: "border-box",
-      }}
-    />
+    <span aria-hidden className="ae-logo-pulse" style={style}>
+      <span className="ae-logo-orbit">
+        <span className="ae-logo-orbit-arc" />
+        <span className="ae-logo-orbit-dot" />
+      </span>
+      <img
+        className="ae-logo-pulse-img"
+        src={LOGO_SRC}
+        alt=""
+        width={px}
+        height={px}
+        decoding="async"
+        draggable={false}
+      />
+    </span>
   );
 }
 
@@ -121,7 +47,7 @@ export function Spinner({
 /// every wait state instead of each page inventing its own.
 export function LoadingBlock({
   label = "Loading…",
-  size = "md",
+  size = "xl",
   minHeight = 120,
 }: {
   label?: string;
@@ -137,7 +63,7 @@ export function LoadingBlock({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        gap: 10,
+        gap: 18,
         minHeight,
         padding: "16px",
         color: colors.subtleInk,
@@ -145,7 +71,7 @@ export function LoadingBlock({
       }}
     >
       <Spinner size={size} />
-      <span>{label}</span>
+      {label && <span style={{ fontWeight: 600 }}>{label}</span>}
     </div>
   );
 }
@@ -154,7 +80,7 @@ export function LoadingBlock({
 /// have room for LoadingBlock's centered column, e.g. a small card message.
 export function InlineLoading({
   label = "Loading…",
-  size = "sm",
+  size = "md",
 }: {
   label?: string;
   size?: keyof typeof SIZES | number;
@@ -192,6 +118,8 @@ export function LoadingOverlay({
   percent,
 }: {
   label?: string;
+  /// 0-100, when real per-item progress exists (a multi-row Save). Shown as a
+  /// number beside the label - the pulsing logo itself is indeterminate.
   percent?: number;
 }) {
   return createPortal(
@@ -213,12 +141,13 @@ export function LoadingOverlay({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 12,
+          gap: 22,
         }}
       >
-        <Spinner size="lg" percent={percent} />
+        <Spinner size="xxl" />
         <span style={{ color: colors.cream, fontSize: 14, fontWeight: 600 }}>
           {label}
+          {percent !== undefined && ` ${Math.round(Math.min(100, Math.max(0, percent)))}%`}
         </span>
       </div>
     </div>,

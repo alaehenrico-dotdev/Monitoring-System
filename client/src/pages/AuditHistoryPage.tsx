@@ -5,7 +5,7 @@ export function AuditHistoryPage() {
     <ReportHistoryPage
       type="Audit Report"
       title="Audit History"
-      subtitle="Previously downloaded Manual Counting & Variance sheets."
+      subtitle="Past Manual Count & Variance sheets."
       backTo="/manual-count"
       backLabel="Back to Audit"
     />

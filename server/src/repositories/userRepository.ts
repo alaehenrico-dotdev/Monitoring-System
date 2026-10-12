@@ -31,7 +31,7 @@ export const userRepository = {
   /// middleware/auth.ts - runs on every cache-miss for an authenticated
   /// request, so it skips passwordHash and everything else findById pulls.
   findStatus(id: number) {
-    return prisma.user.findUnique({ where: { id }, select: { isActive: true, role: true } });
+    return prisma.user.findUnique({ where: { id }, select: { isActive: true, role: true, tokenVersion: true } });
   },
 
   findAllPublic() {
@@ -40,6 +40,12 @@ export const userRepository = {
 
   create(data: UserCreateData, db: Db = prisma) {
     return db.user.create({ data, select: PUBLIC_USER_SELECT });
+  },
+
+  /// Also bumps tokenVersion, so every session opened with the old password
+  /// stops working (see middleware/auth.ts).
+  setPasswordHash(id: number, passwordHash: string, db: Db = prisma) {
+    return db.user.update({ where: { id }, data: { passwordHash, tokenVersion: { increment: 1 } }, select: { id: true } });
   },
 
   setActive(id: number, isActive: boolean, db: Db = prisma) {

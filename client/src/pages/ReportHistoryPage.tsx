@@ -85,19 +85,21 @@ export function ReportHistoryPage({
     <div>
       <PageHeader title={title} subtitle={subtitle}>
         <Toolbar className="no-print">
-          <Link
-            to={backTo}
-            className="ae-btn ae-btn-secondary"
-            style={{ textDecoration: "none" }}
-          >
-            {backLabel}
-          </Link>
-          <ToolbarControls>
+          <div>
+            <Link
+              to={backTo}
+              className="ae-btn ae-btn-secondary"
+              style={{ textDecoration: "none" }}
+            >
+              {backLabel}
+            </Link>
             <SearchInput
               value={query}
               onChange={setQuery}
               placeholder="Search by date or category…"
             />
+          </div>
+          <ToolbarControls>
             <button
               type="button"
               className="ae-btn ae-btn-secondary"

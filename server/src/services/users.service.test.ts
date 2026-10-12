@@ -6,13 +6,15 @@ vi.mock("../lib/prisma", () => ({
 }));
 vi.mock("../lib/cache", () => ({ invalidate: vi.fn() }));
 vi.mock("../repositories/userRepository", () => ({
-  userRepository: { findByUsername: vi.fn(), findById: vi.fn(), create: vi.fn(), setActive: vi.fn(), findAllPublic: vi.fn() },
+  userRepository: { findByUsername: vi.fn(), findById: vi.fn(), create: vi.fn(), setActive: vi.fn(), findAllPublic: vi.fn(), setPasswordHash: vi.fn() },
 }));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 
 import { userRepository } from "../repositories/userRepository";
 import { recordChange } from "./changeLog.service";
-import { createUser, setUserActive } from "./users.service";
+import bcrypt from "bcryptjs";
+import { invalidate } from "../lib/cache";
+import { createUser, resetUserPassword, setUserActive } from "./users.service";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -64,5 +66,32 @@ describe("setUserActive - audit trail", () => {
     await setUserActive(5, true, 1);
 
     expect(recordChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("resetUserPassword", () => {
+  it("stores a hash of the new password and audits it without the secret", async () => {
+    vi.mocked(userRepository.findById).mockResolvedValue({ id: 5, username: "ben" } as never);
+    await resetUserPassword(5, "brand-new-pass", 1);
+    const [id, hash, db] = vi.mocked(userRepository.setPasswordHash).mock.calls[0];
+    expect(id).toBe(5);
+    expect(db).toBe(tx);
+    expect(await bcrypt.compare("brand-new-pass", hash)).toBe(true);
+    const [entry] = vi.mocked(recordChange).mock.calls[0];
+    expect(entry).toMatchObject({ tableName: "users", recordId: 5, action: "UPDATE", changedById: 1 });
+    expect(JSON.stringify(entry)).not.toMatch(/brand-new-pass/);
+    expect(JSON.stringify(entry)).not.toContain(hash);
+  });
+
+  it("drops the cached account status so the old sessions are refused at once", async () => {
+    vi.mocked(userRepository.findById).mockResolvedValue({ id: 5, username: "ben" } as never);
+    await resetUserPassword(5, "brand-new-pass", 1);
+    expect(invalidate).toHaveBeenCalledWith("user-status:5");
+  });
+
+  it("404s for an unknown user", async () => {
+    vi.mocked(userRepository.findById).mockResolvedValue(null);
+    await expect(resetUserPassword(99, "brand-new-pass", 1)).rejects.toMatchObject({ status: 404 });
+    expect(userRepository.setPasswordHash).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOfflineGrid, saveOfflineEntry } from "../api/offlineStock";
-import { getOnlineGrid } from "../api/onlineStock";
 import { useAuth } from "../context/AuthContext";
 import { Button } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
@@ -30,8 +29,6 @@ import { saveManualCount } from "../api/manualCounts";
 import {
   MANUAL_COUNT_KEY,
   manualCountColumn,
-  useEntryManualCounts,
-  useRowsWithManualCounts,
 } from "../hooks/useEntryManualCounts";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
@@ -75,9 +72,6 @@ import {
 import {
   calculateOfflineRemaining,
   calculateOfflineStock,
-  calculateOnlineRemaining,
-  calculateOnlineStock,
-  isNegativeStock,
 } from "../utils/stockMath";
 import { colors } from "../theme";
 import type { Shift } from "../types";
@@ -204,12 +198,6 @@ export function OfflineEntryPage() {
     [rows, pending, baselines],
   );
 
-  // This shift's manual counts, shown in the MANUAL COUNTING column and saved
-  // with the entry. CSV import is not offered here - opening-stock counts are
-  // only imported on the Manual Count page (the authorized audit source).
-  const { counts: manualCounts, loaded: manualCountsLoaded } =
-    useEntryManualCounts(date, shift, "OFFLINE");
-  const csvRows = useRowsWithManualCounts(rows, manualCounts);
   const csvColumns = useMemo(() => [...columns, manualCountColumn], []);
   const gridColumns = columns;
 
@@ -287,9 +275,20 @@ export function OfflineEntryPage() {
     // it already had staged (if any), instead of both always starting empty.
   });
   useEffect(() => {
+    // Ignore a response that lands after the date/shift changed (or after a
+    // newer refetch started) - otherwise a slow reply for the old sheet would
+    // overwrite the new one and edits would be diffed against the wrong rows.
+    let cancelled = false;
     getOfflineGrid(date, shift)
-      .then((data) => setRows(data as unknown as GridRow[]))
-      .catch((e) => setError(e.message));
+      .then((data) => {
+        if (!cancelled) setRows(data as unknown as GridRow[]);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [date, shift, realtimeVersion, reconnects]);
 
   // Best-effort check of whether the *other* shift already has saved
@@ -303,30 +302,20 @@ export function OfflineEntryPage() {
   >(null);
   useResetOnKeyChange(`${date}:${shift}`, () => setOtherShiftCount(null));
   useEffect(() => {
+    let cancelled = false;
     getOfflineGrid(date, otherShift(shift))
-      .then((data) =>
-        setOtherShiftCount(
-          (data as unknown as GridRow[]).filter((r) => r.isSaved).length,
-        ),
-      )
-      .catch(() => setOtherShiftCount(null));
-  }, [date, shift, realtimeVersion, reconnects]);
-
-  // Best-effort - CSV import's advisory negative-stock pre-check
-  // (validateImportRow, below) needs the CURRENT shift's Online rows to
-  // predict whether a Stocks In/Out (Ol<->Off) change would push a
-  // mirrored transfer negative on the Online side. If this fails to load,
-  // the pre-check just skips that one case rather than blocking anything.
-  const [onlineRowsForImportCheck, setOnlineRowsForImportCheck] = useState<
-    GridRow[] | null
-  >(null);
-  useResetOnKeyChange(`${date}:${shift}`, () =>
-    setOnlineRowsForImportCheck(null),
-  );
-  useEffect(() => {
-    getOnlineGrid(date, shift)
-      .then((data) => setOnlineRowsForImportCheck(data as unknown as GridRow[]))
-      .catch(() => setOnlineRowsForImportCheck(null));
+      .then((data) => {
+        if (!cancelled)
+          setOtherShiftCount(
+            (data as unknown as GridRow[]).filter((r) => r.isSaved).length,
+          );
+      })
+      .catch(() => {
+        if (!cancelled) setOtherShiftCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [date, shift, realtimeVersion, reconnects]);
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
@@ -583,7 +572,7 @@ export function OfflineEntryPage() {
     <div>
       <PageHeader
         title={`Daily Offline Stock Monitoring - ${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`}
-        subtitle="Stocks In/Out transfers here mirror automatically onto the Online table."
+        subtitle="Stocks In/Out transfers also update the Online table."
       >
         <Toolbar className="no-print ae-toolbar-entry">
           <div

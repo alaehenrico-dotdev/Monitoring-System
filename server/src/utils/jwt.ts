@@ -16,8 +16,8 @@ import type { AuthUser } from "../types/express";
  */
 const ALGORITHM = "HS256" as const;
 
-export function signToken(user: AuthUser, expiresIn: string = env.jwtExpiresIn): string {
-  return jwt.sign(user, env.jwtSecret, {
+export function signToken(user: AuthUser, expiresIn: string = env.jwtExpiresIn, tokenVersion = 0): string {
+  return jwt.sign({ ...user, tv: tokenVersion }, env.jwtSecret, {
     algorithm: ALGORITHM,
     expiresIn: expiresIn as jwt.SignOptions["expiresIn"],
   });
