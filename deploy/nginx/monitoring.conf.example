@@ -1,7 +1,21 @@
+# HSTS is only emitted over HTTPS (Certbot's HTTPS server block). Copy
+# deploy/nginx/snippets/ala-eh-security-headers.conf to
+# /etc/nginx/snippets/ on the VPS - see PRODUCTION.md section 5.
+map $scheme $ala_eh_hsts {
+    https   "max-age=31536000; includeSubDomains";
+    default "";
+}
+
 server {
     listen 80;
     listen [::]:80;
     server_name monitor.example.com;
+
+    # Hide the nginx version, and send the security headers (CSP, nosniff,
+    # frame/referrer policy, HSTS over HTTPS). Locations below that set their
+    # own add_header must include the snippet again - nginx does not inherit.
+    server_tokens off;
+    include /etc/nginx/snippets/ala-eh-security-headers.conf;
 
     root /var/www/ala-eh/client/dist;
     index index.html;
@@ -26,15 +40,18 @@ server {
         text/plain;
 
     location = /index.html {
+        include /etc/nginx/snippets/ala-eh-security-headers.conf;
         add_header Cache-Control "no-cache" always;
     }
 
     location = /sw.js {
+        include /etc/nginx/snippets/ala-eh-security-headers.conf;
         add_header Cache-Control "no-cache" always;
         try_files $uri =404;
     }
 
     location /assets/ {
+        include /etc/nginx/snippets/ala-eh-security-headers.conf;
         expires 1y;
         add_header Cache-Control "public, immutable";
         try_files $uri =404;

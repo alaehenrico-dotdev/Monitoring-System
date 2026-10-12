@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+.git
+.github
+.claude
+**/.env
+**/.env.local
+**/*.log
+**/*.tsbuildinfo
+coverage
+*.md
+!server/ARCHITECTURE.md
+certs

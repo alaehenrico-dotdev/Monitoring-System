@@ -35,3 +35,9 @@ export function invalidatePrefix(prefix: string) {
     if (key.startsWith(prefix)) store.delete(key);
   }
 }
+
+/// Drops every cached value - for operations that replace data wholesale (a
+/// database restore), where no single key can be named.
+export function invalidateAll() {
+  store.clear();
+}

@@ -36,6 +36,11 @@ async function authenticateHandler(req: Request, _res: Response, next: NextFunct
   if (!status || !status.isActive) {
     throw HttpError.unauthorized("Account is no longer active");
   }
+  // A credential reset bumps the account's tokenVersion; a token issued
+  // before that is no longer valid even though it has not expired.
+  if ((decoded.tv ?? 0) !== status.tokenVersion) {
+    throw HttpError.unauthorized("Your session has ended - please sign in again");
+  }
 
   req.user = { ...decoded, role: status.role };
   next();

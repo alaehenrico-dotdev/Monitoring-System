@@ -37,10 +37,7 @@ export function useSessionExpiryWatch(
   const [minutesLeft, setMinutesLeft] = useState<number | null>(null);
 
   useEffect(() => {
-    if (!active) {
-      setMinutesLeft(null);
-      return;
-    }
+    if (!active) return;
     function check() {
       const exp = tokenExpiryMs();
       if (exp === null || countAllUnsavedWork() === 0) {
@@ -64,5 +61,6 @@ export function useSessionExpiryWatch(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
 
-  return minutesLeft;
+  // Inactive means no warning, whatever the last check left behind.
+  return active ? minutesLeft : null;
 }

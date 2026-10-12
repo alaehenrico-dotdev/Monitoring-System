@@ -82,6 +82,18 @@ export default tseslint.config(
     },
   },
   {
+    // Providers/hooks that deliberately co-export a component with its hook or
+    // helpers (context + useX, etc.). Splitting them would touch every
+    // importer for a dev-only Fast Refresh nicety, so the rule is off here.
+    files: [
+      "client/src/components/{CursorGlow,QuickJump,RestockCards,StockGrid,Toast,ZoomControl}.tsx",
+      "client/src/context/*.tsx",
+      "client/src/hooks/useTopProgress.tsx",
+      "client/src/pages/VarianceReportPage.tsx",
+    ],
+    rules: { "react-refresh/only-export-components": "off" },
+  },
+  {
     // The service worker runs in a ServiceWorkerGlobalScope, not a window or
     // Node - so `self`, `caches`, `fetch`, `Response` and `URL` are all
     // legitimately global here. Scoped to this one file rather than

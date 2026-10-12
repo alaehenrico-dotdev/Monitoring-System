@@ -419,8 +419,9 @@ export function DashboardPage() {
       </div>
 
       {/* "What needs attention" row: entry progress for the shift, the
-          biggest variances, and low/negative stock. The last two reuse the
-          Total Stocks rows already fetched for the stat cards. */}
+          biggest variances, low/negative stock and the lowest days left.
+          The variance and low-stock cards reuse the Total Stocks rows
+          already fetched for the stat cards. */}
       <div className="ae-dash-insights">
         <EntryStatusCard date={viewDate} defaultShift={currentShift} />
         <VarianceTopCard
@@ -429,10 +430,12 @@ export function DashboardPage() {
           failed={showStatsError}
         />
         <LowStockCard rows={stocks} failed={showStatsError} />
-        {/* Both read one shared fetch (see useDaysOfStock) - "Needs restock"
-            hides itself entirely when nothing is below its alert level. */}
-        <NeedsRestockCard rows={daysOfStock} failed={daysOfStockFailed} />
+        {/* Sits in the first row beside the other three. It and "Needs
+            restock" read one shared fetch (see useDaysOfStock) - "Needs
+            restock" hides itself entirely when nothing is below its alert
+            level. */}
         <LowestDaysLeftCard rows={daysOfStock} failed={daysOfStockFailed} />
+        <NeedsRestockCard rows={daysOfStock} failed={daysOfStockFailed} />
       </div>
 
       {/* Two columns: the monitoring stat cards with Recent Activity

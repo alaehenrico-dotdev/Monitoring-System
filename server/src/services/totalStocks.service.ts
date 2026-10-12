@@ -83,7 +83,13 @@ export async function getTotalStocksGrid(entryDate: Date) {
     // Same formula as Manual Count's own variance (manualCounts.service.ts) -
     // shared via calculateVariance rather than re-derived here, so the two
     // can never drift onto different sign conventions.
-    const totalVariance = totalManualCount === null ? null : calculateVariance(totalRemainingStock, totalManualCount);
+    //
+    // Opening balances seed the system rather than audit it, so when every
+    // count behind the figure is one, there is no variance to report.
+    const countsUsed = totalCount ? [totalCount] : locationCount;
+    const allOpeningBalances = countsUsed.length > 0 && countsUsed.every((c) => c.isOpeningBalance);
+    const totalVariance =
+      totalManualCount === null ? null : allOpeningBalances ? 0 : calculateVariance(totalRemainingStock, totalManualCount);
 
     return {
       product,

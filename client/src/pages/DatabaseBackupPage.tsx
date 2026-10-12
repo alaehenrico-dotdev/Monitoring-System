@@ -107,6 +107,7 @@ export function DatabaseBackupPage() {
         )}
         <Button
           variant="secondary"
+          className="ae-btn-solid"
           size="sm"
           onClick={handleDownload}
           disabled={downloading}

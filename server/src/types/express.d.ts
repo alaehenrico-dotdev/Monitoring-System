@@ -5,6 +5,10 @@ export interface AuthUser {
   username: string;
   name: string;
   role: Role;
+  /// Token version the session was issued under (JWT claim `tv`); compared with
+  /// users.tokenVersion on every request. Absent on tokens issued before the
+  /// column existed, which count as version 0.
+  tv?: number;
 }
 
 declare global {

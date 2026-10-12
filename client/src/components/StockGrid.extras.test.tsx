@@ -55,6 +55,10 @@ const menuItems = () => [
   ...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
 ];
 
+// The header menu also carries the color picker's "Reset color" item; the
+// tests below that count items are about the add/delete column actions only.
+const actionItems = () => menuItems().filter((b) => b.textContent !== "Reset color");
+
 describe("StockGrid extra-column header menu", () => {
   it("opens only on editable headers, and never on calculated ones", () => {
     const { container } = renderGrid();
@@ -114,7 +118,7 @@ describe("StockGrid extra-column header menu", () => {
   it("lists delete items only once the column has added columns", () => {
     const { container, rerender } = renderGrid();
     fireEvent.contextMenu(headerFor(container, "Stocks In"));
-    expect(menuItems()).toHaveLength(3);
+    expect(actionItems()).toHaveLength(3);
     fireEvent.keyDown(menu()!, { key: "Escape" });
 
     const onRemoveExtraColumns = vi.fn();
@@ -129,7 +133,7 @@ describe("StockGrid extra-column header menu", () => {
       />,
     );
     fireEvent.contextMenu(headerFor(container, "Stocks In"));
-    const items = menuItems();
+    const items = actionItems();
     expect(items).toHaveLength(5);
     fireEvent.click(items[4]);
     expect(onRemoveExtraColumns).toHaveBeenCalledWith("stockIn", [1, 2]);
@@ -259,7 +263,7 @@ describe("Delivery (Out) uses the same added-column mechanism", () => {
     );
     fireEvent.contextMenu(headerFor(container, "Delivery (Out)"));
     expect(menu()).not.toBeNull();
-    expect(menuItems().map((b) => b.textContent)).toEqual([
+    expect(actionItems().map((b) => b.textContent)).toEqual([
       "Add column: +1",
       "Add column: +2",
       "Add column: +5",

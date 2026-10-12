@@ -47,7 +47,11 @@ CREATE USER 'alaeh_app'@'127.0.0.1' IDENTIFIED BY 'REPLACE_WITH_A_LONG_PASSWORD'
 GRANT ALL PRIVILEGES ON ala_eh_stocks.* TO 'alaeh_app'@'127.0.0.1';
 ```
 
-Keep MySQL bound to localhost; do not open port 3306 to the Internet. Set
+Keep MySQL bound to localhost; do not open port 3306 to the Internet. Confirm
+with `bind-address = 127.0.0.1` in the server config (MariaDB's `my.cnf`, or
+`my.ini` under XAMPP) and verify from another machine that port 3306 refuses
+connections. Use a supported release - MariaDB 10.3 and 10.4 no longer get
+security fixes. Set
 `DATABASE_URL` in `server/.env` to the MySQL connection string. URL-encode
 special characters in the username or password.
 
@@ -212,6 +216,14 @@ The configuration serves the SPA, forwards `/api` and `/health`, and upgrades
 the server's 512 MiB limit and streams those uploads instead of buffering them
 on disk.
 
+The config sends the security headers (Content-Security-Policy, `nosniff`,
+frame and referrer policy, and HSTS over HTTPS) and hides the Nginx version.
+The headers live in
+[`deploy/nginx/snippets/ala-eh-security-headers.conf`](deploy/nginx/snippets/ala-eh-security-headers.conf);
+copy it to `/etc/nginx/snippets/` on the VPS before reloading. The Content
+Security Policy matches the one the client build embeds (`client/vite.config.ts`);
+if you add an external script, font or API origin, allow it in both places.
+
 Validate and reload Nginx, then issue a TLS certificate with Certbot or
 Hostinger's supported certificate flow:
 
@@ -229,6 +241,33 @@ curl --fail https://monitor.example.com/health
 
 It should return `{"status":"ok","database":"ok"}`. `/health/live` checks the
 process without requiring the database.
+
+### Docker deployment over HTTPS
+
+The Docker setup (`docker-compose.yml`) serves plain HTTP on port 8080, which
+is only suitable on a trusted network. For anything else, run the HTTPS
+overlay, which terminates TLS in the web container, redirects HTTP to HTTPS,
+and enables HSTS:
+
+1. Put your certificate chain and key in `certs/fullchain.pem` and
+   `certs/privkey.pem` (the folder is git-ignored). For local testing, a
+   self-signed pair:
+
+   ```bash
+   mkdir certs
+   MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD/certs:/certs" alpine/openssl req -x509 -newkey rsa:2048 -nodes -days 365      -keyout /certs/privkey.pem -out /certs/fullchain.pem -subj "/CN=localhost"      -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+   ```
+
+2. In `.env`, set `CLIENT_ORIGIN=https://your.host` (no trailing slash).
+3. Start it:
+
+   ```bash
+   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+   ```
+
+It listens on 80 and 443 (`HTTP_PORT` / `HTTPS_PORT` in `.env` change that; the
+redirect assumes the standard 443). The database container is never published
+to the host. Only publish ports you mean to expose.
 
 ## 6. Deploy updates
 

@@ -87,3 +87,27 @@ describe("getTotalStocksGrid - totalVariance", () => {
     expect(rows[0].totalVariance).toBe(-10);
   });
 });
+
+describe("getTotalStocksGrid - an opening balance is not a variance", () => {
+  beforeEach(() => {
+    vi.mocked(dailyOnlineStockRepository.findAllForDate).mockImplementation(((_d: Date, shift: string) =>
+      Promise.resolve(shift === "NIGHT" ? [onlineRow(0)] : [])) as never);
+    vi.mocked(dailyOfflineStockRepository.findAllForDate).mockImplementation(((_d: Date, shift: string) =>
+      Promise.resolve(shift === "NIGHT" ? [offlineRow(0)] : [])) as never);
+  });
+  const count = (isOpeningBalance: boolean) =>
+    [{ productId: PRODUCT_ID, location: "ONLINE", shift: "NIGHT", manualCount: 120, isOpeningBalance }] as never;
+
+  it("reports 0 variance when the only count behind the figure is an opening balance", async () => {
+    vi.mocked(manualCountRepository.findForTotals).mockResolvedValue(count(true));
+    const [row] = await getTotalStocksGrid(DATE);
+    expect(row.totalManualCount).toBe(120);
+    expect(row.totalVariance).toBe(0);
+  });
+
+  it("still reports the real variance for an ordinary count", async () => {
+    vi.mocked(manualCountRepository.findForTotals).mockResolvedValue(count(false));
+    const [row] = await getTotalStocksGrid(DATE);
+    expect(row.totalVariance).toBe(-120);
+  });
+});

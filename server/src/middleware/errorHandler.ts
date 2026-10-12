@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { Prisma } from "@prisma/client";
+import { ZodError } from "zod";
 import { HttpError } from "../utils/HttpError";
 
 export function notFoundHandler(req: Request, res: Response) {
@@ -40,6 +41,11 @@ function fromPrisma(err: unknown): HttpError | null {
         return HttpError.badRequest(
           "That record refers to something that no longer exists - reload and try again.",
         );
+      case "P2000":
+      case "P2020":
+        // A value too long / out of range for its column - the client sent
+        // something the schema cannot hold, not a server fault.
+        return HttpError.badRequest("A value was too long or too large.");
       case "P2025":
         return HttpError.notFound("That record no longer exists.");
       case "P2034":
@@ -49,9 +55,18 @@ function fromPrisma(err: unknown): HttpError | null {
           503,
           "The server is busy with another change to the same record - please try again.",
         );
+      case "P2028":
+        // An interactive transaction outlived its timeout (a big reset,
+        // revert or propagation) and was rolled back. Nothing was half-applied.
+        return new HttpError(503, "That took too long and was rolled back - please try again.");
       default:
         return null;
     }
+  }
+  if (err instanceof ZodError) {
+    // Controllers that call .parse() (not .safeParse) land here; bad input is
+    // a 400, not a 500 with a logged stack.
+    return HttpError.badRequest(err.issues[0]?.message ?? "Invalid request.", err.flatten());
   }
   if (err instanceof Prisma.PrismaClientValidationError) {
     // A malformed query built from user input that got past zod. A 400 is

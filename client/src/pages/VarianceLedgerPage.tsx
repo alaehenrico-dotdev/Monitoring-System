@@ -14,13 +14,29 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { downloadCsv } from "../utils/csv";
 import { matchesSearch } from "../utils/search";
 import { formatDateDisplay } from "../utils/dateFormat";
-import { buildVarianceLedger, varianceLedgerCsv, type LedgerCount } from "../utils/varianceLedger";
+import {
+  buildVarianceLedger,
+  varianceLedgerCsv,
+  type LedgerCount,
+} from "../utils/varianceLedger";
 import { colors } from "../theme";
 
 type Scope = "all" | "off" | "recurring";
-const COLUMNS = ["", "SKU", "Product", "Counts", "Off", "Net", "Total discrepancy", "Last off", "Counted most by", "Explained"];
+const COLUMNS = [
+  "",
+  "SKU",
+  "Product",
+  "Counts",
+  "Off",
+  "Net",
+  "Total discrepancy",
+  "Last off",
+  "Counted most by",
+  "Explained",
+];
 
-const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const isoDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const daysAgo = (n: number) => {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -71,7 +87,8 @@ export function VarianceLedgerPage() {
     () =>
       ledger.filter(
         (r) =>
-          (scope === "all" || (scope === "off" ? r.flagged > 0 : r.recurring)) &&
+          (scope === "all" ||
+            (scope === "off" ? r.flagged > 0 : r.recurring)) &&
           matchesSearch([r.sku, r.name, r.category, r.topCounter?.name], query),
       ),
     [ledger, scope, query],
@@ -87,32 +104,14 @@ export function VarianceLedgerPage() {
     <div>
       <PageHeader
         title="Variance Ledger"
-        subtitle="Which SKUs keep coming up short or over, by how much, who was counting, and why. Built from saved manual counts."
+        subtitle="SKUs that are often short or over, with amounts, counters, and reasons."
       >
         <Toolbar className="no-print">
           <div>
-            <DateRangePicker
-              className="ae-fit"
-              aria-label="Date range"
-              from={from}
-              to={to}
-              onChange={(f, t) =>
-                changeFilters(() => {
-                  setFrom(f);
-                  setTo(t);
-                })
-              }
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="Location"
-              value={location}
-              onChange={(v) => changeFilters(() => setLocation(v))}
-              options={[
-                { value: "", label: "Online + Offline" },
-                { value: "ONLINE", label: "Online" },
-                { value: "OFFLINE", label: "Offline" },
-              ]}
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Search SKU, product or counter…"
             />
             <Dropdown
               className="ae-fit"
@@ -125,34 +124,78 @@ export function VarianceLedgerPage() {
                 { value: "all", label: "Every counted SKU" },
               ]}
             />
+            <Dropdown
+              className="ae-fit"
+              aria-label="Location"
+              value={location}
+              onChange={(v) => changeFilters(() => setLocation(v))}
+              options={[
+                { value: "", label: "Online + Offline" },
+                { value: "ONLINE", label: "Online" },
+                { value: "OFFLINE", label: "Offline" },
+              ]}
+            />
+            <DateRangePicker
+              className="ae-fit"
+              aria-label="Date range"
+              from={from}
+              to={to}
+              onChange={(f, t) =>
+                changeFilters(() => {
+                  setFrom(f);
+                  setTo(t);
+                })
+              }
+            />
           </div>
           <ToolbarControls>
-            <SearchInput value={query} onChange={setQuery} placeholder="Search SKU, product or counter…" />
             <button
               type="button"
               className="ae-btn ae-btn-secondary"
               disabled={rows.length === 0}
-              onClick={() => downloadCsv(`variance-ledger-${from}-to-${to}.csv`, varianceLedgerCsv(rows))}
+              onClick={() =>
+                downloadCsv(
+                  `variance-ledger-${from}-to-${to}.csv`,
+                  varianceLedgerCsv(rows),
+                )
+              }
               title="Download the listed SKUs as a CSV file"
             >
               <DownloadIcon /> Export CSV
             </button>
-            <Link to="/variance-report" className="ae-btn ae-btn-secondary" style={{ textDecoration: "none" }}>
+            <Link
+              to="/variance-report"
+              className="ae-btn ae-btn-secondary"
+              style={{ textDecoration: "none" }}
+            >
               <HistoryIcon /> Variance Report
             </Link>
           </ToolbarControls>
         </Toolbar>
       </PageHeader>
 
-      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+      />
 
       {!counts ? (
-        <TableSkeleton headers={COLUMNS} minWidth={720} label="Loading the ledger…" />
+        <TableSkeleton
+          headers={COLUMNS}
+          minWidth={720}
+          label="Loading the ledger…"
+        />
       ) : counts.length === 0 ? (
-        <p style={{ color: colors.subtleInk }}>No manual counts were saved in this period.</p>
+        <p style={{ color: colors.subtleInk }}>
+          No manual counts were saved in this period.
+        </p>
       ) : rows.length === 0 ? (
         <p style={{ color: colors.subtleInk }}>
-          {scope === "all" ? "No matching SKUs." : "Nothing matches - every counted SKU matched the system, or try \"Every counted SKU\"."}
+          {scope === "all"
+            ? "No matching SKUs."
+            : 'Nothing matches - every counted SKU matched the system, or try "Every counted SKU".'}
         </p>
       ) : (
         <RowGlowScroll>
@@ -182,33 +225,83 @@ export function VarianceLedgerPage() {
                       tabIndex={0}
                       aria-expanded={expanded}
                     >
-                      <td style={{ color: colors.subtleInk }}>{expanded ? "▲" : "▼"}</td>
-                      <td style={{ textAlign: "left", color: colors.yellow, whiteSpace: "nowrap" }}>{r.sku ?? "—"}</td>
+                      <td style={{ color: colors.subtleInk }}>
+                        {expanded ? "▲" : "▼"}
+                      </td>
+                      <td
+                        style={{
+                          textAlign: "left",
+                          color: colors.yellow,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {r.sku ?? "—"}
+                      </td>
                       <td style={{ textAlign: "left", color: colors.ink }}>
                         {r.name}
                         {r.recurring && (
-                          <span style={tagStyle} title="Off two or more times in this period">
+                          <span
+                            style={tagStyle}
+                            title="Off two or more times in this period"
+                          >
                             Recurring
                           </span>
                         )}
                       </td>
                       <td>{r.counts}</td>
-                      <td style={{ fontWeight: 700, color: r.flagged ? colors.warningText : undefined }}>{r.flagged}</td>
-                      <td style={{ color: r.net < 0 ? colors.danger : undefined }}>{r.net.toLocaleString()}</td>
-                      <td style={{ fontWeight: 700 }}>{r.absolute.toLocaleString()}</td>
-                      <td style={{ whiteSpace: "nowrap" }}>{r.lastFlaggedDate ? formatDateDisplay(r.lastFlaggedDate) : "—"}</td>
+                      <td
+                        style={{
+                          fontWeight: 700,
+                          color: r.flagged ? colors.warningText : undefined,
+                        }}
+                      >
+                        {r.flagged}
+                      </td>
+                      <td
+                        style={{ color: r.net < 0 ? colors.danger : undefined }}
+                      >
+                        {r.net.toLocaleString()}
+                      </td>
+                      <td style={{ fontWeight: 700 }}>
+                        {r.absolute.toLocaleString()}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {r.lastFlaggedDate
+                          ? formatDateDisplay(r.lastFlaggedDate)
+                          : "—"}
+                      </td>
                       <td style={{ textAlign: "left", whiteSpace: "nowrap" }}>
-                        {r.topCounter ? `${r.topCounter.name} (${r.topCounter.times})` : "—"}
+                        {r.topCounter
+                          ? `${r.topCounter.name} (${r.topCounter.times})`
+                          : "—"}
                       </td>
                       <td>{r.flagged ? `${r.explained}/${r.flagged}` : "—"}</td>
                     </tr>
                     {expanded && (
                       <tr>
-                        <td colSpan={COLUMNS.length} style={{ padding: "8px 12px 16px", background: colors.paperAlt }}>
-                          <table className="ae-table" style={{ fontSize: 12.5, minWidth: 0 }}>
+                        <td
+                          colSpan={COLUMNS.length}
+                          style={{
+                            padding: "8px 12px 16px",
+                            background: colors.paperAlt,
+                          }}
+                        >
+                          <table
+                            className="ae-table"
+                            style={{ fontSize: 12.5, minWidth: 0 }}
+                          >
                             <thead>
                               <tr>
-                                {["Date", "Shift", "Location", "System", "Count", "Variance", "Counted by", "Remarks"].map((h) => (
+                                {[
+                                  "Date",
+                                  "Shift",
+                                  "Location",
+                                  "System",
+                                  "Count",
+                                  "Variance",
+                                  "Counted by",
+                                  "Remarks",
+                                ].map((h) => (
                                   <th key={h} style={{ padding: "3px 10px" }}>
                                     {h}
                                   </th>
@@ -218,17 +311,49 @@ export function VarianceLedgerPage() {
                             <tbody>
                               {r.entries.map((e) => (
                                 <tr key={e.id}>
-                                  <td style={cell}>{e.entryDate.slice(0, 10)}</td>
+                                  <td style={cell}>
+                                    {e.entryDate.slice(0, 10)}
+                                  </td>
                                   <td style={cell}>{e.shift ?? "—"}</td>
                                   <td style={cell}>{e.location}</td>
-                                  <td style={cell}>{Number(e.systemRemainingStock).toLocaleString()}</td>
-                                  <td style={cell}>{Number(e.manualCount).toLocaleString()}</td>
-                                  <td style={{ ...cell, fontWeight: 700, color: Number(e.variance) === 0 ? undefined : Number(e.variance) < 0 ? colors.danger : colors.warningText }}>
+                                  <td style={cell}>
+                                    {Number(
+                                      e.systemRemainingStock,
+                                    ).toLocaleString()}
+                                  </td>
+                                  <td style={cell}>
+                                    {Number(e.manualCount).toLocaleString()}
+                                  </td>
+                                  <td
+                                    style={{
+                                      ...cell,
+                                      fontWeight: 700,
+                                      color:
+                                        Number(e.variance) === 0
+                                          ? undefined
+                                          : Number(e.variance) < 0
+                                            ? colors.danger
+                                            : colors.warningText,
+                                    }}
+                                  >
                                     {Number(e.variance).toLocaleString()}
                                   </td>
-                                  <td style={{ ...cell, textAlign: "left" }}>{e.countedBy?.name ?? "—"}</td>
-                                  <td style={{ ...cell, textAlign: "left", color: e.remarks ? colors.ink : colors.subtleInk }}>
-                                    {e.remarks || (Number(e.variance) !== 0 ? "No reason recorded" : "")}
+                                  <td style={{ ...cell, textAlign: "left" }}>
+                                    {e.countedBy?.name ?? "—"}
+                                  </td>
+                                  <td
+                                    style={{
+                                      ...cell,
+                                      textAlign: "left",
+                                      color: e.remarks
+                                        ? colors.ink
+                                        : colors.subtleInk,
+                                    }}
+                                  >
+                                    {e.remarks ||
+                                      (Number(e.variance) !== 0
+                                        ? "No reason recorded"
+                                        : "")}
                                   </td>
                                 </tr>
                               ))}

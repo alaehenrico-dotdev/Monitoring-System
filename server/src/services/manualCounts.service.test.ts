@@ -11,6 +11,8 @@ vi.mock("../lib/prisma", () => ({
 vi.mock("../repositories/manualCountRepository", () => ({
   manualCountRepository: {
     findOne: vi.fn(),
+    hasAnyCount: vi.fn(),
+    productIdsWithCounts: vi.fn(),
     upsert: vi.fn(),
     findAllForDateAndLocation: vi.fn(),
     findOneWithCounter: vi.fn(),
@@ -69,6 +71,10 @@ beforeEach(() => {
   vi.mocked(productRepository.findActiveById).mockResolvedValue({ id: PRODUCT_ID, name: "Sweet A" } as never);
   vi.mocked(dailyOnlineStockRepository.getOpeningStocksForProducts).mockResolvedValue(new Map());
   vi.mocked(dailyOfflineStockRepository.getOpeningStocksForProducts).mockResolvedValue(new Map());
+  // By default the product already has counts, so a save is a normal audit
+  // count; the opening-balance tests below override this.
+  vi.mocked(manualCountRepository.hasAnyCount).mockResolvedValue(true);
+  vi.mocked(manualCountRepository.productIdsWithCounts).mockResolvedValue(new Set([PRODUCT_ID]));
 });
 
 describe("getManualCountGrid - blank (not yet counted) vs. a real zero count", () => {
@@ -338,6 +344,26 @@ describe("saveManualCount - follow-on changes name their cause", () => {
   });
 });
 
+describe("saveManualCount - re-deriving a later opening balance", () => {
+  it("keeps its variance at 0 when its system figure moves", async () => {
+    vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({ remainingStock: 100 } as never);
+    vi.mocked(manualCountRepository.upsert).mockImplementation(((id: number | undefined, data: object) => Promise.resolve({ id: id ?? 1, ...data })) as never);
+    const next = { id: 5, entryDate: new Date("2026-06-16T00:00:00.000Z"), shift: "MORNING", openingStock: 100, stockInOffToOl: 0, stockOutOlToOff: 0, productionIn: 0, fulfillmentOut: 0, rts: 0 };
+    vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValueOnce(next as never).mockResolvedValue(null);
+    vi.mocked(dailyOnlineStockRepository.getOpeningStock).mockResolvedValue(95);
+    vi.mocked(dailyOnlineStockRepository.upsert).mockResolvedValue({ ...next, openingStock: 95, remainingStock: 95 } as never);
+    // The save's own findOne finds nothing; the later period already holds an
+    // opening balance (it was the first count ever saved for this product).
+    vi.mocked(manualCountRepository.findOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 9, manualCount: 120, systemRemainingStock: 0, variance: 0, isOpeningBalance: true } as never);
+
+    await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 95, 7);
+
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(9, expect.objectContaining({ variance: 0 }), expect.anything());
+  });
+});
+
 describe("getVarianceReport - range limit", () => {
   it("refuses a range longer than a year, so one request cannot read every count", async () => {
     await expect(
@@ -384,5 +410,82 @@ describe("publishing counts", () => {
     vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([]);
     await expect(publishManualCounts(DATE, SHIFT, 7)).rejects.toMatchObject({ status: 400 });
     expect(recordChange).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("opening balance - the first count of a product at a location", () => {
+  beforeEach(() => {
+    vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({ remainingStock: 0 } as never);
+    vi.mocked(manualCountRepository.upsert).mockImplementation(((_id: number | undefined, data: object) =>
+      Promise.resolve({ id: 1, ...data })) as never);
+  });
+
+  it("records the first count with variance 0 even though the system says 0", async () => {
+    vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
+    vi.mocked(manualCountRepository.hasAnyCount).mockResolvedValue(false);
+
+    await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 120);
+
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ isOpeningBalance: true, variance: 0, manualCount: 120, publishedAt: null }),
+      expect.anything(),
+    );
+  });
+
+  it("is saved unpublished, so a supervisor has to approve it before it carries forward", async () => {
+    vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
+    vi.mocked(manualCountRepository.hasAnyCount).mockResolvedValue(false);
+    await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 120);
+    const data = vi.mocked(manualCountRepository.upsert).mock.calls[0][1];
+    expect(data.publishedAt).toBeNull();
+  });
+
+  it("a later count is a normal audit count with a real variance", async () => {
+    vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
+    vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({ remainingStock: 100 } as never);
+    await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 95);
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ isOpeningBalance: false, variance: 5 }),
+      expect.anything(),
+    );
+  });
+
+  it("correcting the opening count later keeps it an opening balance", async () => {
+    vi.mocked(manualCountRepository.findOne).mockResolvedValue({ id: 7, isOpeningBalance: true } as never);
+    await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 130);
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({ isOpeningBalance: true, variance: 0 }),
+      expect.anything(),
+    );
+    expect(manualCountRepository.hasAnyCount).not.toHaveBeenCalled();
+  });
+
+  it("a TOTAL count is never an opening balance", async () => {
+    vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
+    vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue({ remainingStock: 10 } as never);
+    await saveManualCount(PRODUCT_ID, DATE, SHIFT, "TOTAL", 4);
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ isOpeningBalance: false }), expect.anything());
+  });
+
+  it("the grid labels an unsaved row for a never-counted product as an opening balance", async () => {
+    vi.mocked(productRepository.findActive).mockResolvedValue([{ id: PRODUCT_ID, name: "Sweet A" }] as never);
+    vi.mocked(manualCountRepository.findAllForDateAndLocation).mockResolvedValue([]);
+    vi.mocked(dailyOnlineStockRepository.findAllForDate).mockResolvedValue([]);
+    vi.mocked(manualCountRepository.productIdsWithCounts).mockResolvedValue(new Set());
+
+    const rows = await getManualCountGrid(DATE, SHIFT, "ONLINE");
+    expect(rows[0].entry).toMatchObject({ isOpeningBalance: true, variance: null });
+  });
+
+  it("the grid does not label it once the product has been counted", async () => {
+    vi.mocked(productRepository.findActive).mockResolvedValue([{ id: PRODUCT_ID, name: "Sweet A" }] as never);
+    vi.mocked(manualCountRepository.findAllForDateAndLocation).mockResolvedValue([]);
+    vi.mocked(dailyOnlineStockRepository.findAllForDate).mockResolvedValue([]);
+    const rows = await getManualCountGrid(DATE, SHIFT, "ONLINE");
+    expect(rows[0].entry).toMatchObject({ isOpeningBalance: false });
   });
 });

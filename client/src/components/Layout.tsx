@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
@@ -35,13 +35,10 @@ export function Layout() {
     expireSession,
   );
   const [expiryWarnDismissed, setExpiryWarnDismissed] = useState(false);
-  useEffect(() => {
-    if (minutesLeft === null) setExpiryWarnDismissed(false);
-  }, [minutesLeft]);
+  // Reset during render (not in an effect) so there is no extra commit.
+  if (minutesLeft === null && expiryWarnDismissed) setExpiryWarnDismissed(false);
   // Show the offline notice again the next time the connection drops.
-  useEffect(() => {
-    if (online) setOfflineDismissed(false);
-  }, [online]);
+  if (online && offlineDismissed) setOfflineDismissed(false);
 
   return (
     // Sidebar is now a floating overlay only (no docked width to reserve),

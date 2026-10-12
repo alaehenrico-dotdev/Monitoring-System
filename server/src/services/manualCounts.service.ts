@@ -78,12 +78,21 @@ export async function saveManualCount(
   const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
   const systemRemainingStock = await getSystemRemainingStock(productId, entryDate, shift, location, db);
-  const variance = calculateVariance(systemRemainingStock, manualCount);
 
   const existing = await manualCountRepository.findOne(productId, entryDate, shift, location, db);
+  // The first count of a product at a location is its opening balance: the
+  // system had no history to compare it against, so it seeds the system rather
+  // than auditing it. A re-save keeps whatever the row already was, so
+  // correcting the opening figure later does not turn it into a variance.
+  // (TOTAL is a combined view, never an opening balance of its own.)
+  const isOpeningBalance = existing
+    ? existing.isOpeningBalance
+    : location !== "TOTAL" && !(await manualCountRepository.hasAnyCount(productId, location, db));
+  const variance = isOpeningBalance ? 0 : calculateVariance(systemRemainingStock, manualCount);
   // Saving a count (again) takes it back to unpublished: what carries forward
-  // must be what a supervisor approved, not something edited since.
-  const data = { productId, entryDate, shift, location, systemRemainingStock, manualCount, variance, countedById: userId, publishedAt: null, publishedById: null };
+  // must be what a supervisor approved, not something edited since. That is
+  // also the approval step for an opening balance.
+  const data = { productId, entryDate, shift, location, systemRemainingStock, manualCount, variance, isOpeningBalance, countedById: userId, publishedAt: null, publishedById: null };
   const saved = await manualCountRepository.upsert(existing?.id, data, db);
 
   const changeId = await recordChange(
@@ -249,7 +258,7 @@ export async function propagateOpeningStock(
     if (ownCount) {
       // Its system figure just moved, so its stored variance must follow.
       const systemRemainingStock = await getSystemRemainingStock(productId, nextPeriod.entryDate, nextPeriod.shift, location, db);
-      const variance = calculateVariance(systemRemainingStock, toNum(ownCount.manualCount));
+      const variance = ownCount.isOpeningBalance ? 0 : calculateVariance(systemRemainingStock, toNum(ownCount.manualCount));
       const reDerived = await manualCountRepository.upsert(
         ownCount.id,
         {
@@ -354,6 +363,9 @@ export async function getManualCountGrid(entryDate: Date, shift: Shift, location
   // it) - only a CSV import can do that, so it is the first place to look when
   // a variance has no obvious cause. Online/Offline grids only (a TOTAL count
   // has no opening of its own).
+  // Unsaved rows that would be saved as an opening balance (no count exists
+  // yet for the product at this location) - the page labels them up front.
+  const countedProductIds = location === "TOTAL" ? new Set<number>() : await manualCountRepository.productIdsWithCounts(location);
   const savedDaily = location === "ONLINE" ? onlineByProduct : location === "OFFLINE" ? offlineByProduct : null;
   const expectedOpening =
     savedDaily && savedDaily.size
@@ -377,7 +389,16 @@ export async function getManualCountGrid(entryDate: Date, shift: Shift, location
     const systemRemainingStock = systemRemainingStockFor(product.id);
     return {
       product,
-      entry: { productId: product.id, entryDate, shift, location, systemRemainingStock, manualCount: null, variance: null },
+      entry: {
+        productId: product.id,
+        entryDate,
+        shift,
+        location,
+        systemRemainingStock,
+        manualCount: null,
+        variance: null,
+        isOpeningBalance: location !== "TOTAL" && !countedProductIds.has(product.id),
+      },
       isSaved: false,
       isFlagged: false,
       openingBreak,

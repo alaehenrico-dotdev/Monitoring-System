@@ -10,3 +10,6 @@ server/generated/
 *.tsbuildinfo
 client/vite.config.js
 client/vite.config.d.ts
+
+# TLS certificates / keys for docker-compose.tls.yml
+certs/

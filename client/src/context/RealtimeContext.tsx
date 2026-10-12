@@ -8,6 +8,9 @@ const MAX_RECONNECT_MS = 30000;
 // succession - debouncing here means every page that cares gets one refetch
 // per burst instead of one per cell.
 const VERSION_DEBOUNCE_MS = 400;
+// A tab hidden this long may have missed live updates (browsers and sleeping
+// machines suspend sockets and timers), so coming back to it refetches.
+const STALE_AFTER_HIDDEN_MS = 30_000;
 
 const RealtimeContext = createContext<number>(0);
 
@@ -64,7 +67,21 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     }
     connect();
 
+    // Refetch when a long-hidden tab becomes visible again - a Dashboard left
+    // open while data was reset elsewhere must not keep showing the old figures.
+    let hiddenAt: number | null = null;
+    function onVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+      } else {
+        if (hiddenAt !== null && Date.now() - hiddenAt >= STALE_AFTER_HIDDEN_MS) setVersion((v) => v + 1);
+        hiddenAt = null;
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
     return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       closedByEffect = true;
       clearTimeout(reconnectTimer);
       clearTimeout(debounceTimer);

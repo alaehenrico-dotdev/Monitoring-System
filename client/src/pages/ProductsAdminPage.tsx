@@ -163,7 +163,7 @@ export function ProductsAdminPage() {
     <div>
       <PageHeader
         title="SKU &amp; Category Master List"
-        subtitle="Manage the SKUs and categories used throughout the system. Deactivated SKUs stay listed here (dimmed) so they can be reactivated."
+        subtitle="Manage SKUs and categories. Deactivated SKUs appear dimmed."
       />
 
       <form

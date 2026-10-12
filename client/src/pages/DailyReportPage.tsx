@@ -267,15 +267,29 @@ export function DailyReportPage() {
   // with none of them leaves every column list - and so every table, PDF and
   // export - exactly as it was.
   const onlineExtras = useMemo(
-    () => extraColumnsFromRows(report?.online as unknown as GridRow[] | null, onlineStockColumns),
+    () =>
+      extraColumnsFromRows(
+        report?.online as unknown as GridRow[] | null,
+        onlineStockColumns,
+      ),
     [report],
   );
   const offlineExtras = useMemo(
-    () => extraColumnsFromRows(report?.offline as unknown as GridRow[] | null, offlineStockColumns),
+    () =>
+      extraColumnsFromRows(
+        report?.offline as unknown as GridRow[] | null,
+        offlineStockColumns,
+      ),
     [report],
   );
-  const onlineColumns = useMemo(() => columnsWithExtras(onlineStockColumns, onlineExtras), [onlineExtras]);
-  const offlineColumns = useMemo(() => columnsWithExtras(offlineStockColumns, offlineExtras), [offlineExtras]);
+  const onlineColumns = useMemo(
+    () => columnsWithExtras(onlineStockColumns, onlineExtras),
+    [onlineExtras],
+  );
+  const offlineColumns = useMemo(
+    () => columnsWithExtras(offlineStockColumns, offlineExtras),
+    [offlineExtras],
+  );
 
   async function handleExport() {
     if (!report) return;
@@ -373,7 +387,7 @@ export function DailyReportPage() {
     <div>
       <PageHeader
         title={`Daily Report - ${formatDateDisplay(date)}`}
-        subtitle="Generate a printable snapshot of a given date's Online, Offline, and Total stock."
+        subtitle="Print a stock snapshot for any date."
       >
         <Toolbar className="no-print">
           <div
@@ -385,12 +399,13 @@ export function DailyReportPage() {
               minWidth: 0,
             }}
           >
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={changeDate}
-              todayValue={getCurrentShiftAndDate().date}
-            />
+            {report && (
+              <CategoryFilter
+                categories={categories}
+                value={categoryFilter}
+                onChange={setCategoryFilter}
+              />
+            )}
             <Dropdown
               aria-label="Report section"
               value={reportSection}
@@ -400,13 +415,12 @@ export function DailyReportPage() {
                 (s) => ({ value: s, label: SECTION_LABELS[s] }),
               )}
             />
-            {report && (
-              <CategoryFilter
-                categories={categories}
-                value={categoryFilter}
-                onChange={setCategoryFilter}
-              />
-            )}
+            <DatePicker
+              aria-label="Date"
+              value={date}
+              onChange={changeDate}
+              todayValue={getCurrentShiftAndDate().date}
+            />
             <Button onClick={() => load()} disabled={generating}>
               <PlayIcon /> {generating ? "Generating…" : "Generate"}
             </Button>

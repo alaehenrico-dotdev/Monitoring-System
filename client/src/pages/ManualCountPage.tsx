@@ -12,7 +12,11 @@ import {
   type CategoryMenuTarget,
 } from "../components/CategoryColorMenu";
 import { inkFor, useCategoryColors } from "../hooks/useColumnColors";
-import { getManualCountGrid, publishManualCounts, saveManualCount } from "../api/manualCounts";
+import {
+  getManualCountGrid,
+  publishManualCounts,
+  saveManualCount,
+} from "../api/manualCounts";
 import { recordReportHistory } from "../api/reportHistory";
 import type {
   ManualCountEntry,
@@ -166,6 +170,9 @@ interface Figures {
   total: number;
   /// null = nothing counted in the visible location(s), so no variance yet.
   variance: number | null;
+  /// Every counted (or staged) location in view is an opening balance - the
+  /// first count of the product there, which seeds the system and has no variance.
+  opening: boolean;
 }
 
 /// Section 4.4 - the supervisor (or encoder on duty) enters the physical
@@ -195,8 +202,18 @@ export function ManualCountPage() {
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
   const setShift = (s: Shift) =>
     setDateShift((prev) => ({ ...prev, shift: s }));
+  // Online/Offline encoders only work their own channel, so the page opens on
+  // (and stays on) their matching column; only the supervisor can switch.
+  const role = useAuth().user?.role;
+  const lockedLocation: CountLocation | null =
+    role === "ONLINE_ENCODER"
+      ? "ONLINE"
+      : role === "OFFLINE_ENCODER"
+        ? "OFFLINE"
+        : null;
   // Which location(s) the table shows/edits: "TOTAL" = both.
   const [sourceFilter, setSourceFilter] = useState<StockLocation>(() => {
+    if (lockedLocation) return lockedLocation;
     const src = searchParams.get("source");
     return openedFromHistory &&
       (src === "ONLINE" || src === "OFFLINE" || src === "TOTAL")
@@ -204,7 +221,9 @@ export function ManualCountPage() {
       : "TOTAL";
   });
   // Which location a CSV import goes into when the filter shows both.
-  const [importLocation, setImportLocation] = useState<CountLocation>("ONLINE");
+  const [importLocation, setImportLocation] = useState<CountLocation>(
+    lockedLocation ?? "ONLINE",
+  );
   const csvLocation: CountLocation =
     sourceFilter === "TOTAL" ? importLocation : sourceFilter;
   const showOffline = sourceFilter !== "ONLINE";
@@ -303,12 +322,21 @@ export function ManualCountPage() {
     setFuture([]);
   });
   useEffect(() => {
+    // Drop a response for a date/shift (or refetch) that has been superseded.
+    let cancelled = false;
     Promise.all([
       getManualCountGrid(date, shift, "ONLINE"),
       getManualCountGrid(date, shift, "OFFLINE"),
     ])
-      .then(([ONLINE, OFFLINE]) => setGridRows({ ONLINE, OFFLINE }))
-      .catch((e) => setError(e.message));
+      .then(([ONLINE, OFFLINE]) => {
+        if (!cancelled) setGridRows({ ONLINE, OFFLINE });
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [date, shift, realtimeVersion]);
 
   useEffect(() => {
@@ -384,7 +412,10 @@ export function ManualCountPage() {
   ) {
     if (edits.length === 0) return;
     setDrafts((d) => {
-      const next: Drafts = { ONLINE: { ...d.ONLINE }, OFFLINE: { ...d.OFFLINE } };
+      const next: Drafts = {
+        ONLINE: { ...d.ONLINE },
+        OFFLINE: { ...d.OFFLINE },
+      };
       for (const e of edits) next[e.loc][e.productId] = e.value;
       return next;
     });
@@ -395,7 +426,10 @@ export function ManualCountPage() {
     });
   }
 
-  const snapshot = (): DraftSnapshot => ({ drafts, batches: importedBatchByProduct });
+  const snapshot = (): DraftSnapshot => ({
+    drafts,
+    batches: importedBatchByProduct,
+  });
 
   /// Records the state about to be replaced, so Undo can put it back. A new
   /// edit also discards whatever had been undone (the usual undo-stack rule).
@@ -606,7 +640,10 @@ export function ManualCountPage() {
             },
           },
           saved: { ONLINE: on.isSaved, OFFLINE: off?.isSaved ?? false },
-          breaks: { ONLINE: on.openingBreak ?? null, OFFLINE: off?.openingBreak ?? null },
+          breaks: {
+            ONLINE: on.openingBreak ?? null,
+            OFFLINE: off?.openingBreak ?? null,
+          },
         };
       })
     : null;
@@ -629,16 +666,28 @@ export function ManualCountPage() {
     const system =
       (showOnline ? toNum(r.entries.ONLINE.systemRemainingStock) : 0) +
       (showOffline ? toNum(r.entries.OFFLINE.systemRemainingStock) : 0);
+    // An opening balance contributes no variance (the server stores it as 0).
+    const isOpening = (loc: CountLocation) =>
+      r.entries[loc].isOpeningBalance === true;
     let variance: number | null = null;
     if (online !== null)
       variance =
-        (variance ?? 0) + toNum(r.entries.ONLINE.systemRemainingStock) - online;
+        (variance ?? 0) +
+        (isOpening("ONLINE")
+          ? 0
+          : toNum(r.entries.ONLINE.systemRemainingStock) - online);
     if (offline !== null)
       variance =
         (variance ?? 0) +
-        toNum(r.entries.OFFLINE.systemRemainingStock) -
-        offline;
+        (isOpening("OFFLINE")
+          ? 0
+          : toNum(r.entries.OFFLINE.systemRemainingStock) - offline);
+    const counted: CountLocation[] = [
+      ...(online !== null ? (["ONLINE"] as const) : []),
+      ...(offline !== null ? (["OFFLINE"] as const) : []),
+    ];
     return {
+      opening: counted.length > 0 && counted.every(isOpening),
       system,
       online,
       offline,
@@ -656,6 +705,11 @@ export function ManualCountPage() {
     const v = liveFigures(r).variance;
     return v !== null && v !== 0;
   };
+  // Rows whose count in view is an opening balance (saved or staged) - shown
+  // as a note above the table so the missing variance is explained.
+  const openingCount = (auditRows ?? []).filter(
+    (r) => liveFigures(r).opening,
+  ).length;
   const sumLive = (
     list: AuditRow[],
     field: "system" | "online" | "offline" | "total" | "variance",
@@ -694,7 +748,17 @@ export function ManualCountPage() {
   const savedCounts = COUNT_LOCATIONS.flatMap((loc) =>
     (gridRows?.[loc] ?? []).filter((r) => r.isSaved),
   );
-  const unpublishedCount = savedCounts.filter((r) => !r.entry.publishedAt).length;
+  const unpublishedCount = savedCounts.filter(
+    (r) => !r.entry.publishedAt,
+  ).length;
+  // Done adding/editing: nothing staged, nothing mid-save, and saved counts
+  // are waiting for approval - the toolbar's Publish button glows.
+  const publishReady =
+    canPublish &&
+    unpublishedCount > 0 &&
+    pendingCount === 0 &&
+    !saving &&
+    !publishing;
 
   // Nulls (not yet counted) export as blank cells rather than "0", which
   // would misleadingly read as a confirmed zero count.
@@ -820,16 +884,15 @@ export function ManualCountPage() {
       ),
       (loc, productId) => {
         const draft = drafts[loc][productId];
-        if (draft !== undefined) return draft === "" ? undefined : Number(draft);
+        if (draft !== undefined)
+          return draft === "" ? undefined : Number(draft);
         return savedCountOf(loc, productId) ?? undefined;
       },
     );
     if (!outcome) return;
     e.preventDefault();
     pushHistory();
-    setDraftMany(
-      outcome.edits.map((x) => ({ ...x, value: String(x.value) })),
-    );
+    setDraftMany(outcome.edits.map((x) => ({ ...x, value: String(x.value) })));
     setNotice({
       message: outcome.message,
       detail: outcome.detail,
@@ -839,19 +902,6 @@ export function ManualCountPage() {
 
   // PDF of the table exactly as filtered on screen (same columns), built from
   // the row data like every other PDF in the app.
-  // Opened from Audit History: build the PDF once the counts for that
-  // date/shift have loaded. Not recorded again - it is already in the history.
-  useEffect(() => {
-    if (!visibleRows || !printAfterLoad.current) return;
-    printAfterLoad.current = false;
-    if (pendingCount > 0) {
-      setError("Save your changes first - the PDF reflects only saved counts.");
-      return;
-    }
-    void handlePdf(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleRows]);
-
   async function handlePdf(record = true) {
     if (!visibleRows || pendingCount > 0) return;
     const pdfColumns = [
@@ -921,6 +971,21 @@ export function ManualCountPage() {
     }
   }
 
+  // Opened from Audit History: build the PDF once the counts for that
+  // date/shift have loaded. Not recorded again - it is already in the history.
+  useEffect(() => {
+    if (!visibleRows || !printAfterLoad.current) return;
+    printAfterLoad.current = false;
+    if (pendingCount > 0) {
+      // One-shot message for a one-shot trigger (printAfterLoad), not derived state.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setError("Save your changes first - the PDF reflects only saved counts.");
+      return;
+    }
+    void handlePdf(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleRows]);
+
   const varianceCell = (value: number | null): CSSProperties => ({
     ...manualCountTint.Variance,
     fontWeight: value !== null && value !== 0 ? 700 : 400,
@@ -936,7 +1001,7 @@ export function ManualCountPage() {
             {SHIFT_SHORT_LABELS[shift]} Shift - {FILTER_LABEL[sourceFilter]}
           </>
         }
-        subtitle="Review and correct manual counts for the selected date."
+        subtitle="Review and correct manual counts."
       >
         <Toolbar className="no-print">
           <div
@@ -955,26 +1020,19 @@ export function ManualCountPage() {
               onClick={() => setAllExpanded(!anyExpanded)}
               disabled={!auditRows}
               aria-label={
-                anyExpanded ? "Collapse every category" : "Expand every category"
+                anyExpanded
+                  ? "Collapse every category"
+                  : "Expand every category"
               }
               title={
-                anyExpanded ? "Collapse every category" : "Expand every category"
+                anyExpanded
+                  ? "Collapse every category"
+                  : "Expand every category"
               }
               className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
             >
               {anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
             </Button>
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={setDate}
-              todayValue={getCurrentShiftAndDate().date}
-            />
-            <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-            <StockSourceFilter
-              value={sourceFilter}
-              onChange={setSourceFilter}
-            />
             <SearchInput
               value={query}
               onChange={setQuery}
@@ -1007,6 +1065,44 @@ export function ManualCountPage() {
                 },
               ]}
             />
+            {!lockedLocation && (
+              <StockSourceFilter
+                value={sourceFilter}
+                onChange={setSourceFilter}
+              />
+            )}
+            <DatePicker
+              aria-label="Date"
+              value={date}
+              onChange={setDate}
+              todayValue={getCurrentShiftAndDate().date}
+            />
+            <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
+            {canPublish && (
+              <Button
+                className={`ae-toolbar-publish${publishReady ? " ae-toolbar-publish--ready" : ""}`}
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setShowPublishConfirm(true)}
+                disabled={
+                  pendingCount > 0 ||
+                  unpublishedCount === 0 ||
+                  publishing ||
+                  saving
+                }
+                title={
+                  pendingCount > 0
+                    ? "Save your changes first"
+                    : unpublishedCount === 0
+                      ? "Nothing to publish - every saved count is already published"
+                      : "Publish the saved counts: they become the next shift's opening stock"
+                }
+              >
+                <PublishIcon />
+                <span className="ae-toolbar-btn-label">Publish</span>
+              </Button>
+            )}
             {flaggedCount > 0 && (
               <span
                 style={{
@@ -1046,14 +1142,20 @@ export function ManualCountPage() {
             {savedCounts.length > 0 && (
               <span
                 className="ae-unsaved-badge"
-                style={unpublishedCount === 0 ? { color: colors.subtleInk } : undefined}
+                style={
+                  unpublishedCount === 0
+                    ? { color: colors.subtleInk }
+                    : undefined
+                }
                 title={
                   unpublishedCount === 0
                     ? "These counts are the next shift's opening stock"
                     : "Saved counts only become the next shift's opening stock once published"
                 }
               >
-                {unpublishedCount === 0 ? "Published" : `${unpublishedCount} unpublished`}
+                {unpublishedCount === 0
+                  ? "Published"
+                  : `${unpublishedCount} unpublished`}
               </span>
             )}
             <Button
@@ -1100,26 +1202,6 @@ export function ManualCountPage() {
               <PrinterIcon />
               <span className="ae-toolbar-btn-label">PDF</span>
             </Button>
-            {canPublish && (
-              <Button
-                className="ae-toolbar-save"
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowPublishConfirm(true)}
-                disabled={pendingCount > 0 || unpublishedCount === 0 || publishing || saving}
-                title={
-                  pendingCount > 0
-                    ? "Save your changes first"
-                    : unpublishedCount === 0
-                      ? "Nothing to publish - every saved count is already published"
-                      : "Publish the saved counts: they become the next shift's opening stock"
-                }
-              >
-                <PublishIcon />
-                <span className="ae-toolbar-btn-label">Publish</span>
-              </Button>
-            )}
             <Button
               className="ae-toolbar-save"
               type="button"
@@ -1160,7 +1242,9 @@ export function ManualCountPage() {
                   if (sourceFilter !== "TOTAL") setSourceFilter(t.location);
                 }
               }}
-              importLocations={COUNT_LOCATIONS}
+              importLocations={
+                lockedLocation ? [lockedLocation] : COUNT_LOCATIONS
+              }
               importTodayValue={getCurrentShiftAndDate().date}
               columns={csvColumns}
               // Import reads ONLY the file's Manual Count column (never
@@ -1204,6 +1288,21 @@ export function ManualCountPage() {
         onDismiss={() => setNotice(null)}
         variant={notice?.variant ?? "info"}
       />
+      {openingCount > 0 && (
+        <p
+          role="status"
+          style={{
+            margin: "0 0 10px",
+            fontSize: 12.5,
+            color: colors.subtleInk,
+          }}
+        >
+          {openingCount} first count{openingCount === 1 ? "" : "s"} will be
+          recorded as opening balances - they set the starting stock and are not
+          counted as variance. A supervisor must publish them before they become
+          the next shift&apos;s opening stock.
+        </p>
+      )}
       {!auditRows ? (
         <TableSkeleton
           headers={headers}
@@ -1365,7 +1464,11 @@ export function ManualCountPage() {
                               {visibleLocations.some((l) => r.breaks[l]) && (
                                 <span
                                   className="no-print"
-                                  style={{ marginLeft: 4, color: colors.warningText, cursor: "help" }}
+                                  style={{
+                                    marginLeft: 4,
+                                    color: colors.warningText,
+                                    cursor: "help",
+                                  }}
                                   title={visibleLocations
                                     .filter((l) => r.breaks[l])
                                     .map(
@@ -1394,9 +1497,18 @@ export function ManualCountPage() {
                                 : f.total.toLocaleString()}
                             </td>
                             <td style={varianceCell(f.variance)}>
-                              {f.variance === null
-                                ? "—"
-                                : f.variance.toLocaleString()}
+                              {f.variance === null ? (
+                                "—"
+                              ) : f.opening ? (
+                                <span
+                                  style={openingTagStyle}
+                                  title="First count of this product: it sets the starting stock and is not a variance. It becomes the next shift's opening stock once a supervisor publishes it."
+                                >
+                                  Opening
+                                </span>
+                              ) : (
+                                f.variance.toLocaleString()
+                              )}
                             </td>
                             {/* Only where there is something to explain: a
                                 saved count that does not match the system.
@@ -1410,14 +1522,19 @@ export function ManualCountPage() {
                                     <button
                                       type="button"
                                       className="ae-variance-details-btn no-print"
-                                      onClick={() => setDetailsProductId(r.product.id)}
+                                      onClick={() =>
+                                        setDetailsProductId(r.product.id)
+                                      }
                                       aria-label={`Variance details for ${r.product.name}`}
                                       title="Who counted, what moved, who changed what - and why it differs"
                                     >
                                       {remarksOf(r) ? "✎" : "ⓘ"}
                                     </button>
                                     {remarksOf(r) && (
-                                      <span className="ae-remarks-text" title={remarksOf(r)}>
+                                      <span
+                                        className="ae-remarks-text"
+                                        title={remarksOf(r)}
+                                      >
                                         {remarksOf(r)}
                                       </span>
                                     )}
@@ -1449,9 +1566,13 @@ export function ManualCountPage() {
         <VarianceDetails
           productId={detailsProductId}
           productName={
-            auditRows?.find((r) => r.product.id === detailsProductId)?.product.name ?? ""
+            auditRows?.find((r) => r.product.id === detailsProductId)?.product
+              .name ?? ""
           }
-          sku={auditRows?.find((r) => r.product.id === detailsProductId)?.product.sku ?? null}
+          sku={
+            auditRows?.find((r) => r.product.id === detailsProductId)?.product
+              .sku ?? null
+          }
           date={date}
           shift={shift}
           locations={visibleLocations}
@@ -1463,7 +1584,9 @@ export function ManualCountPage() {
                 ? {
                     ...prev,
                     [loc]: prev[loc].map((row) =>
-                      row.product.id === detailsProductId ? { ...row, entry: { ...row.entry, remarks } } : row,
+                      row.product.id === detailsProductId
+                        ? { ...row, entry: { ...row.entry, remarks } }
+                        : row,
                     ),
                   }
                 : prev,
@@ -1480,10 +1603,10 @@ export function ManualCountPage() {
           onCancel={() => setShowPublishConfirm(false)}
         >
           {unpublishedCount} saved count{unpublishedCount === 1 ? "" : "s"} for{" "}
-          {formatDateDisplay(date)} · {SHIFT_SHORT_LABELS[shift]} Shift will become
-          the next shift&apos;s opening stock, and any later sheet already saved is
-          re-calculated from them. Changing a count afterwards takes it back to
-          unpublished until you publish again.
+          {formatDateDisplay(date)} · {SHIFT_SHORT_LABELS[shift]} Shift will
+          become the next shift&apos;s opening stock, and any later sheet
+          already saved is re-calculated from them. Changing a count afterwards
+          takes it back to unpublished until you publish again.
         </ConfirmDialog>
       )}
       {showClearConfirm && (
@@ -1675,3 +1798,13 @@ const manualCountTint: Record<"Variance" | "Total", CSSProperties> = {
   Variance: tintLayer("#2DB7A8"),
   Total: tintLayer("#F5C000"),
 };
+
+const openingTagStyle = {
+  padding: "1px 7px",
+  borderRadius: 999,
+  background: "var(--ae-btn-yellow)",
+  color: "var(--ae-btn-yellow-text)",
+  fontSize: 11,
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+} as const;

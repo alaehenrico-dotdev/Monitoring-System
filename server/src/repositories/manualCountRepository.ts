@@ -13,6 +13,7 @@ export interface ManualCountData {
   /// Set to null on every count save: editing a count un-publishes it.
   publishedAt?: Date | null;
   publishedById?: number | null;
+  isOpeningBalance?: boolean;
 }
 
 export interface VarianceReportFilters {
@@ -64,6 +65,19 @@ export const manualCountRepository = {
       distinct: ["productId"],
       select: { productId: true, entryDate: true, shift: true, manualCount: true },
     });
+  },
+
+  /// True when any count at all exists for the product at this location. The
+  /// first one is its opening balance (see saveManualCount).
+  async hasAnyCount(productId: number, location: StockLocation, db: Db = prisma) {
+    return (await db.manualCount.findFirst({ where: { productId, location }, select: { id: true } })) !== null;
+  },
+
+  /// Products that already have a count at this location - so a grid can tell
+  /// which unsaved rows would be saved as an opening balance.
+  async productIdsWithCounts(location: StockLocation) {
+    const rows = await prisma.manualCount.groupBy({ by: ["productId"], where: { location } });
+    return new Set(rows.map((r) => r.productId));
   },
 
   /// One count with who last saved it - for the Variance details panel.
@@ -137,6 +151,8 @@ export const manualCountRepository = {
     return prisma.manualCount.findMany({
       where: {
         entryDate: { gte: filters.startDate, lte: filters.endDate },
+        // An opening balance seeds the system; it is not an audit result.
+        isOpeningBalance: false,
         productId: filters.productId,
         location: filters.location,
         shift: filters.shift,

@@ -5,7 +5,11 @@ import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
 import { TotalStocksTable } from "../components/TotalStocksTable";
-import { Toolbar, ToolbarControls, ToolbarDivider } from "../components/Toolbar";
+import {
+  Toolbar,
+  ToolbarControls,
+  ToolbarDivider,
+} from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { SearchInput } from "../components/SearchInput";
@@ -29,8 +33,10 @@ const allCsvColumns = [
 // StockSourceFilter has on screen, so "Online only" doesn't export an
 // Offline/Total column nobody asked to see.
 function csvColumnsFor(source: StockLocation) {
-  if (source === "ONLINE") return allCsvColumns.filter((c) => c.key === "onlineRemainingStock");
-  if (source === "OFFLINE") return allCsvColumns.filter((c) => c.key === "offlineRemainingStock");
+  if (source === "ONLINE")
+    return allCsvColumns.filter((c) => c.key === "onlineRemainingStock");
+  if (source === "OFFLINE")
+    return allCsvColumns.filter((c) => c.key === "offlineRemainingStock");
   return allCsvColumns;
 }
 
@@ -60,7 +66,11 @@ export function TotalStocksPage() {
   useEffect(() => {
     getTotalStocks(date)
       .then(setRows)
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load total stocks"));
+      .catch((e) =>
+        setError(
+          e instanceof Error ? e.message : "Failed to load total stocks",
+        ),
+      );
   }, [date, realtimeVersion]);
 
   // CsvTools expects {product, entry} rows; nulls become "" (not 0) so an
@@ -79,28 +89,64 @@ export function TotalStocksPage() {
     },
   }));
 
-  const categories = Array.from(new Set((rows ?? []).map((r) => r.product.category))).sort();
+  const categories = Array.from(
+    new Set((rows ?? []).map((r) => r.product.category)),
+  ).sort();
   const visibleRows = rows?.filter(
-    (r) => matchesSearch([r.product.sku, r.product.name, r.product.category], query) && (categoryFilter === "" || r.product.category === categoryFilter),
+    (r) =>
+      matchesSearch(
+        [r.product.sku, r.product.name, r.product.category],
+        query,
+      ) &&
+      (categoryFilter === "" || r.product.category === categoryFilter),
   );
 
   return (
     <div>
       <PageHeader
         title={`${SOURCE_TITLES[source]} - ${formatDateDisplay(date)}`}
-        subtitle="Review combined online and offline stock balances."
+        subtitle="Combined online and offline stock."
       >
         <Toolbar className="no-print">
-          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "nowrap", minWidth: 0 }}>
-            <DatePicker aria-label="Date" value={date} onChange={setDate} todayValue={getCurrentShiftAndDate().date} style={{ maxWidth: 180 }} />
-            <SearchInput value={query} onChange={setQuery} placeholder="Search SKU or category…" />
-            <CategoryFilter categories={categories} value={categoryFilter} onChange={setCategoryFilter} />
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+              flexWrap: "nowrap",
+              minWidth: 0,
+            }}
+          >
+            <SearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder="Search SKU or category…"
+            />
+            <CategoryFilter
+              categories={categories}
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+            />
             <StockSourceFilter value={source} onChange={setSource} />
+            <DatePicker
+              aria-label="Date"
+              value={date}
+              onChange={setDate}
+              todayValue={getCurrentShiftAndDate().date}
+              style={{ maxWidth: 180 }}
+            />
           </div>
           <ToolbarControls>
             {csvRows && (
               <>
-                <CsvTools filenamePrefix="total-stocks" date={date} rows={csvRows} columns={csvColumns} onImportRow={async () => {}} getPendingValue={() => undefined} canImport={false}
+                <CsvTools
+                  filenamePrefix="total-stocks"
+                  date={date}
+                  rows={csvRows}
+                  columns={csvColumns}
+                  onImportRow={async () => {}}
+                  getPendingValue={() => undefined}
+                  canImport={false}
                   exportFormat="excel"
                   pdf={{
                     title: SOURCE_TITLES[source],
@@ -117,7 +163,12 @@ export function TotalStocksPage() {
           </ToolbarControls>
         </Toolbar>
       </PageHeader>
-      <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
+      <Toast
+        message={error}
+        onDismiss={() => setError(null)}
+        variant="error"
+        duration={null}
+      />
       {!rows ? (
         <TableSkeleton
           headers={["SKU", "Product", ...csvColumns.map((c) => c.label)]}
@@ -131,7 +182,11 @@ export function TotalStocksPage() {
               of carrying over whatever was collapsed on the last one. Also
               remounts on `source` so a collapsed category doesn't carry a
               stale column count across an Online/Offline/Total switch. */}
-          <TotalStocksTable key={`${date}-${source}`} rows={visibleRows ?? []} source={source} />
+          <TotalStocksTable
+            key={`${date}-${source}`}
+            rows={visibleRows ?? []}
+            source={source}
+          />
         </div>
       )}
     </div>

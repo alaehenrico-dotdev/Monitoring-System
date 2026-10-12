@@ -1,3 +1,5 @@
+import { invalidateAll } from "../lib/cache";
+import { broadcastRealtimeEvent } from "../lib/realtime";
 import { spawn } from "child_process";
 import type { Request, Response } from "express";
 import { env } from "../config/env";
@@ -173,6 +175,11 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      // The tables were replaced (fully, or partly if it failed midway), so
+      // nothing cached from before is trustworthy - and open screens need to
+      // reload. A restore used to do neither.
+      invalidateAll();
+      broadcastRealtimeEvent();
       if (code === 0) resolve();
       else reject(new HttpError(500, `Restore failed (mysql exited with code ${code})${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
     });

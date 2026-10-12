@@ -43,7 +43,7 @@ export async function login(username: string, password: string, ip?: string) {
   }
 
   const authUser = { id: user.id, username: user.username, name: user.name, role: user.role };
-  const token = signToken(authUser, env.jwtExpiresIn);
+  const token = signToken(authUser, env.jwtExpiresIn, user.tokenVersion);
   await logSystemEvent("login", { username: user.username, ip: ip ?? null }, user.id);
   return { token, user: authUser };
 }

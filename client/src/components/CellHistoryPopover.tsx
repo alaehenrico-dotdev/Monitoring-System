@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   describeWhen,
@@ -36,15 +36,18 @@ export function CellHistoryPopover({
   target: CellHistoryTarget;
   onClose: () => void;
 }) {
-  const [entries, setEntries] = useState<CellChange[] | null>(null);
+  const [fetched, setEntries] = useState<CellChange[] | null>(null);
+  // Never-saved rows have nothing to look up: derive the empty state instead
+  // of setting it from an effect.
+  const entries = useMemo(
+    () => (target.recordId === undefined ? [] : fetched),
+    [target.recordId, fetched],
+  );
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState({ left: target.x, top: target.y });
 
   useEffect(() => {
-    if (target.recordId === undefined) {
-      setEntries([]);
-      return;
-    }
+    if (target.recordId === undefined) return;
     let cancelled = false;
     fetchCellHistory(target.table, target.recordId, target.colKey).then((all) => {
       if (!cancelled) setEntries(all);

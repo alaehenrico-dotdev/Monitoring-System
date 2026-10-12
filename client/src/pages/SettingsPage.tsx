@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { DatabaseBackupPage } from "./DatabaseBackupPage";
 import { DataResetPage } from "./DataResetPage";
+import { UserPasswordsPage } from "./UserPasswordsPage";
 import { PageHeader } from "../components/PageHeader";
-import { colors } from "../theme";
 
-type Tab = "backup" | "reset";
+type Tab = "backup" | "reset" | "passwords";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "backup", label: "Backup & Restore" },
   { key: "reset", label: "Data Reset" },
+  { key: "passwords", label: "User Passwords" },
 ];
 
 /// Section Admin - groups the two "system-level" admin tools (Database
@@ -23,37 +24,27 @@ export function SettingsPage() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="System-level tools for administrators - back up, restore or wipe the database for a fresh start."
+        subtitle="Admin tools: backups, data reset, and passwords."
       />
 
-      <div style={{ display: "flex", gap: 4, borderBottom: `1px solid ${colors.border}`, marginBottom: 24 }}>
-        {TABS.map((t) => {
-          const active = t.key === tab;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              style={{
-                fontFamily: "inherit",
-                fontSize: 13.5,
-                fontWeight: active ? 700 : 500,
-                cursor: "pointer",
-                background: "transparent",
-                border: "none",
-                borderBottom: active ? `2px solid ${colors.yellow}` : "2px solid transparent",
-                color: active ? colors.ink : colors.subtleInk,
-                padding: "10px 16px",
-                marginBottom: -1,
-              }}
-            >
-              {t.label}
-            </button>
-          );
-        })}
+      <div className="ae-subtabs" role="tablist" aria-label="Settings sections">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={t.key === tab}
+            className="ae-subtab"
+            onClick={() => setTab(t.key)}
+          >
+            {t.label}
+          </button>
+        ))}
       </div>
 
-      {tab === "backup" ? <DatabaseBackupPage /> : <DataResetPage />}
+      {tab === "backup" && <DatabaseBackupPage />}
+      {tab === "reset" && <DataResetPage />}
+      {tab === "passwords" && <UserPasswordsPage />}
     </div>
   );
 }

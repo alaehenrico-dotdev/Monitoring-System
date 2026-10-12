@@ -45,11 +45,17 @@ model User {
   passwordHash String
   role         Role
   isActive     Boolean  @default(true)
+  // Bumped whenever the account's credentials are reset by an admin. Every
+  // token carries the version it was issued under (claim `tv`), so bumping it
+  // signs out sessions that were opened with the old password - a JWT alone
+  // cannot be revoked, and isActive only covers deactivation, not a reset.
+  tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
 
   onlineEntries    DailyOnlineStock[]   @relation("OnlineEncodedBy")
   offlineEntries   DailyOfflineStock[]  @relation("OfflineEncodedBy")
   manualCounts     ManualCount[]        @relation("CountedBy")
+  publishedCounts  ManualCount[]        @relation("PublishedBy")
   changeLogEntries ChangeLog[]          @relation("ChangedBy")
   importBatches    ImportBatch[]        @relation("ImportedBy")
   reportHistory    ReportHistoryEntry[] @relation("GeneratedBy")
@@ -222,6 +228,15 @@ model ManualCount {
   // carried forward. Counts that existed before this column were published.
   publishedAt          DateTime?
   publishedById        Int?
+  // A real foreign key like every other user reference (it was a bare Int, so
+  // nothing stopped it pointing at a user that does not exist). SetNull keeps
+  // the count if the user row is ever removed.
+  publishedBy          User?         @relation("PublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  // The first count of a product at a location seeds the system instead of
+  // auditing it (the system had nothing to compare against), so it is stored
+  // with variance 0 and left out of the variance reports. It still has to be
+  // published - that is the approval - before it becomes the next opening stock.
+  isOpeningBalance     Boolean       @default(false)
   countedById          Int?
   countedBy            User?         @relation("CountedBy", fields: [countedById], references: [id])
   createdAt            DateTime      @default(now())
@@ -232,6 +247,11 @@ model ManualCount {
   // all of which filter or range-scan entryDate across products (see the
   // DailyOnlineStock index above for why the unique key doesn't help).
   @@index([entryDate])
+  // "Which products already have a count at this location" (the opening-
+  // balance check on every Manual Count grid load, and per save). The unique
+  // key leads with productId, so without this that is a scan of the whole
+  // unique index; led by location it reads only the matching slice.
+  @@index([location, productId])
   // Retained for compatibility with existing databases; no active endpoint
   // uses this index.
   @@index([updatedAt])
@@ -348,7 +368,7 @@ model ReportHistoryEntry {
   // "online" / "offline" / "all" - which section of the report was generated.
   // Null on entries from before this column (and for reports with no such
   // split, like the Variance Report).
-  section       String?
+  section       String?  @db.VarChar(20)
   generatedById Int?
   generatedBy   User?    @relation("GeneratedBy", fields: [generatedById], references: [id])
   generatedAt   DateTime @default(now())

@@ -1252,6 +1252,65 @@ table input[type="number"] {
   border-color: #d4a000;
   color: var(--ae-text);
 }
+/* Solid brand-yellow button - same fill as the toolbar's primary action, with
+   no border. Used where a secondary action should read as a button rather
+   than an outlined box (Settings). Declared after .ae-btn-secondary so it wins
+   when both classes are present. */
+.ae-btn-solid {
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+  color: var(--ae-btn-yellow-text);
+}
+.ae-btn-solid:hover:not(:disabled) {
+  background: var(--ae-btn-yellow-hover);
+  filter: none;
+}
+.ae-btn-solid:active:not(:disabled) {
+  background: var(--ae-btn-yellow-active);
+  filter: none;
+}
+
+/* Sub-page switcher (Settings): plain text tabs with a thin divider and a
+   gold underline on the current one - deliberately not button-shaped, so it
+   doesn't read as a second top nav. */
+.ae-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--ae-glass-divider);
+}
+.ae-subtab {
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 8px 2px 10px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  cursor: pointer;
+  color: var(--ae-text-muted);
+  background: none;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease;
+}
+.ae-subtab:hover {
+  color: var(--ae-text);
+}
+.ae-subtab[aria-selected="true"] {
+  font-weight: 600;
+  color: var(--ae-text);
+  border-bottom-color: var(--ae-btn-yellow);
+}
+.ae-subtab:focus-visible {
+  outline: 2px solid var(--ae-btn-yellow);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .ae-btn-ghost {
   background: transparent;
   border-color: #d4a000;
@@ -1585,7 +1644,9 @@ table input[type="number"] {
      there was still plenty of space. */
   min-width: 140px;
 }
-.ae-toolbar--sizer:not(.ae-toolbar--compact) .ae-search--open input[type="search"] {
+.ae-toolbar--sizer:not(.ae-toolbar--compact)
+  .ae-search--open
+  input[type="search"] {
   flex-basis: 140px;
   width: 140px !important;
 }
@@ -3222,13 +3283,19 @@ table input[type="number"] {
   justify-content: flex-start;
 }
 
-/* Insights row: Entry status / Top variances / Low & negative stock. */
+/* Insights row: Entry status / Top variances / Low & negative stock / Lowest
+   days left (4 across on wide screens; Needs restock wraps to the next row). */
 .ae-dash-insights {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
   margin: 12px 0 0;
   flex-shrink: 0;
+}
+@media (min-width: 1280px) {
+  .ae-dash-insights {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 @media (min-width: 1500px) {
   .ae-dash-insights {
@@ -3501,6 +3568,86 @@ table input[type="number"] {
 @keyframes ae-skeleton-shimmer {
   to {
     background-position: -50% 0;
+  }
+}
+
+/* Loading indicator: the Ala Eh! logo (used untouched) with a gold arc and a
+   bright head orbiting just outside it. --lp is the logo's pixel size (set
+   inline) and --ring the arc colour. The arc is a conic gradient (transparent
+   tail -> solid head) cut into a ring by a mask; the head dot sits outside
+   the mask, on the ring's centre line, and the whole thing rotates. The
+   orbit extends beyond the logo's own box without affecting layout. */
+.ae-logo-pulse {
+  --ring: #f5c000;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  vertical-align: middle;
+}
+.ae-logo-pulse-img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+.ae-logo-orbit {
+  --t: max(2px, calc(var(--lp) * 0.03));
+  position: absolute;
+  inset: calc(var(--lp) * -0.08);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: ae-logo-orbit 1.3s linear infinite;
+  will-change: transform;
+}
+.ae-logo-orbit-arc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 200deg,
+    color-mix(in srgb, var(--ring) 18%, transparent) 235deg,
+    var(--ring) 360deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--t)),
+    #000 calc(100% - var(--t) + 0.5px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--t)),
+    #000 calc(100% - var(--t) + 0.5px)
+  );
+}
+.ae-logo-orbit-dot {
+  position: absolute;
+  top: calc(var(--t) / 2);
+  left: 50%;
+  width: calc(var(--t) * 2.6);
+  height: calc(var(--t) * 2.6);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 45%, #fff3c4 70%, var(--ring) 100%);
+  box-shadow:
+    0 0 calc(var(--t) * 2) color-mix(in srgb, var(--ring) 85%, transparent),
+    0 0 calc(var(--t) * 5) color-mix(in srgb, var(--ring) 40%, transparent);
+}
+@keyframes ae-logo-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Reduced motion: the arc is held still, so it still reads as "busy". */
+@media (prefers-reduced-motion: reduce) {
+  .ae-logo-orbit {
+    animation: none;
+    transform: rotate(-35deg);
   }
 }
 
@@ -4640,4 +4787,157 @@ table input[type="number"] {
 .ae-variance-details-btn:focus-visible {
   outline: 2px solid #f5c000;
   outline-offset: 1px;
+}
+
+/* ---------------------------------------------------------------------------
+   Settings > Passwords: one card per account (reuses .ae-dash-card's glass
+   surface) instead of bare rows floating on the page background.
+   ------------------------------------------------------------------------ */
+.ae-account-list {
+  display: grid;
+  gap: 12px;
+}
+.ae-account-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.ae-account-card:hover {
+  border-color: var(--ae-glass-accent);
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.25),
+    0 0 14px rgba(245, 192, 0, 0.12);
+}
+.ae-account-card--inactive {
+  opacity: 0.6;
+}
+.ae-account-avatar {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0c0c0c;
+  background: linear-gradient(135deg, #fdd023, #d4a000);
+  box-shadow: 0 0 0 2px rgba(245, 192, 0, 0.25);
+}
+.ae-account-info {
+  flex: 1;
+  min-width: 0;
+}
+.ae-account-name {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-account-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--ae-text-muted);
+}
+.ae-account-role {
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ae-glass-divider);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ae-account-role--off {
+  color: var(--ae-danger-text);
+  border-color: currentColor;
+}
+@media (max-width: 520px) {
+  .ae-account-card {
+    flex-wrap: wrap;
+  }
+  .ae-account-card .ae-btn {
+    width: 100%;
+  }
+}
+
+/* ---- Publish (Manual Count) ----------------------------------------------
+   Sits beside the shift selector. Unlike the other toolbar actions (icon-only
+   at every tier) it shows its "Publish" text whenever the toolbar has room -
+   the full tier - and collapses to the icon in the compact tiers, like the
+   rest. Own class (not .ae-toolbar-save) because that one is a fixed square;
+   the selectors carry :not(.ae-btn-danger) only to out-rank the stacked
+   :has()/:not() icon-button rules above, which would otherwise win.
+   --ready is set when the sheet is fully saved and waiting to be published
+   (nothing staged, something saved-but-unpublished): solid yellow with a
+   soft pulsing glow, so the next step is hard to miss. */
+.ae-toolbar > :first-child:not(.ae-toolbar-controls) > .ae-toolbar-publish::before {
+  display: none; /* no "|" divider inside the button */
+}
+.ae-toolbar .ae-btn.ae-toolbar-publish:not(.ae-btn-danger) {
+  width: auto;
+  min-width: var(--tb-h);
+  max-width: none;
+  padding: 0 var(--tb-pad-x);
+  gap: 6px;
+  flex: 0 0 auto;
+  margin-left: 6px;
+  border: 1px solid var(--tb-hairline);
+  background: var(--tb-field-bg);
+  color: var(--tb-text);
+}
+.ae-toolbar:not(.ae-toolbar--compact)
+  .ae-btn.ae-toolbar-publish
+  .ae-toolbar-btn-label {
+  max-width: 80px;
+  opacity: 1;
+}
+.ae-toolbar--compact .ae-btn.ae-toolbar-publish:not(.ae-btn-danger) {
+  gap: 0;
+}
+.ae-toolbar--circle .ae-btn.ae-toolbar-publish:not(.ae-btn-danger) {
+  width: var(--tb-h);
+  max-width: var(--tb-h);
+  padding: 0;
+  margin-left: 0;
+  flex: 0 0 var(--tb-h);
+}
+.ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger),
+.ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger):hover:not(:disabled) {
+  background: var(--ae-btn-yellow);
+  border-color: var(--ae-btn-yellow-active);
+  color: var(--ae-btn-yellow-text);
+  animation: ae-publish-glow 1.8s ease-in-out infinite;
+}
+@keyframes ae-publish-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(245, 192, 0, 0.55),
+      0 0 8px 1px rgba(245, 192, 0, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px rgba(245, 192, 0, 0),
+      0 0 18px 4px rgba(245, 192, 0, 0.8);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger),
+  .ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger):hover:not(:disabled) {
+    animation: none;
+    box-shadow: 0 0 12px 2px rgba(245, 192, 0, 0.7);
+  }
 }

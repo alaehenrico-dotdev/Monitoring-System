@@ -240,7 +240,7 @@ export function VarianceReportPage() {
     <div>
       <PageHeader
         title="Variance Report"
-        subtitle="Review differences between recorded stock and manual counts."
+        subtitle="Compare recorded stock with manual counts."
       >
         <Toolbar className="no-print">
           <form
@@ -253,18 +253,18 @@ export function VarianceReportPage() {
               minWidth: 0,
             }}
           >
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={changeDate}
-              style={{ maxWidth: 160 }}
-            />
             <TextInput
               aria-label="Category (optional)"
               value={category}
               onChange={(e) => changeCategory(e.target.value)}
               placeholder="e.g. Premium (Liter)"
               style={{ maxWidth: 200 }}
+            />
+            <DatePicker
+              aria-label="Date"
+              value={date}
+              onChange={changeDate}
+              style={{ maxWidth: 160 }}
             />
             <Button type="submit">
               <PlayIcon /> Run report
@@ -382,7 +382,12 @@ export function VarianceReportPage() {
                       {r.variance}
                     </td>
                     <td>{r.countedBy?.name ?? "—"}</td>
-                    <td style={{ textAlign: "left", color: r.remarks ? colors.ink : colors.subtleInk }}>
+                    <td
+                      style={{
+                        textAlign: "left",
+                        color: r.remarks ? colors.ink : colors.subtleInk,
+                      }}
+                    >
                       {r.remarks?.trim() ? r.remarks : "No reason recorded"}
                     </td>
                   </tr>
