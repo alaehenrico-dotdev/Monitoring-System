@@ -104,7 +104,9 @@ export function PageHeader({
   }
 
   return (
-    <>
+    // One sticky unit (tabs + card): navigation and the page's controls stay on
+    // screen however far the page below is scrolled (see .ae-sticky-head).
+    <div className="ae-sticky-head">
       {/* Office-style tab strip sitting on top of the header card, outside
           it (like the tab row above a ribbon). Not part of the card's
           collapsible content, so navigation stays reachable when the
@@ -166,6 +168,6 @@ export function PageHeader({
           <ChevronIcon />
         </button>
       </div>
-    </>
+    </div>
   );
 }

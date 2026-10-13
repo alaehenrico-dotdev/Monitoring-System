@@ -43,19 +43,47 @@ export function ReportHistoryPage({
   backLabel,
 }: Props) {
   const [history, setHistory] = useState<ReportHistoryEntry[] | null>(null);
+  const [nextCursor, setNextCursor] = useState<number | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const realtimeVersion = useRealtimeVersion();
 
   useEffect(() => {
+    // Refreshes (a realtime nudge) replace only the newest page, so older pages
+    // the person already loaded stay where they are.
     listReportHistory(type)
-      .then(setHistory)
+      .then((first) => {
+        setHistory((prev) => {
+          const oldest = first.items.length ? first.items[first.items.length - 1].id : Infinity;
+          const older = (prev ?? []).filter((e) => e.id < oldest);
+          return [...first.items, ...older];
+        });
+        setNextCursor((prevCursor) =>
+          prevCursor !== null && prevCursor < (first.nextCursor ?? Infinity) ? prevCursor : first.nextCursor,
+        );
+      })
       .catch((e) =>
         setError(
           e instanceof Error ? e.message : "Failed to load report history",
         ),
       );
   }, [type, realtimeVersion]);
+
+  function loadMore() {
+    if (nextCursor === null || loadingMore) return;
+    setLoadingMore(true);
+    listReportHistory(type, nextCursor)
+      .then((page) => {
+        setHistory((prev) => {
+          const have = new Set((prev ?? []).map((e) => e.id));
+          return [...(prev ?? []), ...page.items.filter((e) => !have.has(e.id))];
+        });
+        setNextCursor(page.nextCursor);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load more"))
+      .finally(() => setLoadingMore(false));
+  }
 
   const visible = useMemo(
     () =>
@@ -168,6 +196,16 @@ export function ReportHistoryPage({
               </div>
             </Fragment>
           ))}
+          {nextCursor !== null && (
+            <button
+              type="button"
+              className="ae-btn ae-btn-solid"
+              onClick={loadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? "Loading…" : "Load older reports"}
+            </button>
+          )}
         </div>
       )}
     </div>

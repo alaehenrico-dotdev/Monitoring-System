@@ -1,3 +1,4 @@
+import { useBusyAction } from "../hooks/useBusyAction";
 import {
   Fragment,
   useEffect,
@@ -17,6 +18,7 @@ import {
   publishManualCounts,
   saveManualCount,
 } from "../api/manualCounts";
+import { loadHistory, saveHistory } from "../utils/sessionHistory";
 import { recordReportHistory } from "../api/reportHistory";
 import type {
   ManualCountEntry,
@@ -141,6 +143,8 @@ const sameSnapshot = (a: DraftSnapshot, b: DraftSnapshot) =>
 const draftsKey = (date: string, shift: Shift, loc: CountLocation) =>
   `ala-eh-manual-count-pending:${date}:${shift}:${loc}`;
 
+const historyKey = (date: string, shift: Shift) => `manual-count:${date}:${shift}`;
+
 function loadDrafts(date: string, shift: Shift): Drafts {
   const load = (loc: CountLocation): Record<number, string> => {
     try {
@@ -151,6 +155,42 @@ function loadDrafts(date: string, shift: Shift): Drafts {
     }
   };
   return { ONLINE: load("ONLINE"), OFFLINE: load("OFFLINE") };
+}
+
+/// Which sheet the page was last on (date, shift, location filter). The staged
+/// counts themselves are kept per sheet (above), but without this a person who
+/// switched to another page and came back landed on the *current* sheet - the
+/// one they had been encoding looked empty, as if the entries were lost.
+const VIEW_KEY = "ala-eh-manual-count-view";
+
+interface StoredView {
+  date: string;
+  shift: Shift;
+  source: StockLocation;
+}
+
+/// The last sheet, but only while it still holds unsaved counts. Once nothing
+/// is staged there is nothing to protect, and the page opens on the current
+/// shift as it always did (a stale date left over from yesterday would be a
+/// trap, not a convenience).
+function loadStoredView(): StoredView | null {
+  try {
+    const raw = sessionStorage.getItem(VIEW_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as Partial<StoredView>;
+    if (
+      typeof v.date !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(v.date) ||
+      (v.shift !== "MORNING" && v.shift !== "NIGHT") ||
+      (v.source !== "ONLINE" && v.source !== "OFFLINE" && v.source !== "TOTAL")
+    )
+      return null;
+    const staged = loadDrafts(v.date, v.shift);
+    if (Object.keys(staged.ONLINE).length + Object.keys(staged.OFFLINE).length === 0) return null;
+    return { date: v.date, shift: v.shift, source: v.source };
+  } catch {
+    return null;
+  }
 }
 
 interface AuditRow {
@@ -189,6 +229,8 @@ export function ManualCountPage() {
   const [searchParams] = useSearchParams();
   const openedFromHistory = searchParams.get("history") === "1";
   const printAfterLoad = useRef(openedFromHistory);
+  // Read once: coming back to the page resumes the sheet with unsaved counts.
+  const [resumed] = useState(() => (openedFromHistory ? null : loadStoredView()));
   const [{ date, shift }, setDateShift] = useState<{
     date: string;
     shift: Shift;
@@ -196,7 +238,7 @@ export function ManualCountPage() {
     const now = getCurrentShiftAndDate();
     const d = searchParams.get("date") ?? "";
     const s = searchParams.get("shift");
-    if (!openedFromHistory || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return now;
+    if (!openedFromHistory || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return resumed ?? now;
     return { date: d, shift: s === "MORNING" || s === "NIGHT" ? s : now.shift };
   });
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
@@ -214,6 +256,7 @@ export function ManualCountPage() {
   // Which location(s) the table shows/edits: "TOTAL" = both.
   const [sourceFilter, setSourceFilter] = useState<StockLocation>(() => {
     if (lockedLocation) return lockedLocation;
+    if (resumed) return resumed.source;
     const src = searchParams.get("source");
     return openedFromHistory &&
       (src === "ONLINE" || src === "OFFLINE" || src === "TOTAL")
@@ -296,8 +339,8 @@ export function ManualCountPage() {
   // the keystrokes between focusing a count and leaving it), one Zero all, one
   // paste or one Clear - whole-sheet snapshots, so any of them undoes cleanly.
   // Not persisted: like any undo stack it belongs to this editing session.
-  const [past, setPast] = useState<DraftSnapshot[]>([]);
-  const [future, setFuture] = useState<DraftSnapshot[]>([]);
+  const [past, setPast] = useState<DraftSnapshot[]>(() => loadHistory<DraftSnapshot>(historyKey(date, shift)).past);
+  const [future, setFuture] = useState<DraftSnapshot[]>(() => loadHistory<DraftSnapshot>(historyKey(date, shift)).future);
   // Whether the cell being edited has already put its step on the stack.
   const editStepPushed = useRef(false);
   // The product whose Variance details panel is open.
@@ -317,10 +360,16 @@ export function ManualCountPage() {
     // staged (still there if switched back to) and the one being loaded
     // picks up whatever it already had staged.
     setDrafts(loadDrafts(date, shift));
-    // A different sheet: its edits are not reachable from this one's history.
-    setPast([]);
-    setFuture([]);
+    // A different sheet: its edits are not reachable from this one's history,
+    // and it picks up whatever history it had when it was last left.
+    const history = loadHistory<DraftSnapshot>(historyKey(date, shift));
+    setPast(history.past);
+    setFuture(history.future);
   });
+  // The undo/redo history survives switching pages (see utils/sessionHistory.ts).
+  useEffect(() => {
+    saveHistory(historyKey(date, shift), past, future);
+  }, [past, future, date, shift]);
   useEffect(() => {
     // Drop a response for a date/shift (or refetch) that has been superseded.
     let cancelled = false;
@@ -338,6 +387,16 @@ export function ManualCountPage() {
       cancelled = true;
     };
   }, [date, shift, realtimeVersion]);
+
+  // Remember which sheet is open so it can be resumed (see loadStoredView).
+  useEffect(() => {
+    try {
+      const view: StoredView = { date, shift, source: sourceFilter };
+      sessionStorage.setItem(VIEW_KEY, JSON.stringify(view));
+    } catch {
+      // Best effort.
+    }
+  }, [date, shift, sourceFilter]);
 
   useEffect(() => {
     for (const loc of COUNT_LOCATIONS) {
@@ -902,6 +961,8 @@ export function ManualCountPage() {
 
   // PDF of the table exactly as filtered on screen (same columns), built from
   // the row data like every other PDF in the app.
+  const pdfAction = useBusyAction();
+
   async function handlePdf(record = true) {
     if (!visibleRows || pendingCount > 0) return;
     const pdfColumns = [
@@ -1191,7 +1252,9 @@ export function ManualCountPage() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={() => void handlePdf()}
+              onClick={() => void pdfAction.run(() => handlePdf())}
+              loading={pdfAction.busy}
+              loadingLabel={<span className="ae-toolbar-btn-label">PDF</span>}
               disabled={pendingCount > 0 || !visibleRows}
               title={
                 pendingCount > 0

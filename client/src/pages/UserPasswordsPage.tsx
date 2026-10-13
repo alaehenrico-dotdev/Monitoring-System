@@ -44,7 +44,7 @@ export function UserPasswordsPage() {
   }, []);
 
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div style={{ width: "100%", maxWidth: 760, margin: "0 auto" }}>
       <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 20px" }}>
         Only an administrator can change passwords. Pick an account and set a
         new one, then hand it to the user.

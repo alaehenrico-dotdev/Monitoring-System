@@ -21,6 +21,8 @@ export interface ChangeLogPage {
   items: ChangeLogEntry[];
   /// Pass back as `cursor` for the next (older) page; null on the last one.
   nextCursor: number | null;
+  /// Rows matching the filters in all - only when asked for (`withTotal`).
+  total?: number;
 }
 
 function filterParams(filters: ChangeLogFilters): URLSearchParams {
@@ -40,10 +42,15 @@ function filterParams(filters: ChangeLogFilters): URLSearchParams {
 }
 
 /// One newest-first page of the log.
-export function listChangeLogPage(filters: ChangeLogFilters = {}, page: { limit?: number; cursor?: number } = {}) {
+export function listChangeLogPage(
+  filters: ChangeLogFilters = {},
+  page: { limit?: number; cursor?: number; offset?: number; withTotal?: boolean } = {},
+) {
   const params = filterParams(filters);
   if (page.limit) params.set("limit", String(page.limit));
   if (page.cursor) params.set("cursor", String(page.cursor));
+  if (page.offset) params.set("offset", String(page.offset));
+  if (page.withTotal) params.set("withTotal", "true");
   const qs = params.toString();
   return http.get<ChangeLogPage>(`/change-log${qs ? `?${qs}` : ""}`);
 }

@@ -6,6 +6,7 @@ import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./index.css";
 import { registerServiceWorker } from "./pwa";
+import { installGlobalErrorReporting } from "./utils/errorReporter";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -24,4 +25,5 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   </React.StrictMode>,
 );
 
+installGlobalErrorReporting();
 registerServiceWorker();

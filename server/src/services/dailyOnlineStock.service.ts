@@ -5,6 +5,8 @@ import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRe
 import { productRepository } from "../repositories/productRepository";
 import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
 import { recordChange } from "./changeLog.service";
+import { assertPeriodOpen } from "./dayLock.service";
+import { isNoopSave } from "../utils/noopSave";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { propagateOpeningStock } from "./manualCounts.service";
 import { HttpError } from "../utils/HttpError";
@@ -154,6 +156,7 @@ export async function saveOnlineEntry(
     return saved;
   }
 
+  await assertPeriodOpen(entryDate, shift, db);
   const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
   const existing = await dailyOnlineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
@@ -186,6 +189,10 @@ export async function saveOnlineEntry(
     throw HttpError.badRequest(
       `This would take ${product.name}'s Online stock below zero (would end at ${remainingStock}). Reduce Fulfillment (Out) or the transfer out to Offline, or add Production (In)/RTS first.`
     );
+  }
+
+  if (existing && isNoopSave(existing, openingStock, merged, columnKeysOf(extras).length + (input.clearExtraColumns?.length ?? 0))) {
+    return existing;
   }
 
   const data = { productId, entryDate, shift, openingStock, ...merged, onlineStock, remainingStock, encodedById: userId };

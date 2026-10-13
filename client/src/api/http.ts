@@ -43,6 +43,23 @@ function timeoutFor(path: string, method: string | undefined): number {
   return !method || method === "GET" ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS;
 }
 
+/// Saves go through the server's retry-safe routes (see the API's
+/// middleware/idempotency.ts). Each save sends an Idempotency-Key; if the
+/// attempt fails in a way where the server may still have committed it (a
+/// timeout, a dropped connection, a 5xx), the identical retry reuses the same
+/// key, so the server replays the first result instead of saving twice.
+const IDEMPOTENT_PATH = /^\/(online-stock|offline-stock|manual-counts|products|import-batches|report-history|day-closures|corrections)(\/|$|\?)/;
+const retryKeys = new Map<string, string>();
+const MAX_RETRY_KEYS = 100;
+
+function newKey(): string {
+  // randomUUID only exists in secure contexts; the app is also served over
+  // plain http on the LAN.
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
@@ -50,6 +67,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     ...(options.headers as Record<string, string> | undefined),
   };
   if (token) headers.Authorization = `Bearer ${token}`;
+
+  let retrySig: string | null = null;
+  if (options.method && options.method !== "GET" && IDEMPOTENT_PATH.test(path) && typeof options.body === "string") {
+    retrySig = `${options.method} ${path} ${options.body}`;
+    const key = retryKeys.get(retrySig) ?? newKey();
+    retryKeys.delete(retrySig);
+    retryKeys.set(retrySig, key); // most recent last
+    if (retryKeys.size > MAX_RETRY_KEYS) retryKeys.delete(retryKeys.keys().next().value as string);
+    headers["Idempotency-Key"] = key;
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutFor(path, options.method));
@@ -86,8 +113,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       setToken(null);
       onUnauthorized?.();
     }
+    // A 4xx is a definite "no" - the retry is a fresh attempt. A 5xx may have
+    // committed, so its key is kept for the retry.
+    if (retrySig && response.status < 500) retryKeys.delete(retrySig);
     throw new ApiError(response.status, body.error ?? "Request failed");
   }
+  if (retrySig) retryKeys.delete(retrySig);
   if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }

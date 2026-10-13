@@ -63,15 +63,19 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    heading: "Admin",
+    // What needs a second pair of eyes: requested corrections (any role may
+    // ask), the admin's queue of open items, and the trail of what changed.
+    heading: "Review",
     links: [
+      { to: "/corrections", label: "Corrections", roles: ALL_ROLES },
+      { to: "/admin-queue", label: "Admin Queue", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/change-log", label: "Change Log", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/products", label: "SKUs", roles: ["SUPERVISOR_ADMIN"] },
     ],
   },
   {
-    heading: "Settings",
+    heading: "Admin",
     links: [
+      { to: "/products", label: "SKUs", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/settings", label: "Settings", roles: ["SUPERVISOR_ADMIN"] },
     ],
   },

@@ -133,6 +133,14 @@ function limitCount(name: string, fallback: number): number {
   return value;
 }
 
+function nonNegativeInt(name: string, fallback: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 0) throw new Error(`${name} must be a whole number, 0 or more.`);
+  return value;
+}
+
 function limitWindowMs(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) return fallback;
@@ -191,6 +199,16 @@ export const env = {
     passcodeLimit: limitCount("RATE_LIMIT_PASSCODE_MAX", 10),
     passcodeWindowMs: limitWindowMs("RATE_LIMIT_PASSCODE_WINDOW_MS", 15 * 60 * 1000),
   },
+  // Change-log rows older than this many months are moved to change_log_archive
+  // by the nightly maintenance job (services/maintenance.service.ts). 0 turns
+  // archiving off.
+  changeLogRetentionMonths: nonNegativeInt("CHANGE_LOG_RETENTION_MONTHS", 12),
+  // A backup older than this many hours (or none at all) shows as overdue in
+  // the admin action queue.
+  backupOverdueHours: limitCount("BACKUP_OVERDUE_HOURS", 36),
+  // Folder the backup scripts write to (scripts/backup.*). When set, the
+  // Backups page lists the files found there and can verify them in place.
+  backupDir: process.env.BACKUP_DIR?.trim() || "",
   databaseUrl: required("DATABASE_URL"),
   // No fallback for either of these two: a default here would mean
   // `required()` never actually throws, so every token this app has ever

@@ -606,6 +606,71 @@ table input[type="number"] {
   overflow-x: auto;
 }
 
+/* A content pane with the same surface as the entry tables (.ae-table-scroll):
+   the translucent glass fill WITH its backdrop blur, hairline edge and soft
+   glow. Without the blur the fill reads far more see-through than the entries
+   do, so every list/card page uses this instead of restating the fill. */
+/* Pager step buttons («  ‹  ›): no border and no fill at rest - just the glyph,
+   with a soft tint on hover/focus - so the pager reads as text controls, not a
+   row of boxes. */
+/* The pager's "Rows per page" box: no outline at rest, like the step buttons
+   beside it (the focus ring still shows, for keyboard users). */
+.ae-pager .ae-select {
+  border-color: transparent;
+}
+.ae-pager .ae-select:hover:not(:disabled):not(:focus) {
+  border-color: transparent;
+  background: var(--ae-row-hover);
+}
+.ae-pager .ae-select:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ae-pager-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ae-text);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ae-pager-btn:hover:not(:disabled),
+.ae-pager-btn:focus-visible {
+  background: var(--ae-row-hover);
+  outline: none;
+}
+.ae-pager-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--ae-glass-accent);
+}
+.ae-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ae-panel {
+  position: relative;
+  overflow: hidden;
+  border: 0.3px solid #525252;
+  border-radius: 6px;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(255, 255, 255, 0.22),
+    0 0 32px rgba(255, 255, 255, 0.12);
+}
+
 /* Themed scrollbars for table containers, modal bodies, and the main content
    pane - a thin, pill-shaped thumb (same border-radius: 999px as
    .ae-input/.ae-select) that turns brand gold on hover, instead of the
@@ -718,9 +783,8 @@ table input[type="number"] {
 }
 
 .ae-input-cell {
-  /* Same corner radius as .ae-page-header (8px), instead of the pill
-     radius inherited from .ae-input. */
-  border-radius: 6px;
+  /* Square corners: an editable grid cell sits flush in its table cell. */
+  border-radius: 0;
   padding: 2px 5px;
   background: var(--ae-input-cell-bg);
   color: var(--ae-input-cell-text);
@@ -730,9 +794,11 @@ table input[type="number"] {
 .ae-input-cell:hover:not(:disabled):not(:focus) {
   border-color: var(--ae-input-cell-border);
 }
+/* Clicking into a cell shows no border or ring - the caret and the cell's own
+   fill are the only cue. */
 .ae-input-cell:focus {
-  border-color: var(--ae-input-cell-border);
-  box-shadow: 0 0 0 2px var(--ae-input-cell-focus-ring);
+  border-color: transparent;
+  box-shadow: none;
 }
 .ae-input-cell:disabled {
   background: var(--ae-input-cell-bg);
@@ -750,8 +816,8 @@ table input[type="number"] {
 .ae-input-cell.ae-input-cell--edited:focus {
   background: var(--ae-input-cell-edited-bg);
   color: var(--ae-input-cell-edited-text);
-  border-color: var(--ae-input-cell-edited-border);
-  box-shadow: 0 0 0 2px var(--ae-input-cell-edited-ring);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .ae-number-cell {
@@ -2184,9 +2250,14 @@ table input[type="number"] {
   align-items: center;
   flex-wrap: nowrap;
   gap: 2px;
-  margin: -18px -18px 0;
-  /* Breathing room above and below the tab labels. */
-  padding: 2px 14px 2px 4px;
+  /* Top margin cancels .ae-main's whole top padding (24px; 16px / 12px at the
+     breakpoints below) so the strip sits flush with the top edge. */
+  margin: -24px -18px -5px;
+  /* Breathing room above and below the tab labels. Top: 8px + the tab's own 3px
+     = 11px from the screen edge. Bottom: 10px + the tab's own 6px, minus the 5px
+     the card tucks up under the strip (see the margin above) = 11px to the
+     card, so the labels sit evenly between the two. */
+  padding: 8px 14px 10px 4px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -2260,6 +2331,12 @@ table input[type="number"] {
   width: 0;
   border-radius: 2px;
   background: var(--ae-glass-accent);
+  /* A soft yellow glow - two faint layers, so it reads as a lit line rather than
+     a neon tube. (.ae-header-tabs keeps spare padding below for it: that strip
+     clips vertical overflow.) */
+  box-shadow:
+    0 0 5px rgba(245, 192, 0, 0.5),
+    0 0 12px rgba(245, 192, 0, 0.22);
   opacity: 0;
   pointer-events: none;
   will-change: transform, width;
@@ -2370,7 +2447,11 @@ table input[type="number"] {
   position: relative;
   z-index: 1;
   min-width: 0;
-  padding: 24px;
+  /* No top padding: the pinned header (.ae-sticky-head) sits flush with the
+     pane's top edge. A scroll container's padding is NOT part of where a sticky
+     child pins, so top padding here left a 24px gap above the header whenever
+     it was stuck. */
+  padding: 0 24px 24px;
   display: flex;
   flex-direction: column;
 }
@@ -2387,6 +2468,42 @@ table input[type="number"] {
   flex: 1;
   min-height: 0;
   min-width: 0;
+}
+
+/* A page whose body is not a bounded scroller (a direct .ae-table-scroll or
+   .ae-grid-fill child) - admin pages, reports, settings, forms - scrolls
+   .ae-main itself. Its root must then be as tall as its content; otherwise the
+   sticky header below is only "stuck" within a box one screen tall, and
+   scrolls away with that box. Table pages keep the bounded height above: their
+   .ae-table-scroll does the scrolling, so their header never moves. */
+.ae-main > div:not(:has(> .ae-table-scroll, > .ae-grid-fill)) {
+  flex: 1 0 auto;
+}
+
+/* Tab strip + header card, pinned to the top of the scrolling pane on every
+   page. The pane has no top padding, so the pair sits flush with the top edge
+   at rest and pins at top: 0 with no jump or gap. The side margins (-18px,
+   -10px, -6px) eat most of the pane's side padding; they live here rather
+   than on the two children so the pair moves as one. */
+.ae-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  /* The page root is a column flex box; never let the pair be squeezed. */
+  flex-shrink: 0;
+  margin: 0 -18px 8px;
+}
+.ae-sticky-head > .ae-header-tabs {
+  /* -5px: the room under the strip for the active line's glow, given back so
+     the card sits where it always did. */
+  margin: 0 0 -5px;
+  /* Page content scrolls underneath, so the strip needs a body of its own. */
+  background: color-mix(in srgb, var(--ae-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.ae-sticky-head > .ae-page-header {
+  margin: 0;
 }
 
 /* ------------------------------------------------------------------------
@@ -2697,7 +2814,7 @@ table input[type="number"] {
    were what left blank space on narrow widths. */
 @media (max-width: 900px) {
   .ae-main {
-    padding: 16px;
+    padding: 0 16px 16px;
   }
   .ae-table-scroll {
     margin: 0 calc(-10px / var(--ae-zoom, 1)) calc(-10px / var(--ae-zoom, 1));
@@ -2710,7 +2827,10 @@ table input[type="number"] {
     margin: -10px -10px 8px;
   }
   .ae-header-tabs {
-    margin: -10px -10px 0;
+    margin: -16px -10px -5px;
+  }
+  .ae-sticky-head {
+    margin: 0 -10px 8px;
   }
   .ae-header-tabs + .ae-page-header {
     margin-top: 0;
@@ -2719,7 +2839,7 @@ table input[type="number"] {
 
 @media (max-width: 520px) {
   .ae-main {
-    padding: 12px;
+    padding: 0 12px 12px;
   }
   .ae-table-scroll {
     margin: 0 calc(-6px / var(--ae-zoom, 1)) calc(-6px / var(--ae-zoom, 1));
@@ -2728,7 +2848,10 @@ table input[type="number"] {
     margin: -6px -6px 8px;
   }
   .ae-header-tabs {
-    margin: -6px -6px 0;
+    margin: -12px -6px -5px;
+  }
+  .ae-sticky-head {
+    margin: 0 -6px 8px;
   }
   .ae-header-tabs + .ae-page-header {
     margin-top: 0;
@@ -3633,7 +3756,12 @@ table input[type="number"] {
   height: calc(var(--t) * 2.6);
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: radial-gradient(circle, #fff 0 45%, #fff3c4 70%, var(--ring) 100%);
+  background: radial-gradient(
+    circle,
+    #fff 0 45%,
+    #fff3c4 70%,
+    var(--ring) 100%
+  );
   box-shadow:
     0 0 calc(var(--t) * 2) color-mix(in srgb, var(--ring) 85%, transparent),
     0 0 calc(var(--t) * 5) color-mix(in srgb, var(--ring) 40%, transparent);
@@ -4883,7 +5011,9 @@ table input[type="number"] {
    --ready is set when the sheet is fully saved and waiting to be published
    (nothing staged, something saved-but-unpublished): solid yellow with a
    soft pulsing glow, so the next step is hard to miss. */
-.ae-toolbar > :first-child:not(.ae-toolbar-controls) > .ae-toolbar-publish::before {
+.ae-toolbar
+  > :first-child:not(.ae-toolbar-controls)
+  > .ae-toolbar-publish::before {
   display: none; /* no "|" divider inside the button */
 }
 .ae-toolbar .ae-btn.ae-toolbar-publish:not(.ae-btn-danger) {
@@ -4915,7 +5045,8 @@ table input[type="number"] {
   flex: 0 0 var(--tb-h);
 }
 .ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger),
-.ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger):hover:not(:disabled) {
+.ae-toolbar
+  .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger):hover:not(:disabled) {
   background: var(--ae-btn-yellow);
   border-color: var(--ae-btn-yellow-active);
   color: var(--ae-btn-yellow-text);
@@ -4936,7 +5067,8 @@ table input[type="number"] {
 }
 @media (prefers-reduced-motion: reduce) {
   .ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger),
-  .ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger):hover:not(:disabled) {
+  .ae-toolbar
+    .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger):hover:not(:disabled) {
     animation: none;
     box-shadow: 0 0 12px 2px rgba(245, 192, 0, 0.7);
   }

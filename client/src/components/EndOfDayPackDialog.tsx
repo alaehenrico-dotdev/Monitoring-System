@@ -6,6 +6,7 @@ import { DatePicker } from "./DatePicker";
 import { Spinner } from "./Spinner";
 import {
   buildEndOfDayPack,
+  recordPackHistory,
   type PackResult,
   type PackStepId,
   type PackStepStatus,
@@ -110,7 +111,11 @@ export function EndOfDayPackDialog({
           setSteps((prev) => ({ ...prev, [id]: { status, detail } })),
         onBackupProgress: setBackupBytes,
       });
-      if (packed.zip) saveBlob(packed.zip, packed.zipName);
+      if (packed.zip) {
+        saveBlob(packed.zip, packed.zipName);
+        // Only now that the zip has been saved.
+        recordPackHistory(packed);
+      }
       setResult(packed);
     } catch (e) {
       setFatal(e instanceof Error ? e.message : "Couldn't build the pack.");

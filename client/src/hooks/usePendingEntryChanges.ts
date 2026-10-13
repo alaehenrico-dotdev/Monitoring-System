@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { GridRow } from "../components/StockGrid";
 import { ENTRY_PREFIX, MANUAL_COUNT_PREFIX } from "../utils/unsavedWork";
 import { clearDraftBackups } from "../utils/draftBackup";
+import { clearAllHistory, loadHistory, saveHistory } from "../utils/sessionHistory";
+import { clearSheetViews } from "../utils/sheetView";
 import { EXTRA_COLUMNS_PREFIX } from "./useExtraColumns";
 
 /// productId -> { columnKey -> staged value }
@@ -206,11 +208,11 @@ export function usePendingEntryChanges(
   // are whole pending+baseline sets rather than per-cell diffs, which keeps
   // undo correct for a Quick Fill that touches dozens of cells at once -
   // that stages through stageMany and so costs exactly one history step,
-  // the same as a single typed cell. Not persisted: like any other undo
-  // stack it belongs to the current editing session, while `pending` itself
-  // survives navigation via sessionStorage.
-  const [past, setPast] = useState<Snapshot[]>([]);
-  const [future, setFuture] = useState<Snapshot[]>([]);
+  // the same as a single typed cell. Persisted per sheet alongside `pending`
+  // (utils/sessionHistory.ts), so switching to another page and back keeps
+  // Ctrl+Z working on what was staged before leaving.
+  const [past, setPast] = useState<Snapshot[]>(() => loadHistory<Snapshot>(storageKey).past);
+  const [future, setFuture] = useState<Snapshot[]>(() => loadHistory<Snapshot>(storageKey).future);
 
   // Re-derives pending from storage only when the key itself changes (a
   // different date/shift/page) - the persistence effect below is what reacts
@@ -223,10 +225,16 @@ export function usePendingEntryChanges(
     setPending(loadPending(storageKey));
     setBaselines(loadBaselines(storageKey));
     // A different date/shift/page is a different sheet - its edits are not
-    // something the previous sheet's undo stack should be able to reach.
-    setPast([]);
-    setFuture([]);
+    // something the previous sheet's undo stack should be able to reach, so it
+    // gets its own (whatever it had when it was last left).
+    const history = loadHistory<Snapshot>(storageKey);
+    setPast(history.past);
+    setFuture(history.future);
   }
+
+  useEffect(() => {
+    saveHistory(storageKey, past, future);
+  }, [past, future, storageKey]);
 
   useEffect(() => {
     if (!storageKey) return;
@@ -501,6 +509,7 @@ export function clearAllPendingEntryState() {
           k.startsWith(MANUAL_COUNT_PREFIX) ||
           k.startsWith(BASELINE_PREFIX) ||
           k.startsWith(EXTRA_COLUMNS_PREFIX) ||
+          k === "ala-eh-manual-count-view" ||
           k.startsWith("ala-eh-focus:"))
       )
         keys.push(k);
@@ -509,6 +518,8 @@ export function clearAllPendingEntryState() {
   } catch {
     // best-effort, same as the rest of this file
   }
+  clearAllHistory();
+  clearSheetViews();
   // The localStorage mirror of those edits (utils/draftBackup.ts) has to go
   // too - otherwise the next sign-in would restore what was just discarded
   // (a confirmed log out) or wiped (Data Reset).

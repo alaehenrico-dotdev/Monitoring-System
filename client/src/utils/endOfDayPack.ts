@@ -55,6 +55,17 @@ export interface PackResult {
   files: { name: string; size: number }[];
   /// Steps that failed or were skipped, as human-readable lines.
   problems: string[];
+  /// Report History entries for the reports inside the zip. Written by the
+  /// caller (recordPackHistory) only once the zip has actually been saved.
+  history: HistoryEntry[];
+}
+
+type HistoryEntry = Parameters<typeof recordReportHistory>[0];
+
+/// Call after the zip has been saved: a pack that failed to build or save
+/// leaves no trace in Report History. Best effort, like every history write.
+export function recordPackHistory(result: PackResult): void {
+  for (const entry of result.history) recordReportHistory(entry).catch(() => {});
 }
 
 interface VarianceRow {
@@ -103,7 +114,7 @@ function reportHasData(report: DailyReport): boolean {
 
 async function buildDailyPdf(
   date: string,
-): Promise<{ blob: Blob; name: string } | null> {
+): Promise<{ blob: Blob; name: string; history: HistoryEntry } | null> {
   const report = await getDailyReport(date);
   if (report.date !== date)
     throw new Error("The server returned a report for a different date.");
@@ -137,21 +148,21 @@ async function buildDailyPdf(
       }),
     ],
   });
-  recordReportHistory({
-    type: "Daily Report",
-    scope: report.date,
-    route: `/daily-report?history=1&date=${report.date}`,
-    section: "all",
-  }).catch(() => {});
   return {
     blob: pdf.output("blob"),
     name: pdfFileName("daily-report", report.date),
+    history: {
+      type: "Daily Report",
+      scope: report.date,
+      route: `/daily-report?history=1&date=${report.date}`,
+      section: "all",
+    },
   };
 }
 
 async function buildVariancePdf(
   date: string,
-): Promise<{ blob: Blob; name: string; count: number }> {
+): Promise<{ blob: Blob; name: string; count: number; history: HistoryEntry }> {
   const rows = (await getVarianceReport({
     startDate: date,
     endDate: date,
@@ -189,12 +200,12 @@ async function buildVariancePdf(
       ),
     ],
   });
-  recordReportHistory({
-    type: "Variance Report",
-    scope: date,
-    route: `/variance-report?history=1&date=${date}`,
-  }).catch(() => {});
-  return { blob: pdf.output("blob"), name, count: rows.length };
+  return {
+    blob: pdf.output("blob"),
+    name,
+    count: rows.length,
+    history: { type: "Variance Report", scope: date, route: `/variance-report?history=1&date=${date}` },
+  };
 }
 
 function message(e: unknown): string {
@@ -207,6 +218,7 @@ export async function buildEndOfDayPack(
   const { date, onStep } = opts;
   const inputs: ZipInput[] = [];
   const problems: string[] = [];
+  const history: HistoryEntry[] = [];
 
   if (opts.includeDaily) {
     onStep?.("daily", "running");
@@ -214,6 +226,7 @@ export async function buildEndOfDayPack(
       const daily = await buildDailyPdf(date);
       if (daily) {
         inputs.push({ name: daily.name, data: daily.blob });
+        history.push(daily.history);
         onStep?.("daily", "done");
       } else {
         problems.push(
@@ -232,6 +245,7 @@ export async function buildEndOfDayPack(
     try {
       const variance = await buildVariancePdf(date);
       inputs.push({ name: variance.name, data: variance.blob });
+      history.push(variance.history);
       onStep?.("variance", "done", `${variance.count} flagged`);
     } catch (e) {
       problems.push(`Variance Report failed - ${message(e)}`);
@@ -252,7 +266,7 @@ export async function buildEndOfDayPack(
   }
 
   const zipName = `end-of-day-pack-${date}.zip`;
-  if (inputs.length === 0) return { zip: null, zipName, files: [], problems };
+  if (inputs.length === 0) return { zip: null, zipName, files: [], problems, history: [] };
 
   onStep?.("zip", "running");
   const zip = await createZip(inputs);
@@ -262,5 +276,6 @@ export async function buildEndOfDayPack(
     zipName,
     files: inputs.map((f) => ({ name: f.name, size: f.data.size })),
     problems,
+    history,
   };
 }

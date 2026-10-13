@@ -31,8 +31,14 @@ export function recordReportHistory(data: {
   return http.post<ReportHistoryEntry>("/report-history", data);
 }
 
-export function listReportHistory(type: ReportHistoryType) {
-  return http.get<ReportHistoryEntry[]>(
-    `/report-history?type=${encodeURIComponent(type)}`,
-  );
+export interface ReportHistoryPage {
+  items: ReportHistoryEntry[];
+  /// Pass back as `cursor` for the next (older) page; null on the last page.
+  nextCursor: number | null;
+}
+
+export function listReportHistory(type: ReportHistoryType, cursor?: number) {
+  const params = new URLSearchParams({ type });
+  if (cursor) params.set("cursor", String(cursor));
+  return http.get<ReportHistoryPage>(`/report-history?${params}`);
 }

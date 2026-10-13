@@ -42,13 +42,22 @@ function entry(over: Partial<ChangeLogEntry> & { id: number }): ChangeLogEntry {
   };
 }
 
+/// Every category asks the server for its own table, so a fake server answers
+/// each request with only that table's rows (and `nextCursor` null).
+function serve(items: ChangeLogEntry[]) {
+  api.listChangeLogPage.mockImplementation(async (filters: { tableName?: string }) => ({
+    items: items.filter((e) => !filters.tableName || e.tableName === filters.tableName),
+    nextCursor: null,
+  }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   // jsdom has no layout, so no scrollIntoView (the dropdown calls it on open).
   Element.prototype.scrollIntoView = vi.fn();
   api.listChangeLogUsers.mockResolvedValue([{ id: 7, name: "Ana Cruz", username: "ana" }]);
   api.listProducts.mockResolvedValue([{ id: 5, sku: "AFP007", name: "Soy Sauce 1L" }]);
-  api.listChangeLogPage.mockResolvedValue({ items: [entry({ id: 1 })], nextCursor: null });
+  serve([entry({ id: 1 })]);
 });
 
 const lastFilters = () => api.listChangeLogPage.mock.calls.at(-1)![0];
@@ -72,14 +81,11 @@ describe("ChangeLogPage - readable rows", () => {
   });
 
   it("tags bulk rows so they stand apart from a person's edits", async () => {
-    api.listChangeLogPage.mockResolvedValue({
-      items: [
+    serve([
         entry({ id: 3, source: "import" }),
         entry({ id: 2, tableName: "system", recordId: 0, context: null, summary: null, source: "reset", action: "DELETE", newValue: { event: "data_reset", deleted: { manual_counts: 4 } } }),
         entry({ id: 1 }),
-      ],
-      nextCursor: null,
-    });
+      ]);
     render(<ChangeLogPage />);
 
     expect(await screen.findByText("CSV import")).toBeTruthy();
@@ -88,10 +94,7 @@ describe("ChangeLogPage - readable rows", () => {
   });
 
   it("searches the SKU and the summary text", async () => {
-    api.listChangeLogPage.mockResolvedValue({
-      items: [entry({ id: 2 }), entry({ id: 1, context: { productId: 9, sku: "ZZZ001", productName: "Vinegar", entryDate: null, shift: null, location: null }, summary: "Production in 1 → 2" })],
-      nextCursor: null,
-    });
+    serve([entry({ id: 2 }), entry({ id: 1, context: { productId: 9, sku: "ZZZ001", productName: "Vinegar", entryDate: null, shift: null, location: null }, summary: "Production in 1 → 2" })]);
     render(<ChangeLogPage />);
     await screen.findByText("Production in 1 → 2");
 
@@ -106,7 +109,8 @@ describe("ChangeLogPage - filters", () => {
   it("starts unfiltered", async () => {
     render(<ChangeLogPage />);
     await screen.findByText("Manual count 12 → 10");
-    expect(lastFilters()).toEqual({});
+    // Nothing but each category's own table is sent.
+    expect(api.listChangeLogPage.mock.calls.every((c) => Object.keys(JSON.parse(JSON.stringify(c[0]))).join() === "tableName")).toBe(true);
   });
 
   it("sends the CSV-import filter to the server and reloads", async () => {
@@ -170,10 +174,7 @@ describe("ChangeLogPage - generated reports", () => {
   }
 
   it("lists generated reports as a one-line summary", async () => {
-    api.listChangeLogPage.mockResolvedValue({
-      items: [entry({ id: 4, tableName: "reports", recordId: 3, action: "CREATE", context: null, summary: "Daily Report · Online · 2026-10-09", changes: [] })],
-      nextCursor: null,
-    });
+    serve([entry({ id: 4, tableName: "reports", recordId: 3, action: "CREATE", context: null, summary: "Daily Report · Online · 2026-10-09", changes: [] })]);
     render(<ChangeLogPage />);
 
     expect(await screen.findByText("Daily Report · Online · 2026-10-09")).toBeTruthy();
@@ -212,15 +213,12 @@ describe("ChangeLogPage - admin events and automatic changes", () => {
   it("reads sign-ins, backups and restores in plain words", async () => {
     const sys = (id: number, newValue: object, changedBy: ChangeLogEntry["changedBy"] = null) =>
       entry({ id, tableName: "system", recordId: 0, action: "CREATE", context: null, summary: null, changes: [], newValue, changedBy });
-    api.listChangeLogPage.mockResolvedValue({
-      items: [
+    serve([
         sys(4, { event: "login", username: "ana" }),
         sys(3, { event: "login_failed", username: "mallory" }),
         sys(2, { event: "backup_download", fileName: "x.sql" }),
         sys(1, { event: "backup_restore" }),
-      ],
-      nextCursor: null,
-    });
+      ]);
     render(<ChangeLogPage />);
 
     expect(await screen.findByText("Signed in (ana)")).toBeTruthy();
@@ -230,55 +228,103 @@ describe("ChangeLogPage - admin events and automatic changes", () => {
   });
 
   it("names the account a users change is about, never a bare id", async () => {
-    api.listChangeLogPage.mockResolvedValue({
-      items: [entry({ id: 5, tableName: "users", recordId: 12, action: "UPDATE", context: null, summary: "Active Yes → No", newValue: { username: "cleo", isActive: false } })],
-      nextCursor: null,
-    });
+    serve([entry({ id: 5, tableName: "users", recordId: 12, action: "UPDATE", context: null, summary: "Active Yes → No", newValue: { username: "cleo", isActive: false } })]);
     render(<ChangeLogPage />);
     expect(await screen.findByText("User · cleo")).toBeTruthy();
     expect(screen.getByText("Active Yes → No")).toBeTruthy();
   });
 
   it("tags a follow-on change the system made, pointing at its cause", async () => {
-    api.listChangeLogPage.mockResolvedValue({
-      items: [entry({ id: 9, tableName: "daily_online_stock", causedById: 7, summary: "Opening stock 90 → 100" })],
-      nextCursor: null,
-    });
+    serve([entry({ id: 9, tableName: "daily_online_stock", causedById: 7, summary: "Opening stock 90 → 100" })]);
     render(<ChangeLogPage />);
     expect(await screen.findByText("Auto · from #7")).toBeTruthy();
   });
 });
 
 describe("ChangeLogPage - paging and export", () => {
-  it("offers Load more only while the server has another page, and appends it", async () => {
-    api.listChangeLogPage
-      .mockResolvedValueOnce({ items: [entry({ id: 2 })], nextCursor: 2 })
-      .mockResolvedValueOnce({ items: [entry({ id: 1, summary: "Older edit 1 → 2" })], nextCursor: null });
+  async function pickTable(option: string) {
+    fireEvent.click(screen.getByRole("button", { name: /table/i }));
+    fireEvent.click(await screen.findByRole("option", { name: option }));
+  }
+
+  it("asks for 20 rows per category with every table showing, 100 with one table picked", async () => {
     render(<ChangeLogPage />);
+    await screen.findByText("Manual count 12 → 10");
+    expect(api.listChangeLogPage.mock.calls.every((c) => c[1].limit === 20)).toBe(true);
+    // One request per category, each scoped to its own table.
+    const tables = api.listChangeLogPage.mock.calls.map((c) => c[0].tableName);
+    expect(new Set(tables).size).toBe(tables.length);
+    expect(tables).toContain("manual_counts");
 
-    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
-
-    expect(await screen.findByText("Older edit 1 → 2")).toBeTruthy();
-    expect(api.listChangeLogPage.mock.calls[1][1]).toMatchObject({ cursor: 2 });
-    expect(screen.getByText("Manual count 12 → 10")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
+    api.listChangeLogPage.mockClear();
+    await pickTable("Manual Count");
+    await waitFor(() => expect(api.listChangeLogPage).toHaveBeenCalled());
+    expect(api.listChangeLogPage.mock.calls.every((c) => c[0].tableName === "manual_counts" && c[1].limit === 100)).toBe(true);
   });
 
-  it("ignores a Load more that finishes after the filters changed", async () => {
-    let finish!: (v: unknown) => void;
-    api.listChangeLogPage
-      .mockResolvedValueOnce({ items: [entry({ id: 2 })], nextCursor: 2 })
-      .mockReturnValueOnce(new Promise((r) => (finish = r)))
-      .mockResolvedValue({ items: [entry({ id: 9, summary: "Fresh view row" })], nextCursor: null });
+  /// A fake server holding `total` Manual Count rows, answering by (offset, limit).
+  function serveManualCounts(total: number, flagged?: { importOnly: ChangeLogEntry }) {
+    api.listChangeLogPage.mockImplementation(
+      async (f: { tableName?: string; importOnly?: boolean }, page: { offset?: number; limit?: number }) => {
+        if (f.tableName !== "manual_counts") return { items: [], nextCursor: null, total: 0 };
+        if (f.importOnly && flagged) return { items: [flagged.importOnly], nextCursor: null, total: 1 };
+        const offset = page.offset ?? 0;
+        const n = Math.max(0, Math.min(page.limit ?? 20, total - offset));
+        return {
+          items: Array.from({ length: n }, (_, i) => entry({ id: total - offset - i, summary: `Row ${total - offset - i}` })),
+          nextCursor: null,
+          total,
+        };
+      },
+    );
+  }
+
+  it("pages one category by number, in its own header, with Showing x–y of N", async () => {
+    serveManualCounts(45);
     render(<ChangeLogPage />);
-    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+
+    expect(await screen.findByText("Row 45")).toBeTruthy();
+    const pager = screen.getByRole("navigation", { name: "Manual Count pages" });
+    expect(pager.textContent).toContain("Showing 1–20 of 45 records");
+    expect(pager.textContent).toContain("1 / 3");
+    // The pager sits in the category's header row.
+    expect(pager.closest("tr")?.textContent).toContain("Manual Count");
+
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(await screen.findByText("Row 25")).toBeTruthy();
+    expect(api.listChangeLogPage.mock.calls.at(-1)![1]).toMatchObject({ offset: 20, limit: 20, withTotal: true });
+    expect(screen.queryByText("Row 45")).toBeNull();
+    expect(screen.getByRole("navigation", { name: "Manual Count pages" }).textContent).toContain("Showing 21–40 of 45 records");
+
+    fireEvent.click(screen.getByRole("button", { name: "First page" }));
+    expect(await screen.findByText("Row 45")).toBeTruthy();
+  });
+
+  it("changes rows per page and goes back to page 1", async () => {
+    serveManualCounts(45);
+    render(<ChangeLogPage />);
+    await screen.findByText("Row 45");
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await screen.findByText("Row 25");
+
+    fireEvent.change(screen.getByLabelText("Rows per page"), { target: { value: "50" } });
+
+    expect(await screen.findByText("Row 1")).toBeTruthy();
+    expect(api.listChangeLogPage.mock.calls.at(-1)![1]).toMatchObject({ offset: 0, limit: 50 });
+    // 45 rows fit on one 50-row page, so there is nothing left to page.
+    expect(screen.getByRole("navigation", { name: "Manual Count pages" }).textContent).toContain("1 / 1");
+  });
+
+  it("goes back to the first page when the filters change", async () => {
+    serveManualCounts(45, { importOnly: entry({ id: 9, summary: "Fresh view row" }) });
+    render(<ChangeLogPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Next page" }));
+    await screen.findByText("Row 25");
 
     fireEvent.click(screen.getAllByLabelText("From CSV import")[0]);
-    await screen.findByText("Fresh view row");
-    finish({ items: [entry({ id: 1, summary: "Stale row" })], nextCursor: null });
-    await new Promise((r) => setTimeout(r, 20));
 
-    expect(screen.queryByText("Stale row")).toBeNull();
+    expect(await screen.findByText("Fresh view row")).toBeTruthy();
+    expect(screen.queryByText("Row 25")).toBeNull();
   });
 
   it("exports with the current filters, not just the loaded rows", async () => {

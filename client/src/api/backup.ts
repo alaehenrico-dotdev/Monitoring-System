@@ -1,5 +1,72 @@
-import { API_URL, ApiError, getToken } from "./http";
+import { API_URL, ApiError, getToken, http } from "./http";
 import { saveBlob } from "../utils/saveBlob";
+
+/// "pre-restore" marks the safety copy taken just before a restore, so the
+/// backup history can tell it apart from a routine download.
+export type BackupPurpose = "pre-restore";
+
+export interface BackupReport {
+  ok: boolean;
+  problems: string[];
+  warnings: string[];
+  sizeBytes: number;
+  sha256: string;
+  tableCount: number;
+  missingTables: string[];
+  known: { id: number; fileName: string; createdAt: string } | null;
+}
+
+export interface BackupRecord {
+  id: number;
+  fileName: string;
+  trigger: "manual" | "scheduled" | "pre-restore" | "pre-migration";
+  status: "OK" | "FAILED" | "INVALID";
+  sizeBytes: number | null;
+  sha256: string | null;
+  error: string | null;
+  createdAt: string;
+  verifiedAt: string | null;
+}
+
+export interface BackupFile {
+  name: string;
+  sizeBytes: number;
+  modifiedAt: string;
+}
+
+export interface BackupHistory {
+  records: BackupRecord[];
+  files: BackupFile[];
+  health: {
+    lastBackupAt: string | null;
+    overdue: boolean;
+    overdueHours: number;
+    failedSince: { createdAt: string; fileName: string; error: string | null } | null;
+  };
+}
+
+export function getBackupHistory() {
+  return http.get<BackupHistory>("/backup/history");
+}
+
+export function verifyBackupFileByName(name: string) {
+  return http.post<BackupReport & { fileName: string }>("/backup/verify-file", { name });
+}
+
+/// Pre-restore check: the server reads the file (nothing is written to the
+/// database) and reports whether it is complete and restorable. The file goes
+/// up raw, like the restore itself, so this bypasses the JSON helper.
+export async function validateBackupFile(file: File): Promise<BackupReport> {
+  const token = getToken();
+  const res = await fetch(`${API_URL}/backup/validate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/sql", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: file,
+  });
+  const body = await res.json().catch(() => ({ error: res.statusText }));
+  if (!res.ok) throw new ApiError(res.status, body.error ?? "Couldn't check that file");
+  return body as BackupReport;
+}
 
 /**
  * Database Backup - GET /backup/download streams a raw `mysqldump` file, not
@@ -17,8 +84,9 @@ import { saveBlob } from "../utils/saveBlob";
  */
 export async function downloadDatabaseBackup(
   onProgress?: (bytesReceived: number) => void,
+  purpose?: BackupPurpose,
 ): Promise<void> {
-  const { blob, filename } = await fetchDatabaseBackup(onProgress);
+  const { blob, filename } = await fetchDatabaseBackup(onProgress, purpose);
   saveBlob(blob, filename);
 }
 
@@ -29,9 +97,10 @@ export async function downloadDatabaseBackup(
  */
 export async function fetchDatabaseBackup(
   onProgress?: (bytesReceived: number) => void,
+  purpose?: BackupPurpose,
 ): Promise<{ blob: Blob; filename: string }> {
   const token = getToken();
-  const res = await fetch(`${API_URL}/backup/download`, {
+  const res = await fetch(`${API_URL}/backup/download${purpose ? `?purpose=${purpose}` : ""}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
 

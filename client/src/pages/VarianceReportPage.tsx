@@ -1,3 +1,4 @@
+import { useBusyAction } from "../hooks/useBusyAction";
 import {
   useEffect,
   useRef,
@@ -171,19 +172,6 @@ export function VarianceReportPage() {
         return;
       }
       setRows(data);
-      const params = new URLSearchParams({
-        history: "1",
-        date: requestedDate,
-      });
-      if (category) params.set("category", category);
-      if (searchParams.get("history") !== "1") {
-        // Best effort - see api/reportHistory.ts.
-        recordReportHistory({
-          type: "Variance Report",
-          scope: requestedDate,
-          route: `/variance-report?${params}`,
-        }).catch(() => {});
-      }
     } catch (err) {
       if (id !== requestId.current) return;
       setError(err instanceof Error ? err.message : "Failed to load report");
@@ -192,6 +180,9 @@ export function VarianceReportPage() {
 
   // Built from the rows by utils/tablePdf.ts (fixed page format, columns
   // fitted to the page) instead of window.print().
+  const pdfAction = useBusyAction();
+  const runAction = useBusyAction();
+
   async function handlePdf() {
     if (!rows) return;
     const pdfName = pdfFileName("variance-report", date, category);
@@ -229,6 +220,17 @@ export function VarianceReportPage() {
           ],
         }),
       );
+      // Only once the PDF has actually been saved - and not when it was opened
+      // from Report History, where it is already listed. Best effort.
+      if (searchParams.get("history") !== "1") {
+        const params = new URLSearchParams({ history: "1", date });
+        if (category) params.set("category", category);
+        recordReportHistory({
+          type: "Variance Report",
+          scope: date,
+          route: `/variance-report?${params}`,
+        }).catch(() => {});
+      }
     } catch (err) {
       setError(
         err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed",
@@ -244,7 +246,7 @@ export function VarianceReportPage() {
       >
         <Toolbar className="no-print">
           <form
-            onSubmit={runReport}
+            onSubmit={(e) => void runAction.run(() => runReport(e))}
             style={{
               display: "flex",
               gap: 8,
@@ -266,7 +268,7 @@ export function VarianceReportPage() {
               onChange={changeDate}
               style={{ maxWidth: 160 }}
             />
-            <Button type="submit">
+            <Button type="submit" loading={runAction.busy} loadingLabel="Running…">
               <PlayIcon /> Run report
             </Button>
           </form>
@@ -274,7 +276,9 @@ export function VarianceReportPage() {
             {rows && (
               <Button
                 variant="secondary"
-                onClick={handlePdf}
+                onClick={() => void pdfAction.run(handlePdf)}
+                loading={pdfAction.busy}
+                loadingLabel="PDF"
                 title="Download as PDF"
               >
                 <PrinterIcon /> PDF

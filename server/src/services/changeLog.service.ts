@@ -181,15 +181,19 @@ export type ChangeLogItem = Awaited<ReturnType<typeof enrich>>[number];
 /// last page; pass it back as `cursor` for the next one.
 export async function listChangeLog(
   filters: ChangeLogFilters,
-  page: { limit?: number; cursor?: number } = {},
-): Promise<{ items: ChangeLogItem[]; nextCursor: number | null }> {
+  page: { limit?: number; cursor?: number; offset?: number; withTotal?: boolean } = {},
+): Promise<{ items: ChangeLogItem[]; nextCursor: number | null; total?: number }> {
   const limit = Math.min(page.limit ?? DEFAULT_CHANGE_LOG_LIMIT, MAX_CHANGE_LOG_LIMIT);
-  const rows = await changeLogRepository.findPage(filters, { limit, cursor: page.cursor });
+  const [rows, total] = await Promise.all([
+    changeLogRepository.findPage(filters, { limit, cursor: page.cursor, offset: page.offset }),
+    page.withTotal ? changeLogRepository.count(filters) : Promise.resolve(undefined),
+  ]);
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
   return {
     items: await enrich(pageRows),
     nextCursor: hasMore ? pageRows[pageRows.length - 1].id : null,
+    ...(total === undefined ? {} : { total }),
   };
 }
 
