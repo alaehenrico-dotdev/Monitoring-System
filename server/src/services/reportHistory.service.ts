@@ -26,6 +26,11 @@ export function recordReportHistory(
   });
 }
 
-export function listReportHistory(type?: string) {
-  return reportHistoryRepository.findMany({ type });
+export const REPORT_HISTORY_PAGE = 50;
+
+export async function listReportHistory(type?: string, cursor?: number, limit = REPORT_HISTORY_PAGE) {
+  const rows = await reportHistoryRepository.findPage({ type }, { limit, cursor });
+  const hasMore = rows.length > limit;
+  const items = hasMore ? rows.slice(0, limit) : rows;
+  return { items, nextCursor: hasMore ? items[items.length - 1].id : null };
 }

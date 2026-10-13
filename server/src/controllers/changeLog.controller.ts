@@ -9,6 +9,8 @@ import {
   listChangeLog,
 } from "../services/changeLog.service";
 import { HttpError } from "../utils/HttpError";
+import { env } from "../config/env";
+import { listArchive, runArchive } from "../services/changeLogArchive.service";
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -42,13 +44,16 @@ const filterSchema = z.object({
 const pageSchema = filterSchema.extend({
   limit: z.coerce.number().int().positive().max(MAX_CHANGE_LOG_LIMIT).default(DEFAULT_CHANGE_LOG_LIMIT),
   cursor: z.coerce.number().int().positive().optional(),
+  // Numbered paging: skip this many newest rows, and say how many match in all.
+  offset: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  withTotal: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
 });
 
 export async function getChangeLog(req: Request, res: Response) {
   const parsed = pageSchema.safeParse(req.query);
   if (!parsed.success) throw HttpError.badRequest("Invalid change log query", parsed.error.flatten());
-  const { limit, cursor, ...filters } = parsed.data;
-  res.json(await listChangeLog(filters, { limit, cursor }));
+  const { limit, cursor, offset, withTotal, ...filters } = parsed.data;
+  res.json(await listChangeLog(filters, { limit, cursor, offset, withTotal }));
 }
 
 /// The same filters as the list (paging ignored), as a CSV download.
@@ -84,4 +89,26 @@ export async function getCellHistoryHandler(req: Request, res: Response) {
     throw HttpError.forbidden("Cell history is only available for the stock entry grids");
   }
   res.json(await getCellHistory(parsed.data));
+}
+
+const archiveQuerySchema = z.object({
+  limit: z.coerce.number().int().positive().max(MAX_CHANGE_LOG_LIMIT).default(DEFAULT_CHANGE_LOG_LIMIT),
+  offset: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  tableName: z.string().min(1).optional(),
+  recordId: z.coerce.number().int().positive().optional(),
+});
+
+export async function getArchive(req: Request, res: Response) {
+  const parsed = archiveQuerySchema.safeParse(req.query);
+  if (!parsed.success) throw HttpError.badRequest("Invalid archive query", parsed.error.flatten());
+  res.json({ ...(await listArchive(parsed.data)), retentionMonths: env.changeLogRetentionMonths });
+}
+
+const runSchema = z.object({ months: z.coerce.number().int().min(1).max(120).optional() });
+
+export async function postArchiveRun(req: Request, res: Response) {
+  const parsed = runSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw HttpError.badRequest("Invalid archive request", parsed.error.flatten());
+  const months = parsed.data.months ?? (env.changeLogRetentionMonths || 12);
+  res.json(await runArchive(months, req.user?.id));
 }

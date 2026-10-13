@@ -1,3 +1,4 @@
+import { useBusyAction } from "../hooks/useBusyAction";
 import {
   forwardRef,
   useEffect,
@@ -44,7 +45,7 @@ import {
 } from "../api/importBatches";
 import { Toast, type ToastVariant } from "./Toast";
 import { useTopProgress } from "../hooks/useTopProgress";
-import { LoadingOverlay } from "./Spinner";
+import { LoadingOverlay, Spinner } from "./Spinner";
 import { Modal } from "./Modal";
 import { PendingChangesPreview } from "./PendingChangesPreview";
 import type { PendingChangeDetail } from "../hooks/usePendingEntryChanges";
@@ -423,6 +424,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
   ) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const progress = useTopProgress();
+    const pdfAction = useBusyAction();
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState<string | null>(null);
     const [messageVariant, setMessageVariant] = useState<ToastVariant>("info");
@@ -1047,15 +1049,16 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               whileTap={{ scale: 0.94 }}
               type="button"
               className="ae-segment-btn"
-              onClick={() => void handlePdf()}
-              disabled={disabled || pdfDisabled}
+              onClick={() => void pdfAction.run(handlePdf)}
+              disabled={disabled || pdfDisabled || pdfAction.busy}
+              aria-busy={pdfAction.busy || undefined}
               title={
                 pdfDisabled
                   ? "Save your changes first - PDF reflects only saved data"
                   : "Download as PDF"
               }
             >
-              <PrinterIcon />
+              {pdfAction.busy ? <Spinner size="sm" /> : <PrinterIcon />}
               <span className="ae-segment-label">PDF</span>
             </motion.button>
           )}

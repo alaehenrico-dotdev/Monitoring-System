@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, Keyboard
 import { motion } from "motion/react";
 import { colors } from "../theme";
 import { toolbarLayoutTransition } from "../motion";
+import { Spinner } from "./Spinner";
 
 /**
  * Shared form controls. Every text field, date field, select, and button in
@@ -91,6 +92,13 @@ export function Select({ className = "", children, ...rest }: SelectHTMLAttribut
 interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onAnimationStart" | "onAnimationEnd" | "onDrag" | "onDragEnd" | "onDragStart"> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "md" | "sm";
+  /// An async action is running: the button is disabled (so it cannot be
+  /// clicked twice), announced as busy, and shows a spinner before its content.
+  loading?: boolean;
+  /// What to show next to the spinner instead of `children` while loading
+  /// (e.g. "Closing…", or just the text label when `children` also holds an
+  /// icon the spinner replaces).
+  loadingLabel?: ReactNode;
 }
 
 /// `motion.button` with `layout` - most callers render this inside a
@@ -100,7 +108,16 @@ interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onA
 /// class swap otherwise snaps instantly. `layout` makes any such box-size
 /// change animate smoothly via Framer's FLIP projection instead - it's a
 /// no-op everywhere else this button doesn't actually change size.
-export function Button({ variant = "primary", size = "md", className = "", ...rest }: ButtonProps) {
+export function Button({
+  variant = "primary",
+  size = "md",
+  className = "",
+  loading = false,
+  loadingLabel,
+  disabled,
+  children,
+  ...rest
+}: ButtonProps) {
   const sizeClass = size === "sm" ? "ae-btn-sm" : "";
   return (
     <motion.button
@@ -108,8 +125,19 @@ export function Button({ variant = "primary", size = "md", className = "", ...re
       transition={toolbarLayoutTransition}
       whileTap={{ scale: 0.94 }}
       className={`ae-btn ae-btn-${variant} ${sizeClass} ${className}`.trim()}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       {...rest}
-    />
+    >
+      {loading ? (
+        <>
+          <Spinner size="sm" color={variant === "primary" ? colors.black : undefined} />
+          {loadingLabel ?? children}
+        </>
+      ) : (
+        children
+      )}
+    </motion.button>
   );
 }
 

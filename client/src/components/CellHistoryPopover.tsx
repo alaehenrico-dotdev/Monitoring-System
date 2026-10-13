@@ -1,10 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { requestCorrection, type CorrectionTable } from "../api/ops";
 import {
   describeWhen,
   fetchCellHistory,
   type CellChange,
 } from "../utils/cellHistory";
+
+const CORRECTABLE_TABLES = new Set(["daily_online_stock", "daily_offline_stock", "manual_counts"]);
 
 export interface CellHistoryTarget {
   x: number;
@@ -44,6 +47,45 @@ export function CellHistoryPopover({
     [target.recordId, fetched],
   );
   const ref = useRef<HTMLDivElement>(null);
+  // "Request correction": a figure is not overwritten silently - the request
+  // carries a reason and waits for an admin (see api/ops.ts, CorrectionsPage).
+  const [requesting, setRequesting] = useState(false);
+  const [proposed, setProposed] = useState("");
+  const [reason, setReason] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const canRequest = target.recordId !== undefined && CORRECTABLE_TABLES.has(target.table);
+
+  async function submitRequest() {
+    if (target.recordId === undefined) return;
+    const value = Number(proposed);
+    if (proposed.trim() === "" || !Number.isFinite(value) || value < 0) {
+      setFormError("Enter the corrected figure (0 or more).");
+      return;
+    }
+    if (reason.trim().length < 5) {
+      setFormError("Give a reason (at least 5 characters).");
+      return;
+    }
+    setSending(true);
+    setFormError(null);
+    try {
+      await requestCorrection({
+        tableName: target.table as CorrectionTable,
+        recordId: target.recordId,
+        field: target.colKey,
+        proposedValue: value,
+        reason: reason.trim(),
+      });
+      setSent(true);
+      setRequesting(false);
+    } catch (e) {
+      setFormError(e instanceof Error ? e.message : "Could not send the request.");
+    } finally {
+      setSending(false);
+    }
+  }
   const [pos, setPos] = useState({ left: target.x, top: target.y });
 
   useEffect(() => {
@@ -128,6 +170,51 @@ export function CellHistoryPopover({
           </div>
         </div>
       ))}
+
+      {canRequest && !requesting && !sent && (
+        <button
+          type="button"
+          className="ae-btn ae-btn-solid ae-btn-sm"
+          style={{ margin: "8px 10px 4px" }}
+          onClick={() => setRequesting(true)}
+        >
+          Request correction…
+        </button>
+      )}
+      {sent && <div className="ae-cell-history-note">Correction requested - an admin will review it.</div>}
+      {requesting && (
+        <div style={{ display: "grid", gap: 6, padding: "8px 10px" }}>
+          <input
+            type="number"
+            min={0}
+            step="any"
+            className="ae-input"
+            aria-label="Corrected figure"
+            placeholder="Corrected figure"
+            value={proposed}
+            onChange={(e) => setProposed(e.target.value)}
+          />
+          <textarea
+            className="ae-input"
+            aria-label="Reason for the correction"
+            placeholder="Why is the current figure wrong?"
+            rows={2}
+            maxLength={500}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            style={{ height: "auto", padding: 6 }}
+          />
+          {formError && <div role="alert" style={{ fontSize: 12, color: "var(--ae-danger-text)" }}>{formError}</div>}
+          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+            <button type="button" className="ae-btn ae-btn-solid ae-btn-sm" onClick={() => setRequesting(false)}>
+              Cancel
+            </button>
+            <button type="button" className="ae-btn ae-btn-solid ae-btn-sm" disabled={sending} onClick={() => void submitRequest()}>
+              {sending ? "Sending…" : "Send request"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>,
     document.body,
   );

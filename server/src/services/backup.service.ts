@@ -2,6 +2,7 @@ import { invalidateAll } from "../lib/cache";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { spawn } from "child_process";
 import type { Request, Response } from "express";
+import { createHash } from "crypto";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
 const RESTORE_MAX_BYTES = 512 * 1024 * 1024;
@@ -28,10 +29,20 @@ function parseDatabaseUrl(databaseUrl: string) {
 /// client tools (`mysqldump`) to be installed on whatever machine runs this
 /// server - that's a deploy-time dependency, not something this app can
 /// install for itself.
-export function streamDatabaseBackup(res: Response, filename: string): Promise<void> {
+export interface BackupStreamSummary {
+  sizeBytes: number;
+  sha256: string;
+  /// mysqldump's closing "-- Dump completed" line was seen - the file is whole.
+  complete: boolean;
+}
+
+export function streamDatabaseBackup(res: Response, filename: string): Promise<BackupStreamSummary> {
   const { host, port, user, password, database } = parseDatabaseUrl(env.databaseUrl);
 
   return new Promise((resolve, reject) => {
+    const hash = createHash("sha256");
+    let sizeBytes = 0;
+    let tail = "";
     const dump = spawn(
       env.mysqldumpPath,
       [
@@ -63,6 +74,9 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<v
     // produces a normal JSON error instead of an "attachment" response.
     let started = false;
     dump.stdout.on("data", (chunk) => {
+      hash.update(chunk);
+      sizeBytes += chunk.length;
+      tail = (tail + chunk.toString("latin1")).slice(-4096);
       if (!started) {
         started = true;
         res.setHeader("Content-Type", "application/sql");
@@ -88,7 +102,7 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<v
         // finished - before its exit code was known - so a dump that died
         // partway looked like a complete (but truncated, unrestorable) file.
         res.end();
-        resolve();
+        resolve({ sizeBytes, sha256: hash.digest("hex"), complete: tail.includes("-- Dump completed") });
       } else {
         reject(new HttpError(500, `mysqldump exited with code ${code}${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
       }

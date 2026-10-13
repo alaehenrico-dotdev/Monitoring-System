@@ -1,3 +1,4 @@
+import { useBusyAction } from "../hooks/useBusyAction";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { Button } from "../components/ui";
@@ -219,19 +220,6 @@ export function DailyReportPage() {
         // Only a fresh Generate remounts the grids (every category expanded
         // again); a silent refresh keeps whatever the person had collapsed.
         if (!silent) setReportVersion((v) => v + 1);
-        if (!silent && searchParams.get("history") !== "1") {
-          // Best effort - a failed history write should never surface as a
-          // report-generation failure (see api/reportHistory.ts).
-          recordReportHistory({
-            type: "Daily Report",
-            scope: nextReport.date,
-            route: `/daily-report?history=1&date=${nextReport.date}`,
-            section:
-              reportSection === "online" || reportSection === "offline"
-                ? reportSection
-                : "all",
-          }).catch(() => {});
-        }
       })
       .catch((e) => {
         if (id !== requestId.current || silent) return;
@@ -291,6 +279,24 @@ export function DailyReportPage() {
     [offlineExtras],
   );
 
+  // Report History records a report when it has actually been saved - the PDF
+  // written or the Excel file handed over - not when it merely appeared on
+  // screen. Skipped when the page was opened from the history itself (the
+  // entry already exists). Best effort: a failed history write never surfaces
+  // as an export failure (see api/reportHistory.ts).
+  function logExported() {
+    if (!report || searchParams.get("history") === "1") return;
+    recordReportHistory({
+      type: "Daily Report",
+      scope: report.date,
+      route: `/daily-report?history=1&date=${report.date}`,
+      section:
+        reportSection === "online" || reportSection === "offline"
+          ? reportSection
+          : "all",
+    }).catch(() => {});
+  }
+
   async function handleExport() {
     if (!report) return;
     const online = section(
@@ -318,6 +324,7 @@ export function DailyReportPage() {
     if (reportSection === "all") {
       const allName = `daily-report-${report.date}.xls`;
       downloadExcel(allName, [online, offline, total].join(""));
+      logExported();
       return;
     }
     const bySection: Record<Exclude<ReportSection, "all">, string> = {
@@ -327,11 +334,14 @@ export function DailyReportPage() {
     };
     const sectionName = `daily-report-${reportSection}-${report.date}.xls`;
     downloadExcel(sectionName, bySection[reportSection]);
+    logExported();
   }
 
   // One PDF for whichever section(s) are selected, with the category filter
   // applied - the same rows Export Excel uses, laid out by utils/tablePdf.ts
   // (fixed page format, columns fitted to the page) instead of window.print().
+  const pdfAction = useBusyAction();
+
   async function handlePdf() {
     if (!report) return;
     const sections: PdfSection[] = [];
@@ -378,6 +388,7 @@ export function DailyReportPage() {
           sections,
         }),
       );
+      logExported();
     } catch (e) {
       setError(e instanceof Error ? `PDF failed: ${e.message}` : "PDF failed");
     }
@@ -441,7 +452,9 @@ export function DailyReportPage() {
                 </Button>
                 <Button
                   variant="secondary"
-                  onClick={handlePdf}
+                  onClick={() => void pdfAction.run(handlePdf)}
+                  loading={pdfAction.busy}
+                  loadingLabel="PDF"
                   title="Download as PDF"
                 >
                   <PrinterIcon /> PDF

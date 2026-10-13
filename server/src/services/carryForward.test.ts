@@ -93,6 +93,7 @@ vi.mock("../repositories/productRepository", () => ({
 vi.mock("../repositories/manualCountRepository", () => ({
   manualCountRepository: { findOne: vi.fn(async () => null), upsert: vi.fn() },
 }));
+vi.mock("./dayLock.service", () => ({ assertPeriodOpen: vi.fn() }));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 
 import { saveOfflineEntry } from "./dailyOfflineStock.service";

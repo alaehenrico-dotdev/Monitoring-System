@@ -15,12 +15,15 @@ export const reportHistoryRepository = {
     return db.reportHistoryEntry.create({ data });
   },
 
-  findMany(filters: { type?: string }) {
+  /// One page, newest first, by id (append-only, so id order is time order and
+  /// the cursor stays stable while new rows arrive). One extra row tells the
+  /// caller whether another page exists.
+  findPage(filters: { type?: string }, { limit, cursor }: { limit: number; cursor?: number }) {
     return prisma.reportHistoryEntry.findMany({
-      where: { type: filters.type },
+      where: { type: filters.type, ...(cursor ? { id: { lt: cursor } } : {}) },
       include: { generatedBy: { select: { id: true, name: true, username: true } } },
-      orderBy: { generatedAt: "desc" },
-      take: 200,
+      orderBy: { id: "desc" },
+      take: limit + 1,
     });
   },
 };

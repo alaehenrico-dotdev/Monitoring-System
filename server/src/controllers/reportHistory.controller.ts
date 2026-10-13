@@ -40,5 +40,7 @@ export async function getReportHistory(req: Request, res: Response) {
   ) {
     throw HttpError.forbidden(`Requires role: ${Role.SUPERVISOR_ADMIN}`);
   }
-  res.json(await listReportHistory(type));
+  const cursor = Number(req.query.cursor) || undefined;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+  res.json(await listReportHistory(type, cursor, limit));
 }

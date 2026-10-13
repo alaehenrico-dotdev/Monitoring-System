@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { ApiError } from "../api/http";
-import { downloadDatabaseBackup, restoreDatabaseBackup } from "../api/backup";
+import { downloadDatabaseBackup, restoreDatabaseBackup, validateBackupFile, type BackupReport } from "../api/backup";
 import { verifyResetPasscode } from "../api/dataReset";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
@@ -51,6 +51,31 @@ export function DatabaseRestoreCard() {
   const [resetToken, setResetToken] = useState<string | null>(null);
   const [verifying, setVerifying] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  // Pre-restore check of the chosen file (server reads it; nothing is written).
+  const [check, setCheck] = useState<
+    | { state: "checking" }
+    | { state: "done"; report: BackupReport }
+    | { state: "error"; message: string }
+    | null
+  >(null);
+  const checkId = useRef(0);
+  const fileOk = check?.state === "done" && check.report.ok;
+
+  function chooseFile(next: File | null) {
+    setFile(next);
+    setStatus("idle");
+    setError(null);
+    setCheck(null);
+    if (!next) return;
+    const id = ++checkId.current;
+    setCheck({ state: "checking" });
+    validateBackupFile(next)
+      .then((report) => id === checkId.current && setCheck({ state: "done", report }))
+      .catch((err) =>
+        id === checkId.current &&
+        setCheck({ state: "error", message: err instanceof Error ? err.message : "Could not check that file." }),
+      );
+  }
   const busy = status === "backing-up" || status === "restoring";
 
   async function handleUnlock(e: FormEvent) {
@@ -81,7 +106,7 @@ export function DatabaseRestoreCard() {
     setStatus("backing-up");
     try {
       try {
-        await downloadDatabaseBackup();
+        await downloadDatabaseBackup(undefined, "pre-restore");
       } catch (err) {
         throw Object.assign(
           new Error(
@@ -156,9 +181,9 @@ export function DatabaseRestoreCard() {
               accept=".sql,application/sql,text/plain"
               hidden
               onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setStatus("idle");
-                setError(null);
+                chooseFile(e.target.files?.[0] ?? null);
+                // Lets the same file be picked again to re-run the check.
+                e.target.value = "";
               }}
             />
             {!file ? (
@@ -185,7 +210,8 @@ export function DatabaseRestoreCard() {
                 type="button"
                 variant="danger"
                 size="sm"
-                disabled={busy}
+                disabled={busy || !fileOk}
+                title={fileOk ? undefined : "The file must pass the pre-restore check first"}
                 onClick={() => {
                   setError(null);
                   setStatus("confirming");
@@ -219,6 +245,43 @@ export function DatabaseRestoreCard() {
           }}
         >
           {file.name} ({formatBytes(file.size)})
+        </div>
+      )}
+      {resetToken && file && check && (
+        <div
+          role="status"
+          style={{
+            marginTop: 8,
+            padding: "8px 10px",
+            borderRadius: 6,
+            fontSize: 12.5,
+            border: `1px solid ${check.state === "done" && check.report.ok ? colors.border : colors.danger}`,
+            color: colors.ink,
+          }}
+        >
+          {check.state === "checking" && <InlineLoading label="Checking the backup file…" />}
+          {check.state === "error" && <span style={{ color: colors.danger }}>{check.message}</span>}
+          {check.state === "done" && (
+            <>
+              <strong style={{ color: check.report.ok ? undefined : colors.danger }}>
+                {check.report.ok ? "Backup file looks complete." : "Do not restore this file."}
+              </strong>
+              {check.report.problems.map((p) => (
+                <div key={p} style={{ color: colors.danger }}>• {p}</div>
+              ))}
+              {check.report.ok && (
+                <div style={{ color: colors.subtleInk }}>
+                  {check.report.tableCount} tables, {formatBytes(check.report.sizeBytes)}
+                  {check.report.known
+                    ? ` - matches the backup taken ${new Date(check.report.known.createdAt).toLocaleString()}.`
+                    : "."}
+                </div>
+              )}
+              {check.report.warnings.map((w) => (
+                <div key={w} style={{ color: colors.subtleInk }}>• {w}</div>
+              ))}
+            </>
+          )}
         </div>
       )}
       {!resetToken && passcodeError && (

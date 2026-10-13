@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { animate } from "motion/react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -136,6 +136,39 @@ export function HeaderTabs() {
       ro.disconnect();
       stop?.();
     };
+  }, [pathname, user?.role]);
+
+  // The strip overflows sideways (scrollbar hidden), which a mouse wheel
+  // cannot drive: it only scrolls vertically. While the pointer is over the
+  // strip, turn the wheel into sideways scrolling - but only while there is
+  // somewhere to go, so the page still scrolls normally at either end. The
+  // listener is native and non-passive because preventDefault is needed.
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) return;
+    function onWheel(e: WheelEvent) {
+      if (!nav || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const max = nav.scrollWidth - nav.clientWidth;
+      if (max <= 0) return;
+      const atStart = nav.scrollLeft <= 0 && e.deltaY < 0;
+      const atEnd = nav.scrollLeft >= max - 1 && e.deltaY > 0;
+      if (atStart || atEnd) return;
+      e.preventDefault();
+      nav.scrollLeft += e.deltaY;
+    }
+    nav.addEventListener("wheel", onWheel, { passive: false });
+    return () => nav.removeEventListener("wheel", onWheel);
+  }, [user?.role]);
+
+  // Keep the active tab in view: with more tabs than fit, navigating (or
+  // landing on a page directly) could leave its tab scrolled out of sight.
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>('.ae-header-tab[aria-current="page"]');
+    if (!nav || !active) return;
+    const target = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    nav.scrollTo({ left: Math.max(0, target), behavior: reduce ? "auto" : "smooth" });
   }, [pathname, user?.role]);
 
   const visibleGroups = navGroups

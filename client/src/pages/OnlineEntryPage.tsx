@@ -1,5 +1,7 @@
+import { useBusyAction } from "../hooks/useBusyAction";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { rememberSheet, resumeSheet } from "../utils/sheetView";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOnlineGrid, saveOnlineEntry } from "../api/onlineStock";
 import { useAuth } from "../context/AuthContext";
@@ -117,7 +119,14 @@ export function OnlineEntryPage() {
   // is almost certainly working on (see getCurrentShiftAndDate) - date and
   // shift are picked together, not independently, since Night crosses
   // midnight and belongs to the *previous* calendar date after 12am.
-  const [{ date, shift }, setDateShift] = useState(getCurrentShiftAndDate);
+  const [{ date, shift }, setDateShift] = useState(
+    () => resumeSheet("online") ?? getCurrentShiftAndDate(),
+  );
+  // Remembered so coming back from another page reopens the sheet whose
+  // unsaved edits were being encoded (see utils/sheetView.ts).
+  useEffect(() => {
+    rememberSheet("online", date, shift);
+  }, [date, shift]);
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
   const setShift = (s: Shift) =>
     setDateShift((prev) => ({ ...prev, shift: s }));
@@ -540,6 +549,8 @@ export function OnlineEntryPage() {
   // category fully listed. Built from the row data by utils/tablePdf.ts - not
   // by printing the page - so the layout is the same on every page and
   // always fits the paper. Disabled while edits are unsaved (see the button).
+  const pdfAction = useBusyAction();
+
   async function handlePdf() {
     // Same rule as the button's disabled state: any staged (green) edit locks
     // the PDF again until it's saved or discarded.
@@ -706,7 +717,9 @@ export function OnlineEntryPage() {
               type="button"
               variant="secondary"
               size="sm"
-              onClick={handlePdf}
+              onClick={() => void pdfAction.run(handlePdf)}
+              loading={pdfAction.busy}
+              loadingLabel={<span className="ae-toolbar-btn-label">PDF</span>}
               disabled={pendingCount > 0 || !visibleRows}
               title={
                 pendingCount > 0

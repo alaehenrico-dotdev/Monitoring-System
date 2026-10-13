@@ -12,6 +12,8 @@ export const TABLE_LABELS: Record<string, string> = {
   products: "SKUs",
   reports: "Reports",
   users: "Users",
+  day_closures: "Day Closures",
+  correction_requests: "Corrections",
 };
 
 export const ACTION_COLOR: Record<ChangeLogEntry["action"], string> = {

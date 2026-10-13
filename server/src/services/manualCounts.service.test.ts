@@ -51,6 +51,7 @@ vi.mock("../repositories/dailyOfflineStockRepository", () => ({
 vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(), findActive: vi.fn() },
 }));
+vi.mock("./dayLock.service", () => ({ assertPeriodOpen: vi.fn() }));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 
 import { manualCountRepository } from "../repositories/manualCountRepository";

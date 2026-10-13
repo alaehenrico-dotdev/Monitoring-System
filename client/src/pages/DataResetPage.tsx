@@ -177,6 +177,8 @@ export function DataResetPage() {
       <div
         style={{
           maxWidth: 380,
+          width: "100%",
+          margin: "0 auto",
           background: PANEL_BG,
           border: `1px solid ${PANEL_BORDER}`,
           borderRadius: 6,
@@ -285,7 +287,7 @@ export function DataResetPage() {
   }
 
   return (
-    <div>
+    <div style={{ width: "100%", maxWidth: 760, margin: "0 auto" }}>
       <p
         style={{
           fontSize: 13,

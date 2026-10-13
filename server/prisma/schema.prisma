@@ -52,15 +52,21 @@ model User {
   tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
 
-  onlineEntries    DailyOnlineStock[]   @relation("OnlineEncodedBy")
-  offlineEntries   DailyOfflineStock[]  @relation("OfflineEncodedBy")
-  manualCounts     ManualCount[]        @relation("CountedBy")
-  publishedCounts  ManualCount[]        @relation("PublishedBy")
-  changeLogEntries ChangeLog[]          @relation("ChangedBy")
-  importBatches    ImportBatch[]        @relation("ImportedBy")
-  reportHistory    ReportHistoryEntry[] @relation("GeneratedBy")
-  systemLogEntries SystemLogEntry[]     @relation("UpdatedOn")
-  stockExtras      DailyStockExtra[]    @relation("ExtraEncodedBy")
+  onlineEntries        DailyOnlineStock[]   @relation("OnlineEncodedBy")
+  offlineEntries       DailyOfflineStock[]  @relation("OfflineEncodedBy")
+  manualCounts         ManualCount[]        @relation("CountedBy")
+  publishedCounts      ManualCount[]        @relation("PublishedBy")
+  changeLogEntries     ChangeLog[]          @relation("ChangedBy")
+  importBatches        ImportBatch[]        @relation("ImportedBy")
+  reportHistory        ReportHistoryEntry[] @relation("GeneratedBy")
+  systemLogEntries     SystemLogEntry[]     @relation("UpdatedOn")
+  stockExtras          DailyStockExtra[]    @relation("ExtraEncodedBy")
+  dayClosuresClosed    DayClosure[]         @relation("ClosedBy")
+  dayClosuresUnlocked  DayClosure[]         @relation("UnlockedBy")
+  clientErrors         ClientError[]        @relation("ErrorUser")
+  correctionsRequested CorrectionRequest[]  @relation("CorrectionRequestedBy")
+  correctionsReviewed  CorrectionRequest[]  @relation("CorrectionReviewedBy")
+  correctionEvents     CorrectionEvent[]    @relation("CorrectionEventBy")
 
   @@map("users")
 }
@@ -393,4 +399,163 @@ model SystemLogEntry {
 
   @@index([occurredAt])
   @@map("system_log_entries")
+}
+
+/// A finished operating day (one date + shift), closed once it has been counted
+/// and its report generated. While `isClosed`, the entry/count services refuse
+/// writes to that period; an admin unlock (with a reason) reopens it, and an
+/// approved CorrectionRequest is the explicit adjustment path that may write to
+/// it. Every close/unlock is also written to change_log (table "day_closures").
+model DayClosure {
+  id           Int       @id @default(autoincrement())
+  entryDate    DateTime  @db.Date
+  shift        Shift
+  isClosed     Boolean   @default(true)
+  closedAt     DateTime  @default(now())
+  closedById   Int?
+  closedBy     User?     @relation("ClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  unlockedAt   DateTime?
+  unlockedById Int?
+  unlockedBy   User?     @relation("UnlockedBy", fields: [unlockedById], references: [id], onDelete: SetNull)
+  unlockReason String?   @db.VarChar(500)
+
+  @@unique([entryDate, shift])
+  @@map("day_closures")
+}
+
+/// A browser-side error reported by the client (POST /client-errors) so a
+/// problem on an encoder's PC is visible without them having to call.
+model ClientError {
+  id         Int      @id @default(autoincrement())
+  page       String   @db.VarChar(300)
+  message    String   @db.VarChar(1000)
+  stack      String?  @db.Text
+  source     String   @db.VarChar(32)
+  appVersion String?  @db.VarChar(40)
+  userAgent  String?  @db.VarChar(300)
+  userId     Int?
+  user       User?    @relation("ErrorUser", fields: [userId], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("client_errors")
+}
+
+/// Stored result of a mutating request that carried an Idempotency-Key header,
+/// so a retry of the same save replays the original response instead of
+/// running twice. Rows older than IDEMPOTENCY_TTL_HOURS are purged.
+model IdempotencyKey {
+  id           Int      @id @default(autoincrement())
+  key          String   @db.VarChar(100)
+  userId       Int
+  method       String   @db.VarChar(10)
+  path         String   @db.VarChar(300)
+  requestHash  String   @db.VarChar(64)
+  // Null while the first attempt is still running.
+  statusCode   Int?
+  responseBody Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, key])
+  @@index([createdAt])
+  @@map("idempotency_keys")
+}
+
+/// Cold storage for change_log rows older than the retention period (see
+/// changeLogArchive.service.ts). Same columns as change_log; `id` is the
+/// original change_log id, not auto-generated.
+model ChangeLogArchive {
+  id            Int          @id
+  tableName     String
+  recordId      Int
+  action        ChangeAction
+  changedById   Int?
+  changedAt     DateTime
+  oldValue      Json?
+  newValue      Json?
+  importBatchId Int?
+  causedById    Int?
+  archivedAt    DateTime     @default(now())
+
+  @@index([changedAt])
+  @@index([tableName, recordId, id])
+  @@map("change_log_archive")
+}
+
+enum CorrectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// A request to change a figure that should not be silently overwritten (for
+/// example on a closed day). Approval applies the change through the normal
+/// service as a recorded adjustment; before/after values and every status
+/// change are kept (CorrectionEvent).
+model CorrectionRequest {
+  id            Int              @id @default(autoincrement())
+  // "daily_online_stock" | "daily_offline_stock" | "manual_counts"
+  tableName     String           @db.VarChar(40)
+  recordId      Int
+  field         String           @db.VarChar(64)
+  beforeValue   String           @db.VarChar(64)
+  proposedValue String           @db.VarChar(64)
+  reason        String           @db.VarChar(500)
+  status        CorrectionStatus @default(PENDING)
+  requestedById Int?
+  requestedBy   User?            @relation("CorrectionRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  requestedAt   DateTime         @default(now())
+  reviewedById  Int?
+  reviewedBy    User?            @relation("CorrectionReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  reviewNote    String?          @db.VarChar(500)
+  // Value actually in the record when it was applied (kept as audit evidence).
+  appliedBefore String?          @db.VarChar(64)
+
+  events CorrectionEvent[]
+
+  @@index([status, requestedAt])
+  @@index([tableName, recordId])
+  @@map("correction_requests")
+}
+
+model CorrectionEvent {
+  id        Int               @id @default(autoincrement())
+  requestId Int
+  request   CorrectionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  // "REQUESTED" | "APPROVED" | "REJECTED"
+  event     String            @db.VarChar(20)
+  byId      Int?
+  by        User?             @relation("CorrectionEventBy", fields: [byId], references: [id], onDelete: SetNull)
+  note      String?           @db.VarChar(500)
+  at        DateTime          @default(now())
+
+  @@index([requestId])
+  @@map("correction_events")
+}
+
+enum BackupStatus {
+  OK
+  FAILED
+  INVALID
+}
+
+/// One row per database backup the system knows about (in-app download,
+/// pre-restore safety copy, or one registered from the backup scripts), with
+/// the checks run against it.
+model BackupRecord {
+  id          Int          @id @default(autoincrement())
+  fileName    String       @db.VarChar(200)
+  // "manual" | "scheduled" | "pre-restore" | "pre-migration"
+  trigger     String       @db.VarChar(20)
+  status      BackupStatus
+  sizeBytes   BigInt?
+  sha256      String?      @db.VarChar(64)
+  error       String?      @db.VarChar(500)
+  createdAt   DateTime     @default(now())
+  verifiedAt  DateTime?
+  createdById Int?
+
+  @@index([createdAt])
+  @@map("backup_records")
 }

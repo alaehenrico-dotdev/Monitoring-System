@@ -75,6 +75,8 @@ export interface ChangeLogPageOptions {
   limit: number;
   /// Return rows older than this id (the previous page's nextCursor).
   cursor?: number;
+  /// Skip this many newest rows (numbered paging). Ignored when `cursor` is set.
+  offset?: number;
 }
 
 /// Section 5.8 - change_log: accountability and variance tracing.
@@ -97,14 +99,20 @@ export const changeLogRepository = {
   /// One page of the filtered log, newest first. Ordered by id (append-only,
   /// so id order is time order) so the cursor is stable while new rows arrive.
   /// Fetches one extra row so the caller can tell whether another page exists.
-  findPage(filters: ChangeLogFilters, { limit, cursor }: ChangeLogPageOptions) {
+  findPage(filters: ChangeLogFilters, { limit, cursor, offset }: ChangeLogPageOptions) {
     const where = buildChangeLogWhere(filters);
     return prisma.changeLog.findMany({
       where: cursor ? { AND: [where, { id: { lt: cursor } }] } : where,
       include: { changedBy: { select: { id: true, name: true, username: true, role: true } } },
       orderBy: { id: "desc" },
+      ...(!cursor && offset ? { skip: offset } : {}),
       take: limit + 1,
     });
+  },
+
+  /// How many rows match, for "Showing 21-30 of 160" and the page count.
+  count(filters: ChangeLogFilters) {
+    return prisma.changeLog.count({ where: buildChangeLogWhere(filters) });
   },
 
   /// Live records the change rows point at, for labelling. Batched per table.

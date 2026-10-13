@@ -1,3 +1,5 @@
+import { Spinner } from "../components/Spinner";
+import { useBusyAction } from "../hooks/useBusyAction";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   createProduct,
@@ -36,6 +38,8 @@ export function ProductsAdminPage() {
     null,
   );
   const [busyId, setBusyId] = useState<number | null>(null);
+  // One create at a time: a double-click must not make a duplicate SKU.
+  const addSku = useBusyAction();
 
   function reload() {
     // includeInactive: deactivated SKUs stay in this list (dimmed) so they can be reactivated.
@@ -55,6 +59,7 @@ export function ProductsAdminPage() {
       setError("Name, category, and unit are required.");
       return;
     }
+    await addSku.run(async () => {
     try {
       const created = await createProduct({
         sku: sku || undefined,
@@ -76,6 +81,7 @@ export function ProductsAdminPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add SKU");
     }
+    });
   }
 
   // Low Stock Alert - saved on blur, same as any other admin edit here.
@@ -209,7 +215,12 @@ export function ProductsAdminPage() {
             style={{ width: 90 }}
           />
         </Field>
-        <Button type="submit" style={{ color: colors.yellow }}>
+        <Button
+          type="submit"
+          style={{ color: colors.yellow }}
+          loading={addSku.busy}
+          loadingLabel="Adding…"
+        >
           Add SKU
         </Button>
       </form>
@@ -310,6 +321,11 @@ export function ProductsAdminPage() {
                       inputMode="decimal"
                       style={{ width: 80 }}
                     />
+                    {thresholdBusyId === p.id && (
+                      <span role="status" aria-label="Saving" style={{ marginLeft: 6, verticalAlign: "middle", display: "inline-flex" }}>
+                        <Spinner size="sm" />
+                      </span>
+                    )}
                   </td>
                   <td>
                     {p.isActive ? (

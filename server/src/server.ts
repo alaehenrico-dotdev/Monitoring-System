@@ -3,10 +3,13 @@ import { createApp } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./lib/prisma";
 import { attachRealtime, closeRealtime } from "./lib/realtime";
+import { startMaintenance } from "./services/maintenance.service";
 
 const app = createApp();
 const server = createServer(app);
 attachRealtime(server);
+
+startMaintenance();
 
 server.listen(env.port, env.host, () => {
   // eslint-disable-next-line no-console

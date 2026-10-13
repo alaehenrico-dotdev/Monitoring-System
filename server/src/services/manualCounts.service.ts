@@ -5,6 +5,7 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
+import { assertPeriodOpen } from "./dayLock.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import {
   calculateOfflineRemaining,
@@ -75,6 +76,7 @@ export async function saveManualCount(
     return saved;
   }
 
+  await assertPeriodOpen(entryDate, shift, db);
   const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
   const systemRemainingStock = await getSystemRemainingStock(productId, entryDate, shift, location, db);
@@ -140,6 +142,7 @@ export async function deleteManualCount(
 
   const existing = await manualCountRepository.findOne(productId, entryDate, shift, location, db);
   if (!existing) return false;
+  await assertPeriodOpen(entryDate, shift, db);
 
   await manualCountRepository.delete(existing.id, db);
 
@@ -191,6 +194,8 @@ export async function propagateOpeningStock(
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
       const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
+      // A carry-forward must not quietly rewrite a closed day.
+      await assertPeriodOpen(next.entryDate, next.shift, db);
       const onlineStock = calculateOnlineStock(openingStock, toNum(next.stockInOffToOl), toNum(next.stockOutOlToOff));
       const remainingStock = calculateOnlineRemaining(onlineStock, toNum(next.productionIn), toNum(next.fulfillmentOut), toNum(next.rts));
       const updated = await dailyOnlineStockRepository.upsert(
@@ -221,6 +226,7 @@ export async function propagateOpeningStock(
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
       const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
+      await assertPeriodOpen(next.entryDate, next.shift, db);
       const offlineStock = calculateOfflineStock(openingStock, toNum(next.stockInOlToOff), toNum(next.stockOutOffToOl));
       const remainingStock = calculateOfflineRemaining(
         offlineStock,
@@ -315,8 +321,14 @@ export async function healOpeningStocks(location: "ONLINE" | "OFFLINE", entryDat
     const want = expected.get(row.productId);
     if (want === undefined || countByProduct.get(row.productId) !== want) continue;
     if (want === toNum(row.openingStock)) continue;
-    await prisma.$transaction((tx) => propagateOpeningStock(row.productId, before.entryDate, before.shift, location, userId, tx));
-    changed = true;
+    try {
+      await prisma.$transaction((tx) => propagateOpeningStock(row.productId, before.entryDate, before.shift, location, userId, tx));
+      changed = true;
+    } catch (err) {
+      // A closed day is left as it was printed - a grid load must not fail over it.
+      if (err instanceof HttpError && err.status === 409) continue;
+      throw err;
+    }
   }
   if (changed) broadcastRealtimeEvent();
 }

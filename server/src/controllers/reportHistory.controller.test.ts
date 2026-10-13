@@ -32,7 +32,7 @@ describe("GET /report-history access", () => {
       await c.run();
       expect(c.json).toHaveBeenCalledWith([]);
     }
-    expect(listReportHistory).toHaveBeenCalledWith("Audit Report");
+    expect(listReportHistory).toHaveBeenCalledWith("Audit Report", undefined, 50);
   });
 
   it("keeps Daily and Variance history Supervisor/Admin only", async () => {

@@ -5,6 +5,7 @@ import { DownloadIcon } from "../components/icons";
 import { Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { DatabaseRestoreCard } from "./DatabaseRestoreCard";
+import { BackupHistoryCard } from "./BackupHistoryCard";
 import { colors, motionTokens } from "../theme";
 
 type Status = "idle" | "downloading" | "done" | "error";
@@ -40,6 +41,8 @@ export function DatabaseBackupPage() {
   const [doneDismissed, setDoneDismissed] = useState(false);
   const [bytes, setBytes] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Bumped when a download finishes so the history card re-reads.
+  const [historyKey, setHistoryKey] = useState(0);
 
   async function handleDownload() {
     setStatus("downloading");
@@ -49,6 +52,7 @@ export function DatabaseBackupPage() {
     try {
       await downloadDatabaseBackup(setBytes);
       setStatus("done");
+      setHistoryKey((k) => k + 1);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to download backup.",
@@ -65,6 +69,7 @@ export function DatabaseBackupPage() {
       : 0;
 
   return (
+    <div style={{ width: "100%", maxWidth: 640, margin: "0 auto" }}>
     <div
       style={{
         maxWidth: 640,
@@ -169,6 +174,8 @@ export function DatabaseBackupPage() {
 
       <div style={{ height: 1, background: colors.border }} />
       <DatabaseRestoreCard />
+    </div>
+    <BackupHistoryCard key={historyKey} />
     </div>
   );
 }

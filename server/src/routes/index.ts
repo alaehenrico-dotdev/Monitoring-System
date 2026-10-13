@@ -14,6 +14,11 @@ import backupRoutes from "./backup.routes";
 import dashboardRoutes from "./dashboard.routes";
 import importBatchRoutes from "./importBatch.routes";
 import reportHistoryRoutes from "./reportHistory.routes";
+import dayLockRoutes from "./dayLock.routes";
+import clientErrorRoutes from "./clientError.routes";
+import correctionRoutes from "./correction.routes";
+import actionQueueRoutes from "./actionQueue.routes";
+import { idempotency } from "../middleware/idempotency";
 
 /// Single mount point for every feature's router (Section 3 - the app is
 /// organized around Daily Online Entry, Daily Offline Entry, Manual Count &
@@ -21,19 +26,28 @@ import reportHistoryRoutes from "./reportHistory.routes";
 /// Change-Log endpoints).
 const router = Router();
 
+// Saves are retry-safe: a request carrying an Idempotency-Key is run once and
+// replayed after that (middleware/idempotency.ts). Not applied to auth, the
+// raw-stream restore, or read-only routers.
+const retrySafe = [idempotency];
+
 router.use("/auth", authRoutes);
 router.use("/users", usersRoutes);
-router.use("/products", productsRoutes);
-router.use("/online-stock", dailyOnlineStockRoutes);
-router.use("/offline-stock", dailyOfflineStockRoutes);
-router.use("/manual-counts", manualCountsRoutes);
+router.use("/products", retrySafe, productsRoutes);
+router.use("/online-stock", retrySafe, dailyOnlineStockRoutes);
+router.use("/offline-stock", retrySafe, dailyOfflineStockRoutes);
+router.use("/manual-counts", retrySafe, manualCountsRoutes);
 router.use("/total-stocks", totalStocksRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/change-log", changeLogRoutes);
 router.use("/data-reset", dataResetRoutes);
 router.use("/backup", backupRoutes);
 router.use("/dashboard", dashboardRoutes);
-router.use("/import-batches", importBatchRoutes);
-router.use("/report-history", reportHistoryRoutes);
+router.use("/import-batches", retrySafe, importBatchRoutes);
+router.use("/report-history", retrySafe, reportHistoryRoutes);
+router.use("/day-closures", retrySafe, dayLockRoutes);
+router.use("/corrections", retrySafe, correctionRoutes);
+router.use("/action-queue", actionQueueRoutes);
+router.use("/client-errors", clientErrorRoutes);
 
 export default router;

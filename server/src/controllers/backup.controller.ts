@@ -3,6 +3,15 @@ import { restoreDatabaseFromStream, streamDatabaseBackup } from "../services/bac
 import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveResetToken } from "../services/dataReset.service";
 import { logSystemEvent } from "../services/changeLog.service";
 import { HttpError } from "../utils/HttpError";
+import {
+  backupHealth,
+  buildReport,
+  inspectDump,
+  listBackupFiles,
+  listBackupHistory,
+  recordBackup,
+  verifyBackupFile,
+} from "../services/backupVerify.service";
 
 // Matches every other export's filename style across the app (e.g.
 // "total-stocks-2026-09-30.xls", "online-stock-2026-09-30-morning.pdf" -
@@ -19,11 +28,25 @@ function backupFileName(): string {
 }
 
 export async function getBackupDownload(req: Request, res: Response) {
+  const fileName = backupFileName();
+  // The Restore page takes a safety copy first and says so, so history can tell
+  // it apart from a routine download.
+  const trigger = req.query.purpose === "pre-restore" ? "pre-restore" : "manual";
   try {
-    const fileName = backupFileName();
-    await streamDatabaseBackup(res, fileName);
+    const summary = await streamDatabaseBackup(res, fileName);
+    await recordBackup({
+      fileName,
+      trigger,
+      status: summary.complete ? "OK" : "INVALID",
+      sizeBytes: summary.sizeBytes,
+      sha256: summary.sha256,
+      error: summary.complete ? undefined : 'mysqldump finished without its closing "Dump completed" line.',
+      createdById: req.user?.id,
+      verified: true,
+    });
     await logSystemEvent("backup_download", { fileName }, req.user?.id);
   } catch (err) {
+    await recordBackup({ fileName, trigger, status: "FAILED", error: err instanceof Error ? err.message : String(err), createdById: req.user?.id });
     // Once mysqldump has started streaming, the response headers/body are
     // already committed - there's no way to turn that into a clean JSON
     // error at this point, so the best we can do is drop the connection and
@@ -55,4 +78,24 @@ export async function postRestore(req: Request, res: Response) {
     releaseResetToken(tokenId);
     throw err;
   }
+}
+
+/// Backup history (what this system has taken and verified) plus whatever the
+/// backup scripts left in BACKUP_DIR, and whether one is overdue or failing.
+export async function getBackupHistory(_req: Request, res: Response) {
+  const [records, files, health] = await Promise.all([listBackupHistory(), listBackupFiles(), backupHealth()]);
+  res.json({ records, files, health });
+}
+
+/// Pre-restore check: reads an uploaded dump (raw body, like /restore) without
+/// touching the database, and says whether it is safe to rely on.
+export async function postValidate(req: Request, res: Response) {
+  const inspection = await inspectDump(req);
+  res.json(await buildReport(inspection));
+}
+
+export async function postVerifyFile(req: Request, res: Response) {
+  const name = typeof req.body?.name === "string" ? req.body.name : "";
+  if (!name) throw HttpError.badRequest("A backup file name is required.");
+  res.json(await verifyBackupFile(name, req.user?.id));
 }

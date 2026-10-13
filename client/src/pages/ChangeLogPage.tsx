@@ -1,8 +1,7 @@
 import {
-  Fragment,
+  useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type CSSProperties,
   type KeyboardEvent,
@@ -22,6 +21,8 @@ import { SearchInput } from "../components/SearchInput";
 import { Dropdown } from "../components/Dropdown";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { Button } from "../components/ui";
+import { Pager } from "../components/Pager";
+import { usePagedList } from "../hooks/usePagedList";
 import { matchesSearch } from "../utils/search";
 import {
   endOfDayIso,
@@ -37,10 +38,10 @@ import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 
 const SYSTEM_TABLE = "system";
-const PAGE_SIZE = 100;
-// The server's per-request cap; a realtime refresh re-reads up to this many
-// rows so "Load more" pages already on screen aren't thrown away.
-const MAX_REFRESH_ROWS = 500;
+/// Rows per category: with every table showing, each category is a short
+/// preview; picking one table gives that category room.
+const ROWS_ALL_TABLES = 20;
+const ROWS_ONE_TABLE = 100;
 const REFRESH_DEBOUNCE_MS = 400;
 const COLUMNS = ["When", "Record", "Action", "What changed", "Changed By", ""];
 
@@ -82,9 +83,6 @@ const tableLabel = (table: string) =>
  * System-level events such as data resets are shown alongside record changes.
  */
 export function ChangeLogPage() {
-  const [entries, setEntries] = useState<ChangeLogEntry[] | null>(null);
-  const [nextCursor, setNextCursor] = useState<number | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tableFilter, setTableFilter] = useState("");
@@ -142,57 +140,22 @@ export function ChangeLogPage() {
   );
   const filterKey = JSON.stringify(filters);
 
-  // How many rows are on screen, read by the realtime refresh below without
-  // making it re-run every time a page is appended.
-  const loadedCount = useRef(0);
-  useEffect(() => {
-    loadedCount.current = entries?.length ?? 0;
-  });
-
-  useResetOnKeyChange(filterKey, () => {
-    setEntries(null);
-    setNextCursor(null);
-  });
-  // Bumped whenever the filters change or a refresh starts, so a slow "Load
-  // more" (or an older refresh) can't land rows from a stale view.
-  const generation = useRef(0);
-  useEffect(() => {
-    let cancelled = false;
-    // A realtime event can fire in bursts while an encoder saves a sheet; wait
-    // for it to settle rather than re-reading up to 500 rows per event. The
-    // first load for a given filter set is immediate.
-    const delay = loadedCount.current > 0 ? REFRESH_DEBOUNCE_MS : 0;
-    const timer = setTimeout(() => {
-      const limit = Math.min(
-        MAX_REFRESH_ROWS,
-        Math.max(PAGE_SIZE, loadedCount.current),
-      );
-      listChangeLogPage(filters, { limit })
-        .then((page) => {
-          if (cancelled) return;
-          setEntries(page.items);
-          setNextCursor(page.nextCursor);
-        })
-        .catch((reason: unknown) => {
-          if (cancelled) return;
-          setEntries((cur) => cur ?? []);
-          setError(
-            reason instanceof Error
-              ? reason.message
-              : "Failed to load change log",
-          );
-        });
-    }, delay);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-      // Invalidate any in-flight "Load more" for the view being replaced.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      generation.current++;
-    };
-    // filterKey is the serialized `filters`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterKey, realtimeVersion]);
+  // Each category loads and pages on its own (see CategorySection), so the
+  // page only has to know which categories exist and whether any has rows.
+  const categories = useMemo(
+    () => (tableFilter ? [tableFilter] : [...Object.keys(TABLE_LABELS), SYSTEM_TABLE]),
+    [tableFilter],
+  );
+  const pageSize = tableFilter ? ROWS_ONE_TABLE : ROWS_ALL_TABLES;
+  const [status, setStatus] = useState<Record<string, { loaded: boolean; count: number }>>({});
+  useResetOnKeyChange(filterKey, () => setStatus({}));
+  const reportStatus = useCallback(
+    (table: string, loaded: boolean, count: number) =>
+      setStatus((cur) =>
+        cur[table]?.loaded === loaded && cur[table]?.count === count ? cur : { ...cur, [table]: { loaded, count } },
+      ),
+    [],
+  );
 
   // The user/product pickers are a convenience - without them the filters
   // just aren't offered, the log itself still works.
@@ -204,25 +167,6 @@ export function ChangeLogPage() {
       .then(setProducts)
       .catch(() => {});
   }, []);
-
-  function loadMore() {
-    if (nextCursor === null || loadingMore) return;
-    setLoadingMore(true);
-    const gen = generation.current;
-    listChangeLogPage(filters, { limit: PAGE_SIZE, cursor: nextCursor })
-      .then((page) => {
-        if (gen !== generation.current) return;
-        setEntries((cur) => [...(cur ?? []), ...page.items]);
-        setNextCursor(page.nextCursor);
-      })
-      .catch((reason: unknown) => {
-        if (gen !== generation.current) return;
-        setError(
-          reason instanceof Error ? reason.message : "Failed to load more",
-        );
-      })
-      .finally(() => setLoadingMore(false));
-  }
 
   function exportCsv() {
     setExporting(true);
@@ -240,50 +184,6 @@ export function ChangeLogPage() {
       .finally(() => setExporting(false));
   }
 
-  const filtered = useMemo(
-    () =>
-      entries?.filter((e) =>
-        matchesSearch(
-          [
-            tableLabel(e.tableName),
-            e.action,
-            e.tableName === SYSTEM_TABLE ? changeEventLabel(e) : undefined,
-            e.changedBy?.name,
-            e.changedBy?.username,
-            e.recordId,
-            e.context?.sku,
-            e.context?.productName,
-            e.summary,
-            e.tableName === "users" ? accountName(e) : undefined,
-            e.source ? SOURCE_TAG[e.source] : undefined,
-          ],
-          query,
-        ),
-      ),
-    [entries, query],
-  );
-
-  // Group entries by the table they belong to (Online Stock, Offline Stock,
-  // Manual Count, SKUs), in the same fixed order as TABLE_LABELS, with any
-  // other table after them. The API's newest-first ordering is kept inside
-  // each group.
-  const groupedByTable = useMemo(() => {
-    const groups = new Map<string, ChangeLogEntry[]>();
-    for (const entry of filtered ?? []) {
-      const bucket = groups.get(entry.tableName);
-      if (bucket) bucket.push(entry);
-      else groups.set(entry.tableName, [entry]);
-    }
-    const order = Object.keys(TABLE_LABELS);
-    const rank = (t: string) => {
-      const i = order.indexOf(t);
-      return i === -1 ? order.length : i;
-    };
-    return Array.from(groups.entries()).sort(
-      (x, y) => rank(x[0]) - rank(y[0]) || x[0].localeCompare(y[0]),
-    );
-  }, [filtered]);
-
   function toggleGroup(table: string) {
     setCollapsed((cur) => {
       const next = new Set(cur);
@@ -293,30 +193,9 @@ export function ChangeLogPage() {
     });
   }
 
-  function groupHeading(table: string, count: number) {
-    const isCollapsed = collapsed.has(table);
-    return (
-      <tr>
-        <td colSpan={COLUMNS.length} style={groupHeadingStyle}>
-          <button
-            type="button"
-            onClick={() => toggleGroup(table)}
-            aria-expanded={!isCollapsed}
-            style={groupToggleStyle}
-          >
-            <span aria-hidden="true">{isCollapsed ? "▶" : "▼"}</span>
-            {tableLabel(table)}
-            <span style={{ fontWeight: 500, color: colors.subtleInk }}>
-              ({count})
-            </span>
-          </button>
-        </td>
-      </tr>
-    );
-  }
-
-  const loaded = !!entries;
-  const nothingToShow = (filtered?.length ?? 0) === 0;
+  const anyLoaded = categories.some((t) => status[t]?.loaded);
+  const allLoaded = categories.every((t) => status[t]?.loaded);
+  const nothingToShow = allLoaded && categories.every((t) => status[t].count === 0);
 
   return (
     <div>
@@ -455,15 +334,15 @@ export function ChangeLogPage() {
         variant="error"
         duration={null}
       />
-      {!loaded ? (
-        <TableSkeleton
-          headers={COLUMNS}
-          minWidth={720}
-          label="Loading change log…"
-        />
-      ) : nothingToShow ? (
-        <p style={{ color: colors.subtleInk }}>No matching entries.</p>
-      ) : (
+      {!anyLoaded && (
+        <TableSkeleton headers={COLUMNS} minWidth={720} label="Loading change log…" />
+      )}
+      {nothingToShow && <p style={{ color: colors.subtleInk }}>No matching entries.</p>}
+      {/* Mounted even while empty/loading so each category can fetch; a
+          category with nothing to show renders no rows (and no header). */}
+      {/* A bounded flex child (.ae-grid-fill), like every other grid page, so the
+          table scrolls inside it and the page header stays put above. */}
+      <div className="ae-grid-fill" style={!anyLoaded || nothingToShow ? { display: "none" } : undefined}>
         <RowGlowScroll>
           <table className="ae-table" style={{ minWidth: 720 }}>
             <thead>
@@ -474,49 +353,156 @@ export function ChangeLogPage() {
               </tr>
             </thead>
             <tbody>
-              {groupedByTable.map(([table, tableEntries]) => (
-                <Fragment key={table}>
-                  {groupHeading(table, tableEntries.length)}
-                  {!collapsed.has(table) &&
-                    tableEntries.map((entry) =>
-                      table === SYSTEM_TABLE ? (
-                        <SystemChangeRow
-                          key={entry.id}
-                          entry={entry}
-                          expanded={expanded === entry.id}
-                          onToggle={() =>
-                            setExpanded((cur) =>
-                              cur === entry.id ? null : entry.id,
-                            )
-                          }
-                        />
-                      ) : (
-                        <ChangeLogRow
-                          key={entry.id}
-                          entry={entry}
-                          expanded={expanded === entry.id}
-                          onToggle={() =>
-                            setExpanded((cur) =>
-                              cur === entry.id ? null : entry.id,
-                            )
-                          }
-                        />
-                      ),
-                    )}
-                </Fragment>
+              {categories.map((table) => (
+                <CategorySection
+                  key={table}
+                  table={table}
+                  filters={filters}
+                  filterKey={filterKey}
+                  pageSize={pageSize}
+                  query={query}
+                  collapsed={collapsed.has(table)}
+                  onToggle={() => toggleGroup(table)}
+                  expanded={expanded}
+                  setExpanded={setExpanded}
+                  realtimeVersion={realtimeVersion}
+                  onStatus={reportStatus}
+                />
               ))}
             </tbody>
           </table>
         </RowGlowScroll>
-      )}
-      {loaded && nextCursor !== null && (
-        <div style={{ textAlign: "center", marginTop: 12 }}>
-          <Button variant="secondary" onClick={loadMore} disabled={loadingMore}>
-            {loadingMore ? "Loading…" : "Load more"}
-          </Button>
-        </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+/// What the search box matches against, for one row.
+function matchesEntry(e: ChangeLogEntry, query: string): boolean {
+  return matchesSearch(
+    [
+      tableLabel(e.tableName),
+      e.action,
+      e.tableName === SYSTEM_TABLE ? changeEventLabel(e) : undefined,
+      e.changedBy?.name,
+      e.changedBy?.username,
+      e.recordId,
+      e.context?.sku,
+      e.context?.productName,
+      e.summary,
+      e.tableName === "users" ? accountName(e) : undefined,
+      e.source ? SOURCE_TAG[e.source] : undefined,
+    ],
+    query,
+  );
+}
+
+/// One category (table) of the log: its own header with its own Previous/Next
+/// at the right end, and its own page of rows. Fetches `pageSize` rows of just
+/// this table, so a busy table can't crowd the others out of the page and each
+/// category pages independently.
+function CategorySection({
+  table,
+  filters,
+  filterKey,
+  pageSize,
+  query,
+  collapsed,
+  onToggle,
+  expanded,
+  setExpanded,
+  realtimeVersion,
+  onStatus,
+}: {
+  table: string;
+  filters: ChangeLogFilters;
+  filterKey: string;
+  pageSize: number;
+  query: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  expanded: number | null;
+  setExpanded: (updater: (cur: number | null) => number | null) => void;
+  realtimeVersion: number;
+  onStatus: (table: string, loaded: boolean, count: number) => void;
+}) {
+  // A new filter set (or default page size) is a different list: back to page 1.
+  const fetchPage = useCallback(
+    (offset: number, limit: number) =>
+      listChangeLogPage({ ...filters, tableName: table }, { limit, offset, withTotal: true }).then((r) => ({
+        items: r.items,
+        total: r.total ?? r.items.length,
+      })),
+    // filterKey is the serialized `filters`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filterKey, table],
+  );
+  const list = usePagedList(fetchPage, pageSize);
+  const { reload } = list;
+
+  // A realtime event can fire in bursts while an encoder saves a sheet; wait
+  // for it to settle, then re-read the page on screen.
+  useEffect(() => {
+    if (realtimeVersion === 0) return;
+    const timer = setTimeout(reload, REFRESH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [realtimeVersion, reload]);
+
+  const rows = useMemo(
+    () => list.data?.items.filter((e) => matchesEntry(e, query)) ?? [],
+    [list.data, query],
+  );
+  const loaded = list.data !== null || list.error !== null;
+  // A category with nothing at all (for these filters) has no header.
+  const hasContent = (list.total > 0 && (!query.trim() || rows.length > 0)) || list.page > 1;
+
+  useEffect(() => {
+    onStatus(table, loaded, hasContent ? Math.max(rows.length, 1) : 0);
+  }, [table, loaded, hasContent, rows.length, onStatus]);
+
+  if (!hasContent) return null;
+  return (
+    <>
+      <tr>
+        <td colSpan={COLUMNS.length} style={groupHeadingStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 8px 0 0" }}>
+            <button type="button" onClick={onToggle} aria-expanded={!collapsed} style={groupToggleStyle}>
+              <span aria-hidden="true">{collapsed ? "▶" : "▼"}</span>
+              {tableLabel(table)}
+              <span style={{ fontWeight: 500, color: colors.subtleInk }}>({list.total.toLocaleString()})</span>
+            </button>
+            <Pager
+              compact
+              page={list.page}
+              pageSize={list.pageSize}
+              total={list.total}
+              onPage={list.goToPage}
+              onPageSize={list.setPageSize}
+              loading={list.loading}
+              label={`${tableLabel(table)} pages`}
+            />
+          </div>
+        </td>
+      </tr>
+      {!collapsed &&
+        rows.map((entry) =>
+          table === SYSTEM_TABLE ? (
+            <SystemChangeRow
+              key={entry.id}
+              entry={entry}
+              expanded={expanded === entry.id}
+              onToggle={() => setExpanded((cur) => (cur === entry.id ? null : entry.id))}
+            />
+          ) : (
+            <ChangeLogRow
+              key={entry.id}
+              entry={entry}
+              expanded={expanded === entry.id}
+              onToggle={() => setExpanded((cur) => (cur === entry.id ? null : entry.id))}
+            />
+          ),
+        )}
+    </>
   );
 }
 
@@ -804,7 +790,8 @@ const groupToggleStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 8,
-  width: "100%",
+  flex: 1,
+  minWidth: 0,
   padding: "10px 6px 6px",
   border: "none",
   background: "transparent",

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { getBackupDownload, postRestore } from "../controllers/backup.controller";
+import { getBackupDownload, getBackupHistory, postRestore, postValidate, postVerifyFile } from "../controllers/backup.controller";
 
 const router = Router();
 
@@ -13,5 +13,10 @@ router.get("/download", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHa
 // application/sql, so express.json leaves the stream alone); also requires a
 // passcode token - see postRestore.
 router.post("/restore", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(postRestore));
+
+router.get("/history", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getBackupHistory));
+// Read-only checks, so no passcode: nothing here writes to the live database.
+router.post("/validate", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(postValidate));
+router.post("/verify-file", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(postVerifyFile));
 
 export default router;

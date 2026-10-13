@@ -81,6 +81,12 @@ const AuditHistoryPage = lazy(() =>
     default: m.AuditHistoryPage,
   })),
 );
+const AdminQueuePage = lazy(() =>
+  import("./pages/AdminQueuePage").then((m) => ({ default: m.AdminQueuePage })),
+);
+const CorrectionsPage = lazy(() =>
+  import("./pages/CorrectionsPage").then((m) => ({ default: m.CorrectionsPage })),
+);
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -112,6 +118,7 @@ export default function App() {
                     />
                     {/* Every role can read the report (the server already allows it); the entry pages link here. */}
                     <Route path="/daily-report" element={<DailyReportPage />} />
+                    <Route path="/corrections" element={<CorrectionsPage />} />
 
                     <Route
                       element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}
@@ -133,6 +140,7 @@ export default function App() {
                         path="/variance-ledger"
                         element={<VarianceLedgerPage />}
                       />
+                      <Route path="/admin-queue" element={<AdminQueuePage />} />
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
                       <Route path="/settings" element={<SettingsPage />} />

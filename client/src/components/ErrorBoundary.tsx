@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { colors, fonts } from "../theme";
+import { reportClientError } from "../utils/errorReporter";
 
 interface Props {
   children: ReactNode;
@@ -32,6 +33,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("Unhandled UI error:", error, info.componentStack);
+    reportClientError("boundary", error);
   }
 
   handleReload = () => {
