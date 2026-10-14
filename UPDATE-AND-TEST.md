@@ -24,6 +24,56 @@ Commands are PowerShell. Replace `<...>` with your value.
 
 ---
 
+## Will my data change?
+
+**Pulling does not touch any database.** `git pull` only brings code; your data is
+not in Git. A database changes only in these cases:
+
+| What you do | Effect on data |
+|---|---|
+| `git pull` | None. |
+| `npx prisma migrate deploy` (or the Docker API starting, which runs it by itself) | Changes the **structure** only. Your existing data is kept. |
+| Restoring a backup | Replaces the data in that database with the backup. |
+| `npm run seed` on a database that already has data | Avoid it. Seed is for an empty database. |
+| Data Reset (Settings) | Wipes data. Not part of this update. |
+
+**What this update's two migrations run** (checked in the SQL):
+- `20261014090000_finish_day_snapshots`: adds a column `entriesOnly` to
+  `day_closures` (default `false`, so every existing closed day keeps its current
+  lock), creates the new empty table `daily_report_snapshots`, and links it to `users`.
+- `20261014100000_extra_column_labels`: creates the new empty table
+  `extra_column_labels`.
+
+Neither contains an `UPDATE`, `DELETE`, `DROP`, `TRUNCATE` or `INSERT`. Stock entries,
+manual counts, products, users and the Change Log are not read or changed.
+
+**Which database is affected:** the one in that PC's `DATABASE_URL`
+(`server\.env`, or `.env` for Docker). Each PC normally has its own MySQL, so the
+other PC does not change this PC's data. **Check the host in `DATABASE_URL` first**:
+if it points at this PC's MySQL or a shared server, `migrate deploy` changes that
+database.
+
+**Older migrations:** `migrate deploy` applies every migration the database has not
+run yet. If the other PC's database is far behind, older ones run too (for example
+`harden_schema`, `ops_hardening`). The ones from Oct 10-13 contain no data-deleting
+statements.
+
+**When you need `migrate deploy` after a pull:** only if the pull brought new files
+in `server/prisma/migrations`:
+
+```powershell
+git diff --name-only HEAD@{1} HEAD -- server/prisma/migrations
+```
+
+Anything printed means run it. Nothing printed means skip it. Running it with
+nothing new is harmless. With Docker you never run it yourself.
+
+A backup first is still good practice (**Settings -> Backup & Restore -> Download
+Backup**): it takes a minute and is the only way to undo a change to a database
+you care about.
+
+---
+
 ## Step 1. On this PC: commit and push
 
 Nothing from this update is committed yet. From the project folder:
@@ -122,14 +172,16 @@ Backup & Restore → Restore**, or `SETUP.md` C4). Check the file ends with a
 ```powershell
 cd server
 npx prisma migrate deploy        # applies the 2 new migrations (use deploy, NOT "migrate dev")
-npm run seed                     # empty database only: prints one-time passwords, write them down
 cd ..
 ```
 
+Run `npm run seed` **only on an empty database** (it prints one-time passwords,
+write them down). Never on one that already has data.
+
 Expected: the output lists `20261014090000_finish_day_snapshots` and
-`20261014100000_extra_column_labels` as applied. Existing data is not changed.
-Days finished before this update have no saved report, so they show live data
-until someone finishes them again.
+`20261014100000_extra_column_labels` as applied. Existing data is not changed
+(see "Will my data change?" above). Days finished before this update have no
+saved report, so they show live data until someone finishes them again.
 
 ---
 
