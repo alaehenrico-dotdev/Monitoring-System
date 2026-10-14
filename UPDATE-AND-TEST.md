@@ -1,10 +1,23 @@
-# Pull the update to another PC, then build and test it
+# Pull the update to another PC, then build and test it (Docker)
 
-This is for the **update** (the work done after `5b41179 up`) on a PC that will
-build and test it. For a brand-new PC with nothing installed, do `SETUP.md`
-first (Parts B and C), then come back here.
+This is for the **update** (the work done after `5b41179 up`) on a PC that runs the
+system **in Docker**. Docker builds the server and the client itself and the API
+applies the database migrations when it starts, so there is no `npm run build`,
+`prisma migrate` or `server\.env` to manage. For a PC with nothing installed, do
+`SETUP.md` Part B first.
 
-Commands are PowerShell. Replace `<...>` with your value.
+Commands are PowerShell, run from the project folder. Replace `<...>` with your value.
+
+## Quick path (once `.env` exists, Step 4)
+
+```powershell
+cd <path-to>\Monitoring-System
+git pull
+docker compose up -d --build          # rebuilds, restarts, applies new migrations
+docker compose logs api --tail 30     # should end with "API listening on ..."
+```
+
+Open http://localhost:8080 (or your `WEB_PORT`), then go through the checklist (Step 6).
 
 ---
 
@@ -27,14 +40,15 @@ Commands are PowerShell. Replace `<...>` with your value.
 ## Will my data change?
 
 **Pulling does not touch any database.** `git pull` only brings code; your data is
-not in Git. A database changes only in these cases:
+not in Git. It lives in the Docker volume `db_data`. It changes only in these cases:
 
 | What you do | Effect on data |
 |---|---|
 | `git pull` | None. |
-| `npx prisma migrate deploy` (or the Docker API starting, which runs it by itself) | Changes the **structure** only. Your existing data is kept. |
-| Restoring a backup | Replaces the data in that database with the backup. |
-| `npm run seed` on a database that already has data | Avoid it. Seed is for an empty database. |
+| `docker compose up -d --build` / `docker compose restart api` | The API runs `prisma migrate deploy` as it starts: **structure** changes only, existing data is kept. |
+| Restoring a backup | Replaces the data with the backup. |
+| `docker compose down -v` (or deleting the `db_data` volume) | **Deletes the database.** Plain `docker compose down` keeps it. |
+| Seed (`prisma/seed.ts`) on a database that already has data | Avoid it. Seed is for an empty database. |
 | Data Reset (Settings) | Wipes data. Not part of this update. |
 
 **What this update's two migrations run** (checked in the SQL):
@@ -47,30 +61,16 @@ not in Git. A database changes only in these cases:
 Neither contains an `UPDATE`, `DELETE`, `DROP`, `TRUNCATE` or `INSERT`. Stock entries,
 manual counts, products, users and the Change Log are not read or changed.
 
-**Which database is affected:** the one in that PC's `DATABASE_URL`
-(`server\.env`, or `.env` for Docker). Each PC normally has its own MySQL, so the
-other PC does not change this PC's data. **Check the host in `DATABASE_URL` first**:
-if it points at this PC's MySQL or a shared server, `migrate deploy` changes that
-database.
+**Which database is affected:** the MySQL container of *this* project folder on *that*
+PC (its own `db_data` volume). It does not touch the dev PC's data. Only the database
+that is actually in that PC's Docker is changed.
 
-**Older migrations:** `migrate deploy` applies every migration the database has not
-run yet. If the other PC's database is far behind, older ones run too (for example
-`harden_schema`, `ops_hardening`). The ones from Oct 10-13 contain no data-deleting
-statements.
+**Older migrations:** the API applies every migration the database has not run yet. If
+that database is far behind, older ones run too (for example `harden_schema`,
+`ops_hardening`). The ones from Oct 10-13 contain no data-deleting statements.
 
-**When you need `migrate deploy` after a pull:** only if the pull brought new files
-in `server/prisma/migrations`:
-
-```powershell
-git diff --name-only HEAD@{1} HEAD -- server/prisma/migrations
-```
-
-Anything printed means run it. Nothing printed means skip it. Running it with
-nothing new is harmless. With Docker you never run it yourself.
-
-A backup first is still good practice (**Settings -> Backup & Restore -> Download
-Backup**): it takes a minute and is the only way to undo a change to a database
-you care about.
+A backup first is still good practice (Step 5): it takes a minute and is the only way
+to undo a change to a database you care about.
 
 ---
 
@@ -89,23 +89,29 @@ git push
 - **The workbook is business data.** If it shows as staged, run
   `git restore --staged "10 - CONSOLIDATED STOCKS.xlsx"`, or add the line
   `*.xlsx` to `.gitignore` first. It is not needed to build or run; only to try the
-  import (Step 7). Copy it to the other PC with a USB drive or a private folder.
+  import (Step 6). Copy it to the other PC with a USB drive or a private folder.
 - `.env` files are git-ignored and are **not** pushed. The other PC needs its own.
 
 ---
 
-## Step 2. On the other PC: tools
-
-You need: **Git**, **Node.js 20 or newer**, and **MySQL 8** (Docker is the easiest way).
+## Step 2. On the other PC: check Docker is ready
 
 ```powershell
 git --version
-node --version      # v20 or higher
-docker --version    # only if you run MySQL or the whole system in Docker
+docker --version
+docker info           # must print server details; an error means Docker Desktop is not running yet - start it
+docker compose version
 ```
 
-Install anything missing (`winget install Git.Git OpenJS.NodeJS.LTS Docker.DockerDesktop`).
-`SETUP.md` Part B has the full tool setup.
+Check the web port is free (8080 by default). Nothing printed means free:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue |
+  Select-Object LocalPort, OwningProcess
+```
+
+If it is taken, set `WEB_PORT` in `.env` (Step 4) to another number, e.g. `8081`, and
+use that in the browser and in `CLIENT_ORIGIN`.
 
 ---
 
@@ -126,92 +132,85 @@ git clone https://github.com/alaehenrico-dotdev/Monitoring-System.git
 cd Monitoring-System
 ```
 
-Then install packages. Run this again after every pull that changes a
-`package.json`:
-
-```powershell
-npm install
-```
-
 ---
 
-## Step 4. Settings (first time only)
+## Step 4. The `.env` file (first time only)
+
+Docker uses **one** file in the project root, made from `.env.docker.example`. It is
+git-ignored, so it is not in the repository and not changed by a pull.
 
 ```powershell
-Copy-Item server\.env.example server\.env
-Copy-Item client\.env.example client\.env
+Copy-Item .env.docker.example .env
 ```
 
-Edit `server\.env`:
+Edit `.env`:
 
-| Variable | Value |
+| Variable | What to put |
 |---|---|
-| `DATABASE_URL` | e.g. `mysql://root:devpassword@localhost:3306/ala_eh_stocks?connection_limit=10&pool_timeout=20` |
+| `DB_PASSWORD` | a new password (the API builds its database URL from it, so there is no `DATABASE_URL` here) |
+| `DB_ROOT_PASSWORD` | a different new password |
 | `JWT_SECRET` | 32 or more random characters: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 | `DATA_RESET_PASSCODE` | a passcode you will remember (not `000000`: the server refuses it) |
-| `CLIENT_ORIGIN` | `http://localhost:5173` for development |
+| `CLIENT_ORIGIN` | exactly what you type in the browser, no trailing slash: `http://localhost:8080` |
+| `WEB_PORT` | `8080`, unless it is taken |
 
-A throwaway MySQL in Docker, if you have none:
+`CLIENT_ORIGIN` must match the browser address exactly, or the page loads but every
+request fails with a CORS error.
 
-```powershell
-docker run -d --name ala-eh-dev-db -p 3306:3306 `
-  -e MYSQL_ROOT_PASSWORD=devpassword -e MYSQL_DATABASE=ala_eh_stocks mysql:8.0
-```
-
----
-
-## Step 5. Database
-
-### Testing with real data: restore a backup first
-Take a backup on the machine that holds the data (**Settings → Backup & Restore →
-Download Backup**, or see `SETUP.md` A1). Restore it on the test PC (**Settings →
-Backup & Restore → Restore**, or `SETUP.md` C4). Check the file ends with a
-`-- Dump completed` line. Do not test on the live database.
-
-### Apply the migrations
-```powershell
-cd server
-npx prisma migrate deploy        # applies the 2 new migrations (use deploy, NOT "migrate dev")
-cd ..
-```
-
-Run `npm run seed` **only on an empty database** (it prints one-time passwords,
-write them down). Never on one that already has data.
-
-Expected: the output lists `20261014090000_finish_day_snapshots` and
-`20261014100000_extra_column_labels` as applied. Existing data is not changed
-(see "Will my data change?" above). Days finished before this update have no
-saved report, so they show live data until someone finishes them again.
+> If the project already ran in Docker on this PC, keep its existing `.env`. Changing
+> `DB_PASSWORD` or `DB_ROOT_PASSWORD` after the database was created does **not**
+> change the password inside the existing volume, and the API will fail to connect.
 
 ---
 
-## Step 6. Check, build, run
+## Step 5. Data: start empty, or restore a backup
+
+**Do not test on the live database.** Pick one:
+
+**A. Fresh test database (no old data).** After the first start (see "Start it" below):
+```powershell
+docker compose exec api npx tsx prisma/seed.ts
+```
+It prints one-time passwords for `admin`, `online.encoder` and `offline.encoder`.
+**Write them down: they are shown only once.**
+
+**B. A copy of the real data.**
+1. On the machine that holds the data, take a backup: **Settings -> Backup & Restore ->
+   Download Backup**, or from that project folder:
+   ```powershell
+   docker compose exec -T db sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" --single-transaction --routines --triggers --no-tablespaces ala_eh_stocks > /tmp/backup.sql'
+   docker compose cp db:/tmp/backup.sql .\ala-eh-backup.sql
+   ```
+   Check the file ends with a line starting `-- Dump completed`. A file without it
+   is truncated: do not use it.
+2. Copy it to the test PC, start the system once (see "Start it" below), run the seed (A), sign
+   in as `admin`, then **Settings -> Backup & Restore -> Restore** (enter
+   `DATA_RESET_PASSCODE`, wait for "Backup file looks complete", confirm).
+3. `docker compose restart api` so any newer migrations are applied, then sign in with
+   your **old** accounts (the restore replaced the users).
+
+### Start it (builds, applies migrations)
 
 ```powershell
-npm run lint        # expect 0 errors, 0 warnings
-npm test            # expect all server and client tests to pass
-npm run build       # builds the server and the client
+docker compose up -d --build
+docker compose ps                  # db, api, web: running / healthy
+docker compose logs api --tail 30  # should end with "API listening on ..."
 ```
 
-> **If the build stops at `prisma generate` with `EPERM ... query_engine-windows.dll.node`:**
-> a dev server is still running and holds that file. Stop it (Ctrl+C in its
-> terminal, or close the `npm run dev` window), then run the build again.
+The first build takes several minutes. Look for the two new migrations in the API log
+(`20261014090000_finish_day_snapshots`, `20261014100000_extra_column_labels`) the first
+time it starts after this update. Existing data is not changed (see "Will my data change?").
+Days finished before this update have no saved report, so they show live data until
+someone finishes them again.
 
-Run it for testing:
-
-```powershell
-npm run dev          # server on :4000, client on http://localhost:5173
-```
-
-To test the production build the way it runs for real, use Docker instead
-(`SETUP.md` Part C): `docker compose up -d --build`. The API applies migrations
-itself on every start.
+If the build fails, the error is in the build output: fix it, then run
+the same command again (keep the error text if you need help).
 
 ---
 
-## Step 7. Test checklist
+## Step 6. Test checklist
 
-Sign in as `admin` unless noted. Tick each one.
+Open http://localhost:8080 (or your `WEB_PORT`) and sign in as `admin` unless noted. Tick each one.
 
 **Finish day and saved reports**
 - [ ] On Online Entry, fill and **Save** every product in both grids. **Finish day** glows yellow.
@@ -284,16 +283,41 @@ finish, so nothing earlier ever blocks you.
 
 | Symptom | Fix |
 |---|---|
-| Page loads but every request fails (CORS) | `CLIENT_ORIGIN` in `server\.env` must exactly match the address in the browser, no trailing slash. Restart the server. |
-| `EPERM ... query_engine-windows.dll.node` | A running dev server holds the file. Stop `npm run dev`, then retry. |
-| `prisma migrate deploy` says the database is not empty / drift | You used `migrate dev`, or the database came from a very old copy. Restore a recent backup into an empty database, then run `migrate deploy`. |
-| Server refuses to start | `JWT_SECRET` under 32 characters or a placeholder, or `DATA_RESET_PASSCODE` is `000000`. |
-| Tests fail only on `xlsx.test.ts` | They need no workbook (those cases skip if it is missing). If you copied the file, keep its exact name in the project root. |
-| Import says "No sheet in this workbook is dated …" | The sheet is chosen by the date in cell A1. Change the import date to one of the dates listed. |
-| `npm install` errors after a pull | Delete `node_modules` and run `npm install` again. |
+| `docker info` errors | Docker Desktop is not running. Start it, wait until it says "running", retry. |
+| Page loads but every request fails (CORS) | `CLIENT_ORIGIN` in `.env` must exactly match the browser address, no trailing slash. Then `docker compose up -d` again. |
+| `docker compose up` says `set DB_PASSWORD in .env` | `.env` is missing or a value is empty (Step 4). |
+| API keeps restarting / "Access denied" | `DB_PASSWORD` in `.env` differs from the one the existing database volume was created with. Put the old value back, or (only if the data is disposable) `docker compose down -v` and start again. |
+| API refuses to start | `JWT_SECRET` under 32 characters or a placeholder, or `DATA_RESET_PASSCODE` is `000000`. See `docker compose logs api`. |
+| Port 8080 already in use | Set another `WEB_PORT` in `.env`, update `CLIENT_ORIGIN` to match, `docker compose up -d`. |
+| Still the old screens after the update | The browser cached the old app. Hard refresh (Ctrl+Shift+R), or open a private window. |
+| Import says "No sheet in this workbook is dated ..." | The sheet is chosen by the date in cell A1. Change the import date to one of the dates listed. |
+| Migration error in `docker compose logs api` | Do not delete anything. Restore the backup from Step 5, then keep the log lines for help. |
+
+## Useful Docker commands
+
+```powershell
+docker compose ps                       # what is running
+docker compose logs api --tail 50 -f    # follow the API log (Ctrl+C to stop following)
+docker compose restart api              # restart the API (applies new migrations)
+docker compose down                     # stop everything, KEEPS the data
+docker compose up -d --build            # start / rebuild after a pull
+```
+
+Never run `docker compose down -v` on a database you want to keep: `-v` deletes the data.
+
+## Optional: run the checks without Docker
+
+With Node.js installed you can also run the lint and unit tests directly (they do not
+need a database):
+
+```powershell
+npm install
+npm run lint        # expect 0 errors, 0 warnings
+npm test            # expect all server and client tests to pass
+```
 
 ## Rolling back the test PC
 
-The migrations only add things. To return to the old version, check out the old
-commit (`git checkout 5b41179`), run `npm install`, and restore the backup you
-took in Step 5. Do not drop the new tables on a database you want to keep.
+The migrations only add things. To return to the old version: `git checkout 5b41179`,
+`docker compose up -d --build`, and restore the backup you took in Step 5. Do not drop
+the new tables on a database you want to keep.
