@@ -34,6 +34,8 @@ export interface DayClosure {
   unlockedAt: string | null;
   unlockedBy: { id: number; name: string } | null;
   unlockReason: string | null;
+  /// True for an encoder's Finish day: entries are frozen, Manual Counts are not.
+  entriesOnly?: boolean;
 }
 
 export interface CloseReadiness {
@@ -49,6 +51,30 @@ export const listDayClosures = (from?: string, to?: string) => {
 };
 export const getCloseReadiness = (date: string, shift: Shift) =>
   http.get<CloseReadiness>(`/day-closures/readiness?date=${date}&shift=${shift}`);
+export interface DayStatus {
+  entryDate: string;
+  shift: Shift;
+  isClosed: boolean;
+  closure: DayClosure | null;
+  /// An earlier day with saved entries that is not finished yet: it has to be
+  /// finished before this one can be entered. Null when nothing blocks.
+  blockedBy: { entryDate: string; shift: Shift } | null;
+}
+
+export interface FinishSummary {
+  online: { saved: number; total: number };
+  offline: { saved: number; total: number };
+  alreadyFinished: boolean;
+}
+
+/// Open to every role - an encoder has to know a sheet is locked before typing.
+export const getDayStatus = (date: string, shift: Shift) =>
+  http.get<DayStatus>(`/day-closures/status?date=${date}&shift=${shift}`);
+export const getFinishSummary = (date: string, shift: Shift) =>
+  http.get<FinishSummary>(`/day-closures/finish-summary?date=${date}&shift=${shift}`);
+/// The encoder's Finish day: locks the entry grids and saves the Daily Report snapshot.
+export const finishDay = (date: string, shift: Shift) =>
+  http.post<FinishSummary & { finished: boolean }>("/day-closures/finish", { date, shift });
 export const closeDay = (date: string, shift: Shift) => http.post<DayClosure>("/day-closures/close", { date, shift });
 export const unlockDay = (date: string, shift: Shift, reason: string) =>
   http.post<DayClosure>("/day-closures/unlock", { date, shift, reason });

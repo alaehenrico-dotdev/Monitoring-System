@@ -5,7 +5,7 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { productRepository } from "../repositories/productRepository";
 import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
 import { recordChange } from "./changeLog.service";
-import { assertPeriodOpen } from "./dayLock.service";
+import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { isNoopSave } from "../utils/noopSave";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { propagateOpeningStock } from "./manualCounts.service";
@@ -167,6 +167,7 @@ export async function saveOfflineEntry(
   }
 
   await assertPeriodOpen(entryDate, shift, db);
+  await assertEarlierDaysFinished(entryDate, db);
   const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
   const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);

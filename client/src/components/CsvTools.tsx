@@ -3,26 +3,32 @@ import {
   forwardRef,
   useEffect,
   useImperativeHandle,
+  useMemo,
   useRef,
   useState,
 } from "react";
 import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
+import { pickSheetForDate, readXlsx } from "../utils/xlsx";
+import { splitCombinedSheet, type SheetProduct } from "../utils/combinedSheet";
+import { planProductSync } from "../utils/productSync";
+import { syncProducts } from "../api/products";
 import { importHistoryCsv } from "../utils/importHistoryCsv";
 import {
   categoryKey,
   findHeaderRowIndex,
   findMatchingProduct,
   findProductColumnIndex,
+  FUZZY_MATCH_THRESHOLD,
+  fuzzyScore,
   matchColumnIndexes,
-  normalizeForMatch,
   unmatchedColumns,
   type ImportableColumn,
 } from "../utils/importMatch";
 import { downloadExcel, toExcelTable } from "../utils/excel";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
-import { formatDateDisplay, formatRelativeTime } from "../utils/dateFormat";
+import { formatDateDisplay, formatRelativeTime, localDateStamp } from "../utils/dateFormat";
 import type { Product, Shift, StockLocation } from "../types";
 import { DatePicker } from "./DatePicker";
 import { Dropdown } from "./Dropdown";
@@ -47,6 +53,7 @@ import { Toast, type ToastVariant } from "./Toast";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { LoadingOverlay, Spinner } from "./Spinner";
 import { Modal } from "./Modal";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { PendingChangesPreview } from "./PendingChangesPreview";
 import type { PendingChangeDetail } from "../hooks/usePendingEntryChanges";
 import { Button } from "./ui";
@@ -73,6 +80,10 @@ interface MatchedImportRow {
   /// (see validateImport's own doc comment on CsvToolsProps) - purely a
   /// heads-up so the eventual save failure isn't a surprise.
   warning?: string;
+  /// A count the file leaves blank, read as 0 (blankAsZero). Flagged in the
+  /// Review modal: at a starting count, a blank cell is far more likely "not
+  /// counted" than "counted as none", and saving it would start the product at 0.
+  fromBlank?: boolean;
 }
 
 /// One row of the Review modal's unmatched list - every row that failed to
@@ -92,6 +103,12 @@ interface ImportReview {
   /// anywhere in this file's header row at all (see unmatchedColumns) -
   /// distinct from a column that matched but had a blank cell for one row.
   missingColumns: string[];
+  /// Rows of a combined Online + Offline file that belong to the other
+  /// location and were not read (0 for a plain file).
+  skippedOtherSection: number;
+  /// Every product in a consolidated sheet, in the sheet's order - what the
+  /// product list can be synced to (empty for any other file).
+  sheetProducts: SheetProduct[];
 }
 
 /// Everything handleConfirmImport/acceptSuggestion need to re-derive a diff
@@ -129,43 +146,6 @@ interface ImportBatch {
 /// can't just be inferred locally.
 export interface CsvToolsHandle {
   notifyCommitted: () => void;
-}
-
-function levenshtein(a: string, b: string): number {
-  if (a.length === 0) return b.length;
-  if (b.length === 0) return a.length;
-  const prevRow = new Array<number>(b.length + 1);
-  for (let j = 0; j <= b.length; j++) prevRow[j] = j;
-  for (let i = 1; i <= a.length; i++) {
-    let prevDiag = prevRow[0];
-    prevRow[0] = i;
-    for (let j = 1; j <= b.length; j++) {
-      const temp = prevRow[j];
-      prevRow[j] =
-        a[i - 1] === b[j - 1]
-          ? prevDiag
-          : 1 + Math.min(prevDiag, prevRow[j], prevRow[j - 1]);
-      prevDiag = temp;
-    }
-  }
-  return prevRow[b.length];
-}
-
-/// A minimum similarity below which a "did you mean" suggestion does more
-/// harm than good (attaching a receipt-style edit to an unrelated SKU).
-const FUZZY_MATCH_THRESHOLD = 0.6;
-
-/// Tolerant similarity used only for the Review modal's suggestion on an
-/// unmatched row - normalizeForMatch's exact equality (the real match used
-/// during parsing) is deliberately strict so a row is never silently
-/// attached to the wrong SKU; this is purely to help a human decide, never
-/// applied automatically.
-function fuzzyScore(a: string, b: string): number {
-  const na = normalizeForMatch(a);
-  const nb = normalizeForMatch(b);
-  if (!na || !nb) return 0;
-  if (na === nb) return 1;
-  return 1 - levenshtein(na, nb) / Math.max(na.length, nb.length);
 }
 
 function bestFuzzyMatch(
@@ -253,6 +233,11 @@ interface CsvToolsProps {
   /// Online/Offline Entry behavior). Manual Count passes ["manualCount"] so
   /// it reads that column and never Remaining Stock.
   importKeys?: string[];
+  /// Supervisor/Admin: a consolidated sheet may add its new products and apply
+  /// its category/product order from the Review modal. Others see what differs.
+  canManageProducts?: boolean;
+  /// Called after the product list was changed so the page reloads its rows.
+  onProductsChanged?: () => void;
   /// When true, a blank cell in an imported column counts as 0 instead of
   /// being skipped, and a value is "changed" whenever the current one is
   /// unset (null) or different - so a confirmed 0 is still staged.
@@ -411,6 +396,8 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
       importLocations,
       importTodayValue,
       importKeys = ["openingStock"],
+      canManageProducts = false,
+      onProductsChanged,
       blankAsZero = false,
       showExport = true,
       showPdf = true,
@@ -433,6 +420,33 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
     // own in-flight flag rather than one covering both.
     const [importReview, setImportReview] = useState<ImportReview | null>(null);
     const [savingImport, setSavingImport] = useState(false);
+    // Product sync from a consolidated sheet (see the Review modal).
+    const [confirmSync, setConfirmSync] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+    // New sheet rows the admin said are an existing product (row key -> id):
+    // that product is renamed to the sheet's spelling instead of a duplicate
+    // being added.
+    const [links, setLinks] = useState<Record<string, number>>({});
+    // The file being reviewed, so it can be read again once the product list
+    // changed (new products can then match), and the product list it was read
+    // against.
+    const reviewFileRef = useRef<File | null>(null);
+    const reimportRef = useRef<{ file: File; signature: string } | null>(null);
+    const rowsSignature = rows
+      .map((r) => `${r.product.id}:${r.product.category}:${r.product.name}`)
+      .join("|");
+    const syncPlan = useMemo(
+      () =>
+        importReview && importReview.sheetProducts.length > 0
+          ? planProductSync(
+              importReview.sheetProducts,
+              rows.map((r) => r.product),
+              links,
+            )
+          : null,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [importReview?.sheetProducts, rowsSignature, links],
+    );
     // Same full-screen percent ring the pages' own Save uses (LoadingOverlay),
     // so importing, undoing an import and saving all look identical.
     const [overlay, setOverlay] = useState<{
@@ -595,14 +609,51 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
       return changes;
     }
 
+    /// Whether any imported cell of this line is blank (and so read as 0).
+    function hasBlankCell(
+      line: string[],
+      columnIndexes: { key: string; idx: number }[],
+    ): boolean {
+      return (
+        blankAsZero &&
+        columnIndexes.some(({ idx }) => (line[idx] ?? "").trim() === "")
+      );
+    }
+
     async function handleImportFile(file: File) {
       setBusy(true);
       setMessage(null);
       setShowUndoImport(false);
       try {
-        const text = await file.text();
-        const table = parseCsv(text);
-        if (table.length < 2) throw new Error("File has no data rows");
+        // A .xlsx is read straight from the workbook (the daily consolidated
+        // file has one sheet per day - the one dated like the import target is
+        // used); anything else is CSV text.
+        const parsed = /\.xlsx$/i.test(file.name)
+          ? pickSheetForDate(
+              await readXlsx(await file.arrayBuffer()),
+              importTarget?.date,
+            ).rows
+          : parseCsv(await file.text());
+        if (parsed.length < 2) throw new Error("File has no data rows");
+
+        // A combined Online + Offline workbook holds both tables in one sheet;
+        // read only the section for the location being imported, and say what
+        // was left out. A plain single-table file passes through unchanged.
+        const importLocation =
+          importTarget?.location === "ONLINE" ||
+          importTarget?.location === "OFFLINE"
+            ? importTarget.location
+            : null;
+        const split = importLocation
+          ? splitCombinedSheet(parsed, importLocation)
+          : null;
+        if (split?.combined && split.table.length < 2) {
+          throw new Error(
+            `This file has no ${importLocation} section (found: ${split.sectionsFound.join(", ")}). Pick the matching location and try again.`,
+          );
+        }
+        const table = split?.combined ? split.table : parsed;
+        const skippedOtherSection = split?.combined ? split.skippedRows : 0;
 
         // See findHeaderRowIndex's own doc comment: a file that's been
         // round-tripped through Excel (or had a title/blank row pasted above
@@ -721,6 +772,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             category: match.product.category,
             changes,
             warning: validateImport?.(match.product.id, changes),
+            fromBlank: hasBlankCell(line, columnIndexes),
           });
         }
 
@@ -734,10 +786,15 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
           fileName: file.name,
         };
         setReviewLabel(importTarget ? describeTarget(importTarget) : null);
+        reviewFileRef.current = file;
+        setLinks({});
         setImportReview({
           matchedRows,
           unmatchedRows,
           missingColumns: missingColumns.map((c) => c.label),
+          skippedOtherSection,
+          sheetProducts:
+            split?.layout === "side-by-side" ? (split.products ?? []) : [],
         });
       } catch (err) {
         setMessage(
@@ -751,6 +808,51 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
         setBusy(false);
       }
     }
+
+    /// The admin's confirmed "add new products and apply the order of the
+    /// sheet": one server call, then the same file is read again against the
+    /// updated product list so the new products match (the page reloads its
+    /// rows when the server announces the change - see the effect below).
+    async function handleSyncProducts() {
+      const file = reviewFileRef.current;
+      if (!syncPlan || !file) return;
+      setSyncing(true);
+      try {
+        const result = await syncProducts(syncPlan.items);
+        setConfirmSync(false);
+        setImportReview(null);
+        setMessage(
+          `Product list updated: ${result.created} added, ${result.moved} changed, order applied. Reading the file again…`,
+        );
+        setMessageVariant("info");
+        reimportRef.current = { file, signature: rowsSignature };
+        onProductsChanged?.();
+        // Nothing changed in the list: there is nothing to wait for.
+        if (!result.created && !result.moved && !result.reordered) {
+          reimportRef.current = null;
+          void handleImportFile(file);
+        }
+      } catch (err) {
+        setConfirmSync(false);
+        setMessage(
+          err instanceof Error
+            ? `Could not update the product list: ${err.message}`
+            : "Could not update the product list",
+        );
+        setMessageVariant("error");
+      } finally {
+        setSyncing(false);
+      }
+    }
+
+    // Once the page rows reflect the synced product list, read the file again.
+    useEffect(() => {
+      const pending = reimportRef.current;
+      if (!pending || pending.signature === rowsSignature) return;
+      reimportRef.current = null;
+      void handleImportFile(pending.file);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rowsSignature]);
 
     /// Moves one unmatched row onto the matched list using the destination the
     /// user picked from its fuzzy suggestion - re-running the same "only
@@ -786,6 +888,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 category: product.category,
                 changes,
                 warning: validateImport?.(product.id, changes),
+                fromBlank: hasBlankCell(line, context.columnIndexes),
               },
             ]
           : prev.matchedRows;
@@ -1088,7 +1191,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 style={{ display: "none" }}
                 onChange={(e) => {
                   const file = e.target.files?.[0];
@@ -1246,6 +1349,35 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             width={760}
           >
             {reviewLabel && <ImportTargetBanner label={reviewLabel} />}
+            {importReview.matchedRows.some((r) => r.fromBlank) && (
+              <div
+                role="alert"
+                style={{
+                  margin: "0 0 12px",
+                  padding: "10px 12px",
+                  borderRadius: 10,
+                  border: `1px solid ${colors.border}`,
+                  fontSize: 12.5,
+                  color: colors.warningText,
+                }}
+              >
+                <strong>
+                  {importReview.matchedRows.filter((r) => r.fromBlank).length}{" "}
+                  row(s) have no count in this file and will be saved as 0.
+                </strong>{" "}
+                If they were simply not counted, a 0 would start those products
+                at zero stock. Check them before saving:{" "}
+                {importReview.matchedRows
+                  .filter((r) => r.fromBlank)
+                  .slice(0, 6)
+                  .map((r) => r.productName)
+                  .join(", ")}
+                {importReview.matchedRows.filter((r) => r.fromBlank).length > 6
+                  ? ", …"
+                  : ""}
+                .
+              </div>
+            )}
             <PendingChangesPreview
               showTotal
               items={importReview.matchedRows.flatMap(
@@ -1305,6 +1437,21 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 </ul>
               </div>
             )}
+            {importReview.skippedOtherSection > 0 && (
+              <p
+                style={{
+                  margin: "12px 0 0",
+                  fontSize: 12.5,
+                  color: colors.subtleInk,
+                }}
+              >
+                Combined Online + Offline file: read the{" "}
+                {importTarget?.location} section only.{" "}
+                {importReview.skippedOtherSection} row(s) from the other
+                section were skipped - import again with the other location to
+                read them.
+              </p>
+            )}
             {importReview.missingColumns.length > 0 && (
               <p
                 style={{
@@ -1316,6 +1463,114 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 Not found in this file, left unchanged:{" "}
                 {importReview.missingColumns.join(", ")}.
               </p>
+            )}
+            {syncPlan && !syncPlan.inSync && (
+              <div
+                role="region"
+                aria-label="Product list differs from this sheet"
+                style={{
+                  marginTop: 18,
+                  padding: "12px 14px",
+                  borderRadius: 10,
+                  border: `1px solid ${colors.border}`,
+                  fontSize: 12.5,
+                }}
+              >
+                <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.ink }}>
+                  The product list differs from this sheet
+                </h4>
+                <p style={{ margin: "0 0 8px", color: colors.subtleInk }}>
+                  {[
+                    syncPlan.toCreate.length > 0 &&
+                      `${syncPlan.toCreate.length} new product${syncPlan.toCreate.length === 1 ? "" : "s"} (added with no SKU, shown as a dash)`,
+                    syncPlan.toRename.length > 0 &&
+                      `${syncPlan.toRename.length} renamed to the sheet's spelling`,
+                    syncPlan.toMove.length > 0 &&
+                      `${syncPlan.toMove.length} under a different category`,
+                    syncPlan.reordered > 0 &&
+                      `${syncPlan.reordered} in a different order`,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {(syncPlan.toCreate.length > 0 ||
+                  syncPlan.toMove.length > 0 ||
+                  syncPlan.toRename.length > 0) && (
+                  <ul
+                    style={{
+                      margin: "0 0 10px",
+                      paddingLeft: 18,
+                      maxHeight: 130,
+                      overflowY: "auto",
+                      color: colors.ink,
+                    }}
+                  >
+                    {syncPlan.toCreate.map((i) => (
+                      <li key={`n-${i.key}`}>
+                        <strong>New:</strong> {i.name}{" "}
+                        <span style={{ color: colors.subtleInk }}>
+                          in {i.category}
+                        </span>
+                        {canManageProducts &&
+                          i.suggestions.map((sg) => (
+                            <button
+                              key={sg.id}
+                              type="button"
+                              className="ae-btn ae-btn-secondary ae-btn-sm"
+                              style={{ marginLeft: 6 }}
+                              title="Keep the SKU and history of the existing product and rename it to the spelling in this sheet"
+                              onClick={() =>
+                                setLinks((l) => ({ ...l, [i.key]: sg.id }))
+                              }
+                            >
+                              Same as “{sg.name}” ({sg.category}
+                              {sg.sku ? ` · ${sg.sku}` : ""})
+                            </button>
+                          ))}
+                      </li>
+                    ))}
+                    {syncPlan.toRename.map((r) => (
+                      <li key={`r-${r.key}`}>
+                        <strong>Rename:</strong> {r.from} → {r.to}{" "}
+                        <button
+                          type="button"
+                          className="ae-btn ae-btn-secondary ae-btn-sm"
+                          style={{ marginLeft: 6 }}
+                          onClick={() =>
+                            setLinks(({ [r.key]: _drop, ...rest }) => rest)
+                          }
+                        >
+                          Undo
+                        </button>
+                      </li>
+                    ))}
+                    {syncPlan.toMove.map((m) => (
+                      <li key={`m-${m.name}-${m.to}`}>
+                        <strong>Move:</strong> {m.name}{" "}
+                        <span style={{ color: colors.subtleInk }}>
+                          {m.from} → {m.to}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {canManageProducts ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => setConfirmSync(true)}
+                    disabled={savingImport || syncing}
+                  >
+                    Add new products and apply the order of the sheet
+                  </Button>
+                ) : (
+                  <span style={{ color: colors.subtleInk }}>
+                    Only a Supervisor/Admin can change the product list. Rows
+                    for new products stay unmatched until then.
+                  </span>
+                )}
+              </div>
             )}
             {importReview.unmatchedRows.length > 0 && (
               <div style={{ marginTop: 18 }}>
@@ -1368,6 +1623,21 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             </div>
           </Modal>
         )}
+        {confirmSync && syncPlan && (
+          <ConfirmDialog
+            title="Update the product list?"
+            confirmLabel="Update products"
+            busy={syncing}
+            onConfirm={() => void handleSyncProducts()}
+            onCancel={() => setConfirmSync(false)}
+          >
+            This changes the shared product list for everyone:{" "}
+            {syncPlan.toCreate.length} added (no SKU), {syncPlan.toMove.length}{" "}
+            moved to another category, and every category and product put in
+            the order of this sheet. Nothing is deleted, and the changes are
+            recorded in the Change Log.
+          </ConfirmDialog>
+        )}
         {showHistory && (
           <Modal
             title="Import History"
@@ -1403,7 +1673,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                   size="sm"
                   onClick={() =>
                     downloadCsv(
-                      `import-history-${new Date().toISOString().slice(0, 10)}.csv`,
+                      `import-history-${localDateStamp()}.csv`,
                       importHistoryCsv(historyBatches),
                     )
                   }

@@ -29,6 +29,7 @@ import {
   recordLabel,
   startOfDayIso,
 } from "../utils/changeLogLabel";
+import { localDateStamp } from "../utils/dateFormat";
 import { saveBlob } from "../utils/saveBlob";
 import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
@@ -56,6 +57,8 @@ const EVENT_LABELS: Record<string, string> = {
   login_failed: "Failed sign-in",
   backup_download: "Database backup downloaded",
   backup_restore: "Database restored from a backup",
+  extra_column_label: "Added column renamed",
+  product_sync: "Product list updated from a sheet",
 };
 
 function changeEventLabel(entry: ChangeLogEntry): string {
@@ -175,7 +178,7 @@ export function ChangeLogPage() {
         // BOM so Excel reads the "→" in "What changed" as UTF-8.
         saveBlob(
           new Blob(["﻿", blob], { type: "text/csv;charset=utf-8" }),
-          "change-log.csv",
+          `change-log-${localDateStamp()}.csv`,
         ),
       )
       .catch((reason: unknown) => {

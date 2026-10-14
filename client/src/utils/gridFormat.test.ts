@@ -4,6 +4,7 @@ import {
   formatPercentOfTotal,
   isUnusualJump,
   isValidStockValue,
+  sumRounded,
   ZERO_DASH,
 } from "./gridFormat";
 
@@ -76,5 +77,14 @@ describe("isUnusualJump", () => {
 
   it("ignores an ordinary day-to-day change", () => {
     expect(isUnusualJump(1300, 1200)).toBe(false);
+  });
+});
+
+describe("sumRounded", () => {
+  it("removes float noise and never yields -0", () => {
+    expect(sumRounded([0.1, 0.2])).toBe(0.3);
+    expect(Object.is(sumRounded([0.7, 0.1, -0.8]), 0)).toBe(true);
+    expect(sumRounded([])).toBe(0);
+    expect(sumRounded([1234.5, 0.25])).toBe(1234.75);
   });
 });

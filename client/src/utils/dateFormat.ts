@@ -1,3 +1,12 @@
+/// Today's LOCAL calendar date as "YYYY-MM-DD", for stamping file names.
+/// Never `toISOString().slice(0, 10)`: that is the UTC date, which is the
+/// previous day for the first hours of every day in this app's Asia/Manila
+/// timezone.
+export function localDateStamp(now: Date = new Date()): string {
+  const pad = (v: number) => String(v).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 /// Formats a "YYYY-MM-DD" string for display (e.g. "September 11, 2026").
 /// Built from the date-string parts rather than `new Date(dateStr)` +
 /// `toLocaleDateString()` directly - parsing a bare "YYYY-MM-DD" string

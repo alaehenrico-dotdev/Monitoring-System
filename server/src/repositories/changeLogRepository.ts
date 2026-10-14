@@ -32,6 +32,9 @@ export interface ChangeLogFilters {
 /// Generated-report rows (written by reportHistory.service).
 export const REPORTS_TABLE = "reports";
 
+/// A finished day's saved Daily Report (written by dailyReportSnapshot.service).
+export const SNAPSHOT_TABLE = "daily_report_snapshots";
+
 /// Tables whose snapshots carry a productId; for "products" the record IS the product.
 const STOCK_TABLES = ["daily_online_stock", "daily_offline_stock", "manual_counts"];
 

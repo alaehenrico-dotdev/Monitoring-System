@@ -8,6 +8,7 @@ import { matchesSearch } from "../utils/search";
 import { describe, parseDay } from "../utils/reportHistoryText";
 import { reportHistoryCsv } from "../utils/reportHistoryCsv";
 import { downloadCsv } from "../utils/csv";
+import { localDateStamp } from "../utils/dateFormat";
 import { CalendarIcon, ClockIcon, DownloadIcon, HistoryIcon } from "../components/icons";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
 import { PageHeader } from "../components/PageHeader";
@@ -134,7 +135,7 @@ export function ReportHistoryPage({
               disabled={visible.length === 0}
               onClick={() =>
                 downloadCsv(
-                  `${type.toLowerCase().replace(/\s+/g, "-")}-history-${new Date().toISOString().slice(0, 10)}.csv`,
+                  `${type.toLowerCase().replace(/\s+/g, "-")}-history-${localDateStamp()}.csv`,
                   reportHistoryCsv(visible),
                 )
               }

@@ -51,6 +51,17 @@ function isoDate(d: Date): string {
  * rather than the one that hasn't opened yet, so a supervisor checking in
  * before opening sees last night's numbers instead of an empty Morning grid.
  */
+/// The sheet the audit (Manual Count) opens on. Counting is done per night, so
+/// the default is always a Night sheet: tonight's from 4pm, otherwise the most
+/// recent one that has finished (before 7am that is last night's already, and
+/// during the morning shift it is yesterday's).
+export function getDefaultAuditSheet(now: Date = new Date()): { shift: Shift; date: string } {
+  const current = getCurrentShiftAndDate(now);
+  if (current.shift === "NIGHT") return current;
+  const [y, m, d] = current.date.split("-").map(Number);
+  return { shift: "NIGHT", date: isoDate(new Date(y, m - 1, d - 1)) };
+}
+
 export function getCurrentShiftAndDate(now: Date = new Date()): { shift: Shift; date: string } {
   const hour = now.getHours();
 

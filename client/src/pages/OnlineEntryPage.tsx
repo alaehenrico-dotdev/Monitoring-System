@@ -9,6 +9,8 @@ import { Button } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { DayLockBanner, FinishDayButton, FinishEarlierDayBanner } from "../components/FinishDay";
+import { useDayLock } from "../hooks/useDayLock";
 import { PageHeader } from "../components/PageHeader";
 import {
   ClearIcon,
@@ -38,7 +40,6 @@ import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
 import { CopyPreviousButton } from "../components/CopyPreviousButton";
 import { invalidateRecordHistory } from "../utils/cellHistory";
-import { ExtraSaveModes } from "../components/ExtraSaveModes";
 import { ConflictResolution } from "../components/ConflictResolution";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 import {
@@ -50,11 +51,12 @@ import { onlineStockColumns as columns } from "../config/stockColumns";
 import {
   columnsWithExtras,
   flattenExtraPayload,
+  extraColumnKey,
   MAX_EXTRAS_PER_COLUMN,
-  useExtraSaveModes,
   useGridExtraColumns,
   withoutExtraColumns,
 } from "../hooks/useExtraColumns";
+import { useExtraLabels } from "../hooks/useExtraLabels";
 import { matchesSearch } from "../utils/search";
 import {
   matchesRowFilter,
@@ -163,10 +165,15 @@ export function OnlineEntryPage() {
   const [importedBatchByProduct, setImportedBatchByProduct] = useState<
     Record<number, number>
   >({});
-  const canEdit =
+  const roleCanEdit =
     user?.role === "ONLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
   const { online, reconnects } = useOnlineStatus();
+  // A finished day is frozen: the sheet opens read-only with its saved state
+  // (the server refuses writes to it too - see assertPeriodOpen).
+  const dayLock = useDayLock(date, shift, `${realtimeVersion}:${reconnects}`);
+  // Read-only while an earlier day still has to be finished (days go in order).
+  const canEdit = roleCanEdit && !dayLock.locked && !dayLock.blockedBy;
 
   // Cell edits are staged here instead of hitting the save endpoint
   // immediately - Save (below) flushes them all at once, and Preview shows
@@ -239,11 +246,10 @@ export function OnlineEntryPage() {
     extras,
     addColumns,
     removeColumns,
-    clearColumns,
+    markSaved,
     commitExtraCell,
     withExtraTotals,
     buildSavePayload,
-    saveColumns: extraSaveColumns,
     extraColumnDefs,
   } = useGridExtraColumns({
     storageKey: `ala-eh-extracols:online:${date}:${shift}`,
@@ -253,8 +259,8 @@ export function OnlineEntryPage() {
     getSavedValue,
     columns,
   });
-  const { getMode: getExtraSaveMode, setMode: setExtraSaveMode } =
-    useExtraSaveModes("online");
+
+  const extraLabels = useExtraLabels("ONLINE", date, shift, setError);
 
   function handleAddExtraColumns(mainKey: string, count: number) {
     if (addColumns(mainKey, count) === 0)
@@ -384,7 +390,7 @@ export function OnlineEntryPage() {
     edits: { productId: number; key: string; value: number }[],
   ) {
     // withExtraTotals re-totals any main column whose added columns this
-    // batch touched (Zero all over a category), so the sum can never drift
+    // batch touched (Clear all over a category), so the sum can never drift
     // from the amounts behind it.
     stageMany(
       withExtraTotals(
@@ -449,20 +455,12 @@ export function OnlineEntryPage() {
 
       try {
         const { [MANUAL_COUNT_KEY]: manualCount, ...staged } = changes;
-        // "Save total only": an added column's own amount is draft state, and
-        // the main column is already staged as the sum of them, so only that
-        // sum is submitted. (Storing the amounts individually is Phase 2 -
-        // see ExtraSaveModes' disabled option.)
+        // An added column's own amount is draft state; the main column is
+        // already staged as the sum of them. The amounts themselves travel in
+        // `extras` below so the columns come back after a reload.
         const entryChanges = withoutExtraColumns(staged);
-        // Per-column choice from the Save dialog: "individually" sends each
-        // added column's amount so it comes back after a reload, "total
-        // only" names the column so any amounts the server still holds for
-        // it are dropped. The main column's total is in entryChanges either
-        // way, and the server recomputes it from these amounts regardless.
-        const { extras: extraPayload, clearExtraColumns } = buildSavePayload(
-          productId,
-          (mainKey) => getExtraSaveMode(mainKey) === "individual",
-        );
+        const { extras: extraPayload, clearExtraColumns } =
+          buildSavePayload(productId);
         if (
           Object.keys(entryChanges).length > 0 ||
           extraPayload.length > 0 ||
@@ -522,15 +520,8 @@ export function OnlineEntryPage() {
     if (failed.length) {
       setError(`Failed to save: ${failed.join("; ")}`);
     }
-    // "Save total only": the amounts are now part of the saved main
-    // column, so the columns that held them have nothing left to show.
-    // Columns saved individually keep theirs - that is the whole point.
-    if (failed.length === 0)
-      clearColumns(
-        extraSaveColumns
-          .filter((c) => getExtraSaveMode(c.mainKey) !== "individual")
-          .map((c) => c.mainKey),
-      );
+    // Deleted columns are gone from the server now too.
+    if (failed.length === 0) markSaved();
     return failed.length === 0;
   }
 
@@ -746,6 +737,16 @@ export function OnlineEntryPage() {
               <ReportIcon />
               <span className="ae-toolbar-btn-label">Report</span>
             </Button>
+            {!dayLock.locked && dayLock.loaded && !dayLock.blockedBy && (
+              <FinishDayButton
+                date={date}
+                shift={shift}
+                disabled={pendingCount > 0}
+                disabledReason="Save or discard your changes first - they would be locked out"
+                onFinished={dayLock.refresh}
+                onError={setError}
+              />
+            )}
             <ZoomControl zoom={zoom} onChange={setZoom} />
           </ToolbarControls>
         </Toolbar>
@@ -766,6 +767,20 @@ export function OnlineEntryPage() {
         variant="error"
         duration={null}
       />
+      {dayLock.blockedBy && !dayLock.locked && (
+        <FinishEarlierDayBanner
+          blockedBy={dayLock.blockedBy}
+          onGo={(d, s) => setDateShift({ date: d, shift: s })}
+        />
+      )}
+      {dayLock.locked && (
+        <DayLockBanner
+          date={date}
+          shift={shift}
+          closure={dayLock.closure}
+          isAdmin={user?.role === "SUPERVISOR_ADMIN"}
+        />
+      )}
       <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
       {!rows ? (
         <TableSkeleton
@@ -798,13 +813,24 @@ export function OnlineEntryPage() {
             onAnyExpandedChange={setAnyCatExpanded}
             extraColumns={extras}
             onAddExtraColumns={canEdit ? handleAddExtraColumns : undefined}
-            onRemoveExtraColumns={canEdit ? removeColumns : undefined}
+            onRemoveExtraColumns={
+              canEdit
+                ? (mainKey, slots) => {
+                    removeColumns(mainKey, slots);
+                    for (const slot of slots)
+                      extraLabels.clear(extraColumnKey(mainKey, slot));
+                  }
+                : undefined
+            }
+            extraNames={extraLabels.names}
+            onExtraNameChange={canEdit ? extraLabels.change : undefined}
+            onExtraNameCommit={canEdit ? extraLabels.commit : undefined}
             historyTable="daily_online_stock"
             colorScope="online"
           />
         </div>
       )}
-      {!canEdit && (
+      {!roleCanEdit && (
         <p style={{ fontSize: 12, color: colors.subtleInk, marginTop: 8 }}>
           Read-only: your role can view but not edit Online entries.
         </p>
@@ -813,12 +839,6 @@ export function OnlineEntryPage() {
         <Modal title="Unsaved changes" onClose={() => setShowPreview(false)}>
           <PendingChangesPreview
             items={describePendingChanges(rows, pending, previewColumns)}
-          />
-          <ExtraSaveModes
-            columns={extraSaveColumns}
-            getMode={getExtraSaveMode}
-            onChange={setExtraSaveMode}
-            individualEnabled
           />
           <div
             style={{

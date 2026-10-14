@@ -38,13 +38,16 @@ export const manualCountRepository = {
   /// period's opening stock whether or not a daily row exists for the
   /// counted period, so this is looked up on its own.
   findLatestBefore(productId: number, entryDate: Date, shift: Shift, location: StockLocation, db: Db = prisma) {
+    // A published count is the opening stock of the NEXT DAY only: it feeds
+    // that date's Morning shift, never a Night shift.
+    if (shift === "NIGHT") return Promise.resolve(null);
     return db.manualCount.findFirst({
       where: {
         productId,
         location,
         // Only a published count carries forward.
         publishedAt: { not: null },
-        OR: shift === "NIGHT" ? [{ entryDate: { lt: entryDate } }, { entryDate, shift: "MORNING" }] : [{ entryDate: { lt: entryDate } }],
+        entryDate: { lt: entryDate },
       },
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       select: { entryDate: true, shift: true, manualCount: true },
@@ -53,13 +56,13 @@ export const manualCountRepository = {
 
   /// Batched findLatestBefore - one latest count per product.
   findLatestBeforeForProducts(productIds: number[], entryDate: Date, shift: Shift, location: StockLocation) {
-    if (!productIds.length) return Promise.resolve([]);
+    if (!productIds.length || shift === "NIGHT") return Promise.resolve([]);
     return prisma.manualCount.findMany({
       where: {
         productId: { in: productIds },
         location,
         publishedAt: { not: null },
-        OR: shift === "NIGHT" ? [{ entryDate: { lt: entryDate } }, { entryDate, shift: "MORNING" }] : [{ entryDate: { lt: entryDate } }],
+        entryDate: { lt: entryDate },
       },
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       distinct: ["productId"],

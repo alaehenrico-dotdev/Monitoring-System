@@ -120,7 +120,7 @@ export function VarianceReportPage() {
   // Keep an already-generated report live - same guarded re-run as
   // DailyReportPage, only while a report is already on screen.
   useEffect(() => {
-    if (rows) void runReport();
+    if (rows) void runReport(undefined, { auto: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [realtimeVersion]);
 
@@ -133,7 +133,9 @@ export function VarianceReportPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows]);
 
-  async function runReport(e?: FormEvent) {
+  // `auto` is a realtime refresh of a report already on screen - it must not
+  // add another history entry every time someone else saves.
+  async function runReport(e?: FormEvent, { auto = false } = {}) {
     e?.preventDefault();
     setError(null);
     const id = ++requestId.current;
@@ -166,6 +168,19 @@ export function VarianceReportPage() {
         throw new Error(
           "The server returned a variance for a different date than the one selected.",
         );
+      }
+      // Running the report is what goes in the history - including a date with
+      // no variances (that is itself a result worth keeping) - not only a
+      // successful PDF download. Skipped when opened from the history (its
+      // entry already exists) and for realtime refreshes.
+      if (!auto && searchParams.get("history") !== "1") {
+        const params = new URLSearchParams({ history: "1", date: requestedDate });
+        if (category) params.set("category", category);
+        recordReportHistory({
+          type: "Variance Report",
+          scope: requestedDate,
+          route: `/variance-report?${params}`,
+        }).catch(() => {});
       }
       if (data.length === 0) {
         setEmptyMessage("No variances found for this date.");
@@ -220,17 +235,6 @@ export function VarianceReportPage() {
           ],
         }),
       );
-      // Only once the PDF has actually been saved - and not when it was opened
-      // from Report History, where it is already listed. Best effort.
-      if (searchParams.get("history") !== "1") {
-        const params = new URLSearchParams({ history: "1", date });
-        if (category) params.set("category", category);
-        recordReportHistory({
-          type: "Variance Report",
-          scope: date,
-          route: `/variance-report?${params}`,
-        }).catch(() => {});
-      }
     } catch (err) {
       setError(
         err instanceof Error ? `PDF failed: ${err.message}` : "PDF failed",

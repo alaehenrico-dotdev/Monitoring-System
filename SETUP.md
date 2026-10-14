@@ -195,15 +195,41 @@ docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" ala_eh_st
 docker compose restart api
 ```
 
-### C5. Open it
-- On this PC: http://localhost:8080
-- On other PCs: `http://<this-PC's-IP>:8080`
+### C5. Open it from other devices (and open the firewall)
 
-If other PCs cannot connect, allow the port in Windows Firewall (run PowerShell
-**as Administrator**):
+1. **Find this PC's address** (the one on the office network, not `172.x` or `127.x`):
+   ```powershell
+   Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -like "192.168.*" -or $_.IPAddress -like "10.*" } | Select-Object IPAddress, InterfaceAlias
+   ```
+2. **Put that address in `.env`** and apply it (a wrong value gives CORS errors):
+   ```
+   CLIENT_ORIGIN=http://192.168.1.50:8080
+   ```
+   ```powershell
+   docker compose up -d
+   ```
+3. **Open the firewall** (PowerShell **as Administrator**):
+   ```powershell
+   New-NetFirewallRule -DisplayName "Ala Eh system" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow -Profile Private,Domain
+   ```
+   Make sure this PC's network is **Private**, because the rule above does not apply
+   to Public networks:
+   ```powershell
+   Get-NetConnectionProfile                                   # check NetworkCategory
+   Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private   # use the name shown above
+   ```
+4. **Open it on the other device** (phone, laptop or another PC on the same
+   Wi-Fi/LAN): `http://192.168.1.50:8080` (your address from step 1).
+
+Quick tests from the host PC if it does not work:
 ```powershell
-New-NetFirewallRule -DisplayName "Ala Eh system" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow
+Test-NetConnection 192.168.1.50 -Port 8080     # TcpTestSucceeded should be True
+Get-NetFirewallRule -DisplayName "Ala Eh system" | Select-Object DisplayName, Enabled, Profile
 ```
+To close it again: `Remove-NetFirewallRule -DisplayName "Ala Eh system"`.
+
+Give this PC a fixed address (a DHCP reservation in the router), otherwise the
+address, and so `CLIENT_ORIGIN`, can change after a reboot.
 
 ### C6. Smoke test (5 minutes)
 - [ ] Sign in as admin.

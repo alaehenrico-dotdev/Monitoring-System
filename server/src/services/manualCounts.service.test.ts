@@ -35,6 +35,7 @@ vi.mock("../repositories/dailyOnlineStockRepository", () => ({
     findNext: vi.fn(),
     getOpeningStock: vi.fn(),
     getOpeningStocksForProducts: vi.fn(),
+    productIdsWithRowsAfterDate: vi.fn(),
     upsert: vi.fn(),
   },
 }));
@@ -45,6 +46,7 @@ vi.mock("../repositories/dailyOfflineStockRepository", () => ({
     findNext: vi.fn(),
     getOpeningStock: vi.fn(),
     getOpeningStocksForProducts: vi.fn(),
+    productIdsWithRowsAfterDate: vi.fn(),
     upsert: vi.fn(),
   },
 }));
@@ -390,6 +392,8 @@ describe("publishing counts", () => {
     vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE"), pending(2, 11, "OFFLINE")] as never);
     vi.mocked(manualCountRepository.markPublished).mockImplementation(((id: number) => Promise.resolve({ id, publishedAt: new Date() })) as never);
     vi.mocked(recordChange).mockResolvedValueOnce(101).mockResolvedValueOnce(102);
+    vi.mocked(dailyOnlineStockRepository.productIdsWithRowsAfterDate).mockResolvedValue(new Set([10]));
+    vi.mocked(dailyOfflineStockRepository.productIdsWithRowsAfterDate).mockResolvedValue(new Set());
     // A later saved Online period for product 10 still holds the old opening.
     const next = { id: 9, entryDate: new Date("2026-06-16T00:00:00.000Z"), shift: "MORNING", openingStock: 100, stockInOffToOl: 0, stockOutOlToOff: 0, productionIn: 0, fulfillmentOut: 0, rts: 0 };
     vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValueOnce(next as never).mockResolvedValue(null);
@@ -405,6 +409,18 @@ describe("publishing counts", () => {
     expect(calls[0]).toMatchObject({ tableName: "manual_counts", recordId: 1, action: "UPDATE", changedById: 7 });
     // The re-derived opening on the later period names the publish as its cause.
     expect(calls.find((c) => c.tableName === "daily_online_stock")).toMatchObject({ recordId: 9, causedById: 101 });
+  });
+
+  it("skips the carry-forward walk for products with no later saved row", async () => {
+    vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+    vi.mocked(manualCountRepository.markPublished).mockImplementation(((id: number) => Promise.resolve({ id, publishedAt: new Date() })) as never);
+    vi.mocked(dailyOnlineStockRepository.productIdsWithRowsAfterDate).mockResolvedValue(new Set());
+    vi.mocked(dailyOfflineStockRepository.productIdsWithRowsAfterDate).mockResolvedValue(new Set());
+
+    const out = await publishManualCounts(DATE, SHIFT, 7);
+
+    expect(out.published).toBe(1);
+    expect(dailyOnlineStockRepository.findNext).not.toHaveBeenCalled();
   });
 
   it("refuses when nothing is waiting", async () => {

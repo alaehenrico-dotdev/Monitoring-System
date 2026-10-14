@@ -1,5 +1,6 @@
 import { API_URL, ApiError, getToken, http } from "./http";
 import { saveBlob } from "../utils/saveBlob";
+import { localDateStamp } from "../utils/dateFormat";
 
 /// "pre-restore" marks the safety copy taken just before a restore, so the
 /// backup history can tell it apart from a routine download.
@@ -114,11 +115,10 @@ export async function fetchDatabaseBackup(
   // backup.controller.ts's backupFileName) - this fallback should now only
   // ever fire for a genuinely non-CORS-exposed deployment, not the normal
   // case (see app.ts's `exposedHeaders`).
-  const fallbackStamp = new Date()
-    .toISOString()
-    .slice(0, 16)
-    .replace("T", "-")
-    .replace(":", "");
+  const now = new Date();
+  const pad = (v: number) => String(v).padStart(2, "0");
+  // Local date and time, like the server's own file name.
+  const fallbackStamp = `${localDateStamp(now)}-${pad(now.getHours())}${pad(now.getMinutes())}`;
   const filename =
     /filename="?([^"]+)"?/.exec(disposition)?.[1] ??
     `ala-eh-backup-${fallbackStamp}.sql`;

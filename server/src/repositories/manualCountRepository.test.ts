@@ -17,8 +17,15 @@ beforeEach(() => {
 
 describe("only published counts carry forward as an opening stock", () => {
   it("findLatestBefore ignores a count that has not been published", async () => {
-    await manualCountRepository.findLatestBefore(1, DATE, "NIGHT", "ONLINE");
+    await manualCountRepository.findLatestBefore(1, DATE, "MORNING", "ONLINE");
     expect(prismaMock.manualCount.findFirst.mock.calls[0][0].where).toMatchObject({ publishedAt: { not: null } });
+  });
+
+  it("a count opens the next day only - a Night shift never reads one", async () => {
+    expect(await manualCountRepository.findLatestBefore(1, DATE, "NIGHT", "ONLINE")).toBeNull();
+    expect(await manualCountRepository.findLatestBeforeForProducts([1], DATE, "NIGHT", "ONLINE")).toEqual([]);
+    expect(prismaMock.manualCount.findFirst).not.toHaveBeenCalled();
+    expect(prismaMock.manualCount.findMany).not.toHaveBeenCalled();
   });
 
   it("findLatestBeforeForProducts ignores unpublished counts", async () => {

@@ -14,6 +14,7 @@
  * output consistent from page to page.
  */
 import type { TotalStockRow } from "../types";
+import { sumRounded } from "./gridFormat";
 
 export type PdfAlign = "left" | "center" | "right";
 /** Colors a cell's text. Resolved to the brand palette in tablePdf.ts. */
@@ -127,7 +128,7 @@ function totalsRow(
     kind,
     cells: [
       { text: label, colSpan: 2 },
-      ...columns.map((c) => (sumKeys.has(c.key) ? formatCount(rows.reduce((sum, r) => sum + num(r.entry[c.key]), 0)) : "")),
+      ...columns.map((c) => (sumKeys.has(c.key) ? formatCount(sumRounded(rows.map((r) => num(r.entry[c.key])))) : "")),
     ],
   };
 }
@@ -180,7 +181,7 @@ export function totalStocksSection(rows: TotalStockRow[], options: { title?: str
     groups.set(row.product.category, list);
   }
 
-  const sum = (list: TotalStockRow[], pick: (r: TotalStockRow) => number) => formatCount(list.reduce((s, r) => s + pick(r), 0));
+  const sum = (list: TotalStockRow[], pick: (r: TotalStockRow) => number) => formatCount(sumRounded(list.map((r) => pick(r))));
   const totals = (kind: "subtotal" | "total", label: string, list: TotalStockRow[]): PdfRow => ({
     kind,
     cells: [

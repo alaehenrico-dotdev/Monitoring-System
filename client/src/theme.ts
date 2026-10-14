@@ -56,7 +56,7 @@ export const fonts = {
 
 /**
  * Shared timing/easing for the app's loading system (Skeleton.tsx,
- * TopProgressBar.tsx, ProgressiveImage.tsx) - one place to retune "how fast
+ * TopProgressBar.tsx) - one place to retune "how fast
  * things shimmer/glide" instead of every component hardcoding its own
  * duration the way the rest of the app's one-off animations do.
  */

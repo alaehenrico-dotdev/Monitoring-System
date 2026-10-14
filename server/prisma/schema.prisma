@@ -52,21 +52,22 @@ model User {
   tokenVersion Int      @default(0)
   createdAt    DateTime @default(now())
 
-  onlineEntries        DailyOnlineStock[]   @relation("OnlineEncodedBy")
-  offlineEntries       DailyOfflineStock[]  @relation("OfflineEncodedBy")
-  manualCounts         ManualCount[]        @relation("CountedBy")
-  publishedCounts      ManualCount[]        @relation("PublishedBy")
-  changeLogEntries     ChangeLog[]          @relation("ChangedBy")
-  importBatches        ImportBatch[]        @relation("ImportedBy")
-  reportHistory        ReportHistoryEntry[] @relation("GeneratedBy")
-  systemLogEntries     SystemLogEntry[]     @relation("UpdatedOn")
-  stockExtras          DailyStockExtra[]    @relation("ExtraEncodedBy")
-  dayClosuresClosed    DayClosure[]         @relation("ClosedBy")
-  dayClosuresUnlocked  DayClosure[]         @relation("UnlockedBy")
-  clientErrors         ClientError[]        @relation("ErrorUser")
-  correctionsRequested CorrectionRequest[]  @relation("CorrectionRequestedBy")
-  correctionsReviewed  CorrectionRequest[]  @relation("CorrectionReviewedBy")
-  correctionEvents     CorrectionEvent[]    @relation("CorrectionEventBy")
+  onlineEntries        DailyOnlineStock[]    @relation("OnlineEncodedBy")
+  offlineEntries       DailyOfflineStock[]   @relation("OfflineEncodedBy")
+  manualCounts         ManualCount[]         @relation("CountedBy")
+  publishedCounts      ManualCount[]         @relation("PublishedBy")
+  changeLogEntries     ChangeLog[]           @relation("ChangedBy")
+  importBatches        ImportBatch[]         @relation("ImportedBy")
+  reportHistory        ReportHistoryEntry[]  @relation("GeneratedBy")
+  systemLogEntries     SystemLogEntry[]      @relation("UpdatedOn")
+  stockExtras          DailyStockExtra[]     @relation("ExtraEncodedBy")
+  dayClosuresClosed    DayClosure[]          @relation("ClosedBy")
+  dayClosuresUnlocked  DayClosure[]          @relation("UnlockedBy")
+  reportSnapshots      DailyReportSnapshot[] @relation("SnapshotSavedBy")
+  clientErrors         ClientError[]         @relation("ErrorUser")
+  correctionsRequested CorrectionRequest[]   @relation("CorrectionRequestedBy")
+  correctionsReviewed  CorrectionRequest[]   @relation("CorrectionReviewedBy")
+  correctionEvents     CorrectionEvent[]     @relation("CorrectionEventBy")
 
   @@map("users")
 }
@@ -418,9 +419,52 @@ model DayClosure {
   unlockedById Int?
   unlockedBy   User?     @relation("UnlockedBy", fields: [unlockedById], references: [id], onDelete: SetNull)
   unlockReason String?   @db.VarChar(500)
+  /// True when the period was locked by an encoder's "Finish day": the Online
+  /// and Offline entry grids are frozen but Manual Counts stay editable, so
+  /// the audit can still happen after the entries are done. An admin's full
+  /// "Close day" sets this back to false and locks everything.
+  entriesOnly  Boolean   @default(false)
 
   @@unique([entryDate, shift])
   @@map("day_closures")
+}
+
+/// The Daily Report exactly as it stood when a day was finished (the encoder's
+/// "Finish day"). Once every shift that has entries for the date is closed,
+/// the report for that date is served from here, so later changes - a renamed
+/// or re-categorised product, a corrected count, tomorrow's carry-forward -
+/// never alter a day that was already reported. Re-finishing after an admin
+/// unlock replaces it with the new state. One row per date: the report merges
+/// both shifts.
+model DailyReportSnapshot {
+  id        Int      @id @default(autoincrement())
+  entryDate DateTime @unique @db.Date
+  /// The whole getDailyReport() payload (online, offline and total sections).
+  payload   Json
+  savedAt   DateTime @default(now())
+  savedById Int?
+  savedBy   User?    @relation("SnapshotSavedBy", fields: [savedById], references: [id], onDelete: SetNull)
+
+  @@map("daily_report_snapshots")
+}
+
+/// The name typed into an added ("+1") column's header on an Online/Offline
+/// grid. One row per sheet column (location + date + shift + column + slot),
+/// not per product: the label belongs to the column. Empty names are deleted,
+/// not stored. Saved so the name is the same on every PC and in the Change Log.
+model ExtraColumnLabel {
+  id          Int           @id @default(autoincrement())
+  location    StockLocation
+  entryDate   DateTime      @db.Date
+  shift       Shift         @default(NIGHT)
+  columnKey   String        @db.VarChar(64)
+  slotIndex   Int
+  label       String        @db.VarChar(60)
+  updatedById Int?
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([location, entryDate, shift, columnKey, slotIndex], map: "extra_column_label_key")
+  @@map("extra_column_labels")
 }
 
 /// A browser-side error reported by the client (POST /client-errors) so a

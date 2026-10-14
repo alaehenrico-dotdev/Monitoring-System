@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { createProduct, deactivateProduct, listProducts, updateProduct } from "../services/products.service";
 import { HttpError } from "../utils/HttpError";
+import { syncProductsFromSheet } from "../services/productSync.service";
 
 const createSchema = z.object({
   sku: z.string().min(1).optional(),
@@ -33,4 +34,25 @@ export async function patchProduct(req: Request, res: Response) {
 
 export async function deleteProduct(req: Request, res: Response) {
   res.json(await deactivateProduct(Number(req.params.id), req.user?.id));
+}
+
+const syncSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        category: z.string().trim().min(1).max(100),
+        name: z.string().trim().min(1).max(200),
+        productId: z.number().int().positive().optional(),
+        rename: z.boolean().optional(),
+      }),
+    )
+    .min(1)
+    .max(1000),
+});
+
+/// Adds the sheet's missing products and applies the sheet's sequence.
+export async function postProductSync(req: Request, res: Response) {
+  const parsed = syncSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest("Invalid product sync payload", parsed.error.flatten());
+  res.json(await syncProductsFromSheet(parsed.data.items, req.user?.id));
 }

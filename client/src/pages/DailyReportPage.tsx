@@ -35,6 +35,7 @@ import { recordReportHistory } from "../api/reportHistory";
 import {
   DownloadIcon,
   HistoryIcon,
+  LockIcon,
   PlayIcon,
   PrinterIcon,
 } from "../components/icons";
@@ -480,6 +481,24 @@ export function DailyReportPage() {
         variant="error"
         duration={null}
       />
+
+      {report?.snapshot && (
+        <div className="ae-day-lock" role="status">
+          <span className="ae-day-lock-icon" aria-hidden>
+            <LockIcon />
+          </span>
+          <div className="ae-day-lock-text">
+            <strong>Saved report for {formatDateDisplay(report.date)}</strong>
+            <span>
+              Frozen when the day was finished (
+              {new Date(report.snapshot.savedAt).toLocaleString()}
+              {report.snapshot.savedBy ? ` by ${report.snapshot.savedBy.name}` : ""}
+              ). Later changes to products, counts or other days don&apos;t
+              affect it.
+            </span>
+          </div>
+        </div>
+      )}
 
       {report && (
         <div>

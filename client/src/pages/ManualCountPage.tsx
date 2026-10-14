@@ -66,7 +66,7 @@ import {
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
-import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { getCurrentShiftAndDate, getDefaultAuditSheet, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
@@ -235,7 +235,8 @@ export function ManualCountPage() {
     date: string;
     shift: Shift;
   }>(() => {
-    const now = getCurrentShiftAndDate();
+    // The audit is done per night, so it opens on a Night sheet.
+    const now = getDefaultAuditSheet();
     const d = searchParams.get("date") ?? "";
     const s = searchParams.get("shift");
     if (!openedFromHistory || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return resumed ?? now;
@@ -311,7 +312,7 @@ export function ManualCountPage() {
     Record<CountLocation, Record<number, number>>
   >({ ONLINE: {}, OFFLINE: {} });
   const [error, setError] = useState<string | null>(null);
-  // Result of a paste or a Zero all - a short timed toast, unlike `error`
+  // Result of a paste or a Clear all - a short timed toast, unlike `error`
   // (which stays until dismissed).
   const [notice, setNotice] = useState<{
     message: string;
@@ -336,7 +337,7 @@ export function ManualCountPage() {
   // Publishing is the supervisor's approval step; encoders see the state only.
   const canPublish = useAuth().user?.role === "SUPERVISOR_ADMIN";
   // Undo / redo over the staged (unsaved) counts. A step is one cell edit (all
-  // the keystrokes between focusing a count and leaving it), one Zero all, one
+  // the keystrokes between focusing a count and leaving it), one Clear all, one
   // paste or one Clear - whole-sheet snapshots, so any of them undoes cleanly.
   // Not persisted: like any undo stack it belongs to this editing session.
   const [past, setPast] = useState<DraftSnapshot[]>(() => loadHistory<DraftSnapshot>(historyKey(date, shift)).past);
@@ -352,6 +353,8 @@ export function ManualCountPage() {
   const [savePercent, setSavePercent] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
   const realtimeVersion = useRealtimeVersion();
+  // Bumped after the product list changed from an import, so the grid reloads.
+  const [productsVersion, setProductsVersion] = useState(0);
   const progress = useTopProgress();
 
   useResetOnKeyChange(`${date}:${shift}`, () => {
@@ -386,7 +389,7 @@ export function ManualCountPage() {
     return () => {
       cancelled = true;
     };
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, realtimeVersion, productsVersion]);
 
   // Remember which sheet is open so it can be resumed (see loadStoredView).
   useEffect(() => {
@@ -463,7 +466,7 @@ export function ManualCountPage() {
     });
   }
 
-  /// Stages many counts at once (paste, Zero all). Like a typed count, each
+  /// Stages many counts at once (paste, Clear all). Like a typed count, each
   /// is only a draft until Save, and it detaches the cell from any CSV import
   /// batch it came from (a hand edit must never be reverted with the import).
   function setDraftMany(
@@ -555,7 +558,21 @@ export function ManualCountPage() {
         getManualCountGrid(date, shift, "ONLINE"),
         getManualCountGrid(date, shift, "OFFLINE"),
       ]);
-      setGridRows({ ONLINE, OFFLINE });
+      // Published counts now live on as the next day's opening stock, so the
+      // sheet's count cells are cleared, ready for the next audit. They stay
+      // stored (variance reports still read them).
+      const cleared = (rows: typeof ONLINE) =>
+        rows.map((r) =>
+          r.entry.publishedAt
+            ? {
+                ...r,
+                isSaved: false,
+                isFlagged: false,
+                entry: { ...r.entry, manualCount: null, variance: null },
+              }
+            : r,
+        );
+      setGridRows({ ONLINE: cleared(ONLINE), OFFLINE: cleared(OFFLINE) });
     } catch (e) {
       setShowPublishConfirm(false);
       setError(e instanceof Error ? e.message : "Could not publish");
@@ -901,10 +918,12 @@ export function ManualCountPage() {
     }
   }
 
-  /// Zero all: stage a count of 0 in every visible location column for every
-  /// row of one category - a product line that simply wasn't stocked. Goes
-  /// through the usual draft/Save step, so nothing is written until confirmed.
-  function zeroCategory(category: string) {
+  /// Clear all: stage an empty count in every visible location column for every
+  /// row of one category. An empty draft means "no count" - on Save it removes a
+  /// saved count (and does nothing for a cell never counted), so a cleared row
+  /// is uncounted rather than a confirmed zero. Goes through the usual
+  /// draft/Save step, so nothing is written until confirmed.
+  function clearCategory(category: string) {
     const ids = (groupedRows.get(category) ?? []).map((r) => r.product.id);
     const locs = COUNT_LOCATIONS.filter((l) =>
       l === "ONLINE" ? showOnline : showOffline,
@@ -912,11 +931,11 @@ export function ManualCountPage() {
     pushHistory();
     setDraftMany(
       ids.flatMap((productId) =>
-        locs.map((loc) => ({ loc, productId, value: "0" })),
+        locs.map((loc) => ({ loc, productId, value: "" })),
       ),
     );
     setNotice({
-      message: `${category}: ${ids.length * locs.length} count${ids.length * locs.length === 1 ? "" : "s"} set to 0 (not saved yet)`,
+      message: `${category}: ${ids.length * locs.length} count${ids.length * locs.length === 1 ? "" : "s"} cleared (not saved yet)`,
       variant: "info",
     });
   }
@@ -1321,6 +1340,8 @@ export function ManualCountPage() {
               }}
               canImport
               importKeys={["manualCount"]}
+              canManageProducts={canPublish}
+              onProductsChanged={() => setProductsVersion((v) => v + 1)}
               blankAsZero
               showExport={false}
               showPdf={false}
@@ -1456,24 +1477,24 @@ export function ManualCountPage() {
                             </span>
                             {/* A sibling-style click target inside the bar (a
                                 real button can't nest in a button); it stops
-                                propagation so zeroing doesn't also collapse. */}
+                                propagation so clearing doesn't also collapse. */}
                             <span
                               role="button"
                               tabIndex={0}
                               className="ae-cat-zero no-print"
-                              title={`Stage a count of 0 for every product in ${category}`}
+                              title={`Clear every count in ${category}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                zeroCategory(category);
+                                clearCategory(category);
                               }}
                               onKeyDown={(e) => {
                                 if (e.key !== "Enter" && e.key !== " ") return;
                                 e.stopPropagation();
                                 e.preventDefault();
-                                zeroCategory(category);
+                                clearCategory(category);
                               }}
                             >
-                              Zero all
+                              Clear all
                             </span>
                           </button>
                         </td>

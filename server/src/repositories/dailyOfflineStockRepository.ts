@@ -1,7 +1,7 @@
 import { Shift } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 import { manualCountRepository } from "./manualCountRepository";
-import { periodRank, resolveOpeningStock } from "../utils/stockMath";
+import { resolveOpeningStock } from "../utils/stockMath";
 
 export interface OfflineStockData {
   productId: number;
@@ -47,6 +47,19 @@ export const dailyOfflineStockRepository = {
     });
   },
 
+  /// Which of these products have any saved row on a LATER date than the
+  /// given one - one query, so a publish can skip the carry-forward walk for
+  /// every product that has nothing after it to re-derive.
+  async productIdsWithRowsAfterDate(productIds: number[], entryDate: Date, db: Db = prisma): Promise<Set<number>> {
+    if (!productIds.length) return new Set();
+    const rows = await db.dailyOfflineStock.findMany({
+      where: { productId: { in: productIds }, entryDate: { gt: entryDate } },
+      select: { productId: true },
+      distinct: ["productId"],
+    });
+    return new Set(rows.map((r) => r.productId));
+  },
+
   /// Section 4.6 - same shift-aware carry-forward principle as the Online
   /// table; see dailyOnlineStockRepository.getOpeningStock for the full
   /// reasoning on why the "immediately preceding shift" is always
@@ -82,7 +95,7 @@ export const dailyOfflineStockRepository = {
     // counted period has no daily row of its own - so the latest count
     // before this period competes with the latest row, and the later wins.
     const count = await manualCountRepository.findLatestBefore(productId, entryDate, shift, "OFFLINE", db);
-    if (count && (!prior || periodRank(count.entryDate, count.shift) >= periodRank(prior.entryDate, prior.shift))) {
+    if (count && (!prior || count.entryDate.getTime() >= prior.entryDate.getTime())) {
       return resolveOpeningStock(count.manualCount, 0);
     }
     if (!prior) return 0;
@@ -140,7 +153,7 @@ export const dailyOfflineStockRepository = {
     for (const productId of productIds) {
       const c = candidates.get(productId);
       const count = countByProduct.get(productId);
-      if (count && (!c || periodRank(count.entryDate, count.shift) >= periodRank(c.entryDate, c.shift))) {
+      if (count && (!c || count.entryDate.getTime() >= c.entryDate.getTime())) {
         result.set(productId, resolveOpeningStock(count.manualCount, 0));
       } else if (c) {
         result.set(productId, resolveOpeningStock(undefined, c.remainingStock));

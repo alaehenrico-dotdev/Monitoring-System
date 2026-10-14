@@ -9,7 +9,7 @@ interface ToastProps {
   message: ReactNode | null;
   onDismiss: () => void;
   variant?: ToastVariant;
-  /// ms before auto-dismissing (capped at TOAST_MS, 3s, so every timed toast
+  /// ms before auto-dismissing (capped at TOAST_MS, 4s, so every timed toast
   /// leaves at the same pace); null keeps it up until the user closes it
   /// (or a later action replaces the message) - used for anything worth
   /// reading in full rather than glancing past, e.g. an import that failed
@@ -43,7 +43,7 @@ interface ToastProps {
  * body-text colors tuned for contrast against the page, not for this.
  */
 /// Every timed toast hides after this long, then fades out smoothly.
-const TOAST_MS = 3000;
+const TOAST_MS = 4000;
 
 const HUE: Record<ToastVariant, string> = {
   info: "#4C8DF6",
@@ -186,6 +186,23 @@ export function Toast({
           className="ae-toast"
           style={{ pointerEvents: "auto" }}
         >
+          {/* The border drains around the toast over its lifetime, so the
+              remaining time reads at a glance. Keyed so a replaced message
+              restarts it. */}
+          {duration !== null && (
+            <svg
+              key={key}
+              className="ae-toast-timer"
+              aria-hidden
+              focusable="false"
+              style={{
+                color: HUE[variant],
+                ["--ae-toast-ms" as string]: `${Math.min(duration, TOAST_MS)}ms`,
+              }}
+            >
+              <rect pathLength={1} />
+            </svg>
+          )}
           {/* The variant reads as a coloured badge rather than an edge stripe:
               at a glance it is the only thing that has to be seen, and it
               carries the same meaning to someone who can't separate a 3px

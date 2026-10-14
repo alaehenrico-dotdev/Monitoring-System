@@ -241,7 +241,7 @@ describe("useGridExtraColumns", () => {
     rerender();
     expect(pending[1].stockIn).toBe(10);
 
-    // What Quick Fill's "Zero all" hands over: the added columns only.
+    // What Quick Fill's "Clear all" hands over: the added columns only.
     const zeroed = [1, 2].map((slot) => ({
       productId: 1,
       key: extraColumnKey("stockIn", slot),

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { deleteProduct, getProducts, patchProduct, postProduct } from "../controllers/products.controller";
+import { deleteProduct, getProducts, patchProduct, postProduct, postProductSync } from "../controllers/products.controller";
 
 const router = Router();
 
@@ -10,6 +10,7 @@ router.get("/", authenticate, asyncHandler(getProducts));
 
 // Only the Supervisor/Admin manages the master list (Section 3.2, 4.1).
 router.post("/", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(postProduct));
+router.post("/sync", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(postProductSync));
 router.patch("/:id", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(patchProduct));
 router.delete("/:id", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(deleteProduct));
 

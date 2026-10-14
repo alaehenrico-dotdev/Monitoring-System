@@ -270,18 +270,24 @@ describe("Delivery (Out) uses the same added-column mechanism", () => {
     ]);
   });
 
-  it("names an added column per browser, the way the fixed Delivery columns were nameable", () => {
-    const { container } = renderGrid({ extraColumns: { stockIn: [1] } });
+  it("shows a saved name and reports typing and blur so the page can save it", () => {
+    const onChange = vi.fn();
+    const onCommit = vi.fn();
+    const { container } = renderGrid({
+      extraColumns: { stockIn: [1] },
+      extraNames: { "stockIn__x1": "Batangas run" },
+      onExtraNameChange: onChange,
+      onExtraNameCommit: onCommit,
+    });
     const name = container.querySelector<HTMLInputElement>(
       "th .ae-extra-head-input",
     )!;
     expect(name.placeholder).toBe("+1");
-    fireEvent.change(name, { target: { value: "Batangas run" } });
     expect(name.value).toBe("Batangas run");
-    // A label only - never part of the saved entry.
-    expect(localStorage.getItem("ala-eh-grid-subcolumn-names")).toContain(
-      "Batangas run",
-    );
+    fireEvent.change(name, { target: { value: "Cavite run" } });
+    expect(onChange).toHaveBeenCalledWith(expect.stringContaining("stockIn"), "Cavite run");
+    fireEvent.blur(name);
+    expect(onCommit).toHaveBeenCalledWith(expect.stringContaining("stockIn"));
   });
 });
 

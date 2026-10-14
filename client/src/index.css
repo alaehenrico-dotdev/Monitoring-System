@@ -3668,8 +3668,7 @@ table input[type="number"] {
 }
 
 /* =========================================================================
-   Loading system - skeleton shimmer (components/Skeleton.tsx), progressive
-   image blur-up (components/ProgressiveImage.tsx), and the determinate
+   Loading system - skeleton shimmer (components/Skeleton.tsx) and the determinate
    top-of-viewport progress bar (components/TopProgressBar.tsx,
    hooks/useTopProgress.tsx). Every animated property here is `transform`,
    `opacity`, or `background-position` on its own compositor layer - none of
@@ -3779,40 +3778,6 @@ table input[type="number"] {
   }
 }
 
-.ae-progressive-img-wrap {
-  position: relative;
-  overflow: hidden;
-  display: block;
-}
-.ae-progressive-img-placeholder {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  filter: blur(18px);
-  transform: scale(
-    1.08
-  ); /* hides the blurred edge halo the filter leaves along the border */
-  transition: opacity 0.4s ease;
-}
-.ae-progressive-img-full {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0;
-  filter: blur(14px);
-  transition:
-    opacity 0.4s ease-out,
-    filter 0.4s ease-out;
-}
-.ae-progressive-img-full.is-loaded {
-  opacity: 1;
-  filter: blur(0);
-}
-
 .ae-top-progress-track {
   position: fixed;
   top: 0;
@@ -3840,10 +3805,6 @@ table input[type="number"] {
     animation: none;
     background-image: none;
     background-color: var(--ae-bg-alt);
-  }
-  .ae-progressive-img-placeholder,
-  .ae-progressive-img-full {
-    transition: none;
   }
   .ae-top-progress-track {
     transition: none;
@@ -4497,6 +4458,40 @@ table input[type="number"] {
      page, not a panel docked into it. */
   border-radius: 10px;
   box-shadow: 0 8px 28px rgba(12, 12, 12, 0.28);
+  position: relative;
+}
+/* Countdown border: a stroke that drains over the toast's duration. */
+.ae-toast-timer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.ae-toast-timer rect {
+  x: 0.5px;
+  y: 0.5px;
+  width: calc(100% - 1px);
+  height: calc(100% - 1px);
+  rx: 9.5px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1px;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: ae-toast-drain var(--ae-toast-ms, 4s) linear forwards;
+}
+@keyframes ae-toast-drain {
+  to {
+    stroke-dashoffset: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-toast-timer rect {
+    animation-duration: 0.01ms;
+    animation-delay: var(--ae-toast-ms, 4s);
+  }
 }
 .ae-toast-icon {
   display: inline-flex;
@@ -5071,5 +5066,54 @@ table input[type="number"] {
     .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger):hover:not(:disabled) {
     animation: none;
     box-shadow: 0 0 12px 2px rgba(245, 192, 0, 0.7);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Finished-day lock banner (components/FinishDay.tsx) and the Daily Report's
+   saved-snapshot notice. Wraps on narrow screens: text first, actions below.
+   ------------------------------------------------------------------------ */
+.ae-day-lock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  border-left: 3px solid var(--ae-warning-text, currentColor);
+  border-radius: 8px;
+}
+.ae-day-lock-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--ae-warning-text, currentColor);
+}
+.ae-day-lock-text {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ae-day-lock-text span {
+  color: var(--ae-text-muted);
+}
+.ae-day-lock-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 520px) {
+  .ae-day-lock-actions {
+    flex: 1 1 100%;
+  }
+  .ae-day-lock-actions > * {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }
