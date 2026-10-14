@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCurrentShiftAndDate, otherShift } from "./shift";
+import { getCurrentShiftAndDate, getDefaultAuditSheet, otherShift } from "./shift";
 
 describe("getCurrentShiftAndDate", () => {
   it("is Morning, same date, from 7:00am up to (not including) 4:00pm", () => {
@@ -46,5 +46,24 @@ describe("otherShift", () => {
   it("swaps Morning and Night", () => {
     expect(otherShift("MORNING")).toBe("NIGHT");
     expect(otherShift("NIGHT")).toBe("MORNING");
+  });
+});
+
+describe("getDefaultAuditSheet", () => {
+  it("is tonight's Night sheet from 4pm", () => {
+    expect(getDefaultAuditSheet(new Date(2026, 5, 15, 16, 0))).toEqual({ shift: "NIGHT", date: "2026-06-15" });
+    expect(getDefaultAuditSheet(new Date(2026, 5, 15, 23, 30))).toEqual({ shift: "NIGHT", date: "2026-06-15" });
+  });
+
+  it("is still last night's sheet after midnight", () => {
+    expect(getDefaultAuditSheet(new Date(2026, 5, 15, 0, 30))).toEqual({ shift: "NIGHT", date: "2026-06-14" });
+  });
+
+  it("is the last finished Night sheet (yesterday's) during the morning shift", () => {
+    expect(getDefaultAuditSheet(new Date(2026, 5, 15, 9, 0))).toEqual({ shift: "NIGHT", date: "2026-06-14" });
+  });
+
+  it("crosses a month boundary", () => {
+    expect(getDefaultAuditSheet(new Date(2026, 6, 1, 10, 0))).toEqual({ shift: "NIGHT", date: "2026-06-30" });
   });
 });

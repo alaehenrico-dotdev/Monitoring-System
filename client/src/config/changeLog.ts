@@ -13,6 +13,7 @@ export const TABLE_LABELS: Record<string, string> = {
   reports: "Reports",
   users: "Users",
   day_closures: "Day Closures",
+  daily_report_snapshots: "Saved Daily Reports",
   correction_requests: "Corrections",
 };
 

@@ -62,7 +62,9 @@ export async function exportChangeLog(req: Request, res: Response) {
   if (!parsed.success) throw HttpError.badRequest("Invalid change log query", parsed.error.flatten());
   const csv = await exportChangeLogCsv(parsed.data);
   res.setHeader("Content-Type", "text/csv; charset=utf-8");
-  res.setHeader("Content-Disposition", 'attachment; filename="change-log.csv"');
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  res.setHeader("Content-Disposition", `attachment; filename="change-log-${stamp}.csv"`);
   res.send(csv);
 }
 

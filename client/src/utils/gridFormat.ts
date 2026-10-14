@@ -57,3 +57,11 @@ export function isUnusualJump(nextValue: number, savedValue: number): boolean {
   const delta = Math.abs(nextValue - savedValue);
   return delta >= JUMP_FLOOR && delta >= savedValue * JUMP_FACTOR;
 }
+
+/// Sum of stock figures, rounded to 2dp like every figure the server stores
+/// (Decimal(14,2)): a plain float sum can leave noise like 0.30000000000000004
+/// or a tiny negative that a "-0" would then be printed for.
+export function sumRounded(values: number[]): number {
+  const total = values.reduce((a, b) => a + b, 0);
+  return Math.round((total + Number.EPSILON) * 100) / 100 + 0;
+}

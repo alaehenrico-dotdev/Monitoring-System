@@ -324,6 +324,12 @@ export function useGridExtraColumns({
   // it only has to outlive a refetch, and a different sheet reloads it all.
   const dismissed = useRef(new Set<string>());
 
+  // Main columns whose added columns were ALL deleted since the last save.
+  // Their amounts are still stored on the server, and a column that is no
+  // longer in `extras` would otherwise never be named in a save - so the
+  // deleted amounts would come back on the next load.
+  const removedMainKeys = useRef(new Set<string>());
+
   // Added columns the server already holds amounts for, folded in alongside
   // whatever this session has added. A union, not a replacement: a column
   // added here but never saved must survive a refetch too.
@@ -379,6 +385,7 @@ export function useGridExtraColumns({
       // number is never silently reused by a different column of amounts.
       let next = current.length ? Math.max(...current) + 1 : 1;
       const added = Array.from({ length: n }, () => next++);
+      removedMainKeys.current.delete(mainKey);
       setExtras((prev) => ({
         ...prev,
         [mainKey]: [...(prev[mainKey] ?? []), ...added],
@@ -417,6 +424,7 @@ export function useGridExtraColumns({
       if (dropped.length === 0) return;
       const remaining = current.filter((s) => !dropped.includes(s));
       for (const slot of dropped) dismissed.current.add(`${mainKey}:${slot}`);
+      if (remaining.length === 0) removedMainKeys.current.add(mainKey);
 
       setExtras((prev) => {
         const left = (prev[mainKey] ?? []).filter((s) => !dropped.includes(s));
@@ -490,7 +498,7 @@ export function useGridExtraColumns({
 
   /**
    * Appends each affected main column's recomputed total to a batch of cell
-   * edits - what Quick Fill ("Zero all" over a category) needs, since it
+   * edits - what Quick Fill ("Clear all" over a category) needs, since it
    * writes added columns directly rather than cell by cell through
    * commitExtraCell and would otherwise leave the main column reading the
    * total of values it no longer holds.
@@ -548,24 +556,17 @@ export function useGridExtraColumns({
   }, []);
 
   /**
-   * What one product's save sends about its added columns.
-   *
-   * `isIndividual` decides per main column: "Save individually" sends every
-   * slot's amount (so the columns come back after a reload), while "Save total
-   * only" names the column in `clearExtraColumns` instead, which drops any
-   * amounts the server still holds for it. Either way the main column's own
-   * total is already in the ordinary field changes - and the server recomputes
-   * it from these amounts regardless, so the two cannot disagree.
+   * What one product's save sends about its added columns: every slot's amount
+   * (so the columns come back after a reload), plus the main columns whose
+   * added columns were all deleted (`clearExtraColumns`, so the server drops
+   * the amounts it still holds for them). The main column's own total is in
+   * the ordinary field changes, and the server recomputes it from these
+   * amounts regardless, so the two cannot disagree.
    */
   const buildSavePayload = useCallback(
-    (productId: number, isIndividual: (mainKey: string) => boolean) => {
+    (productId: number) => {
       const payload: StockExtraPayload[] = [];
-      const clearExtraColumns: string[] = [];
       for (const [mainKey, slots] of Object.entries(extras)) {
-        if (!isIndividual(mainKey)) {
-          clearExtraColumns.push(mainKey);
-          continue;
-        }
         for (const slot of slots) {
           payload.push({
             columnKey: mainKey,
@@ -574,10 +575,18 @@ export function useGridExtraColumns({
           });
         }
       }
+      const clearExtraColumns = [...removedMainKeys.current].filter((k) => !extras[k]);
       return { extras: payload, clearExtraColumns };
     },
     [extras, readCell],
   );
+
+  /// Called once every product has saved: the deletions are now on the server,
+  /// so there is nothing left to clear and nothing left to suppress.
+  const markSaved = useCallback(() => {
+    removedMainKeys.current.clear();
+    dismissed.current.clear();
+  }, []);
 
   /// Added columns that currently hold at least one staged amount - the ones
   /// the Save dialog has to ask about. Columns added but never typed into
@@ -614,6 +623,7 @@ export function useGridExtraColumns({
     addColumns,
     removeColumns,
     clearColumns,
+    markSaved,
     commitExtraCell,
     withExtraTotals,
     buildSavePayload,

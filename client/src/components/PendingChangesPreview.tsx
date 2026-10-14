@@ -1,5 +1,6 @@
 import type { PendingChangeDetail } from "../hooks/usePendingEntryChanges";
 import { colors } from "../theme";
+import { sumRounded } from "../utils/gridFormat";
 
 /// The Preview modal's contents on the Online/Offline Entry pages - every
 /// staged-but-unsaved edit as one row, so an encoder can check a whole
@@ -14,8 +15,8 @@ export function PendingChangesPreview({
   /// glance before it is saved.
   showTotal?: boolean;
 }) {
-  const totalOld = items.reduce((sum, i) => sum + i.oldValue, 0);
-  const totalNew = items.reduce((sum, i) => sum + i.newValue, 0);
+  const totalOld = sumRounded(items.map((i) => i.oldValue));
+  const totalNew = sumRounded(items.map((i) => i.newValue));
   if (items.length === 0) {
     return (
       <p style={{ margin: 0, color: colors.subtleInk, fontSize: 13 }}>

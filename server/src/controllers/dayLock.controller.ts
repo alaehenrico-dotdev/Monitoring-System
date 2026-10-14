@@ -3,6 +3,7 @@ import { z } from "zod";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
+import { finishDay, getFinishSummary } from "../services/dayFinish.service";
 import { closeDay, closeReadiness, getClosureStatus, listClosures, unlockDay } from "../services/dayLock.service";
 
 const unlockSchema = z.object({ reason: z.string().trim().min(5, "Give a reason (at least 5 characters)").max(500) });
@@ -32,4 +33,14 @@ export async function postUnlock(req: Request, res: Response) {
   const parsed = unlockSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest(parsed.error.issues[0]?.message ?? "Invalid request", parsed.error.flatten());
   res.json(await unlockDay(parseDateOnly(req.body?.date), parseShift(req.body?.shift), parsed.data.reason, req.user?.id));
+}
+
+/// What finishing this shift would lock - open to every role, like the status.
+export async function getFinishInfo(req: Request, res: Response) {
+  res.json(await getFinishSummary(parseDateOnly(req.query.date), parseShift(req.query.shift)));
+}
+
+/// The encoder's "Finish day": lock the entry grids and save the report snapshot.
+export async function postFinish(req: Request, res: Response) {
+  res.json(await finishDay(parseDateOnly(req.body?.date), parseShift(req.body?.shift), req.user?.id));
 }

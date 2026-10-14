@@ -64,6 +64,11 @@ export const productRepository = {
     return (result._max.sortOrder ?? 0) + 1;
   },
 
+  /// For writers that change products inside their own transaction.
+  invalidateCache() {
+    invalidatePrefix(CACHE_PREFIX);
+  },
+
   create(data: ProductCreateData) {
     invalidatePrefix(CACHE_PREFIX);
     return prisma.product.create({ data });

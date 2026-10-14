@@ -52,6 +52,7 @@ import {
   isUnusualJump,
   isValidStockValue,
   ZERO_DASH,
+  sumRounded,
 } from "../utils/gridFormat";
 
 export interface GridRow {
@@ -93,19 +94,6 @@ const NO_EXTRAS: number[] = [];
 // .ae-extra-col in index.css); the first one also gets the left edge.
 function extraCellClass(i: number): string {
   return i === 0 ? "ae-extra-col ae-extra-col--first" : "ae-extra-col";
-}
-
-// Names typed into an added column's header input are a per-browser label
-// only (the saved data is keyed by the column and slot, not by its name) -
-// which is why this is localStorage and not part of the entry at all.
-const NAMES_STORAGE_KEY = "ala-eh-grid-subcolumn-names";
-function loadNames(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(NAMES_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
 }
 
 // Header fills for the color-coded columns. Pastel fills on purpose, with the
@@ -228,6 +216,11 @@ interface StockGridProps {
    *  and headers keep the browser's own context menu. */
   onAddExtraColumns?: (mainKey: string, count: number) => void;
   onRemoveExtraColumns?: (mainKey: string, slots: number[]) => void;
+  /** Names typed into the added columns' header inputs, keyed by extraColumnKey; saved by the page (hooks/useExtraLabels.ts). */
+  extraNames?: Record<string, string>;
+  onExtraNameChange?: (key: string, value: string) => void;
+  /** The name input lost focus (or Enter) - the page saves it. */
+  onExtraNameCommit?: (key: string) => void;
   /**
    * Namespaces the header colors picked from the same right-click menu
    * (hooks/useColumnColors.ts) - "online" and "offline" share column keys,
@@ -458,6 +451,9 @@ export function StockGrid({
   extraColumns,
   onAddExtraColumns,
   onRemoveExtraColumns,
+  extraNames,
+  onExtraNameChange,
+  onExtraNameCommit,
   colorScope = "grid",
 }: StockGridProps) {
   // Explicit expand/collapse choices, keyed by category name - absent means
@@ -469,8 +465,6 @@ export function StockGrid({
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
-  const [extraNames, setExtraNames] =
-    useState<Record<string, string>>(loadNames);
   // Which header's right-click menu is open, if any (null = none). Held here
   // rather than per-header so only one can ever be open at a time.
   const [menu, setMenu] = useState<ColumnMenuTarget | null>(null);
@@ -529,18 +523,6 @@ export function StockGrid({
     return addedOf(col.key).map((slot) => extraColumnKey(col.key, slot));
   }
 
-  function renameExtraColumn(key: string, value: string) {
-    setExtraNames((n) => {
-      const next = { ...n, [key]: value };
-      try {
-        localStorage.setItem(NAMES_STORAGE_KEY, JSON.stringify(next));
-      } catch {
-        // label only - fine to lose
-      }
-      return next;
-    });
-  }
-
   function openMenu(col: GridColumn, x: number, y: number) {
     setMenu({
       mainKey: col.key,
@@ -565,7 +547,7 @@ export function StockGrid({
   const percentTotal = useMemo(
     () =>
       percentOfTotalKey
-        ? rows.reduce((sum, r) => sum + toNum(r.entry[percentOfTotalKey]), 0)
+        ? sumRounded(rows.map((r) => toNum(r.entry[percentOfTotalKey])))
         : 0,
     [rows, percentOfTotalKey],
   );
@@ -663,9 +645,10 @@ export function StockGrid({
     onCommitMany(edits);
   }
 
-  /// Quick Fill - set every editable cell in one category to zero, for a
-  /// product line that simply didn't move this shift.
-  function zeroCategory(category: string) {
+  /// Quick Fill - clear every editable cell in one category, for a product
+  /// line that simply didn't move this shift. An entry cell cannot be empty
+  /// (a movement of nothing is 0), so cleared cells read 0.
+  function clearCategory(category: string) {
     if (!onCommitMany) return;
     const groupRows = groups.get(category) ?? [];
     const keys = columns
@@ -994,19 +977,27 @@ export function StockGrid({
                     >
                       <span className="ae-added-col-head">
                         {/* Nameable, the way the fixed Delivery columns this
-                            replaced were - a per-browser label, so one shift
-                            can call its added columns by route or customer
-                            without that becoming saved data. */}
+                            replaced were - so one shift can call its added
+                            columns by route or customer. The name is saved
+                            with the sheet (hooks/useExtraLabels.ts). */}
                         <input
                           type="text"
                           className="ae-extra-head-input"
-                          value={extraNames[extraColumnKey(c.key, slot)] ?? ""}
+                          value={extraNames?.[extraColumnKey(c.key, slot)] ?? ""}
                           onChange={(e) =>
-                            renameExtraColumn(
+                            onExtraNameChange?.(
                               extraColumnKey(c.key, slot),
                               e.target.value,
                             )
                           }
+                          onBlur={() =>
+                            onExtraNameCommit?.(extraColumnKey(c.key, slot))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") e.currentTarget.blur();
+                          }}
+                          readOnly={readOnly}
+                          maxLength={60}
                           placeholder={`+${slot}`}
                           aria-label={`${c.label} +${slot} name`}
                           spellCheck={false}
@@ -1117,25 +1108,25 @@ export function StockGrid({
                         {canQuickFill && (
                           // Nested inside the toggle button is invalid HTML, so
                           // this is a sibling span acting as the click target -
-                          // it stops propagation so zeroing a category doesn't
+                          // it stops propagation so clearing a category doesn't
                           // also collapse it.
                           <span
                             role="button"
                             tabIndex={0}
                             className="ae-cat-zero no-print"
-                            title={`Set every editable cell in ${category} to zero`}
+                            title={`Clear every editable cell in ${category}`}
                             onClick={(e) => {
                               e.stopPropagation();
-                              zeroCategory(category);
+                              clearCategory(category);
                             }}
                             onKeyDown={(e) => {
                               if (e.key !== "Enter" && e.key !== " ") return;
                               e.stopPropagation();
                               e.preventDefault();
-                              zeroCategory(category);
+                              clearCategory(category);
                             }}
                           >
-                            Zero all
+                            Clear all
                           </span>
                         )}
                       </button>
@@ -1302,8 +1293,7 @@ export function StockGrid({
               {columns.map((col) => (
                 <Fragment key={col.key}>
                   <td style={tint(col)}>
-                    {rows
-                      .reduce((sum, r) => sum + toNum(r.entry[col.key]), 0)
+                    {sumRounded(rows.map((r) => toNum(r.entry[col.key])))
                       .toLocaleString()}
                   </td>
                   {trailingKeys(col).map((key, i) => (
@@ -1312,8 +1302,7 @@ export function StockGrid({
                       className={extraCellClass(i)}
                       style={tint(col)}
                     >
-                      {rows
-                        .reduce((sum, r) => sum + toNum(r.entry[key]), 0)
+                      {sumRounded(rows.map((r) => toNum(r.entry[key])))
                         .toLocaleString()}
                     </td>
                   ))}

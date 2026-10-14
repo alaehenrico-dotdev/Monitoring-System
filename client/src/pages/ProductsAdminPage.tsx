@@ -1,6 +1,7 @@
 import { Spinner } from "../components/Spinner";
 import { useBusyAction } from "../hooks/useBusyAction";
 import { useEffect, useState, type FormEvent } from "react";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 import {
   createProduct,
   deactivateProduct,
@@ -50,7 +51,10 @@ export function ProductsAdminPage() {
       );
   }
 
-  useEffect(reload, []);
+  // Also refetched when anyone changes the product list (e.g. an import that
+  // adds products), so this list never shows a stale one.
+  const realtimeVersion = useRealtimeVersion();
+  useEffect(reload, [realtimeVersion]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();

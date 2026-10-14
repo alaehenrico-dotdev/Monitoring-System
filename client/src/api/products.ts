@@ -20,3 +20,17 @@ export function updateProduct(id: number, data: Partial<Pick<Product, "sku" | "n
 export function deactivateProduct(id: number) {
   return http.delete<Product>(`/products/${id}`);
 }
+export interface ProductSyncResult {
+  created: number;
+  moved: number;
+  renamed: number;
+  reactivated: number;
+  reordered: number;
+  total: number;
+}
+
+/// Supervisor/Admin: add the sheet's missing products (no SKU) and apply its
+/// category/product sequence. One request, one transaction, safe to retry.
+export function syncProducts(items: { category: string; name: string; productId?: number; rename?: boolean }[]) {
+  return http.post<ProductSyncResult>("/products/sync", { items });
+}

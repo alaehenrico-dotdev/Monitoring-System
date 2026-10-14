@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../repositories/changeLogRepository", () => ({
   REPORTS_TABLE: "reports",
+  SNAPSHOT_TABLE: "daily_report_snapshots",
   changeLogRepository: {
     create: vi.fn(),
     findPage: vi.fn(),
@@ -102,6 +103,17 @@ describe("listChangeLog", () => {
     expect(item.context).toEqual({ productId: 5, sku: "AFP007", productName: "Soy Sauce 1L", entryDate: "2026-10-09", shift: "NIGHT", location: "ONLINE" });
     expect(item.summary).toBe("Manual count 12 → 10");
     expect(item.source).toBeNull();
+  });
+
+  it("describes a saved daily report without dumping its payload", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([
+      logRow({ tableName: "daily_report_snapshots", action: "UPDATE", oldValue: { payload: { online: [] } }, newValue: { entryDate: "2026-10-14" } }),
+    ] as never);
+
+    const [item] = (await listChangeLog({})).items;
+
+    expect(item.summary).toMatch(/saved again; the previous version is kept/);
+    expect(item.changes).toEqual([]);
   });
 
   it("falls back to the snapshot when the record was deleted", async () => {

@@ -66,20 +66,21 @@ async function open() {
 }
 
 describe("ManualCountPage - toolbar from the entry pages", () => {
-  it("Zero all stages a 0 for the whole category and shows the unsaved badge", async () => {
+  it("Clear all removes the saved counts of the whole category (uncounted cells are not changes) and shows the unsaved badge", async () => {
     await open();
 
-    fireEvent.click(screen.getAllByText("Zero all")[0]);
+    fireEvent.click(screen.getAllByText("Clear all")[0]);
 
-    // Sauces = 2 products x 2 locations, each a change from its saved count (or from none).
+    // Sauces = 2 products x 2 locations, but only the 2 Online counts were ever saved; the
+    // Offline cells were never counted, so clearing them changes nothing.
     // (The toolbar renders hidden measuring copies, so there is more than one badge.)
-    expect((await screen.findAllByText(/4/, { selector: ".ae-unsaved-badge" })).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/2/, { selector: ".ae-unsaved-badge" })).length).toBeGreaterThan(0);
     expect(api.saveManualCount).not.toHaveBeenCalled();
   });
 
   it("Clear discards staged counts after a confirm", async () => {
     await open();
-    fireEvent.click(screen.getAllByText("Zero all")[0]);
+    fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
 
     fireEvent.click(screen.getAllByRole("button", { name: /Clear/ })[0]);
@@ -207,9 +208,9 @@ describe("ManualCountPage - undo of staged edits", () => {
     expect(screen.queryAllByRole("button", { name: /Undo/ })).toHaveLength(0);
   });
 
-  it("undoes Zero all in one step", async () => {
+  it("undoes Clear all in one step", async () => {
     await open();
-    fireEvent.click(screen.getAllByText("Zero all")[0]);
+    fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
 
     undo();
@@ -257,7 +258,7 @@ describe("ManualCountPage - undo of staged edits", () => {
 
   it("works from the keyboard when not typing in a cell", async () => {
     await open();
-    fireEvent.click(screen.getAllByText("Zero all")[0]);
+    fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
 
     fireEvent.keyDown(window, { key: "z", ctrlKey: true });
@@ -299,7 +300,7 @@ describe("ManualCountPage - publishing the sheet", () => {
 
   it("will not publish while counts are staged but unsaved", async () => {
     await open();
-    fireEvent.click(screen.getAllByText("Zero all")[0]);
+    fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
     expect((screen.getAllByRole("button", { name: /Publish/ })[0] as HTMLButtonElement).disabled).toBe(true);
   });

@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import type { StockLocation, TotalStockRow } from "../types";
 import { colors } from "../theme";
+import { sumRounded } from "../utils/gridFormat";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { ChevronIcon } from "./icons";
 
@@ -55,7 +56,7 @@ export function TotalStocksTable({
     groups.set(row.product.category, list);
   }
 
-  const grandTotal = rows.reduce((sum, r) => sum + r.totalRemainingStock, 0);
+  const grandTotal = sumRounded(rows.map((r) => r.totalRemainingStock));
 
   // Which remaining-stock column(s) are visible for the current source
   // filter - "TOTAL" shows all three (the original layout), "ONLINE"/
@@ -204,22 +205,19 @@ export function TotalStocksTable({
                   </td>
                   {showOnline && (
                     <td>
-                      {groupRows
-                        .reduce((s, r) => s + r.onlineRemainingStock, 0)
+                      {sumRounded(groupRows.map((r) => r.onlineRemainingStock))
                         .toLocaleString()}
                     </td>
                   )}
                   {showOffline && (
                     <td>
-                      {groupRows
-                        .reduce((s, r) => s + r.offlineRemainingStock, 0)
+                      {sumRounded(groupRows.map((r) => r.offlineRemainingStock))
                         .toLocaleString()}
                     </td>
                   )}
                   {showTotal && (
                     <td>
-                      {groupRows
-                        .reduce((s, r) => s + r.totalRemainingStock, 0)
+                      {sumRounded(groupRows.map((r) => r.totalRemainingStock))
                         .toLocaleString()}
                     </td>
                   )}
@@ -233,15 +231,13 @@ export function TotalStocksTable({
             </td>
             {showOnline && (
               <td>
-                {rows
-                  .reduce((s, r) => s + r.onlineRemainingStock, 0)
+                {sumRounded(rows.map((r) => r.onlineRemainingStock))
                   .toLocaleString()}
               </td>
             )}
             {showOffline && (
               <td>
-                {rows
-                  .reduce((s, r) => s + r.offlineRemainingStock, 0)
+                {sumRounded(rows.map((r) => r.offlineRemainingStock))
                   .toLocaleString()}
               </td>
             )}

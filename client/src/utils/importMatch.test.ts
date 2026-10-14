@@ -171,21 +171,24 @@ describe("findMatchingProduct - duplicate product names across categories", () =
     expect(findMatchingProduct(rows, "Sweet A", "Class A (Liter)")?.product.id).toBe(1);
   });
 
-  it("is case/punctuation-insensitive on both the name and the category", () => {
-    // Mirrors the real report's own inconsistency: "CLASS A -(LITER)" (with a
-    // stray dash) vs the app's own "Class A (Liter)".
-    expect(findMatchingProduct(rows, "sweet a", "CLASS A -(LITER)")?.product.id).toBe(1);
+  it("ignores case and stray spacing in the name, and punctuation in the category heading", () => {
+    // The category is a heading ("CLASS A -(LITER)" vs "Class A (Liter)"); the
+    // product name only tolerates what a person can't see.
+    expect(findMatchingProduct(rows, "  sweet   a ", "CLASS A -(LITER)")?.product.id).toBe(1);
+  });
+
+  it("is strict on product names: punctuation or extra characters do not match", () => {
+    expect(findMatchingProduct(rows, "Sweet-A", "Class A (Liter)")).toBeUndefined();
+    expect(findMatchingProduct(rows, "Sweet A2", "Class A (Liter)")).toBeUndefined();
+    expect(findMatchingProduct(rows, "Sweet", "Class A (Liter)")).toBeUndefined();
   });
 
   it("returns undefined for a name that matches but in a category it was never in", () => {
     expect(findMatchingProduct(rows, "Sweet A", "Premium (350ML)")).toBeUndefined();
   });
 
-  it("falls back to the first name-only match when no category is given", () => {
-    // Only safe because CsvTools always supplies a category once one's known
-    // (see its own currentCategory tracking) - documented here so a caller
-    // that skips category isn't surprised which of the duplicates it gets.
-    expect(findMatchingProduct(rows, "Sweet A", undefined)?.product.id).toBe(1);
+  it("refuses to guess between duplicates when no category is given", () => {
+    expect(findMatchingProduct(rows, "Sweet A", undefined)).toBeUndefined();
   });
 
   it("still matches a product whose name doesn't repeat, category or not", () => {

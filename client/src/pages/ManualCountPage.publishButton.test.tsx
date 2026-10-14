@@ -76,7 +76,7 @@ describe("ManualCountPage - Publish button", () => {
     grid(null);
     await open();
     fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
-    fireEvent.click(screen.getAllByText("Zero all")[0]);
+    fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
     expect(publishButton().classList.contains("ae-toolbar-publish--ready")).toBe(false);
     expect((publishButton() as HTMLButtonElement).disabled).toBe(true);

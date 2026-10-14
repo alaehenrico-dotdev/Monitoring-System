@@ -2,6 +2,7 @@ import { getOnlineGrid } from "./dailyOnlineStock.service";
 import { getOfflineGrid } from "./dailyOfflineStock.service";
 import { getTotalStocksGrid } from "./totalStocks.service";
 import { toDateOnlyString } from "../utils/date";
+import { findFrozenSnapshot, snapshotMeta } from "./dailyReportSnapshot.service";
 
 /// Merges a date's Morning and Night grids down to one row per product for
 /// the Daily Report's printable view (Section 4.8) - the report itself
@@ -23,7 +24,7 @@ function mergeShiftGrids<T extends { product: { id: number }; isSaved?: boolean 
  * Excel printout. This service only composes the read models above - it
  * holds no stock-calculation logic of its own.
  */
-export async function getDailyReport(entryDate: Date) {
+export async function buildDailyReport(entryDate: Date) {
   const [onlineMorning, onlineNight, offlineMorning, offlineNight, total] = await Promise.all([
     getOnlineGrid(entryDate, "MORNING"),
     getOnlineGrid(entryDate, "NIGHT"),
@@ -38,4 +39,15 @@ export async function getDailyReport(entryDate: Date) {
     offline: mergeShiftGrids(offlineMorning, offlineNight),
     total,
   };
+}
+
+/// What the Daily Report endpoint serves: the frozen snapshot once the day has
+/// been finished (so it can never change afterwards), the live figures
+/// otherwise. `snapshot` tells the page which one it is looking at.
+export async function getDailyReport(entryDate: Date) {
+  const frozen = await findFrozenSnapshot(entryDate);
+  if (frozen) {
+    return { ...(frozen.payload as unknown as Awaited<ReturnType<typeof buildDailyReport>>), snapshot: snapshotMeta(frozen) };
+  }
+  return { ...(await buildDailyReport(entryDate)), snapshot: null };
 }

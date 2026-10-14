@@ -338,7 +338,7 @@ describe("ChangeLogPage - paging and export", () => {
 
     await waitFor(() => expect(api.saveBlob).toHaveBeenCalled());
     expect(api.exportChangeLogCsv).toHaveBeenCalledWith(expect.objectContaining({ importOnly: true }));
-    expect(api.saveBlob.mock.calls[0][1]).toBe("change-log.csv");
+    expect(api.saveBlob.mock.calls[0][1]).toMatch(/^change-log-\d{4}-\d{2}-\d{2}\.csv$/);
   });
 
   it("reports a failed export instead of failing silently", async () => {

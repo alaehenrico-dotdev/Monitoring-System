@@ -104,22 +104,73 @@ export function categoryKey(s: string): string {
   return CATEGORY_ALIASES[normalized] ?? normalized;
 }
 
+/// The STRICT comparison used for product names. Only differences that are
+/// invisible to a person are ignored - letter case, leading/trailing spaces,
+/// repeated or non-breaking spaces (Excel exports them) - so "Sweet A" and
+/// "SWEET  A " are the same product but "Sweet-A", "Sweet A2" and "Sweet" are
+/// not. A near miss goes to the Review modal's unmatched list instead, where a
+/// person can accept a suggestion; it is never attached to a SKU on a guess.
+export function strictNameKey(s: string): string {
+  return s.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
 /// Resolves one imported row's raw product name (+ category, when known) to
-/// the matching row in `rows`. Product names repeat across categories (e.g.
+/// the matching row in `rows`. The name must match strictly (strictNameKey);
+/// the category is the looser section-header comparison (categoryKey), since
+/// those are headings, not SKUs. Product names repeat across categories (e.g.
 /// "Sweet A" exists in both Class A (Liter) and Class A (Gallon)) - matching
 /// on category too, whenever it's known (an explicit column, or an inferred
 /// section header - see CsvTools.tsx's currentCategory tracking), avoids
-/// silently updating the wrong SKU. When category is undefined, the first
-/// name-only match wins - only safe when the file has no duplicate names
-/// across categories, or always resolves its own category by then.
+/// silently updating the wrong SKU. When category is undefined and the name
+/// exists in more than one category, the row is ambiguous and returns
+/// undefined (it lands in the Review modal's unmatched list for a person to
+/// resolve) rather than guessing the first one.
 export function findMatchingProduct<T extends { product: { name: string; category: string } }>(
   rows: T[],
   productName: string,
   category: string | undefined,
 ): T | undefined {
-  return rows.find(
+  const matches = rows.filter(
     (r) =>
-      normalizeForMatch(r.product.name) === normalizeForMatch(productName) &&
+      strictNameKey(r.product.name) === strictNameKey(productName) &&
       (category === undefined || categoryKey(r.product.category) === categoryKey(category)),
   );
+  return matches.length === 1 || (category !== undefined && matches.length > 1) ? matches[0] : undefined;
+}
+
+export function levenshtein(a: string, b: string): number {
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const prevRow = new Array<number>(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prevRow[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let prevDiag = prevRow[0];
+    prevRow[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const temp = prevRow[j];
+      prevRow[j] =
+        a[i - 1] === b[j - 1]
+          ? prevDiag
+          : 1 + Math.min(prevDiag, prevRow[j], prevRow[j - 1]);
+      prevDiag = temp;
+    }
+  }
+  return prevRow[b.length];
+}
+
+/// A minimum similarity below which a "did you mean" suggestion does more
+/// harm than good (attaching a receipt-style edit to an unrelated SKU).
+export const FUZZY_MATCH_THRESHOLD = 0.6;
+
+/// Tolerant similarity used only for the Review modal's suggestion on an
+/// unmatched row - normalizeForMatch's exact equality (the real match used
+/// during parsing) is deliberately strict so a row is never silently
+/// attached to the wrong SKU; this is purely to help a human decide, never
+/// applied automatically.
+export function fuzzyScore(a: string, b: string): number {
+  const na = normalizeForMatch(a);
+  const nb = normalizeForMatch(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  return 1 - levenshtein(na, nb) / Math.max(na.length, nb.length);
 }

@@ -76,7 +76,7 @@ export async function saveManualCount(
     return saved;
   }
 
-  await assertPeriodOpen(entryDate, shift, db);
+  await assertPeriodOpen(entryDate, shift, db, "count");
   const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
   const systemRemainingStock = await getSystemRemainingStock(productId, entryDate, shift, location, db);
@@ -142,7 +142,7 @@ export async function deleteManualCount(
 
   const existing = await manualCountRepository.findOne(productId, entryDate, shift, location, db);
   if (!existing) return false;
-  await assertPeriodOpen(entryDate, shift, db);
+  await assertPeriodOpen(entryDate, shift, db, "count");
 
   await manualCountRepository.delete(existing.id, db);
 
@@ -184,7 +184,8 @@ export async function propagateOpeningStock(
   causedById?: number,
 ) {
   if (location === "TOTAL") return;
-  let cursor = { entryDate, shift };
+  // A count opens the next DAY: start the walk past this date's Night shift.
+  let cursor = { entryDate, shift: "NIGHT" as Shift };
   for (;;) {
     let nextPeriod: { entryDate: Date; shift: Shift };
 
@@ -456,13 +457,22 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
       if (pending.length === 0) throw HttpError.badRequest("There are no saved counts waiting to be published for this shift");
 
       const now = new Date();
+      // A count only opens the NEXT day, so a product with no saved row after
+      // this date has nothing to re-derive - skip its walk (the common case)
+      // rather than paying a query per count to find that out.
+      const idsFor = (location: StockLocation) => pending.filter((c) => c.location === location).map((c) => c.productId);
+      const [onlineHasLater, offlineHasLater] = await Promise.all([
+        dailyOnlineStockRepository.productIdsWithRowsAfterDate(idsFor("ONLINE"), entryDate, tx),
+        dailyOfflineStockRepository.productIdsWithRowsAfterDate(idsFor("OFFLINE"), entryDate, tx),
+      ]);
       for (const count of pending) {
         const published = await manualCountRepository.markPublished(count.id, userId ?? null, now, tx);
         const changeId = await recordChange(
           { tableName: TABLE, recordId: count.id, action: "UPDATE", changedById: userId, oldValue: count, newValue: published },
           tx,
         );
-        await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId);
+        const hasLater = count.location === "ONLINE" ? onlineHasLater : count.location === "OFFLINE" ? offlineHasLater : null;
+        if (hasLater?.has(count.productId)) await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId);
       }
       return { published: pending.length, publishedAt: now };
     },

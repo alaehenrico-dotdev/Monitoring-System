@@ -1,6 +1,6 @@
 import { ChangeAction } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
-import { changeLogRepository, REPORTS_TABLE, type ChangeLogFilters } from "../repositories/changeLogRepository";
+import { changeLogRepository, REPORTS_TABLE, SNAPSHOT_TABLE, type ChangeLogFilters } from "../repositories/changeLogRepository";
 import { toDateOnlyString } from "../utils/date";
 import { diffChanges, summarizeChange } from "../utils/changeSummary";
 
@@ -162,6 +162,7 @@ async function enrich(rows: Row[]) {
 
     const isSystem = r.tableName === "system";
     const isReport = r.tableName === REPORTS_TABLE;
+    const isSnapshot = r.tableName === SNAPSHOT_TABLE;
     const source: ChangeLogSource =
       r.importBatchId !== null ? "import" : isSystem && asObject(r.newValue).event === "data_reset" ? "reset" : null;
 
@@ -169,8 +170,16 @@ async function enrich(rows: Row[]) {
       ...r,
       context,
       source,
-      summary: isSystem ? null : isReport ? describeReport(r.newValue) : summarizeChange(r.action, r.oldValue, r.newValue),
-      changes: isSystem || isReport ? [] : diffChanges(r.oldValue, r.newValue),
+      summary: isSystem
+        ? null
+        : isReport
+          ? describeReport(r.newValue)
+          : isSnapshot
+            ? r.action === "UPDATE"
+              ? "Daily report saved again; the previous version is kept in this entry"
+              : "Daily report saved when the day was finished"
+            : summarizeChange(r.action, r.oldValue, r.newValue),
+      changes: isSystem || isReport || isSnapshot ? [] : diffChanges(r.oldValue, r.newValue),
     };
   });
 }
