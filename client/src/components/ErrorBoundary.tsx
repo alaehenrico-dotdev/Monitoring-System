@@ -48,7 +48,7 @@ export class ErrorBoundary extends Component<Props, State> {
         role="alert"
         style={{
           fontFamily: fonts.body,
-          minHeight: "100vh",
+          minHeight: "var(--ae-vh)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",

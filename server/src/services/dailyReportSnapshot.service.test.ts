@@ -29,25 +29,36 @@ describe("findFrozenSnapshot", () => {
   });
 
   it("serves the snapshot when every shift with entries is closed", async () => {
-    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", isClosed: true }]);
+    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", onlineLocked: true, offlineLocked: true }]);
     expect(await findFrozenSnapshot(DATE)).toBe(SNAP);
   });
 
   it("goes live when a shift with entries was never finished", async () => {
     db.dailyOnlineStock.groupBy.mockResolvedValue([{ shift: "MORNING" }, { shift: "NIGHT" }]);
-    db.dayClosure.findMany.mockResolvedValue([{ shift: "MORNING", isClosed: true }]);
+    db.dayClosure.findMany.mockResolvedValue([{ shift: "MORNING", onlineLocked: true, offlineLocked: true }]);
     expect(await findFrozenSnapshot(DATE)).toBeNull();
   });
 
   it("goes live once an admin unlocks the shift", async () => {
-    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", isClosed: false }]);
+    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", onlineLocked: false, offlineLocked: false }]);
     expect(await findFrozenSnapshot(DATE)).toBeNull();
+  });
+
+  it("goes live while one page of a shift is finished but the other, which has entries, is not", async () => {
+    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", onlineLocked: true, offlineLocked: false }]);
+    expect(await findFrozenSnapshot(DATE)).toBeNull();
+  });
+
+  it("serves the snapshot when the only page with entries is finished", async () => {
+    db.dailyOfflineStock.groupBy.mockResolvedValue([]);
+    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", onlineLocked: true, offlineLocked: false }]);
+    expect(await findFrozenSnapshot(DATE)).toBe(SNAP);
   });
 
   it("ignores a shift that has no entries at all", async () => {
     db.dailyOnlineStock.groupBy.mockResolvedValue([{ shift: "NIGHT" }]);
     db.dailyOfflineStock.groupBy.mockResolvedValue([]);
-    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", isClosed: true }]);
+    db.dayClosure.findMany.mockResolvedValue([{ shift: "NIGHT", onlineLocked: true, offlineLocked: true }]);
     expect(await findFrozenSnapshot(DATE)).toBe(SNAP);
   });
 });

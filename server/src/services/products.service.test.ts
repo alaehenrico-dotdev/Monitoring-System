@@ -12,7 +12,10 @@ vi.mock("../repositories/productRepository", () => ({
 }));
 vi.mock("./changeLog.service", () => ({
   recordChange: vi.fn(),
+  logSystemEvent: vi.fn(),
 }));
+vi.mock("../lib/prisma", () => ({ prisma: {}, serializableTransaction: vi.fn() }));
+vi.mock("../lib/realtime", () => ({ broadcastRealtimeEvent: vi.fn() }));
 
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
@@ -31,14 +34,14 @@ describe("listProducts", () => {
 });
 
 describe("createProduct", () => {
-  it("assigns the next sort order for the category when none is given, and records the change", async () => {
+  it("appends to the end of the list when no sort order is given, and records the change", async () => {
     vi.mocked(productRepository.nextSortOrder).mockResolvedValue(3);
     const created = { id: 1, name: "Sweet A", category: "Class A", unit: "Liter", sortOrder: 3 };
     vi.mocked(productRepository.create).mockResolvedValue(created as never);
 
     const result = await createProduct({ name: "Sweet A", category: "Class A", unit: "Liter" }, 7);
 
-    expect(productRepository.nextSortOrder).toHaveBeenCalledWith("Class A");
+    expect(productRepository.nextSortOrder).toHaveBeenCalledWith();
     expect(productRepository.create).toHaveBeenCalledWith(expect.objectContaining({ name: "Sweet A", sortOrder: 3 }));
     expect(recordChange).toHaveBeenCalledWith(
       expect.objectContaining({ tableName: "products", action: "CREATE", changedById: 7, newValue: created }),

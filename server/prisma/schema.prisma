@@ -424,6 +424,12 @@ model DayClosure {
   /// the audit can still happen after the entries are done. An admin's full
   /// "Close day" sets this back to false and locks everything.
   entriesOnly  Boolean   @default(false)
+  /// Finishing is per entry page: Online and Offline are locked separately,
+  /// by their own encoder. `isClosed` is true only when BOTH are locked (an
+  /// admin's full close, or both pages finished); a change to one locked page
+  /// that would also change the other needs an admin's approval.
+  onlineLocked  Boolean  @default(true)
+  offlineLocked Boolean  @default(true)
 
   @@unique([entryDate, shift])
   @@map("day_closures")

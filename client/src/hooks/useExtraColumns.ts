@@ -60,8 +60,16 @@ export function isExtraColumnKey(key: string): boolean {
   return parseExtraColumnKey(key) !== null;
 }
 
-export function extraColumnLabel(mainLabel: string, slot: number): string {
-  return `${mainLabel} +${slot}`;
+/// What an added column is called everywhere it is shown (Preview, PDF, CSV,
+/// reports): the name typed into its header when there is one, otherwise the
+/// generic "Delivery (Out) +1". `names` is keyed by extraColumnKey.
+export function extraColumnLabel(
+  mainLabel: string,
+  slot: number,
+  typedName?: string,
+): string {
+  const name = typedName?.trim();
+  return name ? name : `${mainLabel} +${slot}`;
 }
 
 /**
@@ -87,12 +95,13 @@ export function withoutExtraColumns(
 export function extraColumnList(
   columns: { key: string; label: string }[],
   extras: ExtraColumnsByKey,
+  names?: Record<string, string>,
 ): { key: string; label: string }[] {
   return columns.flatMap((c) =>
-    (extras[c.key] ?? []).map((slot) => ({
-      key: extraColumnKey(c.key, slot),
-      label: extraColumnLabel(c.label, slot),
-    })),
+    (extras[c.key] ?? []).map((slot) => {
+      const key = extraColumnKey(c.key, slot);
+      return { key, label: extraColumnLabel(c.label, slot, names?.[key]) };
+    }),
   );
 }
 
@@ -153,14 +162,15 @@ export interface StockExtraPayload {
 export function columnsWithExtras<T extends { key: string; label: string }>(
   columns: T[],
   extras: ExtraColumnsByKey,
+  names?: Record<string, string>,
 ): { key: string; label: string }[] {
   if (Object.keys(extras).length === 0) return columns;
   return columns.flatMap((c) => [
     c,
-    ...(extras[c.key] ?? []).map((slot) => ({
-      key: extraColumnKey(c.key, slot),
-      label: extraColumnLabel(c.label, slot),
-    })),
+    ...(extras[c.key] ?? []).map((slot) => {
+      const key = extraColumnKey(c.key, slot);
+      return { key, label: extraColumnLabel(c.label, slot, names?.[key]) };
+    }),
   ]);
 }
 

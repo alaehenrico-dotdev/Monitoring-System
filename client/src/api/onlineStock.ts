@@ -1,5 +1,6 @@
 import { http } from "./http";
 import type { OnlineEntry, OnlineGridRow, Shift } from "../types";
+import type { HeldTransfer } from "./offlineStock";
 
 export async function getOnlineGrid(date: string, shift: Shift): Promise<OnlineGridRow[]> {
   return http.get<OnlineGridRow[]>(`/online-stock?date=${date}&shift=${shift}`);
@@ -19,8 +20,8 @@ export interface OnlineEntryInput {
   clearExtraColumns?: string[];
 }
 
-export async function saveOnlineEntry(productId: number, date: string, shift: Shift, input: OnlineEntryInput): Promise<OnlineEntry> {
-  return http.put<OnlineEntry>(
+export async function saveOnlineEntry(productId: number, date: string, shift: Shift, input: OnlineEntryInput): Promise<OnlineEntry & { heldForApproval?: HeldTransfer[] }> {
+  return http.put<OnlineEntry & { heldForApproval?: HeldTransfer[] }>(
     `/online-stock/${productId}?date=${date}&shift=${shift}`,
     input,
   );

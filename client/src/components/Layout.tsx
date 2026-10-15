@@ -51,7 +51,7 @@ export function Layout() {
         className="app-shell"
         style={{
           fontFamily: fonts.body,
-          height: "100vh",
+          height: "var(--ae-vh)",
           display: "flex",
           overflow: "hidden",
         }}

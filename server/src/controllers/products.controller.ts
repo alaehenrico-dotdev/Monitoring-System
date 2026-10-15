@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { createProduct, deactivateProduct, listProducts, updateProduct } from "../services/products.service";
+import { createProduct, deactivateProduct, listProducts, reorderProducts, updateProduct } from "../services/products.service";
 import { HttpError } from "../utils/HttpError";
 import { syncProductsFromSheet } from "../services/productSync.service";
 
@@ -55,4 +55,13 @@ export async function postProductSync(req: Request, res: Response) {
   const parsed = syncSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid product sync payload", parsed.error.flatten());
   res.json(await syncProductsFromSheet(parsed.data.items, req.user?.id));
+}
+
+const reorderSchema = z.object({ orderedIds: z.array(z.number().int().positive()).min(1).max(5000) });
+
+/// Supervisor/Admin: set the product sequence used by every grid and report.
+export async function putProductOrder(req: Request, res: Response) {
+  const parsed = reorderSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest("Invalid product order payload", parsed.error.flatten());
+  res.json(await reorderProducts(parsed.data.orderedIds, req.user?.id));
 }

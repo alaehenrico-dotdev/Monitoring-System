@@ -41,6 +41,10 @@
    stay fixed on the sidebar, dashboard, login screen, and table headers,
    which are permanently dark by design in both modes. */
 :root {
+  /* Viewport height that follows mobile browser bars. 100vh is the tallest the
+     viewport gets (bars hidden), so full-height shells overflowed and their
+     bottoms were cut off on phones; dvh tracks the bars. Falls back to vh. */
+  --ae-vh: 100vh;
   /* ---- Motion -----------------------------------------------------------
      One vocabulary for interaction timing. These durations were already in
      the file as ad-hoc 100/120/150/180/220/240ms values picked per rule;
@@ -158,6 +162,11 @@
   --ae-surface-glass: rgba(255, 255, 255, 0.4);
   --ae-header-glass: rgba(231, 223, 201, 0.7);
   --ae-glass-blur: blur(14px) saturate(140%);
+}
+@supports (height: 100dvh) {
+  :root {
+    --ae-vh: 100dvh;
+  }
 }
 
 :root[data-theme="dark"] {
@@ -450,18 +459,27 @@ table input[type="number"] {
   border: none;
   border-radius: 0;
   background: transparent;
-  color: #0c0c0c;
+  color: #000;
   font: inherit;
   font-weight: 700;
   text-align: center;
   outline: none;
 }
 .ae-extra-head-input::placeholder {
-  color: rgba(12, 12, 12, 0.45);
+  color: rgba(0, 0, 0, 0.5);
   font-weight: 500;
 }
 .ae-extra-head-input:focus {
-  box-shadow: inset 0 0 0 2px #0c0c0c;
+  box-shadow: inset 0 0 0 2px #000;
+}
+:root[data-theme="dark"] .ae-extra-head-input {
+  color: #fff;
+}
+:root[data-theme="dark"] .ae-extra-head-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+:root[data-theme="dark"] .ae-extra-head-input:focus {
+  box-shadow: inset 0 0 0 2px #fff;
 }
 /* Manual Count and Total Stocks grids: header labels centered over their
    column instead of stuck flush-left, regardless of how that column's own
@@ -2184,7 +2202,7 @@ table input[type="number"] {
   padding-right: 0;
   flex: 0 0 var(--tb-h);
 }
-/* Expand/collapse-all categories: a bare icon, no border or box. */
+/* Expand/collapse-all categories and Arrange product order: a bare icon, no border or box. */
 .ae-toolbar .ae-btn.ae-toolbar-collapse-btn,
 .ae-toolbar .ae-btn.ae-toolbar-collapse-btn:hover:not(:disabled),
 .ae-toolbar .ae-btn.ae-toolbar-collapse-btn:active:not(:disabled) {

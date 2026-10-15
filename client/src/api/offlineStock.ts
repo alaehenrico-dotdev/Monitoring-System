@@ -23,13 +23,22 @@ export interface OfflineEntryInput {
   clearExtraColumns?: string[];
 }
 
+/// A transfer change the server did not apply because it would also change the
+/// other entry page, which is already finished: it waits in the admin's
+/// Corrections queue and applies to both pages once approved.
+export interface HeldTransfer {
+  field: string;
+  before: number;
+  proposed: number;
+}
+
 export async function saveOfflineEntry(
   productId: number,
   date: string,
   shift: Shift,
   changes: OfflineEntryInput | Record<string, number>,
-): Promise<OfflineEntry> {
-  return http.put<OfflineEntry>(
+): Promise<OfflineEntry & { heldForApproval?: HeldTransfer[] }> {
+  return http.put<OfflineEntry & { heldForApproval?: HeldTransfer[] }>(
     `/offline-stock/${productId}?date=${date}&shift=${shift}`,
     changes,
   );

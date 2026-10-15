@@ -31,7 +31,7 @@ vi.mock("../repositories/productRepository", () => ({
     findActiveById: vi.fn(),
   },
 }));
-vi.mock("./dayLock.service", () => ({ assertPeriodOpen: vi.fn(), assertEarlierDaysFinished: vi.fn() }));
+vi.mock("./dayLock.service", () => ({ assertPeriodOpen: vi.fn(), assertEarlierDaysFinished: vi.fn(), isCounterpartLocked: vi.fn().mockResolvedValue(false) }));
 vi.mock("./changeLog.service", () => ({
   recordChange: vi.fn(),
 }));

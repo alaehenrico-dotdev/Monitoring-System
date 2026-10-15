@@ -196,7 +196,7 @@ export async function propagateOpeningStock(
       const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
       // A carry-forward must not quietly rewrite a closed day.
-      await assertPeriodOpen(next.entryDate, next.shift, db);
+      await assertPeriodOpen(next.entryDate, next.shift, db, "entry", "ONLINE");
       const onlineStock = calculateOnlineStock(openingStock, toNum(next.stockInOffToOl), toNum(next.stockOutOlToOff));
       const remainingStock = calculateOnlineRemaining(onlineStock, toNum(next.productionIn), toNum(next.fulfillmentOut), toNum(next.rts));
       const updated = await dailyOnlineStockRepository.upsert(
@@ -227,7 +227,7 @@ export async function propagateOpeningStock(
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
       const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
-      await assertPeriodOpen(next.entryDate, next.shift, db);
+      await assertPeriodOpen(next.entryDate, next.shift, db, "entry", "OFFLINE");
       const offlineStock = calculateOfflineStock(openingStock, toNum(next.stockInOlToOff), toNum(next.stockOutOffToOl));
       const remainingStock = calculateOfflineRemaining(
         offlineStock,

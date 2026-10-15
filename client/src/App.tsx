@@ -99,7 +99,7 @@ export default function App() {
             <TopProgressBar />
             <Suspense
               fallback={
-                <LoadingBlock label="" minHeight="100vh" size="xxl" />
+                <LoadingBlock label="" minHeight="var(--ae-vh)" size="xxl" />
               }
             >
               <Routes>

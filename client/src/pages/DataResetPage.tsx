@@ -35,12 +35,15 @@ const PANEL_RED = "#e2555c";
 
 const WIPED_ITEMS = [
   "Online & offline stock entries",
+  "Added-column names",
   "Manual counts",
-  "Daily & variance reports",
-  "Change log",
+  "Finished (locked) days",
+  "Saved Daily Reports & report history",
+  "Pending corrections & held transfers",
+  "Change log (including archived)",
 ];
 const PRESERVED_ITEMS = [
-  "Products & categories",
+  "Products, categories & their order",
   "User accounts & roles",
   "System settings",
 ];

@@ -7,7 +7,8 @@ import { HttpError } from "../utils/HttpError";
 const createSchema = z.object({
   name: z.string().min(1),
   username: z.string().min(3),
-  password: z.string().min(6),
+  // Same floor as a password reset (below); max 72 because bcrypt ignores the rest.
+  password: z.string().min(8, "Password must be at least 8 characters").max(72),
   role: z.nativeEnum(Role),
 });
 

@@ -12,6 +12,7 @@ import {
   type ActionQueue,
   type CloseReadiness,
   type DayClosure,
+  type EntryLocation,
   type QueueItem,
 } from "../api/ops";
 import type { Shift } from "../types";
@@ -200,6 +201,8 @@ function ClosingTab() {
   const [busyShift, setBusyShift] = useState<Shift | null>(null);
   const busy = busyShift !== null;
   const [unlocking, setUnlocking] = useState<Shift | null>(null);
+  // Which entry page to unlock: one of them, or both ("ALL").
+  const [unlockScope, setUnlockScope] = useState<EntryLocation | "ALL">("ALL");
   const [reason, setReason] = useState("");
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
@@ -224,7 +227,14 @@ function ClosingTab() {
     };
   }, [date, version]);
 
-  const isClosed = (s: Shift) => closures?.some((c) => c.entryDate.slice(0, 10) === date && c.shift === s && c.isClosed) ?? false;
+  const closureOf = (s: Shift) => closures?.find((c) => c.entryDate.slice(0, 10) === date && c.shift === s);
+  // Each entry page is finished by its own encoder, so a shift can be finished
+  // on one page only. "Closed" means both are.
+  const isClosed = (s: Shift) => closureOf(s)?.isClosed ?? false;
+  const lockedPages = (s: Shift) => {
+    const c = closureOf(s);
+    return { online: !!c?.onlineLocked, offline: !!c?.offlineLocked };
+  };
 
   /// Runs one close/unlock for a shift. Returns whether it worked, so a dialog
   /// can stay open (showing its own busy state) until then.
@@ -258,6 +268,8 @@ function ClosingTab() {
       <div className="ae-panel" style={{ marginTop: 12 }}>
         {SHIFTS.map((s) => {
           const closed = isClosed(s);
+          const pages = lockedPages(s);
+          const anyLocked = pages.online || pages.offline;
           const r = readiness[s];
           return (
             <div key={s} style={{ ...rowStyle, alignItems: "flex-start" }}>
@@ -265,22 +277,27 @@ function ClosingTab() {
               <span style={{ flex: 1, minWidth: 0 }}>
                 {closed ? (
                   <span className="ae-dash-chip ae-dash-chip--done">Closed</span>
+                ) : anyLocked ? (
+                  <span className="ae-dash-chip ae-dash-chip--progress">
+                    {pages.online ? "Online finished" : "Offline finished"} · other page open
+                  </span>
                 ) : r?.ready ? (
                   <span className="ae-dash-chip ae-dash-chip--progress">Ready to close</span>
                 ) : (
                   <span className="ae-dash-chip ae-dash-chip--idle">Not ready</span>
                 )}
-                {!closed && r && !r.ready && (
+                {!closed && !anyLocked && r && !r.ready && (
                   <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.subtleInk, fontSize: 12.5 }}>
                     {r.problems.map((p) => <li key={p}>{p}</li>)}
                   </ul>
                 )}
               </span>
-              {closed ? (
-                <Button className="ae-btn-solid" size="sm" disabled={busy} onClick={() => { setReason(""); setUnlocking(s); }}>
+              {anyLocked && (
+                <Button className="ae-btn-solid" size="sm" disabled={busy} onClick={() => { setReason(""); setUnlockScope("ALL"); setUnlocking(s); }}>
                   Unlock…
                 </Button>
-              ) : (
+              )}
+              {!closed && (
                 <Button
                   className="ae-btn-solid"
                   size="sm"
@@ -311,9 +328,13 @@ function ClosingTab() {
               <span style={{ flex: 1, minWidth: 0, color: colors.subtleInk, fontSize: 12.5 }}>
                 {c.isClosed
                   ? `Closed ${new Date(c.closedAt).toLocaleString()}${c.closedBy ? ` by ${c.closedBy.name}` : ""}`
-                  : `Unlocked ${c.unlockedAt ? new Date(c.unlockedAt).toLocaleString() : ""}${c.unlockedBy ? ` by ${c.unlockedBy.name}` : ""}: ${c.unlockReason ?? ""}`}
+                  : c.onlineLocked || c.offlineLocked
+                    ? `${c.onlineLocked ? "Online" : "Offline"} finished ${new Date(c.closedAt).toLocaleString()}${c.closedBy ? ` by ${c.closedBy.name}` : ""}`
+                    : `Unlocked ${c.unlockedAt ? new Date(c.unlockedAt).toLocaleString() : ""}${c.unlockedBy ? ` by ${c.unlockedBy.name}` : ""}: ${c.unlockReason ?? ""}`}
               </span>
-              <span className={`ae-dash-chip ae-dash-chip--${c.isClosed ? "done" : "idle"}`}>{c.isClosed ? "Closed" : "Open"}</span>
+              <span className={`ae-dash-chip ae-dash-chip--${c.isClosed ? "done" : c.onlineLocked || c.offlineLocked ? "progress" : "idle"}`}>
+                {c.isClosed ? "Closed" : c.onlineLocked || c.offlineLocked ? "Partly" : "Open"}
+              </span>
             </div>
           ))}
         </div>
@@ -324,6 +345,25 @@ function ClosingTab() {
           <p style={{ margin: "0 0 10px", fontSize: 13 }}>
             Unlocking lets encoders change this day's numbers again. The reason is kept in the change log.
           </p>
+          {(() => {
+            const pages = lockedPages(unlocking);
+            return (
+              <label style={{ display: "block", fontSize: 12, fontWeight: 600, margin: "0 0 10px" }}>
+                Unlock
+                <select
+                  className="ae-input"
+                  aria-label="Which page to unlock"
+                  value={unlockScope}
+                  onChange={(e) => setUnlockScope(e.target.value as EntryLocation | "ALL")}
+                  style={{ marginLeft: 8 }}
+                >
+                  <option value="ALL">Both pages</option>
+                  {pages.online && <option value="ONLINE">Online only</option>}
+                  {pages.offline && <option value="OFFLINE">Offline only</option>}
+                </select>
+              </label>
+            );
+          })()}
           <textarea
             className="ae-input"
             aria-label="Reason for unlocking"
@@ -344,7 +384,7 @@ function ClosingTab() {
               onClick={() => {
                 const shift = unlocking;
                 // Stays open while it runs; closes only once it has worked.
-                void act(shift, () => unlockDay(date, shift, reason.trim())).then((ok) => ok && setUnlocking(null));
+                void act(shift, () => unlockDay(date, shift, reason.trim(), unlockScope === "ALL" ? undefined : unlockScope)).then((ok) => ok && setUnlocking(null));
               }}
             >
               Unlock day

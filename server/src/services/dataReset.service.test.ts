@@ -14,6 +14,12 @@ const db = vi.hoisted(() => ({
   importBatch: [] as Record<string, unknown>[],
   changeLog: [] as Record<string, unknown>[],
   reportHistoryEntry: [] as Record<string, unknown>[],
+  dayClosure: [] as Record<string, unknown>[],
+  dailyReportSnapshot: [] as Record<string, unknown>[],
+  extraColumnLabel: [] as Record<string, unknown>[],
+  correctionRequest: [] as Record<string, unknown>[],
+  changeLogArchive: [] as Record<string, unknown>[],
+  idempotencyKey: [] as Record<string, unknown>[],
 }));
 
 function makeModel(table: Record<string, unknown>[]) {
@@ -42,6 +48,12 @@ vi.mock("../lib/prisma", () => ({
         importBatch: makeModel(db.importBatch),
         changeLog: makeModel(db.changeLog),
         reportHistoryEntry: makeModel(db.reportHistoryEntry),
+        dayClosure: makeModel(db.dayClosure),
+        dailyReportSnapshot: makeModel(db.dailyReportSnapshot),
+        extraColumnLabel: makeModel(db.extraColumnLabel),
+        correctionRequest: makeModel(db.correctionRequest),
+        changeLogArchive: makeModel(db.changeLogArchive),
+        idempotencyKey: makeModel(db.idempotencyKey),
       }),
   },
 }));
@@ -72,5 +84,23 @@ describe("resetAllData", () => {
 
     expect(db.dailyOfflineStock).toHaveLength(0);
     expect(db.dailyStockExtra).toHaveLength(0);
+  });
+
+  it("also clears what the per-page Finish day, snapshots and approvals left behind", async () => {
+    db.dayClosure.push({ id: 1, entryDate: new Date("2026-06-01"), shift: "NIGHT", onlineLocked: true, offlineLocked: false });
+    db.dailyReportSnapshot.push({ id: 1, entryDate: new Date("2026-06-01"), payload: {} });
+    db.extraColumnLabel.push({ id: 1, location: "ONLINE", columnKey: "stockInOffToOl", slotIndex: 1, label: "Route A" });
+    db.correctionRequest.push({ id: 1, tableName: "daily_online_stock", recordId: 10, field: "stockInOffToOl", status: "PENDING" });
+    db.changeLogArchive.push({ id: 5, tableName: "daily_online_stock", recordId: 10 });
+    db.idempotencyKey.push({ id: 1, key: "abc", userId: 1 });
+
+    const token = verifyPasscode(env.dataResetPasscode, USER);
+    if (!token) throw new Error("test setup: passcode didn't verify against env.dataResetPasscode");
+    const result = await resetAllData(token, USER);
+
+    for (const table of [db.dayClosure, db.dailyReportSnapshot, db.extraColumnLabel, db.correctionRequest, db.changeLogArchive, db.idempotencyKey]) {
+      expect(table).toHaveLength(0);
+    }
+    expect(result.deleted).toMatchObject({ dayClosures: 1, reportSnapshots: 1, extraColumnLabels: 1, corrections: 1, changeLogArchive: 1, idempotencyKeys: 1 });
   });
 });

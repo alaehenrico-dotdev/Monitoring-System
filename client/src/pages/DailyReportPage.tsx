@@ -1,6 +1,7 @@
 import { useBusyAction } from "../hooks/useBusyAction";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
+import { getDayExtraNames, type DayExtraNames } from "../api/extraLabels";
 import { Button } from "../components/ui";
 import { Dropdown } from "../components/Dropdown";
 import { DatePicker } from "../components/DatePicker";
@@ -114,6 +115,11 @@ export function DailyReportPage() {
   const [date, setDate] = useState(searchParams.get("date") ?? today());
   const [report, setReport] = useState<DailyReport | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Names typed into added-column headers on the shown date's sheets.
+  const [extraNames, setExtraNames] = useState<DayExtraNames>({
+    ONLINE: {},
+    OFFLINE: {},
+  });
   // Which part of the report to show/export - defaults to the full,
   // three-section report (previous behavior). Picking a single section
   // filters both the on-screen view (so Print/PDF reflects just that
@@ -218,6 +224,9 @@ export function DailyReportPage() {
           return;
         }
         setReport(nextReport);
+        void getDayExtraNames(requestedDate).then((names) => {
+          if (id === requestId.current) setExtraNames(names);
+        });
         // Only a fresh Generate remounts the grids (every category expanded
         // again); a silent refresh keeps whatever the person had collapsed.
         if (!silent) setReportVersion((v) => v + 1);
@@ -272,12 +281,12 @@ export function DailyReportPage() {
     [report],
   );
   const onlineColumns = useMemo(
-    () => columnsWithExtras(onlineStockColumns, onlineExtras),
-    [onlineExtras],
+    () => columnsWithExtras(onlineStockColumns, onlineExtras, extraNames.ONLINE),
+    [onlineExtras, extraNames],
   );
   const offlineColumns = useMemo(
-    () => columnsWithExtras(offlineStockColumns, offlineExtras),
-    [offlineExtras],
+    () => columnsWithExtras(offlineStockColumns, offlineExtras, extraNames.OFFLINE),
+    [offlineExtras, extraNames],
   );
 
   // Report History records a report when it has actually been saved - the PDF
@@ -511,6 +520,7 @@ export function DailyReportPage() {
                   rows={byCategory(report.online) as unknown as GridRow[]}
                   columns={onlineStockColumns}
                   extraColumns={onlineExtras}
+                  extraNames={extraNames.ONLINE}
                   onCommit={noop}
                   readOnly
                 />
@@ -527,6 +537,7 @@ export function DailyReportPage() {
                   rows={byCategory(report.offline) as unknown as GridRow[]}
                   columns={offlineStockColumns}
                   extraColumns={offlineExtras}
+                  extraNames={extraNames.OFFLINE}
                   onCommit={noop}
                   readOnly
                 />
