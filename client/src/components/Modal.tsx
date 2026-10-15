@@ -63,7 +63,7 @@ export function Modal({
           boxShadow: "0 12px 40px rgba(12, 12, 12, 0.3)",
           width: "100%",
           maxWidth: width,
-          maxHeight: "85vh",
+          maxHeight: "calc(var(--ae-vh) * 0.85)",
           display: "flex",
           flexDirection: "column",
         }}

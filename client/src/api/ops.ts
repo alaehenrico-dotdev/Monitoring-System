@@ -36,7 +36,13 @@ export interface DayClosure {
   unlockReason: string | null;
   /// True for an encoder's Finish day: entries are frozen, Manual Counts are not.
   entriesOnly?: boolean;
+  /// Each entry page is finished on its own; `isClosed` means both are.
+  onlineLocked: boolean;
+  offlineLocked: boolean;
 }
+
+/// The two entry pages that are finished independently.
+export type EntryLocation = "ONLINE" | "OFFLINE";
 
 export interface CloseReadiness {
   ready: boolean;
@@ -55,6 +61,11 @@ export interface DayStatus {
   entryDate: string;
   shift: Shift;
   isClosed: boolean;
+  /// Whether the page asked about (`location`) is finished; with no location,
+  /// whether both are.
+  locked: boolean;
+  onlineLocked: boolean;
+  offlineLocked: boolean;
   closure: DayClosure | null;
   /// An earlier day with saved entries that is not finished yet: it has to be
   /// finished before this one can be entered. Null when nothing blocks.
@@ -64,20 +75,25 @@ export interface DayStatus {
 export interface FinishSummary {
   online: { saved: number; total: number };
   offline: { saved: number; total: number };
+  onlineLocked: boolean;
+  offlineLocked: boolean;
+  /// For the page asked about.
   alreadyFinished: boolean;
 }
 
 /// Open to every role - an encoder has to know a sheet is locked before typing.
-export const getDayStatus = (date: string, shift: Shift) =>
-  http.get<DayStatus>(`/day-closures/status?date=${date}&shift=${shift}`);
-export const getFinishSummary = (date: string, shift: Shift) =>
-  http.get<FinishSummary>(`/day-closures/finish-summary?date=${date}&shift=${shift}`);
-/// The encoder's Finish day: locks the entry grids and saves the Daily Report snapshot.
-export const finishDay = (date: string, shift: Shift) =>
-  http.post<FinishSummary & { finished: boolean }>("/day-closures/finish", { date, shift });
+export const getDayStatus = (date: string, shift: Shift, location?: EntryLocation) =>
+  http.get<DayStatus>(`/day-closures/status?date=${date}&shift=${shift}${location ? `&location=${location}` : ""}`);
+export const getFinishSummary = (date: string, shift: Shift, location?: EntryLocation) =>
+  http.get<FinishSummary>(`/day-closures/finish-summary?date=${date}&shift=${shift}${location ? `&location=${location}` : ""}`);
+/// The encoder's Finish day for their own entry page: locks that page only. The
+/// Daily Report snapshot is saved once the other page is finished too.
+export const finishDay = (date: string, shift: Shift, location: EntryLocation) =>
+  http.post<FinishSummary & { finished: boolean; reportSaved?: boolean }>("/day-closures/finish", { date, shift, location });
 export const closeDay = (date: string, shift: Shift) => http.post<DayClosure>("/day-closures/close", { date, shift });
-export const unlockDay = (date: string, shift: Shift, reason: string) =>
-  http.post<DayClosure>("/day-closures/unlock", { date, shift, reason });
+/// `location` unlocks one entry page; leave it out to unlock both.
+export const unlockDay = (date: string, shift: Shift, reason: string, location?: EntryLocation) =>
+  http.post<DayClosure>("/day-closures/unlock", { date, shift, reason, ...(location ? { location } : {}) });
 
 /* ---------------------------------------------------------- corrections */
 

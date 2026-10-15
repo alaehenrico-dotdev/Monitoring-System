@@ -10,6 +10,7 @@
  * whatever succeeded, and the caller gets every step's outcome so a missing
  * backup is reported rather than silently absent.
  */
+import { getDayExtraNames } from "../api/extraLabels";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { getVarianceReport } from "../api/manualCounts";
 import { recordReportHistory } from "../api/reportHistory";
@@ -122,13 +123,16 @@ async function buildDailyPdf(
 
   const onlineRows = report.online as unknown as GridRow[];
   const offlineRows = report.offline as unknown as GridRow[];
+  const names = await getDayExtraNames(date);
   const onlineColumns = columnsWithExtras(
     onlineStockColumns,
     extraColumnsFromRows(onlineRows, onlineStockColumns),
+    names.ONLINE,
   );
   const offlineColumns = columnsWithExtras(
     offlineStockColumns,
     extraColumnsFromRows(offlineRows, offlineStockColumns),
+    names.OFFLINE,
   );
 
   const pdf = await buildTablePdf({

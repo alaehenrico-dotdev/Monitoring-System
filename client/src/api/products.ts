@@ -20,6 +20,12 @@ export function updateProduct(id: number, data: Partial<Pick<Product, "sku" | "n
 export function deactivateProduct(id: number) {
   return http.delete<Product>(`/products/${id}`);
 }
+/// Supervisor/Admin: set the product sequence (each product's SKU moves with
+/// it). One shared order - every grid, report and picker follows it.
+export function reorderProducts(orderedIds: number[]) {
+  return http.put<{ moved: number; total: number }>("/products/order", { orderedIds });
+}
+
 export interface ProductSyncResult {
   created: number;
   moved: number;

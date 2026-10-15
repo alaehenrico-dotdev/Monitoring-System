@@ -92,7 +92,7 @@ export function Sidebar() {
           left,
           transformOrigin: "top left",
           width: PANEL_WIDTH,
-          maxHeight: `calc(100vh - ${top}px - ${PANEL_BOTTOM_MARGIN}px)`,
+          maxHeight: `calc(var(--ae-vh) - ${top}px - ${PANEL_BOTTOM_MARGIN}px)`,
           zIndex: 50,
           pointerEvents: open ? "auto" : "none",
           display: "flex",

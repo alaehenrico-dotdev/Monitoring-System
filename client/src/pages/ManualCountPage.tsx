@@ -74,6 +74,7 @@ import type { Shift } from "../types";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { useUndoRedoKeys } from "../hooks/useGridView";
+import { ReorderProductsButton } from "../components/ReorderProductsButton";
 import { useAuth } from "../context/AuthContext";
 import { useTopProgress } from "../hooks/useTopProgress";
 import type { ToastVariant } from "../components/Toast";
@@ -1113,6 +1114,7 @@ export function ManualCountPage() {
             >
               {anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
             </Button>
+            <ReorderProductsButton isAdmin={canPublish} />
             <SearchInput
               value={query}
               onChange={setQuery}

@@ -10,6 +10,8 @@ vi.mock("../context/RealtimeContext", () => ({ useRealtimeVersion: () => 0 }));
 const summary = (online: number, offline: number, alreadyFinished = false) => ({
   online: { saved: online, total: 60 },
   offline: { saved: offline, total: 60 },
+  onlineLocked: false,
+  offlineLocked: false,
   alreadyFinished,
 });
 
@@ -17,7 +19,7 @@ function setup(props: Partial<React.ComponentProps<typeof FinishDayButton>> = {}
   const onError = vi.fn();
   render(
     <MemoryRouter>
-      <FinishDayButton date="2026-10-14" shift="NIGHT" disabled={false} onFinished={vi.fn()} onError={onError} {...props} />
+      <FinishDayButton date="2026-10-14" shift="NIGHT" location="ONLINE" disabled={false} onFinished={vi.fn()} onError={onError} {...props} />
     </MemoryRouter>,
   );
   return { onError, button: () => screen.getByRole("button", { name: /Finish day/ }) };
@@ -26,6 +28,23 @@ function setup(props: Partial<React.ComponentProps<typeof FinishDayButton>> = {}
 beforeEach(() => vi.clearAllMocks());
 
 describe("FinishDayButton", () => {
+  it("glows once every product is saved on its own page, whatever the other page has", async () => {
+    api.getFinishSummary.mockResolvedValue(summary(60, 10));
+    const { button } = setup();
+    await waitFor(() => expect(button().classList.contains("ae-toolbar-publish--ready")).toBe(true));
+  });
+
+  it("finishes only its own page and says the report waits for the other", async () => {
+    api.getFinishSummary.mockResolvedValue(summary(60, 10));
+    api.finishDay.mockResolvedValue({ ...summary(60, 10, true), finished: true, reportSaved: false });
+    const { button } = setup();
+    await waitFor(() => expect(api.getFinishSummary).toHaveBeenCalledWith("2026-10-14", "NIGHT", "ONLINE"));
+    fireEvent.click(button());
+    fireEvent.click(await screen.findByRole("button", { name: /Finish & lock/ }));
+    expect(await screen.findByText(/saved once Offline is finished too/)).toBeTruthy();
+    expect(api.finishDay).toHaveBeenCalledWith("2026-10-14", "NIGHT", "ONLINE");
+  });
+
   it("glows once every product is saved in both grids", async () => {
     api.getFinishSummary.mockResolvedValue(summary(60, 60));
     const { button } = setup();

@@ -35,8 +35,8 @@ export async function saveExtraLabel(
   const label = input.label.trim().replace(/\s+/g, " ");
   if (label.length > MAX_LABEL_LENGTH) throw HttpError.badRequest(`Names are at most ${MAX_LABEL_LENGTH} characters`);
 
-  await assertPeriodOpen(entryDate, shift);
-  await assertEarlierDaysFinished(entryDate);
+  await assertPeriodOpen(entryDate, shift, undefined, "entry", location);
+  await assertEarlierDaysFinished(entryDate, undefined, location);
   const where = {
     location_entryDate_shift_columnKey_slotIndex: { location: location as StockLocation, entryDate, shift, columnKey, slotIndex },
   };

@@ -6,6 +6,7 @@ import { productRepository } from "../repositories/productRepository";
 import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
 import { recordChange } from "./changeLog.service";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
+import { holdLockedTransfers, requestHeldTransfers, type HeldTransfer } from "./heldTransfers.service";
 import { isNoopSave } from "../utils/noopSave";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { propagateOpeningStock } from "./manualCounts.service";
@@ -159,18 +160,29 @@ export async function saveOfflineEntry(
   input: OfflineEntryInput,
   userId?: number,
   db?: Db,
-): Promise<DailyOfflineStock> {
+): Promise<DailyOfflineStock & { heldForApproval?: HeldTransfer[] }> {
   if (!db) {
     const saved = await serializableTransaction((tx) => saveOfflineEntry(productId, entryDate, shift, input, userId, tx));
     broadcastRealtimeEvent();
     return saved;
   }
 
-  await assertPeriodOpen(entryDate, shift, db);
-  await assertEarlierDaysFinished(entryDate, db);
+  await assertPeriodOpen(entryDate, shift, db, "entry", "OFFLINE");
+  await assertEarlierDaysFinished(entryDate, db, "OFFLINE");
   const product = await productRepository.findActiveById(productId, db);
   if (!product) throw HttpError.notFound("Active product not found");
   const existing = await dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift, db);
+
+  // A transfer change that would also rewrite the other page, once that page is
+  // finished, is held for an admin instead (heldTransfers.service.ts).
+  const split = await holdLockedTransfers("OFFLINE", input, existing, entryDate, shift, db);
+  const held = split.held;
+  input = split.input;
+  const withHeld = async <R extends object>(row: R & { id: number }) => {
+    if (held.length === 0) return row;
+    await requestHeldTransfers("OFFLINE", row.id, held, userId, db);
+    return { ...row, heldForApproval: held };
+  };
 
   const extras = input.extras ?? [];
   const extrasError = validateExtras("OFFLINE", extras);
@@ -217,7 +229,7 @@ export async function saveOfflineEntry(
   }
 
   if (existing && isNoopSave(existing, openingStock, merged, columnKeysOf(extras).length + (input.clearExtraColumns?.length ?? 0))) {
-    return existing;
+    return withHeld(existing);
   }
 
   const data = { productId, entryDate, shift, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
@@ -272,7 +284,7 @@ export async function saveOfflineEntry(
   // that wraps this whole function has actually committed. A caller that
   // passes its own `db`/`tx` in (composing this into a larger transaction)
   // owns broadcasting for itself, once ITS transaction commits.
-  return saved;
+  return withHeld(saved);
 }
 
 async function mirrorTransferToOnline(

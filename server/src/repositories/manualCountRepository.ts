@@ -162,7 +162,7 @@ export const manualCountRepository = {
         product: filters.category ? { category: filters.category } : undefined,
       },
       include: { product: true, countedBy: { select: { id: true, name: true, username: true } } },
-      orderBy: [{ entryDate: "desc" }, { shift: "desc" }, { product: { name: "asc" } }],
+      orderBy: [{ entryDate: "desc" }, { shift: "desc" }, { product: { sortOrder: "asc" } }, { product: { name: "asc" } }],
     });
   },
 };

@@ -45,7 +45,7 @@ export function LoginPage() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          minHeight: "100vh",
+          minHeight: "var(--ae-vh)",
           padding: "24px 16px",
           boxSizing: "border-box",
           fontFamily: fonts.body,

@@ -4,6 +4,7 @@ import {
   finishDay,
   getFinishSummary,
   type DayClosure,
+  type EntryLocation,
   type FinishSummary,
 } from "../api/ops";
 import type { Shift } from "../types";
@@ -20,6 +21,9 @@ import { CheckIcon, LockIcon, ReportIcon } from "./icons";
 
 const reportLink = (date: string) => `/daily-report?date=${date}&auto=1`;
 
+const PAGE_LABEL: Record<EntryLocation, string> = { ONLINE: "Online", OFFLINE: "Offline" };
+const other = (location: EntryLocation): EntryLocation => (location === "ONLINE" ? "OFFLINE" : "ONLINE");
+
 /**
  * Shown above a sheet that has been finished: it is read-only, and says why,
  * who locked it, and the two ways forward - open the report for it, or (for an
@@ -28,11 +32,13 @@ const reportLink = (date: string) => `/daily-report?date=${date}&auto=1`;
 export function DayLockBanner({
   date,
   shift,
+  location,
   closure,
   isAdmin,
 }: {
   date: string;
   shift: Shift;
+  location: EntryLocation;
   closure: DayClosure | null;
   isAdmin: boolean;
 }) {
@@ -43,14 +49,14 @@ export function DayLockBanner({
       </span>
       <div className="ae-day-lock-text">
         <strong>
-          {formatDateDisplay(date)} · {SHIFT_LABELS[shift]} is finished and
-          locked.
+          {PAGE_LABEL[location]} · {formatDateDisplay(date)} ·{" "}
+          {SHIFT_LABELS[shift]} is finished and locked.
         </strong>
         <span>
           {closure?.closedBy ? `Finished by ${closure.closedBy.name}. ` : ""}
           {closure?.entriesOnly === false
             ? "Closed by an admin, so counts are locked too. "
-            : "This is the saved state of the day; it can't be edited. "}
+            : `The ${PAGE_LABEL[other(location)]} page is locked separately. A transfer change on it that would also change this page needs an admin's approval. `}
           {isAdmin
             ? "Unlock it from the Admin Queue to change it."
             : "Ask an admin to unlock it if something must change."}
@@ -133,6 +139,7 @@ export function FinishEarlierDayBanner({
 export function FinishDayButton({
   date,
   shift,
+  location,
   disabled,
   disabledReason,
   onFinished,
@@ -140,6 +147,8 @@ export function FinishDayButton({
 }: {
   date: string;
   shift: Shift;
+  /// The entry page this button finishes - only that page is locked.
+  location: EntryLocation;
   /// True while there are unsaved edits - they would be locked out unsaved.
   disabled: boolean;
   disabledReason?: string;
@@ -147,6 +156,9 @@ export function FinishDayButton({
   onError: (message: string) => void;
 }) {
   const [step, setStep] = useState<"idle" | "confirm" | "done">("idle");
+  // Whether finishing this page also saved the day's report (the other page was
+  // already finished), for the "done" message.
+  const [reportSaved, setReportSaved] = useState(false);
   const [summary, setSummary] = useState<FinishSummary | null>(null);
   // How complete the sheet is right now, for the glow (kept apart from
   // `summary`, which is the snapshot the open dialog is showing).
@@ -156,17 +168,17 @@ export function FinishDayButton({
 
   useEffect(() => {
     let current = true;
-    getFinishSummary(date, shift)
+    getFinishSummary(date, shift, location)
       .then((s) => current && setProgress(s))
       .catch(() => current && setProgress(null));
     return () => {
       current = false;
     };
-  }, [date, shift, realtimeVersion]);
+  }, [date, shift, location, realtimeVersion]);
 
   // Which sheet this belongs to can change under an open dialog; never finish
   // the wrong one.
-  useResetOnKeyChange(`${date}:${shift}`, () => setStep("idle"));
+  useResetOnKeyChange(`${date}:${shift}:${location}`, () => setStep("idle"));
 
   async function open() {
     if (disabled) {
@@ -174,7 +186,7 @@ export function FinishDayButton({
       return;
     }
     try {
-      setSummary(await getFinishSummary(date, shift));
+      setSummary(await getFinishSummary(date, shift, location));
       setStep("confirm");
     } catch (e) {
       onError(e instanceof Error ? e.message : "Couldn't check this shift");
@@ -184,7 +196,8 @@ export function FinishDayButton({
   async function confirm() {
     await action.run(async () => {
       try {
-        await finishDay(date, shift);
+        const result = await finishDay(date, shift, location);
+        setReportSaved(result.reportSaved ?? false);
         setStep("done");
         onFinished();
       } catch (e) {
@@ -195,9 +208,13 @@ export function FinishDayButton({
   }
 
   const complete = (g: { saved: number; total: number }) => g.total > 0 && g.saved >= g.total;
-  const ready =
-    !disabled && !!progress && !progress.alreadyFinished && complete(progress.online) && complete(progress.offline);
-  const thin = summary ? !complete(summary.online) || !complete(summary.offline) : false;
+  const mine = (s: FinishSummary) => (location === "ONLINE" ? s.online : s.offline);
+  // Only this page's own entries decide whether it is ready: the other page has
+  // its own encoder and its own Finish day.
+  const ready = !disabled && !!progress && !progress.alreadyFinished && complete(mine(progress));
+  const thin = summary ? !complete(mine(summary)) : false;
+  const otherName = PAGE_LABEL[other(location)];
+  const otherDone = summary ? (location === "ONLINE" ? summary.offlineLocked : summary.onlineLocked) : false;
 
   return (
     <>
@@ -212,8 +229,8 @@ export function FinishDayButton({
           disabled
             ? disabledReason
             : ready
-              ? "Every product is saved - lock this sheet and save the day's report"
-              : "Lock this sheet and save the day's report"
+              ? `Every product is saved - lock the ${PAGE_LABEL[location]} page`
+              : `Lock the ${PAGE_LABEL[location]} page (${otherName} stays open)`
         }
       >
         <CheckIcon />
@@ -222,25 +239,27 @@ export function FinishDayButton({
 
       {step === "confirm" && summary && (
         <ConfirmDialog
-          title={`Finish ${formatDateDisplay(date)} · ${SHIFT_LABELS[shift]}?`}
+          title={`Finish ${PAGE_LABEL[location]} · ${formatDateDisplay(date)} · ${SHIFT_LABELS[shift]}?`}
           confirmLabel="Finish & lock"
           busy={action.busy}
           onConfirm={() => void confirm()}
           onCancel={() => setStep("idle")}
         >
           <p style={{ margin: "0 0 10px" }}>
-            This locks the Online and Offline entries for this shift and saves
-            the Daily Report as it is now. Nobody can edit them afterwards
-            unless an admin unlocks the day.
+            This locks the {PAGE_LABEL[location]} entries for this shift. The{" "}
+            {otherName} page is not affected - it is finished separately, by its
+            own encoder
+            {otherDone
+              ? " (already done), so the Daily Report is saved now."
+              : ", and the Daily Report is saved once both pages are finished."}{" "}
+            Nobody can edit {PAGE_LABEL[location]} afterwards unless an admin
+            unlocks it, and a transfer change that would also alter the{" "}
+            {otherName} page needs an admin's approval.
           </p>
           <ul style={{ margin: "0 0 10px", paddingLeft: 18 }}>
             <li>
-              Online: {summary.online.saved} of {summary.online.total} products
-              saved
-            </li>
-            <li>
-              Offline: {summary.offline.saved} of {summary.offline.total}{" "}
-              products saved
+              {PAGE_LABEL[location]}: {mine(summary).saved} of{" "}
+              {mine(summary).total} products saved
             </li>
           </ul>
           {thin && (
@@ -255,8 +274,11 @@ export function FinishDayButton({
       {step === "done" && (
         <Modal title="Day finished" onClose={() => setStep("idle")} width={420}>
           <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: 0 }}>
-            {formatDateDisplay(date)} · {SHIFT_LABELS[shift]} is saved and
-            locked. The report for it is ready to generate.
+            {PAGE_LABEL[location]} · {formatDateDisplay(date)} ·{" "}
+            {SHIFT_LABELS[shift]} is saved and locked.{" "}
+            {reportSaved
+              ? "The report for it is ready to generate."
+              : `The Daily Report is saved once ${otherName} is finished too.`}
           </p>
           <div
             style={{

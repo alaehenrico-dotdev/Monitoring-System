@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOfflineGrid, saveOfflineEntry } from "../api/offlineStock";
 import { useAuth } from "../context/AuthContext";
+import { ReorderProductsButton } from "../components/ReorderProductsButton";
 import { Button } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
@@ -50,6 +51,7 @@ import {
 import { offlineStockColumns as columns } from "../config/stockColumns";
 import {
   columnsWithExtras,
+  extraColumnList,
   flattenExtraPayload,
   extraColumnKey,
   MAX_EXTRAS_PER_COLUMN,
@@ -138,6 +140,8 @@ export function OfflineEntryPage() {
     setDateShift((prev) => ({ ...prev, shift: s }));
   const [rows, setRows] = useState<GridRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Names of products whose transfer change is waiting for an admin's approval.
+  const [heldNotice, setHeldNotice] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("offline-entry");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -171,7 +175,7 @@ export function OfflineEntryPage() {
   const { online, reconnects } = useOnlineStatus();
   // A finished day is frozen: the sheet opens read-only with its saved state
   // (the server refuses writes to it too - see assertPeriodOpen).
-  const dayLock = useDayLock(date, shift, `${realtimeVersion}:${reconnects}`);
+  const dayLock = useDayLock(date, shift, `${realtimeVersion}:${reconnects}`, "OFFLINE");
   // Read-only while an earlier day still has to be finished (days go in order).
   const canEdit = roleCanEdit && !dayLock.locked && !dayLock.blockedBy;
 
@@ -250,7 +254,6 @@ export function OfflineEntryPage() {
     commitExtraCell,
     withExtraTotals,
     buildSavePayload,
-    extraColumnDefs,
   } = useGridExtraColumns({
     storageKey: `ala-eh-extracols:offline:${date}:${shift}`,
     rows,
@@ -274,8 +277,11 @@ export function OfflineEntryPage() {
   // exist, so an added column's amount reads as "Stocks In (Off-Ol) +2"
   // rather than its raw storage key.
   const previewColumns = useMemo(
-    () => [...csvColumns, ...extraColumnDefs],
-    [csvColumns, extraColumnDefs],
+    () => [
+      ...csvColumns,
+      ...extraColumnList(columns, extras, extraLabels.names),
+    ],
+    [csvColumns, extras, extraLabels.names],
   );
 
   // Ctrl+Z / Ctrl+Shift+Z over staged edits, while any exist to undo.
@@ -444,6 +450,7 @@ export function OfflineEntryPage() {
     // visible once Save has actually started.
     setShowPreview(false);
     const failed: string[] = [];
+    const heldNames: string[] = [];
     const savedManualCountIds: number[] = [];
     const entries = Object.entries(pending);
     for (let i = 0; i < entries.length; i++) {
@@ -472,9 +479,17 @@ export function OfflineEntryPage() {
           // The endpoint returns the daily row, which carries only each
           // column's total - folding the amounts back on keeps the added
           // columns showing their figures without a second round trip.
+          const { heldForApproval, ...savedRow } = saved;
+          if (heldForApproval?.length)
+            heldNames.push(priorRow?.product.name ?? `#${productId}`);
+          // A held column's amounts were not saved, so they are not shown as if
+          // they were.
+          const heldKeys = new Set(heldForApproval?.map((h) => h.field));
           mergeEntry(productId, {
-            ...(saved as unknown as Record<string, unknown>),
-            ...flattenExtraPayload(extraPayload),
+            ...(savedRow as unknown as Record<string, unknown>),
+            ...flattenExtraPayload(
+              extraPayload.filter((e) => !heldKeys.has(e.columnKey)),
+            ),
           });
         }
         // After the entry itself, so the count's variance is measured
@@ -518,6 +533,10 @@ export function OfflineEntryPage() {
     if (failed.length) {
       setError(`Failed to save: ${failed.join("; ")}`);
     }
+    if (heldNames.length)
+      setHeldNotice(
+        `${heldNames.join(", ")}: the transfer change was not applied because Online is already finished for this shift. It was sent to an admin for approval (Corrections) and applies to both pages once approved. Everything else was saved.`,
+      );
     // Deleted columns are gone from the server now too.
     if (failed.length === 0) markSaved();
     return failed.length === 0;
@@ -556,7 +575,7 @@ export function OfflineEntryPage() {
           // none, this is the same column list - and the same PDF - as
           // before.
           sections: [
-            stockGridSection(visibleRows, columnsWithExtras(columns, extras)),
+            stockGridSection(visibleRows, columnsWithExtras(columns, extras, extraLabels.names)),
           ],
         }),
       );
@@ -608,6 +627,7 @@ export function OfflineEntryPage() {
             >
               {anyCatExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
             </Button>
+            <ReorderProductsButton isAdmin={user?.role === "SUPERVISOR_ADMIN"} />
             <SearchInput
               value={query}
               onChange={setQuery}
@@ -739,6 +759,7 @@ export function OfflineEntryPage() {
               <FinishDayButton
                 date={date}
                 shift={shift}
+                location="OFFLINE"
                 disabled={pendingCount > 0}
                 disabledReason="Save or discard your changes first - they would be locked out"
                 onFinished={dayLock.refresh}
@@ -765,6 +786,12 @@ export function OfflineEntryPage() {
         variant="error"
         duration={null}
       />
+      <Toast
+        message={heldNotice}
+        onDismiss={() => setHeldNotice(null)}
+        variant="warning"
+        duration={null}
+      />
       {dayLock.blockedBy && !dayLock.locked && (
         <FinishEarlierDayBanner
           blockedBy={dayLock.blockedBy}
@@ -775,6 +802,7 @@ export function OfflineEntryPage() {
         <DayLockBanner
           date={date}
           shift={shift}
+          location="OFFLINE"
           closure={dayLock.closure}
           isAdmin={user?.role === "SUPERVISOR_ADMIN"}
         />

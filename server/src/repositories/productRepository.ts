@@ -30,7 +30,8 @@ const CACHE_KEY_ALL = `${CACHE_PREFIX}all`;
 // without any risk of an admin's edit going unnoticed for long.
 const TTL_MS = 60_000;
 
-const ORDER_BY = [{ sortOrder: "asc" }, { name: "asc" }] as const;
+// `id` last so two products sharing a sortOrder never swap places between requests.
+const ORDER_BY = [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }] as const;
 
 /// Section 5.1 - products: the master list every other table reads from.
 export const productRepository = {
@@ -59,8 +60,10 @@ export const productRepository = {
     return prisma.product.findFirst({ where: { name, category } });
   },
 
-  async nextSortOrder(category: string): Promise<number> {
-    const result = await prisma.product.aggregate({ where: { category }, _max: { sortOrder: true } });
+  /// One order across the whole list (admins can arrange it freely), so a new
+  /// product goes to the end rather than into the middle of its category.
+  async nextSortOrder(): Promise<number> {
+    const result = await prisma.product.aggregate({ _max: { sortOrder: true } });
     return (result._max.sortOrder ?? 0) + 1;
   },
 

@@ -25,7 +25,11 @@ import {
   CellHistoryPopover,
   type CellHistoryTarget,
 } from "./CellHistoryPopover";
-import { extraColumnKey, parseExtraColumnKey } from "../hooks/useExtraColumns";
+import {
+  extraColumnKey,
+  extraColumnLabel,
+  parseExtraColumnKey,
+} from "../hooks/useExtraColumns";
 import {
   inkFor,
   useCategoryColors,
@@ -735,7 +739,11 @@ export function StockGrid({
         },
         ...extras.map((slot) => ({
           key: extraColumnKey(c.key, slot),
-          label: `${c.label} +${slot}`,
+          label: extraColumnLabel(
+            c.label,
+            slot,
+            extraNames?.[extraColumnKey(c.key, slot)],
+          ),
           editable: true,
         })),
       ];
@@ -794,7 +802,9 @@ export function StockGrid({
       (() => {
         const parsed = parseExtraColumnKey(colKey);
         const main = parsed && columns.find((c) => c.key === parsed.mainKey);
-        return main ? `${main.label} +${parsed!.slot}` : colKey;
+        return main
+          ? extraColumnLabel(main.label, parsed!.slot, extraNames?.[colKey])
+          : colKey;
       })();
     return `${row?.product.name ?? "Row"} - ${label}`;
   }

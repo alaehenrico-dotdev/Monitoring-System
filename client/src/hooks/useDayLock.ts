@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { getDayStatus, type DayClosure, type DayStatus } from "../api/ops";
+import { getDayStatus, type DayClosure, type DayStatus, type EntryLocation } from "../api/ops";
 import type { Shift } from "../types";
 
 /**
- * Whether one date + shift has been finished/closed, so an entry page can show
+ * Whether one entry page (Online or Offline) of a date + shift has been
+ * finished/closed - each page is finished on its own, so the other page being
+ * finished does not lock this one - so an entry page can show
  * it read-only instead of letting an encoder type into a sheet the server will
  * refuse. The server is still the authority (every write re-checks); this is
  * only so the refusal doesn't come as a surprise after the typing.
@@ -13,20 +15,20 @@ import type { Shift } from "../types";
  * failed lookup reports "not locked": better to let the save be refused with
  * the server's own message than to block editing on a status call.
  */
-export function useDayLock(date: string, shift: Shift, refreshKey: unknown) {
+export function useDayLock(date: string, shift: Shift, refreshKey: unknown, location: EntryLocation) {
   const [state, setState] = useState<{
     key: string;
     closure: DayClosure | null;
     locked: boolean;
     blockedBy: DayStatus["blockedBy"];
   } | null>(null);
-  const key = `${date}:${shift}`;
+  const key = `${date}:${shift}:${location}`;
 
   const load = useCallback(() => {
     let cancelled = false;
-    getDayStatus(date, shift)
+    getDayStatus(date, shift, location)
       .then((s) => {
-        if (!cancelled) setState({ key, closure: s.closure, locked: s.isClosed, blockedBy: s.blockedBy ?? null });
+        if (!cancelled) setState({ key, closure: s.closure, locked: s.locked, blockedBy: s.blockedBy ?? null });
       })
       .catch(() => {
         if (!cancelled) setState({ key, closure: null, locked: false, blockedBy: null });
@@ -34,7 +36,7 @@ export function useDayLock(date: string, shift: Shift, refreshKey: unknown) {
     return () => {
       cancelled = true;
     };
-  }, [date, shift, key]);
+  }, [date, shift, location, key]);
 
   useEffect(load, [load, refreshKey]);
 

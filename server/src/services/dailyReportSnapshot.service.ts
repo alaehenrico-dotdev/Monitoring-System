@@ -46,7 +46,8 @@ export async function saveSnapshot(entryDate: Date, report: unknown, userId: num
 
 /**
  * The snapshot for `entryDate`, but only while the day is actually frozen:
- * every shift that has saved Online/Offline rows for that date is closed.
+ * every page (Online / Offline) of every shift that has saved rows for that
+ * date is finished.
  * Anything else - no snapshot, an admin-unlocked shift, or a shift that has
  * entries but was never finished - means the numbers are still moving, so the
  * report must be read live instead.
@@ -59,13 +60,16 @@ export async function findFrozenSnapshot(entryDate: Date, db: Db = prisma) {
   if (!snapshot) return null;
 
   const [closures, online, offline] = await Promise.all([
-    db.dayClosure.findMany({ where: { entryDate }, select: { shift: true, isClosed: true } }),
+    db.dayClosure.findMany({ where: { entryDate }, select: { shift: true, onlineLocked: true, offlineLocked: true } }),
     db.dailyOnlineStock.groupBy({ by: ["shift"], where: { entryDate } }),
     db.dailyOfflineStock.groupBy({ by: ["shift"], where: { entryDate } }),
   ]);
-  const closed = new Set(closures.filter((c) => c.isClosed).map((c) => c.shift));
-  const shiftsWithEntries = new Set([...online, ...offline].map((r) => r.shift));
-  for (const shift of shiftsWithEntries) if (!closed.has(shift)) return null;
+  // Each page is finished on its own, so each shift's Online rows need its
+  // Online page locked and its Offline rows need its Offline page locked.
+  const onlineClosed = new Set(closures.filter((c) => c.onlineLocked).map((c) => c.shift));
+  const offlineClosed = new Set(closures.filter((c) => c.offlineLocked).map((c) => c.shift));
+  for (const r of online) if (!onlineClosed.has(r.shift)) return null;
+  for (const r of offline) if (!offlineClosed.has(r.shift)) return null;
   return snapshot;
 }
 

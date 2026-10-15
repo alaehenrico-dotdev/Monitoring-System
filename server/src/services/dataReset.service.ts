@@ -73,8 +73,10 @@ export function releaseResetToken(tokenId: string) {
 }
 
 /**
- * Wipes all transactional data (stock entries, manual counts) and the
- * change log itself, leaving products/users/settings untouched. Runs as
+ * Wipes all transactional data (stock entries, manual counts, day locks, saved
+ * report snapshots, correction requests) and the change log itself (live and
+ * archived), leaving products (and the order admins arranged them in), users
+ * and settings untouched. Runs as
  * one transaction so a failure partway through can't leave the system
  * half-wiped, and closes by writing a single new change-log entry recording
  * that the reset happened (who, when) - otherwise the very audit trail this
@@ -108,6 +110,26 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     // live data for its date, so leaving one around after a reset would let
     // an admin "reopen" a report that's now empty.
     const reportHistory = await tx.reportHistoryEntry.deleteMany();
+    // Everything that describes or depends on the entries wiped above. Left
+    // behind, each one keeps working against a period that no longer has data:
+    //  - day closures: a finished (locked) page would refuse the new entries a
+    //    fresh start is meant to take, for dates that now look empty;
+    //  - report snapshots: the Daily Report is served from a frozen snapshot
+    //    once a day is finished, so the old figures would keep showing;
+    //  - added-column names: they belong to sheets that no longer exist, and
+    //    would reappear on a new sheet for the same date and shift;
+    //  - correction requests (and their events, which cascade): held transfers
+    //    and corrections point at entry rows that are gone, so approving one
+    //    would write into nothing;
+    //  - archived change log: the cold-storage half of the change log, which
+    //    "wipe the change log" has to include or it is only half wiped;
+    //  - idempotency keys: a stored response for an old save must not replay.
+    const dayClosures = await tx.dayClosure.deleteMany();
+    const reportSnapshots = await tx.dailyReportSnapshot.deleteMany();
+    const extraColumnLabels = await tx.extraColumnLabel.deleteMany();
+    const corrections = await tx.correctionRequest.deleteMany();
+    const changeLogArchive = await tx.changeLogArchive.deleteMany();
+    const idempotencyKeys = await tx.idempotencyKey.deleteMany();
 
     const deleted = {
       onlineStock: onlineStock.count,
@@ -117,6 +139,12 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
       importBatches: importBatches.count,
       changeLog: changeLog.count,
       reportHistory: reportHistory.count,
+      dayClosures: dayClosures.count,
+      reportSnapshots: reportSnapshots.count,
+      extraColumnLabels: extraColumnLabels.count,
+      corrections: corrections.count,
+      changeLogArchive: changeLogArchive.count,
+      idempotencyKeys: idempotencyKeys.count,
     };
 
     await tx.changeLog.create({
