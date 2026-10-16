@@ -57,6 +57,6 @@ describe("ManualCountPage - opening balance", () => {
     expect(vinegarRow.textContent).not.toContain("Opening");
 
     expect(screen.getByRole("status").textContent).toMatch(/1 first count will be recorded as opening balances/);
-    expect(screen.getByRole("status").textContent).toMatch(/never change a shift/);
+    expect(screen.getByRole("status").textContent).toMatch(/only becomes a shift.s opening stock if you tick the option/);
   });
 });

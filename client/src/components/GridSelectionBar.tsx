@@ -18,13 +18,20 @@ export function GridSelectionBar({
   fillTargets,
   onFill,
   onClearCells,
+  clearLabel = "Clear cells",
+  clearTitle = "Set every editable cell in the selected rows to 0 (Delete)",
   onCopy,
   onDeselect,
 }: {
   count: number;
   fillTargets: FillTarget[] | null;
   onFill: (key: string, value: number) => void;
-  onClearCells: () => void;
+  /// Omitted (with `fillTargets` null) on a read-only table.
+  onClearCells?: () => void;
+  /// What clearing means here: "Clear cells" (set to 0) on the stock sheets,
+  /// "Clear counts" (back to uncounted) on the Audit page.
+  clearLabel?: string;
+  clearTitle?: string;
   onCopy: () => void;
   onDeselect: () => void;
 }) {
@@ -72,9 +79,9 @@ export function GridSelectionBar({
           </Button>
         </span>
       )}
-      {fillTargets && (
-        <Button type="button" variant="secondary" size="sm" onClick={onClearCells} title="Set every editable cell in the selected rows to 0 (Delete)">
-          Clear cells
+      {fillTargets && onClearCells && (
+        <Button type="button" variant="secondary" size="sm" onClick={onClearCells} title={clearTitle}>
+          {clearLabel}
         </Button>
       )}
       <Button type="button" variant="secondary" size="sm" onClick={onCopy} title="Copy the selected rows as a table you can paste into Excel (Ctrl+C)">

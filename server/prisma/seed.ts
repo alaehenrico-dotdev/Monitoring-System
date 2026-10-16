@@ -183,11 +183,11 @@ async function seedProducts() {
       if (existing) {
         await prisma.product.update({
           where: { id: existing.id },
-          data: { unit: group.unit, sortOrder, ...(sku ? { sku } : {}) },
+          data: { name: name.toUpperCase(), unit: group.unit, sortOrder, ...(sku ? { sku } : {}) },
         });
       } else {
         await prisma.product.create({
-          data: { name, category: group.category, unit: group.unit, sortOrder, sku },
+          data: { name: name.toUpperCase(), category: group.category, unit: group.unit, sortOrder, sku },
         });
       }
     }

@@ -5,9 +5,9 @@ import type { Request, Response } from "express";
 import { createHash } from "crypto";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
+import { isMysqldumpHeader } from "../utils/dumpHeader";
 const RESTORE_MAX_BYTES = 512 * 1024 * 1024;
 const RESTORE_TIMEOUT_MS = 10 * 60 * 1000;
-const DUMP_HEADER = /^-- (MySQL|MariaDB) dump/;
 
 function parseDatabaseUrl(databaseUrl: string) {
   const url = new URL(databaseUrl);
@@ -159,7 +159,7 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
       if (!validated) {
         prefix = Buffer.concat([prefix, chunk]);
         const headerText = prefix.subarray(0, 256).toString("utf8").replace(/^\uFEFF/, "");
-        if (!DUMP_HEADER.test(headerText)) {
+        if (!isMysqldumpHeader(headerText)) {
           if (prefix.length >= 256) fail(HttpError.badRequest("That file isn't a database backup made by this system's Download Backup."));
           return;
         }

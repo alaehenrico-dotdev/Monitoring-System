@@ -49,13 +49,14 @@ const syncSchema = z.object({
     )
     .min(1)
     .max(1000),
+  deactivateUnlisted: z.boolean().optional(),
 });
 
 /// Adds the sheet's missing products and applies the sheet's sequence.
 export async function postProductSync(req: Request, res: Response) {
   const parsed = syncSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid product sync payload", parsed.error.flatten());
-  res.json(await syncProductsFromSheet(parsed.data.items, req.user?.id));
+  res.json(await syncProductsFromSheet(parsed.data.items, req.user?.id, { deactivateUnlisted: parsed.data.deactivateUnlisted }));
 }
 
 const reorderSchema = z.object({ orderedIds: z.array(z.number().int().positive()).min(1).max(5000) });

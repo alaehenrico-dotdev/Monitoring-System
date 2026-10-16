@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { syncProducts } from "../api/products";
+import { saveOrderTemplate } from "../api/orderTemplates";
 import type { Product } from "../types";
 import { colors } from "../theme";
 import { Button, Select } from "./ui";
@@ -37,11 +38,15 @@ const SYNC_OPTIONS = { renameLinked: false };
 export function OrderTemplateReview({
   rows,
   existing,
+  saveAs,
   onBack,
   onDone,
 }: {
   rows: TemplateRow[];
   existing: Product[];
+  /// Applying also keeps the template under this name (a template read from a file),
+  /// so it is still there after a reset or rebuild. Omitted for one that is already saved.
+  saveAs?: string;
   onBack: () => void;
   onDone: () => void;
 }) {
@@ -52,12 +57,16 @@ export function OrderTemplateReview({
   // is really another product (row key -> the product to keep).
   const [merges, setMerges] = useState<Record<string, number>>({});
   const [confirming, setConfirming] = useState(false);
+  // Optionally hide the products the template does not list. Off by default: a
+  // template sets the ORDER and CATEGORIES of the products the system already has,
+  // it does not remove any of them. Hiding only switches a product off - its entries
+  // and history stay - and it can be switched back on from the SKU list.
+  const [hideOthers, setHideOthers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // As matched by name only - tells which product each row would use before any merge.
   const base = useMemo(() => planProductSync(rows, existing, links, SYNC_OPTIONS), [rows, existing, links]);
-  const plan = useMemo(() => planProductSync(rows, existing, { ...links, ...merges }, SYNC_OPTIONS), [rows, existing, links, merges]);
   const byId = useMemo(() => new Map(existing.map((p) => [p.id, p])), [existing]);
 
   /// For each row that matched a product with no SKU: that product.
@@ -70,14 +79,29 @@ export function OrderTemplateReview({
     return m;
   }, [base, byId]);
 
+  // Products being merged away. They are taken out of what the plan can match, so
+  // no other template row (one with the same name under another category, say)
+  // can pick up a product that is about to be deleted - the server refuses a
+  // product that is both merged away and a row of the sheet.
+  const mergedAway = useMemo(() => new Set(Object.keys(merges).flatMap((k) => mergeable.get(k)?.id ?? [])), [merges, mergeable]);
+  const plan = useMemo(
+    () =>
+      planProductSync(
+        rows,
+        existing.filter((p) => !mergedAway.has(p.id)),
+        { ...links, ...merges },
+        SYNC_OPTIONS,
+      ),
+    [rows, existing, links, merges, mergedAway],
+  );
+
   // Existing products no template row has claimed - what a row can be linked to.
   // Linking one removes it from the others' choices, and a product that is being
   // merged away is not a choice for anything.
   const unclaimed = useMemo(() => {
     const claimed = new Set(plan.items.flatMap((i) => (i.productId === undefined ? [] : [i.productId])));
-    const mergedAway = new Set(Object.keys(merges).flatMap((k) => mergeable.get(k)?.id ?? []));
     return existing.filter((p) => !claimed.has(p.id) && !mergedAway.has(p.id));
-  }, [plan, existing, merges, mergeable]);
+  }, [plan, existing, mergedAway]);
   /// Best matches first: the same name with a size or unit tacked on ("Palm Oil
   /// Liter") ranks above unrelated products, but every free product is offered.
   const choicesFor = (item: { category: string; name: string }) =>
@@ -93,6 +117,8 @@ export function OrderTemplateReview({
     return duplicate ? { ...item, mergeFromId: duplicate.id } : item;
   });
   const mergeCount = items.filter((i) => i.mergeFromId !== undefined).length;
+  // Products no template row claims, and which are not being merged away.
+  const hideCount = hideOthers ? unclaimed.length : 0;
 
   const categories = new Set(plan.items.map((i) => categoryKey(i.category))).size;
   const placed = plan.items.filter((i) => i.productId !== undefined).length;
@@ -103,11 +129,24 @@ export function OrderTemplateReview({
     setSaving(true);
     setError(null);
     try {
-      const r = await syncProducts(items);
+      const r = await syncProducts(items, { deactivateUnlisted: hideCount > 0 });
+      // The order is applied; keeping the template is a courtesy and must not turn a
+      // successful apply into an error, so a failure here is only reported.
+      let kept = "";
+      if (saveAs) {
+        try {
+          await saveOrderTemplate(saveAs, rows);
+          kept = `saved as "${saveAs}"`;
+        } catch {
+          kept = "could not be saved as a template";
+        }
+      }
       const parts = [
         `${r.total} products in the template's order`,
         r.created ? `${r.created} added` : "",
         r.merged ? `${r.merged} merged` : "",
+        r.deactivated ? `${r.deactivated} hidden` : "",
+        kept,
         r.moved ? `${r.moved} changed` : "",
       ].filter(Boolean);
       showToast(`Template applied - ${parts.join(", ")}`, "success");
@@ -131,7 +170,10 @@ export function OrderTemplateReview({
           {plan.toCreate.length > 0 && ` ${plan.toCreate.length} will be added.`}
           {mergeCount > 0 && ` ${mergeCount} will be merged.`}
           {plan.toMove.length > 0 && ` ${plan.toMove.length} will move to the template's category.`}
-          {others > 0 && ` ${others} other product${others === 1 ? "" : "s"} not in the template stay in the system, after these.`}
+          {others > 0 &&
+            (hideOthers
+              ? ` ${others} other product${others === 1 ? "" : "s"} not in the template will be hidden.`
+              : ` ${others} other product${others === 1 ? "" : "s"} not in the template stay where they are, beside their own category.`)}
         </span>
       </div>
       {error && (
@@ -256,6 +298,37 @@ export function OrderTemplateReview({
           );
         })}
       </ol>
+      {unclaimed.length > 0 && (
+        <div style={{ margin: "10px 0 0", fontSize: 12.5 }}>
+          <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+            <input
+              type="checkbox"
+              checked={hideOthers}
+              disabled={saving}
+              onChange={(e) => setHideOthers(e.target.checked)}
+              style={{ marginTop: 2 }}
+            />
+            <span>
+              Also hide the {unclaimed.length} product{unclaimed.length === 1 ? "" : "s"} that {unclaimed.length === 1 ? "is" : "are"} not in the template (optional)
+              <span style={{ display: "block", color: colors.subtleInk }}>
+                Leave this off to keep every product: those not in the template stay, beside their own category. Hidden products
+                disappear from every sheet and report but keep their entries and history, and can be switched back on from the SKU
+                list. Their stock no longer shows in Total Stocks.
+              </span>
+            </span>
+          </label>
+          <details style={{ margin: "4px 0 0 24px", color: colors.subtleInk }}>
+            <summary style={{ cursor: "pointer" }}>Which products?</summary>
+            <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+              {unclaimed.map((p) => (
+                <li key={p.id}>
+                  {p.name} · {p.category}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
+      )}
       {mergeCount > 0 && (
         <p role="note" style={{ margin: "10px 0 0", fontSize: 12.5, color: colors.warningText }}>
           {mergeCount} merge{mergeCount === 1 ? "" : "s"}: all of the entries, counts and added columns of the duplicate move to the
@@ -268,24 +341,39 @@ export function OrderTemplateReview({
         </Button>
         <Button
           type="button"
-          onClick={() => (mergeCount > 0 ? setConfirming(true) : void apply())}
-          disabled={(plan.inSync && mergeCount === 0) || saving}
+          onClick={() => (mergeCount > 0 || hideCount > 0 ? setConfirming(true) : void apply())}
+          disabled={(plan.inSync && mergeCount === 0 && hideCount === 0) || saving}
           loading={saving}
         >
-          {plan.inSync && mergeCount === 0 ? "Already matches" : mergeCount > 0 ? `Apply template & merge ${mergeCount}` : "Apply template"}
+          {plan.inSync && mergeCount === 0 && hideCount === 0
+            ? "Already matches"
+            : mergeCount > 0
+              ? `Apply template & merge ${mergeCount}`
+              : "Apply template"}
         </Button>
       </div>
       {confirming && (
         <ConfirmDialog
-          title={`Merge ${mergeCount} product${mergeCount === 1 ? "" : "s"}?`}
-          confirmLabel="Merge and apply"
+          title={mergeCount > 0 ? `Merge ${mergeCount} product${mergeCount === 1 ? "" : "s"}?` : `Hide ${hideCount} product${hideCount === 1 ? "" : "s"}?`}
+          confirmLabel={mergeCount > 0 ? "Merge and apply" : "Hide and apply"}
           busy={saving}
           onConfirm={() => void apply()}
           onCancel={() => setConfirming(false)}
         >
-          Each duplicate&apos;s entries, counts and added columns move to the product it is the same as, which keeps its own name
-          and SKU, and the duplicate is deleted. If both have entries for the same date and shift nothing is merged and you
-          will be told which. This cannot be undone.
+          {mergeCount > 0 && (
+            <p style={{ margin: "0 0 8px" }}>
+              Each duplicate&apos;s entries, counts and added columns move to the product it is the same as, which keeps its own
+              name and SKU, and the duplicate is deleted. If both have entries for the same date and shift nothing is merged and
+              you will be told which. This cannot be undone.
+            </p>
+          )}
+          {hideCount > 0 && (
+            <p style={{ margin: 0 }}>
+              {hideCount} product{hideCount === 1 ? "" : "s"} not in the template will be hidden from every sheet and report. Their
+              entries and history are kept, their stock no longer shows in Total Stocks, and you can switch them back on from the
+              SKU list.
+            </p>
+          )}
         </ConfirmDialog>
       )}
     </>

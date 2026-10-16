@@ -1,6 +1,8 @@
 import { productRepository } from "../repositories/productRepository";
 import { HttpError } from "../utils/HttpError";
 import { serializableTransaction } from "../lib/prisma";
+import { strictKey } from "../utils/strictKey";
+import { normalizeProductName } from "../utils/productName";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { logSystemEvent, recordChange } from "./changeLog.service";
 
@@ -8,21 +10,67 @@ export async function listProducts(includeInactive = false) {
   return productRepository.findAll(includeInactive);
 }
 
+/**
+ * Adds a product. Without an explicit `sortOrder` it is placed right after the
+ * last product of its category (or at the very end for a new category), so it
+ * shows up with the products it belongs with rather than at the bottom of the
+ * whole list, and every product after it moves down one place.
+ *
+ * The category is matched to an existing one the way a person reads it (letter
+ * case and spacing ignored) and takes that category's own spelling, so typing
+ * "class a (gallon)" joins "Class A (Gallon)" instead of starting a second
+ * category group that looks the same. Done in one SERIALIZABLE transaction so
+ * two people adding at once cannot take the same place.
+ */
 export async function createProduct(
   data: { sku?: string; name: string; category: string; unit: string; sortOrder?: number; lowStockThreshold?: number | null },
   changedById?: number
 ) {
-  const sortOrder = data.sortOrder ?? (await productRepository.nextSortOrder());
-  const product = await productRepository.create({
-    sku: data.sku,
-    name: data.name,
-    category: data.category,
-    unit: data.unit,
-    sortOrder,
-    lowStockThreshold: data.lowStockThreshold ?? null,
+  if (data.sortOrder !== undefined) {
+    const product = await productRepository.create({
+      sku: data.sku,
+      name: normalizeProductName(data.name),
+      category: data.category,
+      unit: data.unit,
+      sortOrder: data.sortOrder,
+      lowStockThreshold: data.lowStockThreshold ?? null,
+    });
+    await recordChange({ tableName: "products", recordId: product.id, action: "CREATE", changedById, newValue: product });
+    productRepository.invalidateCache();
+    return product;
+  }
+
+  const product = await serializableTransaction(async (tx) => {
+    const all = await tx.product.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }, { id: "asc" }] });
+    const wanted = strictKey(data.category);
+    const category = all.find((p) => strictKey(p.category) === wanted)?.category ?? data.category.trim().replace(/\s+/g, " ");
+
+    const created = await tx.product.create({
+      data: { sku: data.sku, name: normalizeProductName(data.name), category, unit: data.unit, sortOrder: all.length + 1, lowStockThreshold: data.lowStockThreshold ?? null },
+    });
+
+    // The new product goes after the last one of its category, else at the end.
+    let at = all.length;
+    for (let i = all.length - 1; i >= 0; i--) {
+      if (strictKey(all[i].category) === wanted) {
+        at = i + 1;
+        break;
+      }
+    }
+    const order = [...all.slice(0, at).map((p) => p.id), created.id, ...all.slice(at).map((p) => p.id)];
+    const current = new Map<number, number>([...all.map((p) => [p.id, p.sortOrder] as const), [created.id, all.length + 1]]);
+    let placed = created;
+    for (const [i, id] of order.entries()) {
+      if (current.get(id) === i + 1) continue;
+      const updated = await tx.product.update({ where: { id }, data: { sortOrder: i + 1 } });
+      if (id === created.id) placed = updated;
+    }
+    await recordChange({ tableName: "products", recordId: placed.id, action: "CREATE", changedById, newValue: placed }, tx);
+    return placed;
   });
 
-  await recordChange({ tableName: "products", recordId: product.id, action: "CREATE", changedById, newValue: product });
+  productRepository.invalidateCache();
+  broadcastRealtimeEvent();
   return product;
 }
 
@@ -34,7 +82,7 @@ export async function updateProduct(
   const existing = await productRepository.findById(id);
   if (!existing) throw HttpError.notFound("Product not found");
 
-  const updated = await productRepository.update(id, data);
+  const updated = await productRepository.update(id, data.name === undefined ? data : { ...data, name: normalizeProductName(data.name) });
   await recordChange({ tableName: "products", recordId: id, action: "UPDATE", changedById, oldValue: existing, newValue: updated });
   return updated;
 }

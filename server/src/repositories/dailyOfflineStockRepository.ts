@@ -93,8 +93,8 @@ export const dailyOfflineStockRepository = {
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       select: { entryDate: true, shift: true, remainingStock: true },
     });
-    // Manual counts are an audit only: the encoder types Opening directly and
-    // this carried-forward figure is just the default. The one exception is a
+    // Manual counts are an audit only: Opening is this carried-forward figure
+    // (or an import's). The one exception is a
     // count a supervisor applied to opening stock when publishing it - the
     // latest such count competes with the latest row, and the later wins.
     const count = await manualCountRepository.findLatestBefore(productId, entryDate, shift, "OFFLINE", db);

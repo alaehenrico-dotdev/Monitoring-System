@@ -8,8 +8,8 @@ import { BackupStatus } from "@prisma/client";
 import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/HttpError";
+import { isMysqldumpHeader } from "../utils/dumpHeader";
 
-const DUMP_HEADER = /^-- (MySQL|MariaDB) dump/;
 const TRAILER = "-- Dump completed";
 const TAIL_BYTES = 4096;
 const CARRY_CHARS = 200;
@@ -55,7 +55,7 @@ export async function inspectDump(stream: Readable, maxBytes = RESTORE_MAX_BYTES
   return {
     sizeBytes,
     sha256: hash.digest("hex"),
-    headerOk: DUMP_HEADER.test(headerText),
+    headerOk: isMysqldumpHeader(headerText),
     trailerOk: tail.includes(TRAILER),
     tables: [...tables].sort(),
   };

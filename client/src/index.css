@@ -447,6 +447,19 @@ table input[type="number"] {
   user-select: none;
   -webkit-user-select: none;
 }
+/* A Shift+click or a drag would otherwise also start the browser's own text
+   highlight, which paints across everything between the two points - the
+   category bars, subtotals and totals included - although only product rows are
+   ever part of a selection. Text in these tables is copied with the selection's
+   Copy button instead; the count/stock inputs stay selectable. */
+.ae-table--pickable {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ae-table--pickable input {
+  user-select: text;
+  -webkit-user-select: text;
+}
 .ae-table tbody tr.ae-row-selected td {
   background-color: var(--ae-row-selected-bg);
 }

@@ -13,10 +13,11 @@ import type { GridColumn } from "../components/StockGrid";
 // carries a couple of long-standing typos of its own ("Fullfilment"), so
 // both spellings are accepted on import.
 export const onlineStockColumns: GridColumn[] = [
-  // Typed directly by the encoder (the previous period's Remaining Stock,
-  // Section 4.6, is only the default shown until they do) and still
-  // importable, so a re-imported report can seed/correct it too. Manual
-  // counts (Audit) no longer feed it. The Remaining/Total Stocks aliases
+  // Not editable in the live grid: Section 4.6 carries it forward from the
+  // previous period's Remaining Stock, or a supervisor can set it from the Audit
+  // page by publishing a sheet's counts with "use as next day's opening stock".
+  // Still importable, so a re-imported report can seed/correct it directly.
+  // The Remaining/Total Stocks aliases
   // are listed BEFORE bare "Stocks" on purpose: a normal full daily report
   // (Section 8.1) carries both that day's own "STOCKS" column (its already-
   // stale opening balance) and its "REMAINING STOCKS" ending balance, and
@@ -29,7 +30,7 @@ export const onlineStockColumns: GridColumn[] = [
   {
     key: "openingStock",
     label: "Stocks (Opening)",
-    editable: true,
+    editable: false,
     importable: true,
     aliases: [
       "Remaining Stocks",
@@ -66,13 +67,13 @@ export const onlineStockColumns: GridColumn[] = [
 
 /// Offline grid columns (Section 4.3).
 export const offlineStockColumns: GridColumn[] = [
-  // Typed directly by the encoder, same as Online - see onlineStockColumns'
-  // own copy of this comment for why the Remaining/Total Stocks aliases are
-  // listed before bare "Stocks".
+  // Carried forward (or set from the Audit page), same as Online - see
+  // onlineStockColumns' own copy of this comment for why the Remaining/Total
+  // Stocks aliases are listed before bare "Stocks".
   {
     key: "openingStock",
     label: "Stocks (Opening)",
-    editable: true,
+    editable: false,
     importable: true,
     aliases: [
       "Remaining Stocks",

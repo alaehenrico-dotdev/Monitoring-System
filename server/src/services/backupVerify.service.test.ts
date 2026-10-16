@@ -28,6 +28,14 @@ describe("inspectDump + buildReport", () => {
     expect(report.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
+  it("passes the dump the Docker image's MariaDB mysqldump writes (a sandbox-mode comment comes first)", async () => {
+    const sandbox = "/*M!999999\\- enable the sandbox mode */ \n";
+    const text = sandbox + "-- MariaDB dump 10.19  Distrib 10.11.18-MariaDB, for debian-linux-gnu (x86_64)\n" + dump().split("\n").slice(1).join("\n");
+    const report = await buildReport(await inspectDump(Readable.from([text])));
+    expect(report.ok).toBe(true);
+    expect(report.problems).toEqual([]);
+  });
+
   it("flags a dump cut short (no closing line)", async () => {
     const report = await buildReport(await inspectDump(Readable.from([dump({ trailer: false })])));
     expect(report.ok).toBe(false);

@@ -192,7 +192,7 @@ export async function saveOnlineEntry(
     fulfillmentOut: extraTotals.fulfillmentOut ?? input.fulfillmentOut ?? toNum(existing?.fulfillmentOut),
     rts: extraTotals.rts ?? input.rts ?? toNum(existing?.rts),
   };
-  // An opening the encoder typed (or imported) is theirs: it is flagged so the
+  // An opening set by an import (the grid no longer edits it) is flagged so the
   // carry-forward and an applied count leave it alone from then on.
   const openingManual = input.openingStock !== undefined ? true : (existing?.openingManual ?? false);
   const { onlineStock, remainingStock } = calculate(openingStock, merged);

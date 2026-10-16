@@ -48,7 +48,7 @@ const FIELD_LABELS: Record<string, string> = {
   remarks: "Remarks",
   publishedAt: "Publication",
   appliedToOpening: "Used as next day's opening stock",
-  openingManual: "Opening typed by encoder",
+  openingManual: "Opening set by import",
   name: "Name",
   category: "Category",
   unit: "Unit",

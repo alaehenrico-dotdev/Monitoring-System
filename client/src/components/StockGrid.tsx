@@ -1083,7 +1083,7 @@ export function StockGrid({
       )}
       <RowGlowScroll focusStorageKey={focusStorageKey}>
         <table
-          className="ae-table ae-table--sticky-id"
+          className="ae-table ae-table--sticky-id ae-table--pickable"
           style={{ minWidth: 720 }}
           onPaste={handlePaste}
         >

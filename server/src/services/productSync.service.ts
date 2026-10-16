@@ -3,6 +3,7 @@ import { serializableTransaction } from "../lib/prisma";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { HttpError } from "../utils/HttpError";
 import { strictKey } from "../utils/strictKey";
+import { normalizeProductName } from "../utils/productName";
 import { productRepository } from "../repositories/productRepository";
 import { logSystemEvent, recordChange } from "./changeLog.service";
 import { mergeProductInto, type MergeOutcome } from "./productMerge.service";
@@ -33,6 +34,14 @@ interface Outcome {
   reordered: number;
   total: number;
   merged: MergeOutcome[];
+  deactivated: { before: Product; after: Product }[];
+}
+
+export interface ProductSyncOptions {
+  /// Also switch off every active product the sheet does not list, so the lists
+  /// show exactly the sheet's products. They are deactivated, never deleted: their
+  /// entries and history stay, and each can be switched back on from the SKU list.
+  deactivateUnlisted?: boolean;
 }
 
 /**
@@ -55,7 +64,7 @@ interface Outcome {
  * same items changes nothing, and a row that strictly matches an existing
  * product (or one created earlier in the same run) is reused, never duplicated.
  */
-export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: number) {
+export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: number, options: ProductSyncOptions = {}) {
   // Checked up front, before any write: a merge target has to be named, and the
   // product being merged away cannot also be a row of the sheet.
   const mergeIds = items.flatMap((i) => (i.mergeFromId === undefined ? [] : [i.mergeFromId]));
@@ -85,13 +94,15 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
     const changed: { before: Product; after: Product }[] = [];
     const order: number[] = [];
     const seen = new Set<number>();
+    /// Each placed product's category after this sync (a moved product's new one).
+    const categoryOf = new Map<number, string>();
     let renamed = 0;
     let reactivated = 0;
     let reordered = 0;
 
     for (const item of items) {
       const category = tidy(item.category);
-      const name = tidy(item.name);
+      const name = normalizeProductName(item.name);
       let product = item.productId !== undefined ? byId.get(item.productId) : lookup.get(pairKey(category, name));
       if (item.productId !== undefined && !product) throw HttpError.badRequest(`Unknown product id ${item.productId}`);
 
@@ -121,8 +132,35 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
       if (seen.has(product.id)) continue;
       seen.add(product.id);
       order.push(product.id);
+      categoryOf.set(product.id, product.category);
     }
-    for (const p of all) if (!seen.has(p.id)) order.push(p.id);
+    // A product the sheet does not list stays with its own category: right after the
+    // last product of that category (a sheet product, or an unlisted one placed just
+    // before it, so their relative order holds), and at the end when no product
+    // of the sheet is in its category. They are not pushed to the bottom of everything.
+    for (const p of all) {
+      if (seen.has(p.id)) continue;
+      const wanted = strictKey(p.category);
+      let at = order.length;
+      for (let i = order.length - 1; i >= 0; i--) {
+        if (strictKey(categoryOf.get(order[i]) ?? "") === wanted) {
+          at = i + 1;
+          break;
+        }
+      }
+      order.splice(at, 0, p.id);
+      categoryOf.set(p.id, p.category);
+    }
+
+    // Products the sheet does not list, switched off when asked (they keep their place
+    // in `order`, so switching one back on puts it back beside its category).
+    const deactivated: { before: Product; after: Product }[] = [];
+    if (options.deactivateUnlisted) {
+      for (const p of all) {
+        if (seen.has(p.id) || !p.isActive) continue;
+        deactivated.push({ before: p, after: await tx.product.update({ where: { id: p.id }, data: { isActive: false } }) });
+      }
+    }
 
     const current = new Map<number, number>([...all.map((p) => [p.id, p.sortOrder] as const), ...created.map((p) => [p.id, 0] as const)]);
     const isNew = new Set(created.map((p) => p.id));
@@ -139,11 +177,17 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
         tx,
       );
     }
-    return { created, changed, renamed, reactivated, reordered, total: order.length, merged };
+    for (const c of deactivated) {
+      await recordChange(
+        { tableName: "products", recordId: c.after.id, action: "UPDATE", changedById: userId, oldValue: c.before, newValue: c.after },
+        tx,
+      );
+    }
+    return { created, changed, renamed, reactivated, reordered, total: order.length, merged, deactivated };
   });
 
   productRepository.invalidateCache();
-  if (outcome.created.length || outcome.changed.length || outcome.reordered || outcome.merged.length) {
+  if (outcome.created.length || outcome.changed.length || outcome.reordered || outcome.merged.length || outcome.deactivated.length) {
     await logSystemEvent(
       "product_sync",
       {
@@ -152,6 +196,7 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
         renamed: outcome.renamed,
         reactivated: outcome.reactivated,
         reordered: outcome.reordered,
+        deactivated: outcome.deactivated.map((d) => d.before.name),
         merged: outcome.merged.map((m) => ({ from: m.from.name, into: m.into.name, moved: m.moved, droppedBlank: m.droppedBlank })),
       },
       userId ?? null,
@@ -167,5 +212,6 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
     reordered: outcome.reordered,
     total: outcome.total,
     merged: outcome.merged.length,
+    deactivated: outcome.deactivated.length,
   };
 }

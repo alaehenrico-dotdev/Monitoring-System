@@ -56,6 +56,19 @@ describe("StockGrid row selection", () => {
     expect(selectedNames()).toEqual(["Product 2", "Product 3"]);
   });
 
+  it("a range across categories never includes a category bar, subtotal or the grand total", () => {
+    renderGrid();
+    press(2);
+    press(5, { shiftKey: true });
+
+    const rows = [...document.querySelectorAll("tr.ae-row-selected")];
+    expect(rows).toHaveLength(4);
+    expect(rows.every((tr) => tr.classList.contains("ae-cat-row") && !tr.querySelector(".ae-cat-toggle"))).toBe(true);
+    expect(document.querySelector(".ae-table--pickable")).not.toBeNull();
+    fireEvent.mouseDown(screen.getByText("GRAND TOTAL"), { button: 0, shiftKey: true });
+    expect(document.querySelectorAll("tr.ae-row-selected")).toHaveLength(4);
+  });
+
   it("Ctrl+click adds and removes single rows", () => {
     renderGrid();
     press(1);

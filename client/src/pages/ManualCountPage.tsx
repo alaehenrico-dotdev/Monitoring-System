@@ -69,6 +69,9 @@ import { pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { getCurrentShiftAndDate, getDefaultAuditSheet, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
+import { GridSelectionBar } from "../components/GridSelectionBar";
+import { copyRowsToClipboard, useRowSelection } from "../hooks/useRowSelection";
+import { toTsv } from "../utils/rowSelection";
 import { TableSkeleton } from "../components/Skeleton";
 import type { Shift } from "../types";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
@@ -554,7 +557,7 @@ export function ManualCountPage() {
       setShowPublishConfirm(false);
       setApplyToOpening(false);
       const kept = keptManual
-        ? ` · ${keptManual} opening${keptManual === 1 ? "" : "s"} typed by an encoder ${keptManual === 1 ? "was" : "were"} kept`
+        ? ` · ${keptManual} opening${keptManual === 1 ? "" : "s"} set by an import ${keptManual === 1 ? "was" : "were"} kept`
         : "";
       setNotice({
         message: `Published ${published} count${published === 1 ? "" : "s"} - ${
@@ -879,6 +882,67 @@ export function ManualCountPage() {
     groupedRows.set(r.product.category, list);
   }
   const visibleProductIds = (visibleRows ?? []).map((r) => r.product.id);
+
+  // ---- Row selection --------------------------------------------------------
+  // Excel-style: press the SKU/Product cell to select a row, Shift+press for a
+  // range, Ctrl/Cmd+press to add or remove one, or press and drag (see
+  // hooks/useRowSelection.ts). Only rows on screen can be selected, so a
+  // collapsed category's rows are not part of it (same open/closed rule as the
+  // table below: a category holding a staged count is always open).
+  const selectableIds = [...groupedRows.entries()].flatMap(([category, groupRows]) =>
+    groupRows.some((r) => drafts.ONLINE[r.product.id] !== undefined || drafts.OFFLINE[r.product.id] !== undefined) ||
+    expandedOverride[category]
+      ? groupRows.map((r) => r.product.id)
+      : [],
+  );
+  const selection = useRowSelection({
+    visibleIds: selectableIds,
+    onCopy: copySelectedRows,
+    onClear: clearSelectedCounts,
+  });
+  const selectedRows = selection.selected.flatMap((id) => (visibleRows ?? []).find((r) => r.product.id === id) ?? []);
+  /// The count columns on screen, in the order they are drawn (Offline first).
+  const countColumns = (["OFFLINE", "ONLINE"] as CountLocation[]).filter((l) => (l === "ONLINE" ? showOnline : showOffline));
+
+  /// Fills one count into a location's column for every selected row - staged
+  /// as drafts like a typed count, so nothing is written until Save.
+  function fillSelectedCounts(loc: string, value: number) {
+    pushHistory();
+    setDraftMany(selection.selected.map((productId) => ({ loc: loc as CountLocation, productId, value: String(value) })));
+    setNotice({
+      message: `${loc === "ONLINE" ? "Online" : "Offline"} count set to ${value.toLocaleString()} on ${selection.selected.length} row${selection.selected.length === 1 ? "" : "s"} (not saved yet)`,
+      variant: "info",
+    });
+  }
+  /// Back to uncounted for every selected row (an empty draft removes a saved
+  /// count on Save - the same as "Clear all" on a category).
+  function clearSelectedCounts(ids: number[]) {
+    pushHistory();
+    setDraftMany(ids.flatMap((productId) => countColumns.map((loc) => ({ loc, productId, value: "" }))));
+    setNotice({ message: `${ids.length} row${ids.length === 1 ? "" : "s"} cleared (not saved yet)`, variant: "info" });
+  }
+  /// The selected rows as tab-separated text, which Excel pastes as a grid.
+  function copySelectedRows(ids: number[]) {
+    const rows = ids.flatMap((id) => (visibleRows ?? []).find((r) => r.product.id === id) ?? []);
+    const cell = (n: number | null) => (n === null ? "" : String(n));
+    copyRowsToClipboard(
+      toTsv(
+        ["SKU", "Product", "System Remaining", ...countColumns.map((l) => (l === "ONLINE" ? "Online Count" : "Offline Count")), "Total Count", "Variance"],
+        rows.map((r) => {
+          const f = liveFigures(r);
+          return [
+            r.product.sku ?? "",
+            r.product.name,
+            String(f.system),
+            ...countColumns.map((l) => cell(l === "ONLINE" ? f.online : f.offline)),
+            String(f.total),
+            cell(f.variance),
+          ];
+        }),
+      ),
+      rows.length,
+    );
+  }
   // Categories holding a staged count stay open whatever this says (see
   // `hasPending` in the table), so "collapse all" hides only what is safe to.
   const anyExpanded = [...groupedRows.keys()].some((c) => expandedOverride[c]);
@@ -1397,8 +1461,8 @@ export function ManualCountPage() {
         >
           {openingCount} first count{openingCount === 1 ? "" : "s"} will be
           recorded as opening balances - they are not counted as variance.
-          Counts never change a shift&apos;s opening stock; that is entered
-          directly on the Online/Offline sheets.
+          A count only becomes a shift&apos;s opening stock if you tick the
+          option when publishing.
         </p>
       )}
       {!auditRows ? (
@@ -1413,11 +1477,23 @@ export function ManualCountPage() {
               inner wrapper, not the page - at high zoom the table scrolls
               sideways in place instead of pushing the whole page (heading,
               date/location fields) off to the right. */}
+          {selection.selected.length > 0 && (
+            <GridSelectionBar
+              count={selection.selected.length}
+              fillTargets={countColumns.map((l) => ({ key: l, label: l === "ONLINE" ? "Online Count" : "Offline Count" }))}
+              onFill={fillSelectedCounts}
+              onClearCells={() => clearSelectedCounts(selection.selected)}
+              clearLabel="Clear counts"
+              clearTitle="Put the selected rows back to uncounted (Delete) - nothing is saved until you Save"
+              onCopy={() => copySelectedRows(selection.selected)}
+              onDeselect={selection.clear}
+            />
+          )}
           <RowGlowScroll
             focusStorageKey={`ala-eh-focus:manual-count:${date}:${shift}`}
           >
             <table
-              className="ae-table ae-table--center-head ae-table--compact"
+              className="ae-table ae-table--center-head ae-table--compact ae-table--pickable"
               onPaste={handlePaste}
             >
               <thead>
@@ -1547,9 +1623,12 @@ export function ManualCountPage() {
                             key={r.product.id}
                             data-row-id={r.product.id}
                             className={
-                              isCollapsed
+                              (isCollapsed
                                 ? "ae-cat-row ae-row-collapsed"
-                                : "ae-cat-row"
+                                : "ae-cat-row") +
+                              (selection.selectedSet.has(r.product.id)
+                                ? " ae-row-selected"
+                                : "")
                             }
                             style={
                               isFlagged(r)
@@ -1557,7 +1636,11 @@ export function ManualCountPage() {
                                 : undefined
                             }
                           >
-                            <td className="ae-cell-sku">
+                            <td
+                              className="ae-cell-sku ae-row-pick"
+                              onMouseDown={(e) => selection.press(e, r.product.id)}
+                              onMouseEnter={() => selection.enter(r.product.id)}
+                            >
                               {r.product.sku ?? "—"}
                               {visibleLocations.some((l) => r.breaks[l]) && (
                                 <span
@@ -1571,7 +1654,7 @@ export function ManualCountPage() {
                                     .filter((l) => r.breaks[l])
                                     .map(
                                       (l) =>
-                                        `${LOCATION_LABEL[l]}: opening stock is ${r.breaks[l]!.actual.toLocaleString()} but the previous period carries forward ${r.breaks[l]!.expected.toLocaleString()} (typed or imported)`,
+                                        `${LOCATION_LABEL[l]}: opening stock is ${r.breaks[l]!.actual.toLocaleString()} but the previous period carries forward ${r.breaks[l]!.expected.toLocaleString()} (imported)`,
                                     )
                                     .join("\n")}
                                   aria-label="Opening stock does not carry forward"
@@ -1580,7 +1663,14 @@ export function ManualCountPage() {
                                 </span>
                               )}
                             </td>
-                            <td className="ae-cell-name">{r.product.name}</td>
+                            <td
+                              className="ae-cell-name ae-row-pick"
+                              onMouseDown={(e) => selection.press(e, r.product.id)}
+                              onMouseEnter={() => selection.enter(r.product.id)}
+                              title="Click to select the row - Shift+click for a range, Ctrl+click to add"
+                            >
+                              {r.product.name}
+                            </td>
                             <td>{f.system.toLocaleString()}</td>
                             {showOffline && countCell("OFFLINE")}
                             {showOnline && countCell("ONLINE")}
@@ -1656,6 +1746,16 @@ export function ManualCountPage() {
                   <td />
                 </tr>
               </tbody>
+              {selection.selected.length > 0 && (
+                // The selection's own totals, pinned to the bottom edge.
+                <tfoot className="no-print">
+                  <tr className="ae-row-selected-total">
+                    <td colSpan={2}>SELECTED ({selection.selected.length})</td>
+                    {renderTotals(selectedRows)}
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </RowGlowScroll>
         </div>
@@ -1720,8 +1820,8 @@ export function ManualCountPage() {
             <span>
               Also use these counts as the next day&apos;s opening stock
               <span style={{ display: "block", fontSize: 12, color: colors.subtleInk }}>
-                Online and Offline counts only. An opening an encoder has
-                already typed is left as it is.
+                Online and Offline counts only. An opening that was set by
+                an import is left as it is.
               </span>
             </span>
           </label>
