@@ -6,6 +6,8 @@ export async function getOfflineGrid(date: string, shift: Shift): Promise<Offlin
 }
 
 export interface OfflineEntryInput {
+  /// See OnlineEntryInput.openingStock.
+  openingStock?: number;
   stockInOlToOff?: number;
   stockOutOffToOl?: number;
   productionIn?: number;

@@ -101,10 +101,12 @@ export async function getTrace(req: Request, res: Response) {
   res.json(await getVarianceTrace(productId, entryDate, shift, location));
 }
 
-/// POST /manual-counts/publish?date&shift - release a sheet's saved counts to
-/// the next period's opening stock. Supervisor/Admin only (see the route).
+/// POST /manual-counts/publish?date&shift - approve a sheet's saved counts as
+/// final. Body `{ applyToOpening: true }` also makes them the next day's
+/// opening stock (default false: counts are an audit only). Supervisor/Admin
+/// only (see the route).
 export async function postPublish(req: Request, res: Response) {
   const entryDate = parseDateOnly(req.query.date ?? req.body?.date);
   const shift = parseShift(req.query.shift ?? req.body?.shift);
-  res.json(await publishManualCounts(entryDate, shift, req.user?.id));
+  res.json(await publishManualCounts(entryDate, shift, req.user?.id, req.body?.applyToOpening === true));
 }

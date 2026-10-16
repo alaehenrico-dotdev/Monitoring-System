@@ -44,6 +44,7 @@ const syncSchema = z.object({
         name: z.string().trim().min(1).max(200),
         productId: z.number().int().positive().optional(),
         rename: z.boolean().optional(),
+        mergeFromId: z.number().int().positive().optional(),
       }),
     )
     .min(1)

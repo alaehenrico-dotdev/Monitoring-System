@@ -7,6 +7,9 @@ export async function getOnlineGrid(date: string, shift: Shift): Promise<OnlineG
 }
 
 export interface OnlineEntryInput {
+  /// Typed directly in the grid; omitted, the server keeps the saved value or
+  /// the carried-forward default.
+  openingStock?: number;
   stockInOffToOl?: number;
   stockOutOlToOff?: number;
   productionIn?: number;

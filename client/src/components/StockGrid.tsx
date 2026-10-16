@@ -50,6 +50,15 @@ import {
   type PasteTargetColumn,
 } from "../utils/gridPaste";
 import { showToast } from "./Toast";
+import { GridSelectionBar } from "./GridSelectionBar";
+import {
+  dragTo,
+  EMPTY_SELECTION,
+  pressRow as pressRowSelection,
+  selectedIds,
+  toTsv,
+  type SelectionState,
+} from "../utils/rowSelection";
 import {
   formatGridNumber,
   formatPercentOfTotal,
@@ -655,14 +664,156 @@ export function StockGrid({
   function clearCategory(category: string) {
     if (!onCommitMany) return;
     const groupRows = groups.get(category) ?? [];
-    const keys = columns
-      .filter((c) => c.editable)
-      .flatMap((c) => [...(isEditable(c) ? [c.key] : []), ...trailingKeys(c)]);
+    const keys = allEditableKeys();
     const edits = groupRows.flatMap((r) =>
       keys.map((key) => ({ productId: r.product.id, key, value: 0 })),
     );
     onCommitMany(edits);
   }
+
+  /// Every cell a person can type into, main columns and added ones alike.
+  function allEditableKeys(): string[] {
+    return columns
+      .filter((c) => c.editable)
+      .flatMap((c) => [...(isEditable(c) ? [c.key] : []), ...trailingKeys(c)]);
+  }
+
+  // ---- Row selection --------------------------------------------------------
+  // Excel-style: click a SKU/Product cell to select the row, Shift+click for a
+  // range, Ctrl/Cmd+click to add or remove one, or press and drag. What can be
+  // done to the selection (fill, clear, copy) lives in GridSelectionBar; the
+  // pure state logic is utils/rowSelection.ts.
+  const [selection, setSelection] = useState<SelectionState>(EMPTY_SELECTION);
+  const dragging = useRef(false);
+  // The rows on screen in drawn order. A collapsed category is not on screen, so
+  // its rows are never part of the selection (same open/closed rule as the
+  // render below, including "a category with a pending edit is always open").
+  const visibleIds = [...groups.entries()].flatMap(([category, groupRows]) =>
+    (!!pending && groupRows.some((r) => pending[r.product.id])) ||
+    expandedOverride[category]
+      ? groupRows.map((r) => r.product.id)
+      : [],
+  );
+  const selected = selectedIds(selection, visibleIds);
+  const selectedSet = new Set(selected);
+  const rowById = new Map(rows.map((r) => [r.product.id, r]));
+  const selectedRows = selected.flatMap((id) => rowById.get(id) ?? []);
+
+  /// Every value column in display order, added columns after their owner.
+  const displayCols = columns.flatMap((c) => [
+    { key: c.key, label: c.label, editable: isEditable(c) },
+    ...addedOf(c.key).map((slot) => ({
+      key: extraColumnKey(c.key, slot),
+      label: extraColumnLabel(
+        c.label,
+        slot,
+        extraNames?.[extraColumnKey(c.key, slot)],
+      ),
+      editable: true,
+    })),
+  ]);
+
+  function onRowPress(e: React.MouseEvent, productId: number) {
+    if (e.button !== 0) return;
+    dragging.current = true;
+    const mods = { shift: e.shiftKey, toggle: e.ctrlKey || e.metaKey };
+    setSelection((prev) => pressRowSelection(prev, productId, mods, visibleIds));
+  }
+  function onRowEnter(productId: number) {
+    if (dragging.current) setSelection((prev) => dragTo(prev, productId));
+  }
+  const deselect = () => setSelection(EMPTY_SELECTION);
+
+  function fillSelected(key: string, value: number) {
+    if (!onCommitMany) return;
+    onCommitMany(selected.map((productId) => ({ productId, key, value })));
+    const label = displayCols.find((c) => c.key === key)?.label ?? key;
+    showToast(
+      `Filled ${label} with ${value.toLocaleString()} on ${selected.length} row${selected.length === 1 ? "" : "s"} - save to keep it`,
+      "success",
+    );
+  }
+  function clearSelectedCells() {
+    if (!onCommitMany) return;
+    const keys = allEditableKeys();
+    onCommitMany(
+      selected.flatMap((productId) =>
+        keys.map((key) => ({ productId, key, value: 0 })),
+      ),
+    );
+    showToast(
+      `Cleared ${selected.length} row${selected.length === 1 ? "" : "s"} - save to keep it`,
+      "success",
+    );
+  }
+  /// The selected rows as tab-separated text, which Excel pastes as a grid.
+  function copySelected() {
+    const text = toTsv(
+      ["SKU", "Product", ...displayCols.map((c) => c.label)],
+      selectedRows.map((r) => [
+        r.product.sku ?? "",
+        r.product.name,
+        ...displayCols.map((c) => String(toNum(r.entry[c.key]))),
+      ]),
+    );
+    const n = selectedRows.length;
+    const write = navigator.clipboard?.writeText(text);
+    if (!write) {
+      showToast("Couldn't copy - the browser blocked clipboard access", "error");
+      return;
+    }
+    write.then(
+      () => showToast(`Copied ${n} row${n === 1 ? "" : "s"} - paste into Excel`, "success"),
+      () => showToast("Couldn't copy - the browser blocked clipboard access", "error"),
+    );
+  }
+
+  // Latest actions for the one document listener below, so it is registered
+  // once instead of on every render.
+  const selectionActions = useRef({
+    count: 0,
+    deselect,
+    copy: copySelected,
+    clearCells: null as (() => void) | null,
+  });
+  useLayoutEffect(() => {
+    selectionActions.current = {
+      count: selected.length,
+      deselect,
+      copy: copySelected,
+      clearCells: canQuickFill ? clearSelectedCells : null,
+    };
+  });
+  useEffect(() => {
+    const up = () => {
+      dragging.current = false;
+    };
+    function onKey(e: globalThis.KeyboardEvent) {
+      const a = selectionActions.current;
+      if (a.count === 0) return;
+      const t = e.target as HTMLElement | null;
+      // Typing in a cell, a field or a dialog is never about the selection.
+      if (t?.closest("input, textarea, select, [contenteditable=true]")) return;
+      if (document.querySelector('[role="dialog"]')) return;
+      if (e.key === "Escape") {
+        a.deselect();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+        // A text selection the person made themselves keeps its own copy.
+        if (window.getSelection()?.toString()) return;
+        e.preventDefault();
+        a.copy();
+      } else if (e.key === "Delete" && a.clearCells) {
+        e.preventDefault();
+        a.clearCells();
+      }
+    }
+    window.addEventListener("mouseup", up);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mouseup", up);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
 
   const extraCount = columns.reduce((n, c) => n + addedOf(c.key).length, 0);
 
@@ -914,6 +1065,22 @@ export function StockGrid({
 
   return (
     <>
+      {selected.length > 0 && (
+        <GridSelectionBar
+          count={selected.length}
+          fillTargets={
+            canQuickFill
+              ? displayCols
+                  .filter((c) => c.editable)
+                  .map((c) => ({ key: c.key, label: c.label }))
+              : null
+          }
+          onFill={fillSelected}
+          onClearCells={clearSelectedCells}
+          onCopy={copySelected}
+          onDeselect={deselect}
+        />
+      )}
       <RowGlowScroll focusStorageKey={focusStorageKey}>
         <table
           className="ae-table ae-table--sticky-id"
@@ -1148,9 +1315,12 @@ export function StockGrid({
                       id={`ae-stockgrid-row-${row.product.id}`}
                       data-row-id={row.product.id}
                       className={
-                        isCollapsed
+                        (isCollapsed
                           ? "ae-cat-row ae-row-collapsed"
-                          : "ae-cat-row"
+                          : "ae-cat-row") +
+                        (selectedSet.has(row.product.id)
+                          ? " ae-row-selected"
+                          : "")
                       }
                       style={
                         row.isFlagged
@@ -1158,10 +1328,19 @@ export function StockGrid({
                           : undefined
                       }
                     >
-                      <td className="ae-cell-sku ae-sticky-sku">
+                      <td
+                        className="ae-cell-sku ae-sticky-sku ae-row-pick"
+                        onMouseDown={(e) => onRowPress(e, row.product.id)}
+                        onMouseEnter={() => onRowEnter(row.product.id)}
+                      >
                         {row.product.sku ?? ZERO_DASH}
                       </td>
-                      <td className="ae-cell-name ae-sticky-name">
+                      <td
+                        className="ae-cell-name ae-sticky-name ae-row-pick"
+                        onMouseDown={(e) => onRowPress(e, row.product.id)}
+                        onMouseEnter={() => onRowEnter(row.product.id)}
+                        title="Click to select the row - Shift+click for a range, Ctrl+click to add"
+                      >
                         {row.product.name}
                       </td>
                       {columns.map((col) => {
@@ -1327,6 +1506,40 @@ export function StockGrid({
               ))}
             </tr>
           </tbody>
+          {selected.length > 0 && (
+            // The selection's own totals, pinned to the bottom edge so they
+            // stay in view however far the table is scrolled.
+            <tfoot className="no-print">
+              <tr className="ae-row-selected-total">
+                <td colSpan={2} className="ae-sticky-subtotal">
+                  SELECTED ({selected.length})
+                </td>
+                {columns.map((col) => {
+                  const sum = (key: string) =>
+                    sumRounded(selectedRows.map((r) => toNum(r.entry[key])));
+                  return (
+                    <Fragment key={col.key}>
+                      <td style={tint(col)}>{sum(col.key).toLocaleString()}</td>
+                      {trailingKeys(col).map((key, i) => (
+                        <td
+                          key={key}
+                          className={extraCellClass(i)}
+                          style={tint(col)}
+                        >
+                          {sum(key).toLocaleString()}
+                        </td>
+                      ))}
+                      {showPercent && col.key === percentOfTotalKey && (
+                        <td className="ae-pct-col">
+                          {formatPercentOfTotal(sum(col.key), percentTotal)}
+                        </td>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </RowGlowScroll>
       {menu && onAddExtraColumns && onRemoveExtraColumns && (

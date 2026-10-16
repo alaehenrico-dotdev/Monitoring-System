@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { listProducts, reorderProducts } from "../api/products";
+import { deleteOrderTemplate, listOrderTemplates, saveOrderTemplate, type SavedOrderTemplate } from "../api/orderTemplates";
 import type { Product } from "../types";
 import { colors } from "../theme";
-import { Button } from "./ui";
+import { Button, Select, TextInput } from "./ui";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { showToast } from "./Toast";
 import { Modal } from "./Modal";
 import { ReorderIcon } from "./icons";
 import { moveItem } from "../utils/moveItem";
+import { readXlsxColumnA, type XlsxStyledSheet } from "../utils/xlsx";
+import { templateRowsFromColumn, type TemplateRow } from "../utils/orderTemplate";
+import { OrderTemplateReview } from "./OrderTemplateReview";
 
 /**
  * Toolbar icon (Supervisor/Admin only) that opens the product-order dialog.
@@ -29,6 +35,7 @@ export function ReorderProductsButton({ isAdmin }: { isAdmin: boolean }) {
         className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
       >
         <ReorderIcon />
+        <span className="ae-toolbar-btn-label">Reorder</span>
       </Button>
       {open && <ReorderProductsDialog onClose={() => setOpen(false)} />}
     </>
@@ -42,6 +49,26 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
   const [saving, setSaving] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
+  // Excel template (see utils/orderTemplate.ts): the workbook that was picked
+  // and the rows read from one of its sheets. While there are rows the dialog
+  // shows OrderTemplateReview instead of the drag list; nothing is saved until
+  // the review's "Apply template".
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [template, setTemplate] = useState<{ fileName: string; sheets: XlsxStyledSheet[]; sheet: number } | null>(null);
+  const [templateRows, setTemplateRows] = useState<TemplateRow[] | null>(null);
+  const [templateError, setTemplateError] = useState<string | null>(null);
+  // Templates kept in the database (so they survive a reset or rebuild), the one
+  // currently chosen from them, and the name to save a just-read file under.
+  const [saved, setSaved] = useState<SavedOrderTemplate[]>([]);
+  const [activeSaved, setActiveSaved] = useState<number | null>(null);
+  const [saveName, setSaveName] = useState<string | null>(null);
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    // A failure here only means no saved templates are offered; the file picker still works.
+    listOrderTemplates().then(setSaved, () => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +86,8 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
     };
   }, []);
 
-  const changed = items !== null && items.some((p, i) => p.id !== original[i]);
+  // A shorter list (a template that lists fewer products) is a change even when it starts the same.
+  const changed = items !== null && (items.length !== original.length || items.some((p, i) => p.id !== original[i]));
 
   async function save() {
     if (!items || !changed) return;
@@ -79,8 +107,199 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
     setOverIndex(null);
   }
 
+  /// Reads one sheet of the template into rows for the review.
+  function applyTemplate(sheets: XlsxStyledSheet[], sheet: number) {
+    const rows = templateRowsFromColumn(sheets[sheet].cells);
+    if (rows.length === 0) {
+      setTemplateRows(null);
+      setTemplateError(
+        `No bold category and product names were found in column A of "${sheets[sheet].name}". Pick another sheet or file.`,
+      );
+      return;
+    }
+    setTemplateError(null);
+    setTemplateRows(rows);
+  }
+
+  async function pickTemplate(file: File | undefined) {
+    if (!file) return;
+    setTemplateError(null);
+    try {
+      setActiveSaved(null);
+      setSaveName(null);
+      const sheets = await readXlsxColumnA(await file.arrayBuffer());
+      // The first sheet that has something to read: a workbook may open on a cover page.
+      const first = Math.max(0, sheets.findIndex((s) => templateRowsFromColumn(s.cells).length > 0));
+      setTemplate({ fileName: file.name, sheets, sheet: first });
+      applyTemplate(sheets, first);
+    } catch (e) {
+      setTemplate(null);
+      setTemplateRows(null);
+      setTemplateError(e instanceof Error ? e.message : "Could not read that file");
+    }
+  }
+
+  /// Offered for a template that was just read from a file: "Encoder order" or, for a
+  /// workbook with a tab per day, "Encoder order - OCT 8".
+  const suggestedName = template
+    ? template.fileName.replace(/\.xlsx$/i, "") + (template.sheets.length > 1 ? ` - ${template.sheets[template.sheet].name}` : "")
+    : "";
+  const nameToSave = (saveName ?? suggestedName).trim();
+
+  async function saveCurrentTemplate() {
+    if (!templateRows || !nameToSave) return;
+    setSavingTemplate(true);
+    try {
+      const out = await saveOrderTemplate(nameToSave, templateRows);
+      setSaved((cur) => [...cur.filter((t) => t.id !== out.id), out].sort((a, b) => a.name.localeCompare(b.name)));
+      setActiveSaved(out.id);
+      setTemplate(null);
+      showToast(`Saved "${out.name}" - it will be here after a reset or rebuild`, "success");
+    } catch (e) {
+      setTemplateError(e instanceof Error ? e.message : "Could not save the template");
+    } finally {
+      setSavingTemplate(false);
+    }
+  }
+
+  async function removeSavedTemplate() {
+    const id = activeSaved;
+    setConfirmDelete(false);
+    if (id === null) return;
+    try {
+      await deleteOrderTemplate(id);
+      setSaved((cur) => cur.filter((t) => t.id !== id));
+      setActiveSaved(null);
+      setTemplateRows(null);
+    } catch (e) {
+      setTemplateError(e instanceof Error ? e.message : "Could not delete the template");
+    }
+  }
+
   return (
     <Modal title="Arrange product order" onClose={saving ? () => {} : onClose} width={560}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
+        {saved.length > 0 && (
+          <>
+            <Select
+              aria-label="Saved templates"
+              value={activeSaved ?? ""}
+              disabled={saving || !items}
+              onChange={(e) => {
+                const t = saved.find((x) => x.id === Number(e.target.value));
+                setTemplate(null);
+                setTemplateError(null);
+                setActiveSaved(t?.id ?? null);
+                setTemplateRows(t ? t.rows : null);
+              }}
+              style={{ width: "auto", maxWidth: 240 }}
+            >
+              <option value="">Saved templates…</option>
+              {saved.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name} ({t.rows.length})
+                </option>
+              ))}
+            </Select>
+            {activeSaved !== null && (
+              <button
+                type="button"
+                className="ae-fill-down-btn"
+                onClick={() => setConfirmDelete(true)}
+                title="Delete this saved template"
+                aria-label="Delete saved template"
+              >
+                &times;
+              </button>
+            )}
+          </>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".xlsx"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // Cleared so picking the same file again re-applies it.
+            e.target.value = "";
+            void pickTemplate(file);
+          }}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={saving || !items}
+          onClick={() => fileInput.current?.click()}
+          title="Arrange the list from an Excel template: bold headings are categories, bold lines under them are products"
+        >
+          Select Excel template
+        </Button>
+        {template && (
+          <span style={{ fontSize: 12, color: colors.subtleInk, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }} title={template.fileName}>
+            {template.fileName}
+          </span>
+        )}
+        {template && template.sheets.length > 1 && (
+          <Select
+            aria-label="Template sheet"
+            value={template.sheet}
+            disabled={saving}
+            onChange={(e) => {
+              const sheet = Number(e.target.value);
+              setTemplate({ ...template, sheet });
+              applyTemplate(template.sheets, sheet);
+            }}
+            style={{ width: "auto", minWidth: 120 }}
+          >
+            {template.sheets.map((s, i) => (
+              <option key={i} value={i}>
+                {s.name || `Sheet ${i + 1}`}
+              </option>
+            ))}
+          </Select>
+        )}
+      </div>
+      {template && templateRows && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <TextInput
+            aria-label="Template name"
+            value={saveName ?? suggestedName}
+            onChange={(e) => setSaveName(e.target.value)}
+            maxLength={100}
+            style={{ width: 220 }}
+          />
+          <Button type="button" variant="secondary" size="sm" disabled={!nameToSave || savingTemplate} loading={savingTemplate} onClick={() => void saveCurrentTemplate()}>
+            Save template
+          </Button>
+          <span style={{ fontSize: 12, color: colors.subtleInk }}>Keeps it in the system, so it is still here after a reset or rebuild.</span>
+        </div>
+      )}
+      {templateError && (
+        <div role="alert" style={{ color: colors.danger, fontSize: 13, marginBottom: 10 }}>
+          {templateError}
+        </div>
+      )}
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete this saved template?"
+          confirmLabel="Delete"
+          onConfirm={() => void removeSavedTemplate()}
+          onCancel={() => setConfirmDelete(false)}
+        >
+          {saved.find((t) => t.id === activeSaved)?.name} will no longer be offered. Products already arranged by it are not changed.
+        </ConfirmDialog>
+      )}
+      {templateRows && items ? (
+        <OrderTemplateReview
+          rows={templateRows}
+          existing={items}
+          onBack={() => setTemplateRows(null)}
+          onDone={onClose}
+        />
+      ) : (
+        <>
       <p style={{ margin: "0 0 12px", fontSize: 13, color: colors.subtleInk }}>
         Drag a row by its handle, or use the arrows. Each product keeps its SKU. The new order applies to every page
         and report, for everyone.
@@ -196,6 +415,8 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
           Save order
         </Button>
       </div>
+        </>
+      )}
     </Modal>
   );
 }

@@ -160,10 +160,15 @@ function LocationTrace({
           {trace.count && (
             <p style={lineStyle}>
               {trace.count.publishedAt ? (
-                <>Published {when(trace.count.publishedAt)} - this is the next shift's opening stock.</>
+                <>
+                  Published {when(trace.count.publishedAt)} -{" "}
+                  {trace.count.appliedToOpening
+                    ? "used as the next day's opening stock."
+                    : "final for reporting (audit only, opening stock unchanged)."}
+                </>
               ) : (
                 <span style={{ color: colors.warningText }}>
-                  Not published yet - the next shift still opens from the system stock until a supervisor publishes this sheet.
+                  Not published yet - a supervisor approves this sheet by publishing it.
                 </span>
               )}
             </p>

@@ -434,6 +434,65 @@ table input[type="number"] {
   font-size: 12px;
   letter-spacing: 0.05em;
 }
+/* Row selection (StockGrid): click / Shift+click / Ctrl+click / drag on the
+   SKU or Product cell. The selected tint is opaque (the surface with gold mixed
+   in) so the frosted sticky identity cells stay solid while the table scrolls
+   sideways behind them. Declared after the generic row-hover rule, with the
+   same specificity, so a selected row keeps its colour under the pointer. */
+:root {
+  --ae-row-selected-bg: color-mix(in srgb, #f5c000 20%, var(--ae-surface));
+}
+.ae-table td.ae-row-pick {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ae-table tbody tr.ae-row-selected td {
+  background-color: var(--ae-row-selected-bg);
+}
+.ae-table tbody tr.ae-row-selected td.ae-cell-sku {
+  box-shadow: inset 3px 0 0 #f5c000;
+}
+.ae-table tfoot tr.ae-row-selected-total td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background-color: var(--ae-row-selected-bg);
+  font-weight: 700;
+  box-shadow: inset 0 2px 0 #f5c000;
+}
+.ae-table tfoot tr.ae-row-selected-total td.ae-sticky-subtotal {
+  z-index: 3;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+.ae-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--ae-border);
+  border-left: 3px solid #f5c000;
+  border-radius: 6px;
+  background: var(--ae-row-selected-bg);
+}
+.ae-selection-count {
+  margin-right: 4px;
+}
+.ae-selection-fill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media print {
+  .ae-table tbody tr.ae-row-selected td {
+    background-color: transparent;
+  }
+}
+
 /* Spare input columns after Delivery (Out) (StockGrid's `expandable`
    columns): vertical grid lines on every cell of them, from the header
    down through the subtotal/grand total rows. Drawn with a border, in a
@@ -1993,9 +2052,12 @@ table input[type="number"] {
   transform: scaleX(1);
 }
 
-/* Button labels are always collapsed: toolbar actions (Undo, Save, Clear,
-   PDF, Report, Import, ...) are icon-only at every tier. The title attribute
-   on each button supplies the hover tooltip. */
+/* Button labels follow the toolbar tier (Toolbar.tsx): shown in the full tier
+   - a wide screen - and collapsed in the compact/circle tiers, where the
+   toolbar actions (Undo, Save, Clear, PDF, Report, Import, ...) are icon-only.
+   The title attribute on each button supplies the hover tooltip either way.
+   Which tier applies is measured, not a fixed breakpoint, so a label is only
+   shown when there is room for every one of them. */
 .ae-segment-label,
 .ae-toolbar-btn-label {
   display: inline-block;
@@ -2006,8 +2068,8 @@ table input[type="number"] {
     max-width 220ms ease,
     opacity 160ms ease;
 }
-.ae-toolbar .ae-segment-label,
-.ae-toolbar .ae-toolbar-btn-label {
+.ae-toolbar--compact .ae-segment-label,
+.ae-toolbar--compact .ae-toolbar-btn-label {
   max-width: 0;
   opacity: 0;
 }
@@ -5134,4 +5196,47 @@ table input[type="number"] {
     flex: 1 1 auto;
     justify-content: center;
   }
+}
+
+/* ---- Full tier: toolbar actions show their text ----------------------------
+   Toolbar.tsx picks the full tier only when every control fits with its label,
+   so on a wide screen the icon buttons read as labeled buttons (Undo, Save,
+   Clear, PDF, Report, Import, Expand all, Reorder, ...) and drop back to the
+   square icon buttons above as soon as there is not enough room. The selectors
+   start from :not(.ae-toolbar--compact) so they out-rank the "icon-only at every
+   tier" squares earlier in the file without !important, and they are the same
+   look the Publish button already had. Primary (Save) and danger buttons keep
+   their own colours; only size and spacing change for them. */
+.ae-toolbar:not(.ae-toolbar--compact) .ae-btn:has(.ae-toolbar-btn-label),
+.ae-toolbar:not(.ae-toolbar--compact) .ae-toolbar-save,
+.ae-toolbar:not(.ae-toolbar--compact) .ae-segment-btn {
+  width: auto;
+  min-width: var(--tb-h);
+  max-width: none;
+  padding: 0 var(--tb-pad-x);
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.ae-toolbar:not(.ae-toolbar--compact)
+  .ae-btn:has(.ae-toolbar-btn-label):not(.ae-btn-danger):not(
+    .ae-toolbar-primary
+  ):not(.ae-toolbar-publish),
+.ae-toolbar:not(.ae-toolbar--compact)
+  .ae-toolbar-save:not(.ae-toolbar-primary):not(.ae-btn-danger):not(
+    .ae-toolbar-publish
+  ),
+.ae-toolbar:not(.ae-toolbar--compact) .ae-segment-btn {
+  border: 1px solid var(--tb-hairline);
+  background: var(--tb-field-bg);
+  color: var(--tb-text);
+}
+/* Expand all / Reorder were bare icons; with text they are boxed like the rest.
+   !important matches the rule that made them bare (and its :hover/:active forms). */
+.ae-toolbar:not(.ae-toolbar--compact) .ae-btn.ae-toolbar-collapse-btn,
+.ae-toolbar:not(.ae-toolbar--compact)
+  .ae-btn.ae-toolbar-collapse-btn:hover:not(:disabled),
+.ae-toolbar:not(.ae-toolbar--compact)
+  .ae-btn.ae-toolbar-collapse-btn:active:not(:disabled) {
+  border: 1px solid var(--tb-hairline) !important;
+  background: var(--tb-field-bg);
 }

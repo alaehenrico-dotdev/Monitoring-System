@@ -1227,6 +1227,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             }}
           >
             <HistoryIcon />
+            <span className="ae-toolbar-btn-label">Import history</span>
           </Button>
         )}
         <Toast

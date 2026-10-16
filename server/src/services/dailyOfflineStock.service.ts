@@ -218,6 +218,8 @@ export async function saveOfflineEntry(
     backloads: extraTotals.backloads ?? input.backloads ?? toNum(existing?.backloads),
     upsellOut: extraTotals.upsellOut ?? input.upsellOut ?? toNum(existing?.upsellOut),
   };
+  // See saveOnlineEntry: a typed/imported opening is flagged as the encoder's own.
+  const openingManual = input.openingStock !== undefined ? true : (existing?.openingManual ?? false);
   const { offlineStock, remainingStock } = calculate(openingStock, merged);
 
   // Negative-stock guard - see the matching comment in
@@ -232,7 +234,7 @@ export async function saveOfflineEntry(
     return withHeld(existing);
   }
 
-  const data = { productId, entryDate, shift, openingStock, ...merged, offlineStock, remainingStock, encodedById: userId };
+  const data = { productId, entryDate, shift, openingStock, openingManual, ...merged, offlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOfflineStockRepository.upsert(existing?.id, data, db);
 
   // Columns whose stored amounts this save replaces - see the matching

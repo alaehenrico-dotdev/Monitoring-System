@@ -335,6 +335,9 @@ export function ManualCountPage() {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  // Publish-dialog choice: also make the counts the next day's opening stock.
+  // Off by default - counts are an audit only unless a supervisor opts in.
+  const [applyToOpening, setApplyToOpening] = useState(false);
   // Publishing is the supervisor's approval step; encoders see the state only.
   const canPublish = useAuth().user?.role === "SUPERVISOR_ADMIN";
   // Undo / redo over the staged (unsaved) counts. A step is one cell edit (all
@@ -542,15 +545,21 @@ export function ManualCountPage() {
   }
 
   /// Discards every staged-but-unsaved count on this sheet (both locations).
-  /// Releases this sheet's saved counts to the next shift's opening stock.
+  /// Approves this sheet's saved counts, optionally also as the next day's opening stock.
   async function handlePublish() {
     setPublishing(true);
     setError(null);
     try {
-      const { published } = await publishManualCounts(date, shift);
+      const { published, keptManual = 0 } = await publishManualCounts(date, shift, applyToOpening);
       setShowPublishConfirm(false);
+      setApplyToOpening(false);
+      const kept = keptManual
+        ? ` · ${keptManual} opening${keptManual === 1 ? "" : "s"} typed by an encoder ${keptManual === 1 ? "was" : "were"} kept`
+        : "";
       setNotice({
-        message: `Published ${published} count${published === 1 ? "" : "s"} - they are now the next shift's opening stock`,
+        message: `Published ${published} count${published === 1 ? "" : "s"} - ${
+          applyToOpening ? "now the next day's opening stock" : "now final for reporting"
+        }${kept}`,
         variant: "success",
       });
       // The server broadcasts the change; re-read now so the badge and button
@@ -559,9 +568,9 @@ export function ManualCountPage() {
         getManualCountGrid(date, shift, "ONLINE"),
         getManualCountGrid(date, shift, "OFFLINE"),
       ]);
-      // Published counts now live on as the next day's opening stock, so the
-      // sheet's count cells are cleared, ready for the next audit. They stay
-      // stored (variance reports still read them).
+      // Published counts are final, so the sheet's count cells are cleared,
+      // ready for the next audit. They stay stored (variance reports still
+      // read them).
       const cleared = (rows: typeof ONLINE) =>
         rows.map((r) =>
           r.entry.publishedAt
@@ -1113,6 +1122,9 @@ export function ManualCountPage() {
               className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
             >
               {anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
+              <span className="ae-toolbar-btn-label">
+                {anyExpanded ? "Collapse all" : "Expand all"}
+              </span>
             </Button>
             <ReorderProductsButton isAdmin={canPublish} />
             <SearchInput
@@ -1178,7 +1190,7 @@ export function ManualCountPage() {
                     ? "Save your changes first"
                     : unpublishedCount === 0
                       ? "Nothing to publish - every saved count is already published"
-                      : "Publish the saved counts: they become the next shift's opening stock"
+                      : "Publish the saved counts: approve them as final (optionally also as the next day's opening stock)"
                 }
               >
                 <PublishIcon />
@@ -1231,8 +1243,8 @@ export function ManualCountPage() {
                 }
                 title={
                   unpublishedCount === 0
-                    ? "These counts are the next shift's opening stock"
-                    : "Saved counts only become the next shift's opening stock once published"
+                    ? "These counts are approved and final for reporting"
+                    : "Saved counts are only final for reporting once a supervisor publishes them"
                 }
               >
                 {unpublishedCount === 0
@@ -1384,9 +1396,9 @@ export function ManualCountPage() {
           }}
         >
           {openingCount} first count{openingCount === 1 ? "" : "s"} will be
-          recorded as opening balances - they set the starting stock and are not
-          counted as variance. A supervisor must publish them before they become
-          the next shift&apos;s opening stock.
+          recorded as opening balances - they are not counted as variance.
+          Counts never change a shift&apos;s opening stock; that is entered
+          directly on the Online/Offline sheets.
         </p>
       )}
       {!auditRows ? (
@@ -1559,7 +1571,7 @@ export function ManualCountPage() {
                                     .filter((l) => r.breaks[l])
                                     .map(
                                       (l) =>
-                                        `${LOCATION_LABEL[l]}: opening stock is ${r.breaks[l]!.actual.toLocaleString()} but the previous period carries forward ${r.breaks[l]!.expected.toLocaleString()} (set by an import)`,
+                                        `${LOCATION_LABEL[l]}: opening stock is ${r.breaks[l]!.actual.toLocaleString()} but the previous period carries forward ${r.breaks[l]!.expected.toLocaleString()} (typed or imported)`,
                                     )
                                     .join("\n")}
                                   aria-label="Opening stock does not carry forward"
@@ -1588,7 +1600,7 @@ export function ManualCountPage() {
                               ) : f.opening ? (
                                 <span
                                   style={openingTagStyle}
-                                  title="First count of this product: it sets the starting stock and is not a variance. It becomes the next shift's opening stock once a supervisor publishes it."
+                                  title="First count of this product: it is not counted as a variance. It does not change opening stock."
                                 >
                                   Opening
                                 </span>
@@ -1686,13 +1698,33 @@ export function ManualCountPage() {
           confirmLabel={`Publish ${unpublishedCount}`}
           busy={publishing}
           onConfirm={() => void handlePublish()}
-          onCancel={() => setShowPublishConfirm(false)}
+          onCancel={() => {
+            setShowPublishConfirm(false);
+            setApplyToOpening(false);
+          }}
         >
           {unpublishedCount} saved count{unpublishedCount === 1 ? "" : "s"} for{" "}
-          {formatDateDisplay(date)} · {SHIFT_SHORT_LABELS[shift]} Shift will
-          become the next shift&apos;s opening stock, and any later sheet
-          already saved is re-calculated from them. Changing a count afterwards
-          takes it back to unpublished until you publish again.
+          {formatDateDisplay(date)} · {SHIFT_SHORT_LABELS[shift]} Shift will be
+          approved as final for reporting. Changing a count afterwards takes it
+          back to unpublished until you publish again.
+          <label
+            style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}
+          >
+            <input
+              type="checkbox"
+              checked={applyToOpening}
+              disabled={publishing}
+              onChange={(e) => setApplyToOpening(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              Also use these counts as the next day&apos;s opening stock
+              <span style={{ display: "block", fontSize: 12, color: colors.subtleInk }}>
+                Online and Offline counts only. An opening an encoder has
+                already typed is left as it is.
+              </span>
+            </span>
+          </label>
         </ConfirmDialog>
       )}
       {showClearConfirm && (

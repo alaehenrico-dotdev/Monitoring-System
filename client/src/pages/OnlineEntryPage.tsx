@@ -628,6 +628,9 @@ export function OnlineEntryPage() {
               className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
             >
               {anyCatExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
+              <span className="ae-toolbar-btn-label">
+                {anyCatExpanded ? "Collapse all" : "Expand all"}
+              </span>
             </Button>
             <ReorderProductsButton isAdmin={user?.role === "SUPERVISOR_ADMIN"} />
             <SearchInput

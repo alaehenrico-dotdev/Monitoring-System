@@ -110,12 +110,12 @@ describe("VarianceDetails", () => {
     expect(await screen.findByText(/Not published yet/)).toBeTruthy();
   });
 
-  it("says when a count was published and became the next opening stock", async () => {
+  it("says when a count was published and is final for reporting", async () => {
     api.getVarianceTrace.mockResolvedValue(
       trace({ count: { manualCount: 100, systemRemainingStock: 105, variance: 5, remarks: null, countedBy: "Ana Cruz", countedAt: null, publishedAt: "2026-10-09T22:00:00.000Z" } }),
     );
     open();
-    expect(await screen.findByText(/Published .* next shift's opening stock/)).toBeTruthy();
+    expect(await screen.findByText(/Published .* final for reporting/)).toBeTruthy();
     expect(screen.queryByText(/Not published yet/)).toBeNull();
   });
 });

@@ -5,6 +5,7 @@ import { HttpError } from "../utils/HttpError";
 import { strictKey } from "../utils/strictKey";
 import { productRepository } from "../repositories/productRepository";
 import { logSystemEvent, recordChange } from "./changeLog.service";
+import { mergeProductInto, type MergeOutcome } from "./productMerge.service";
 
 export interface ProductSyncItem {
   category: string;
@@ -15,6 +16,10 @@ export interface ProductSyncItem {
   /// With productId: the sheet's spelling replaces the product's name (the
   /// admin said it is the same product), keeping its SKU, history and id.
   rename?: boolean;
+  /// With productId: a product WITHOUT a SKU that is the same product (added earlier
+  /// under another spelling, and used since). Everything recorded against it moves
+  /// onto productId and it is deleted - see productMerge.service.ts.
+  mergeFromId?: number;
 }
 
 const pairKey = (category: string, name: string) => `${strictKey(category)}\u0000${strictKey(name)}`;
@@ -27,6 +32,7 @@ interface Outcome {
   reactivated: number;
   reordered: number;
   total: number;
+  merged: MergeOutcome[];
 }
 
 /**
@@ -43,12 +49,33 @@ interface Outcome {
  * leaves the list exactly as it was, and two admins syncing at once cannot both
  * create the same new product. A product that matches the sheet but was retired
  * is switched back on - the sheet lists it, and left inactive it would match
- * here yet never appear in the grids. Idempotent: running it again with the
+ * here yet never appear in the grids. Rows with `mergeFromId` first merge that
+ * duplicate into the row's product, in the same transaction (a clash between the
+ * two stops the whole sync). Idempotent: running it again with the
  * same items changes nothing, and a row that strictly matches an existing
  * product (or one created earlier in the same run) is reused, never duplicated.
  */
 export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: number) {
+  // Checked up front, before any write: a merge target has to be named, and the
+  // product being merged away cannot also be a row of the sheet.
+  const mergeIds = items.flatMap((i) => (i.mergeFromId === undefined ? [] : [i.mergeFromId]));
+  for (const item of items) {
+    if (item.mergeFromId !== undefined && item.productId === undefined) {
+      throw HttpError.badRequest(`${item.name}: choose the product it is the same as before merging`);
+    }
+  }
+  if (items.some((i) => i.productId !== undefined && mergeIds.includes(i.productId))) {
+    throw HttpError.badRequest("A product that is being merged away cannot also be a row of the sheet");
+  }
+
   const outcome = await serializableTransaction<Outcome>(async (tx) => {
+    // Merges first, so the product list read below is already without the duplicates.
+    const merged: MergeOutcome[] = [];
+    for (const item of items) {
+      if (item.mergeFromId !== undefined && item.productId !== undefined) {
+        merged.push(await mergeProductInto(tx, item.mergeFromId, item.productId, userId));
+      }
+    }
     const all = await tx.product.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
     const byId = new Map(all.map((p) => [p.id, p]));
     const lookup = new Map<string, Product>();
@@ -112,11 +139,11 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
         tx,
       );
     }
-    return { created, changed, renamed, reactivated, reordered, total: order.length };
+    return { created, changed, renamed, reactivated, reordered, total: order.length, merged };
   });
 
   productRepository.invalidateCache();
-  if (outcome.created.length || outcome.changed.length || outcome.reordered) {
+  if (outcome.created.length || outcome.changed.length || outcome.reordered || outcome.merged.length) {
     await logSystemEvent(
       "product_sync",
       {
@@ -125,6 +152,7 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
         renamed: outcome.renamed,
         reactivated: outcome.reactivated,
         reordered: outcome.reordered,
+        merged: outcome.merged.map((m) => ({ from: m.from.name, into: m.into.name, moved: m.moved, droppedBlank: m.droppedBlank })),
       },
       userId ?? null,
       "UPDATE",
@@ -138,5 +166,6 @@ export async function syncProductsFromSheet(items: ProductSyncItem[], userId?: n
     reactivated: outcome.reactivated,
     reordered: outcome.reordered,
     total: outcome.total,
+    merged: outcome.merged.length,
   };
 }
