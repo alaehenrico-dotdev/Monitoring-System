@@ -192,6 +192,9 @@ export async function saveOnlineEntry(
     fulfillmentOut: extraTotals.fulfillmentOut ?? input.fulfillmentOut ?? toNum(existing?.fulfillmentOut),
     rts: extraTotals.rts ?? input.rts ?? toNum(existing?.rts),
   };
+  // An opening the encoder typed (or imported) is theirs: it is flagged so the
+  // carry-forward and an applied count leave it alone from then on.
+  const openingManual = input.openingStock !== undefined ? true : (existing?.openingManual ?? false);
   const { onlineStock, remainingStock } = calculate(openingStock, merged);
 
   // Negative-stock guard (Section: Stock Out cannot exceed what's on hand) -
@@ -208,7 +211,7 @@ export async function saveOnlineEntry(
     return withHeld(existing);
   }
 
-  const data = { productId, entryDate, shift, openingStock, ...merged, onlineStock, remainingStock, encodedById: userId };
+  const data = { productId, entryDate, shift, openingStock, openingManual, ...merged, onlineStock, remainingStock, encodedById: userId };
   const saved = await dailyOnlineStockRepository.upsert(existing?.id, data, db);
 
   // Columns whose stored amounts this save replaces: the ones it sent amounts

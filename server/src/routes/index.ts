@@ -19,6 +19,7 @@ import extraColumnLabelsRoutes from "./extraColumnLabels.routes";
 import clientErrorRoutes from "./clientError.routes";
 import correctionRoutes from "./correction.routes";
 import actionQueueRoutes from "./actionQueue.routes";
+import orderTemplatesRoutes from "./orderTemplates.routes";
 import { idempotency } from "../middleware/idempotency";
 
 /// Single mount point for every feature's router (Section 3 - the app is
@@ -50,6 +51,7 @@ router.use("/day-closures", retrySafe, dayLockRoutes);
 router.use("/extra-labels", retrySafe, extraColumnLabelsRoutes);
 router.use("/corrections", retrySafe, correctionRoutes);
 router.use("/action-queue", actionQueueRoutes);
+router.use("/order-templates", retrySafe, orderTemplatesRoutes);
 router.use("/client-errors", clientErrorRoutes);
 
 export default router;

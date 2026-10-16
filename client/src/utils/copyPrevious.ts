@@ -46,13 +46,14 @@ export function describePeriod(period: Period): string {
 /**
  * Columns "Copy previous" may offer.
  *
- * Only directly-editable movement columns: Opening Stock is carried forward
- * by the server (Section 4.6) and the Online/Offline/Remaining Stock columns
- * are calculated from the others, so copying either would either be
- * overwritten on save or quietly contradict the figures it was derived from.
+ * Only directly-editable movement columns: Opening Stock is a balance, not a
+ * movement (copying last shift's opening would be wrong - it is last shift's
+ * Remaining that carries over), and the Online/Offline/Remaining Stock columns
+ * are calculated from the others, so copying either would quietly contradict
+ * the figures it was derived from.
  */
 export function copyableColumns(columns: GridColumn[]): GridColumn[] {
-  return columns.filter((c) => c.editable);
+  return columns.filter((c) => c.editable && c.key !== "openingStock");
 }
 
 /**

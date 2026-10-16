@@ -4,7 +4,6 @@ import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
 import { MAX_EXTRAS_PER_COLUMN } from "../utils/stockExtras";
-import { healOpeningStocks } from "../services/manualCounts.service";
 import { getOnlineGrid, saveOnlineEntry } from "../services/dailyOnlineStock.service";
 
 // Added columns' individual amounts ("Save individually" - see
@@ -29,9 +28,9 @@ const entrySchema = z.object({
   productionIn: z.number().min(0).optional(),
   fulfillmentOut: z.number().min(0).optional(),
   rts: z.number().min(0).optional(),
-  // Not user-editable in the live grid (auto-carried forward, Section 4.6)
-  // but settable via CSV import (see CsvTools.tsx) to seed a real starting
-  // balance on a file's first date - no .min(0), a negative opening stock
+  // Typed directly by the encoder in the live grid (the carried-forward
+  // figure, Section 4.6, is only the default) and also settable via CSV
+  // import (see CsvTools.tsx) - no .min(0), a negative opening stock
   // is a real thing a business's own external sheet can already show.
   openingStock: z.number().optional(),
   extras: extrasSchema,
@@ -41,7 +40,6 @@ const entrySchema = z.object({
 export async function getOnlineStockGrid(req: Request, res: Response) {
   const entryDate = parseDateOnly(req.query.date);
   const shift = parseShift(req.query.shift);
-  await healOpeningStocks("ONLINE", entryDate, shift, req.user?.id);
   res.json(await getOnlineGrid(entryDate, shift));
 }
 

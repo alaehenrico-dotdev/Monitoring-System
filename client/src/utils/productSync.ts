@@ -16,6 +16,9 @@ export interface SyncItem {
   productId?: number;
   /// With productId: the sheet's spelling replaces the product's name.
   rename?: boolean;
+  /// With productId: a product without a SKU that is the same product - its
+  /// entries move onto productId and it is deleted (server: productMerge.service).
+  mergeFromId?: number;
 }
 
 export interface NewProduct extends SyncItem {
@@ -63,6 +66,9 @@ export function planProductSync(
   sheet: SheetProduct[],
   existing: ExistingProduct[],
   links: Record<string, number> = {},
+  /// `renameLinked: false` keeps a linked product's own name (the product list is
+  /// the source of truth for names and the sheet only says where it goes).
+  options: { renameLinked?: boolean } = {},
 ): ProductSyncPlan {
   const current = [...existing].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
   // A sheet category resolves to the system's own spelling of it when there is one.
@@ -138,7 +144,7 @@ export function planProductSync(
       continue;
     }
     const item: SyncItem = { ...row, productId: hit.id };
-    if (linked.has(row) && hit.name !== row.name) {
+    if (options.renameLinked !== false && linked.has(row) && hit.name !== row.name) {
       item.rename = true;
       toRename.push({ key: sheetRowKey(row.category, row.name), from: hit.name, to: row.name });
     }

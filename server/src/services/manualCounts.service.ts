@@ -94,7 +94,7 @@ export async function saveManualCount(
   // Saving a count (again) takes it back to unpublished: what carries forward
   // must be what a supervisor approved, not something edited since. That is
   // also the approval step for an opening balance.
-  const data = { productId, entryDate, shift, location, systemRemainingStock, manualCount, variance, isOpeningBalance, countedById: userId, publishedAt: null, publishedById: null };
+  const data = { productId, entryDate, shift, location, systemRemainingStock, manualCount, variance, isOpeningBalance, countedById: userId, publishedAt: null, publishedById: null, appliedToOpening: false };
   const saved = await manualCountRepository.upsert(existing?.id, data, db);
 
   const changeId = await recordChange(
@@ -110,7 +110,10 @@ export async function saveManualCount(
     db,
   );
 
-  await propagateOpeningStock(productId, entryDate, shift, location, userId, db, changeId);
+  // A count is an audit only. Only one that was applied to opening stock has
+  // anything to undo: saving it again un-publishes it, so the next day's
+  // opening goes back to the carried-forward figure.
+  if (existing?.appliedToOpening) await propagateOpeningStock(productId, entryDate, shift, location, userId, db, changeId);
 
   // Not broadcast here - see saveOnlineEntry's matching comment.
   return saved;
@@ -158,20 +161,25 @@ export async function deleteManualCount(
     db,
   );
 
-  await propagateOpeningStock(productId, entryDate, shift, location, userId, db, changeId);
+  if (existing.appliedToOpening) await propagateOpeningStock(productId, entryDate, shift, location, userId, db, changeId);
+
   // Not broadcast here - see saveOnlineEntry's matching comment
   // (dailyOnlineStock.service.ts).
   return true;
 }
 
-/// Section 4.4/4.6 - a manual count is the starting point of the next
+/// Section 4.6 - carry-forward of Remaining Stock into the next saved
 /// period's opening stock. A next-period row that was already saved has its
 /// opening stock stored, so it must be re-derived here or it keeps carrying
-/// the old system figure. Walks forward row by row: each changed row's new
+/// the old figure. Walks forward row by row: each changed row's new
 /// Remaining Stock feeds the one after it, stopping once an opening stock
-/// comes out unchanged or a row has its own manual count for this location
-/// (which supersedes whatever carries into it). TOTAL counts are informational
-/// only - they can't be split back into Online/Offline balances.
+/// comes out unchanged. Manual counts take part only when applied to opening
+/// stock (see getOpeningStock); a counted row's stored system figure and
+/// variance are re-derived as it moves. TOTAL counts are informational only.
+///
+/// A row whose opening the encoder typed (openingManual) is never rewritten:
+/// the walk stops there and returns "kept-manual" if that row's opening
+/// differs from what would have carried into it.
 export async function propagateOpeningStock(
   productId: number,
   entryDate: Date,
@@ -182,7 +190,7 @@ export async function propagateOpeningStock(
   /// The change_log row that started this walk - stamped on every follow-on
   /// row it writes, so they read as consequences of that change.
   causedById?: number,
-) {
+): Promise<"kept-manual" | undefined> {
   if (location === "TOTAL") return;
   // A count opens the next DAY: start the walk past this date's Night shift.
   let cursor = { entryDate, shift: "NIGHT" as Shift };
@@ -195,6 +203,7 @@ export async function propagateOpeningStock(
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
       const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
+      if (next.openingManual) return "kept-manual";
       // A carry-forward must not quietly rewrite a closed day.
       await assertPeriodOpen(next.entryDate, next.shift, db, "entry", "ONLINE");
       const onlineStock = calculateOnlineStock(openingStock, toNum(next.stockInOffToOl), toNum(next.stockOutOlToOff));
@@ -227,6 +236,7 @@ export async function propagateOpeningStock(
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
       const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
+      if (next.openingManual) return "kept-manual";
       await assertPeriodOpen(next.entryDate, next.shift, db, "entry", "OFFLINE");
       const offlineStock = calculateOfflineStock(openingStock, toNum(next.stockInOlToOff), toNum(next.stockOutOffToOl));
       const remainingStock = calculateOfflineRemaining(
@@ -262,6 +272,8 @@ export async function propagateOpeningStock(
     }
 
     const ownCount = await manualCountRepository.findOne(productId, nextPeriod.entryDate, nextPeriod.shift, location, db);
+    // A count no longer supersedes what carries into its period (it is an
+    // audit only), so the walk keeps going past it.
     if (ownCount) {
       // Its system figure just moved, so its stored variance must follow.
       const systemRemainingStock = await getSystemRemainingStock(productId, nextPeriod.entryDate, nextPeriod.shift, location, db);
@@ -288,50 +300,9 @@ export async function propagateOpeningStock(
           db,
         );
       }
-      return;
     }
     cursor = nextPeriod;
   }
-}
-
-/// Rows saved before a count was imported (or before counts carried forward
-/// at all) still hold the stale opening stock they captured. On grid load,
-/// re-derive any saved row whose opening should have started from a manual
-/// count but doesn't. Only that case is touched - an opening stock seeded by
-/// a CSV import with nothing (or no count) before it is left alone.
-export async function healOpeningStocks(location: "ONLINE" | "OFFLINE", entryDate: Date, shift: Shift, userId?: number) {
-  const rows =
-    location === "ONLINE"
-      ? await dailyOnlineStockRepository.findAllForDate(entryDate, shift)
-      : await dailyOfflineStockRepository.findAllForDate(entryDate, shift);
-  if (!rows.length) return;
-  const ids = rows.map((r) => r.productId);
-  const [expected, counts] = await Promise.all([
-    location === "ONLINE"
-      ? dailyOnlineStockRepository.getOpeningStocksForProducts(ids, entryDate, shift)
-      : dailyOfflineStockRepository.getOpeningStocksForProducts(ids, entryDate, shift),
-    manualCountRepository.findLatestBeforeForProducts(ids, entryDate, shift, location),
-  ]);
-  const countByProduct = new Map(counts.map((c) => [c.productId, toNum(c.manualCount)]));
-  const before =
-    shift === "NIGHT"
-      ? { entryDate, shift: "MORNING" as Shift }
-      : { entryDate: new Date(entryDate.getTime() - 24 * 60 * 60 * 1000), shift: "NIGHT" as Shift };
-  let changed = false;
-  for (const row of rows) {
-    const want = expected.get(row.productId);
-    if (want === undefined || countByProduct.get(row.productId) !== want) continue;
-    if (want === toNum(row.openingStock)) continue;
-    try {
-      await prisma.$transaction((tx) => propagateOpeningStock(row.productId, before.entryDate, before.shift, location, userId, tx));
-      changed = true;
-    } catch (err) {
-      // A closed day is left as it was printed - a grid load must not fail over it.
-      if (err instanceof HttpError && err.status === 409) continue;
-      throw err;
-    }
-  }
-  if (changed) broadcastRealtimeEvent();
 }
 
 /// For a TOTAL grid, the naive per-product getSystemRemainingStock call
@@ -443,14 +414,15 @@ export async function getVarianceReport(filters: {
 export const MAX_REMARKS_LENGTH = 500;
 
 /**
- * Publishes a sheet's counts (one date + shift, every location): from now on
- * each one is the opening stock of the next period, and the periods already
- * saved after it are re-derived from it straight away. Until then a saved
- * count is a figure under review and the next period opens from the system
- * stock as before. Each publish is logged against the count, and the
- * re-derived rows name that log line as their cause.
+ * Publishes a sheet's counts (one date + shift, every location): the
+ * supervisor's sign-off that the counts are final for reporting. Counts are an
+ * audit only unless `applyToOpening` is set, in which case each ONLINE/OFFLINE
+ * count also becomes the next day's opening stock and the periods already
+ * saved after it are re-derived straight away - except rows whose opening an
+ * encoder typed, which are kept (counted in `keptManual`). Each publish is
+ * logged against the count, and re-derived rows name that log line as cause.
  */
-export async function publishManualCounts(entryDate: Date, shift: Shift, userId?: number) {
+export async function publishManualCounts(entryDate: Date, shift: Shift, userId?: number, applyToOpening = false) {
   const result = await prisma.$transaction(
     async (tx) => {
       const pending = await manualCountRepository.findUnpublishedForPeriod(entryDate, shift, tx);
@@ -461,22 +433,29 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
       // this date has nothing to re-derive - skip its walk (the common case)
       // rather than paying a query per count to find that out.
       const idsFor = (location: StockLocation) => pending.filter((c) => c.location === location).map((c) => c.productId);
-      const [onlineHasLater, offlineHasLater] = await Promise.all([
-        dailyOnlineStockRepository.productIdsWithRowsAfterDate(idsFor("ONLINE"), entryDate, tx),
-        dailyOfflineStockRepository.productIdsWithRowsAfterDate(idsFor("OFFLINE"), entryDate, tx),
-      ]);
+      const [onlineHasLater, offlineHasLater] = applyToOpening
+        ? await Promise.all([
+            dailyOnlineStockRepository.productIdsWithRowsAfterDate(idsFor("ONLINE"), entryDate, tx),
+            dailyOfflineStockRepository.productIdsWithRowsAfterDate(idsFor("OFFLINE"), entryDate, tx),
+          ])
+        : [new Set<number>(), new Set<number>()];
+      let keptManual = 0;
       for (const count of pending) {
-        const published = await manualCountRepository.markPublished(count.id, userId ?? null, now, tx);
+        // TOTAL is a combined view and can never be split into an opening.
+        const apply = applyToOpening && count.location !== "TOTAL";
+        const published = await manualCountRepository.markPublished(count.id, userId ?? null, now, apply, tx);
         const changeId = await recordChange(
           { tableName: TABLE, recordId: count.id, action: "UPDATE", changedById: userId, oldValue: count, newValue: published },
           tx,
         );
-        const hasLater = count.location === "ONLINE" ? onlineHasLater : count.location === "OFFLINE" ? offlineHasLater : null;
-        if (hasLater?.has(count.productId)) await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId);
+        const hasLater = count.location === "ONLINE" ? onlineHasLater : offlineHasLater;
+        if (apply && hasLater.has(count.productId)) {
+          const outcome = await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId);
+          if (outcome === "kept-manual") keptManual++;
+        }
       }
-      return { published: pending.length, publishedAt: now };
+      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, keptManual };
     },
-    // A whole sheet is hundreds of rows, each re-deriving what follows it.
     { timeout: 120_000, maxWait: 10_000 },
   );
   broadcastRealtimeEvent();
@@ -511,6 +490,12 @@ export async function setCountRemarks(
   return saved;
 }
 
+function previousPeriod(entryDate: Date, shift: Shift): { entryDate: Date; shift: Shift } {
+  return shift === "NIGHT"
+    ? { entryDate, shift: "MORNING" }
+    : { entryDate: new Date(entryDate.getTime() - 24 * 60 * 60 * 1000), shift: "NIGHT" };
+}
+
 export interface VarianceTraceItem {
   at: Date;
   who: string | null;
@@ -524,12 +509,6 @@ export interface VarianceTraceItem {
   /// An entry edit made after the count was last saved - the usual reason a
   /// count no longer lines up with the sheet it was measured against.
   afterCount: boolean;
-}
-
-function previousPeriod(entryDate: Date, shift: Shift): { entryDate: Date; shift: Shift } {
-  return shift === "NIGHT"
-    ? { entryDate, shift: "MORNING" }
-    : { entryDate: new Date(entryDate.getTime() - 24 * 60 * 60 * 1000), shift: "NIGHT" };
 }
 
 /**
@@ -556,6 +535,8 @@ export async function getVarianceTrace(productId: number, entryDate: Date, shift
       ? await dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift)
       : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift);
   const actualOpening = entry ? toNum(entry.openingStock) : expectedOpening;
+  // Only a count applied to opening stock is ever the source; otherwise it is
+  // the system carry (or what the encoder typed over it - that shows as isBreak).
   const prior = previousPeriod(entryDate, shift);
   const latestCount = await manualCountRepository.findLatestBefore(productId, entryDate, shift, location);
   const source =

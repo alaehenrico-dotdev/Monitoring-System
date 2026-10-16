@@ -14,6 +14,8 @@ export interface ManualCountData {
   publishedAt?: Date | null;
   publishedById?: number | null;
   isOpeningBalance?: boolean;
+  /// Cleared on every count save, like publishedAt.
+  appliedToOpening?: boolean;
 }
 
 export interface VarianceReportFilters {
@@ -33,20 +35,21 @@ export const manualCountRepository = {
     });
   },
 
-  /// The most recent saved count strictly before the given period (Morning <
-  /// Night within a date). A count is the starting point of the following
-  /// period's opening stock whether or not a daily row exists for the
-  /// counted period, so this is looked up on its own.
+  /// The most recent count strictly before the given period that a supervisor
+  /// applied to opening stock when publishing it (counts are otherwise an audit
+  /// only). It is looked up on its own because it applies whether or not a
+  /// daily row exists for the counted period.
   findLatestBefore(productId: number, entryDate: Date, shift: Shift, location: StockLocation, db: Db = prisma) {
-    // A published count is the opening stock of the NEXT DAY only: it feeds
+    // An applied count is the opening stock of the NEXT DAY only: it feeds
     // that date's Morning shift, never a Night shift.
     if (shift === "NIGHT") return Promise.resolve(null);
     return db.manualCount.findFirst({
       where: {
         productId,
         location,
-        // Only a published count carries forward.
+        // Only a published count that was applied to opening stock.
         publishedAt: { not: null },
+        appliedToOpening: true,
         entryDate: { lt: entryDate },
       },
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
@@ -62,6 +65,7 @@ export const manualCountRepository = {
         productId: { in: productIds },
         location,
         publishedAt: { not: null },
+        appliedToOpening: true,
         entryDate: { lt: entryDate },
       },
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
@@ -103,8 +107,8 @@ export const manualCountRepository = {
     return db.manualCount.findMany({ where: { entryDate, shift, publishedAt: null } });
   },
 
-  markPublished(id: number, userId: number | null, publishedAt: Date, db: Db = prisma) {
-    return db.manualCount.update({ where: { id }, data: { publishedAt, publishedById: userId } });
+  markPublished(id: number, userId: number | null, publishedAt: Date, appliedToOpening: boolean, db: Db = prisma) {
+    return db.manualCount.update({ where: { id }, data: { publishedAt, publishedById: userId, appliedToOpening } });
   },
 
   findAllForDateAndLocation(entryDate: Date, shift: Shift, location: StockLocation) {

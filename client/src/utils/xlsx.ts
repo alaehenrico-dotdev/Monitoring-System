@@ -125,6 +125,18 @@ const MAX_COLS = 200;
 /// empty rows; stock sheets are a few hundred rows long.
 const MAX_ROWS = 5000;
 
+/// The text a cell shows: its cached value, whatever the cell type.
+function cellText(attrs: string, body: string, shared: string[]): string {
+  const type = /\bt="(\w+)"/.exec(attrs)?.[1] ?? "n";
+  const v = /<v\b[^>]*>([\s\S]*?)<\/v>/.exec(body)?.[1];
+  if (type === "inlineStr") return textOf(body);
+  if (v === undefined) return "";
+  if (type === "s") return shared[Number(v)] ?? "";
+  if (type === "str" || type === "e") return decodeXml(v);
+  if (type === "b") return v === "1" ? "TRUE" : "FALSE";
+  return numberText(v);
+}
+
 function parseSheet(xml: string, shared: string[]): string[][] {
   const rows: string[][] = [];
   for (const rowMatch of xml.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) {
@@ -136,18 +148,8 @@ function parseSheet(xml: string, shared: string[]): string[][] {
       if (!ref || !c[2]) continue;
       const col = colIndex(ref);
       if (col < 0 || col >= MAX_COLS) continue;
-      const type = /\bt="(\w+)"/.exec(c[1])?.[1] ?? "n";
-      const v = /<v\b[^>]*>([\s\S]*?)<\/v>/.exec(c[2])?.[1];
-      let value = "";
-      if (type === "inlineStr") value = textOf(c[2]);
-      else if (v !== undefined) {
-        if (type === "s") value = shared[Number(v)] ?? "";
-        else if (type === "str" || type === "e") value = decodeXml(v);
-        else if (type === "b") value = v === "1" ? "TRUE" : "FALSE";
-        else value = numberText(v);
-      }
       while (cells.length <= col) cells.push("");
-      cells[col] = value;
+      cells[col] = cellText(c[1], c[2], shared);
     }
     if (cells.some((x) => x !== "")) {
       while (rows.length < rowNo - 1) rows.push([]);
@@ -164,7 +166,8 @@ export function excelSerialToIso(serial: number): string | null {
   return new Date(Date.UTC(1899, 11, 30) + Math.floor(serial) * 86_400_000).toISOString().slice(0, 10);
 }
 
-export async function readXlsx(data: ArrayBuffer): Promise<XlsxSheet[]> {
+/// Opens the zip and resolves the visible sheets to their XML parts.
+async function openWorkbook(data: ArrayBuffer) {
   if (data.byteLength > MAX_XLSX_BYTES) throw new Error("That file is too large to import");
   const buf = new Uint8Array(data);
   const entries = readCentralDirectory(buf);
@@ -185,20 +188,82 @@ export async function readXlsx(data: ArrayBuffer): Promise<XlsxSheet[]> {
   const sharedXml = await part("xl/sharedStrings.xml");
   const shared = sharedXml ? parseSharedStrings(sharedXml) : [];
 
-  const sheets: XlsxSheet[] = [];
+  const sheets: { name: string; xml: string }[] = [];
   for (const m of workbook.matchAll(/<sheet\b([^>]*)\/?>/g)) {
     if (/\bstate="(hidden|veryHidden)"/.test(m[1])) continue;
     const name = decodeXml(/\bname="([^"]*)"/.exec(m[1])?.[1] ?? "").trim();
     const rid = /\br:id="([^"]+)"/.exec(m[1])?.[1];
     const path = rid ? targets.get(rid) : undefined;
     const xml = path ? await part(path) : null;
-    if (!xml) continue;
-    const rows = parseSheet(xml, shared);
-    const a1 = rows[0]?.[0] ?? "";
-    sheets.push({ name, rows, date: /^\d+(\.\d+)?$/.test(a1) ? excelSerialToIso(Number(a1)) : null });
+    if (xml) sheets.push({ name, xml });
   }
   if (sheets.length === 0) throw new Error("The workbook has no sheets");
-  return sheets;
+  return { sheets, shared, styles: await part("xl/styles.xml") };
+}
+
+export async function readXlsx(data: ArrayBuffer): Promise<XlsxSheet[]> {
+  const { sheets: parts, shared } = await openWorkbook(data);
+  return parts.map(({ name, xml }) => {
+    const rows = parseSheet(xml, shared);
+    const a1 = rows[0]?.[0] ?? "";
+    return { name, rows, date: /^\d+(\.\d+)?$/.test(a1) ? excelSerialToIso(Number(a1)) : null };
+  });
+}
+
+/// One cell of a sheet's first column with the formatting a person reads it by.
+export interface XlsxStyledCell {
+  /// 1-based sheet row.
+  row: number;
+  text: string;
+  bold: boolean;
+  /// Font size in points (11 when the file does not say).
+  size: number;
+}
+
+export interface XlsxStyledSheet {
+  name: string;
+  /// Non-empty cells of column A, top to bottom.
+  cells: XlsxStyledCell[];
+}
+
+/// Per cell format (the `s` index on a cell): is its font bold, and how big.
+function parseCellFormats(xml: string | null): { bold: boolean; size: number }[] {
+  if (!xml) return [];
+  const fontsXml = /<fonts\b[\s\S]*?<\/fonts>/.exec(xml)?.[0] ?? "";
+  const fonts = [...fontsXml.matchAll(/<font\b(?!s)([^>]*?)(?:\/>|>([\s\S]*?)<\/font>)/g)].map((m) => {
+    const body = m[2] ?? "";
+    // <b/> or <b val="1"/> is bold; <b val="0"/> explicitly is not.
+    const b = /<b\b([^>]*)\/?>/.exec(body);
+    const bold = !!b && !/\bval="(0|false)"/.test(b[1]);
+    const size = Number(/<sz\b[^>]*\bval="([\d.]+)"/.exec(body)?.[1]);
+    return { bold, size: Number.isFinite(size) && size > 0 ? size : 11 };
+  });
+  const xfsXml = /<cellXfs\b[\s\S]*?<\/cellXfs>/.exec(xml)?.[0] ?? "";
+  return [...xfsXml.matchAll(/<xf\b([^>]*?)(?:\/>|>[\s\S]*?<\/xf>)/g)].map((m) => {
+    const fontId = Number(/\bfontId="(\d+)"/.exec(m[1])?.[1] ?? 0);
+    return fonts[fontId] ?? { bold: false, size: 11 };
+  });
+}
+
+/// Column A of every visible sheet with each cell's bold flag and font size -
+/// what a layout template (e.g. the product order sheet, where categories are
+/// big bold headings and products are plain-size bold lines) is read from.
+export async function readXlsxColumnA(data: ArrayBuffer): Promise<XlsxStyledSheet[]> {
+  const { sheets: parts, shared, styles } = await openWorkbook(data);
+  const formats = parseCellFormats(styles);
+  return parts.map(({ name, xml }) => {
+    const cells: XlsxStyledCell[] = [];
+    for (const m of xml.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const ref = /\br="([A-Z]+)(\d+)"/.exec(m[1]);
+      if (!ref || ref[1] !== "A" || !m[2]) continue;
+      const row = Number(ref[2]);
+      const text = cellText(m[1], m[2], shared).replace(/\s+/g, " ").trim();
+      if (text === "" || row > MAX_ROWS) continue;
+      const format = formats[Number(/\bs="(\d+)"/.exec(m[1])?.[1] ?? 0)] ?? { bold: false, size: 11 };
+      cells.push({ row, text, bold: format.bold, size: format.size });
+    }
+    return { name, cells };
+  });
 }
 
 /// The sheet to import for `date`: the one whose A1 date matches. A workbook

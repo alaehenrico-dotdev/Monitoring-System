@@ -111,6 +111,9 @@ model DailyOnlineStock {
   entryDate       DateTime @db.Date
   shift           Shift    @default(NIGHT)
   openingStock    Decimal  @default(0) @db.Decimal(14, 2)
+  // True once the opening was typed (or imported) rather than carried forward:
+  // the carry-forward and an applied count then leave it alone.
+  openingManual   Boolean  @default(false)
   stockInOffToOl  Decimal  @default(0) @db.Decimal(14, 2)
   stockOutOlToOff Decimal  @default(0) @db.Decimal(14, 2)
   onlineStock     Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
@@ -144,6 +147,8 @@ model DailyOfflineStock {
   entryDate       DateTime @db.Date
   shift           Shift    @default(NIGHT)
   openingStock    Decimal  @default(0) @db.Decimal(14, 2)
+  // See DailyOnlineStock.openingManual.
+  openingManual   Boolean  @default(false)
   stockInOlToOff  Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockOutOlToOff
   stockOutOffToOl Decimal  @default(0) @db.Decimal(14, 2) // mirrors online.stockInOffToOl
   offlineStock    Decimal  @default(0) @db.Decimal(14, 2) // calc: opening + in - out
@@ -244,6 +249,11 @@ model ManualCount {
   // with variance 0 and left out of the variance reports. It still has to be
   // published - that is the approval - before it becomes the next opening stock.
   isOpeningBalance     Boolean       @default(false)
+  // Counts are an audit only. When a supervisor publishes a sheet with "use as
+  // next day's opening stock" ticked, each published count is flagged here and
+  // becomes the next day's Morning opening (unless an encoder typed one).
+  // Saving the count again clears it together with publishedAt.
+  appliedToOpening     Boolean       @default(false)
   countedById          Int?
   countedBy            User?         @relation("CountedBy", fields: [countedById], references: [id])
   createdAt            DateTime      @default(now())
@@ -608,4 +618,21 @@ model BackupRecord {
 
   @@index([createdAt])
   @@map("backup_records")
+}
+
+/// A saved product-order template ("Select Excel template" in Arrange product
+/// order): the products, in order, under their categories, as read from an Excel
+/// file. Stored rather than read from the file each time, so it is still there
+/// after a reset or rebuild - the Data Reset does not touch this table. `rows` is
+/// `{ category, name }[]`. The built-in "Encoder default order" is inserted by
+/// the migration that created this table.
+model OrderTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique(map: "order_templates_name_key") @db.VarChar(100)
+  rows        Json
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("order_templates")
 }

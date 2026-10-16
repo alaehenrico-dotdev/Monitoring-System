@@ -8,6 +8,8 @@ export interface OfflineStockData {
   entryDate: Date;
   shift: Shift;
   openingStock: number;
+  /// True once typed/imported rather than carried - see the schema.
+  openingManual?: boolean;
   stockInOlToOff: number;
   stockOutOffToOl: number;
   offlineStock: number;
@@ -91,9 +93,10 @@ export const dailyOfflineStockRepository = {
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       select: { entryDate: true, shift: true, remainingStock: true },
     });
-    // A saved count is the starting point of the next period even when the
-    // counted period has no daily row of its own - so the latest count
-    // before this period competes with the latest row, and the later wins.
+    // Manual counts are an audit only: the encoder types Opening directly and
+    // this carried-forward figure is just the default. The one exception is a
+    // count a supervisor applied to opening stock when publishing it - the
+    // latest such count competes with the latest row, and the later wins.
     const count = await manualCountRepository.findLatestBefore(productId, entryDate, shift, "OFFLINE", db);
     if (count && (!prior || count.entryDate.getTime() >= prior.entryDate.getTime())) {
       return resolveOpeningStock(count.manualCount, 0);
@@ -145,8 +148,7 @@ export const dailyOfflineStockRepository = {
       }
     }
 
-    // Same rule as getOpeningStock: the latest saved count before this
-    // period beats an earlier (or equal-period) daily row's Remaining Stock.
+    // Same rule as getOpeningStock: only an applied count beats the carry.
     const counts = await manualCountRepository.findLatestBeforeForProducts(productIds, entryDate, shift, "OFFLINE");
     const countByProduct = new Map(counts.map((m) => [m.productId, m]));
 

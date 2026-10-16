@@ -79,6 +79,8 @@ export interface VarianceTrace {
     countedBy: string | null;
     countedAt: string | null;
     publishedAt: string | null;
+    /// Published with "use as next day's opening stock" ticked.
+    appliedToOpening?: boolean;
   } | null;
   opening: { expected: number; actual: number; isBreak: boolean; source: "count" | "system" };
   entrySaved: boolean;
@@ -112,11 +114,13 @@ export function setCountRemarks(
   );
 }
 
-/// Releases a sheet's saved counts (one date + shift, every location) to the
-/// next shift's opening stock. Supervisor/Admin only.
-export function publishManualCounts(date: string, shift: Shift) {
-  return http.post<{ published: number; publishedAt: string }>(
+/// Approves a sheet's saved counts (one date + shift, every location) as final.
+/// With `applyToOpening` they also become the next day's opening stock, except
+/// where an encoder typed one (`keptManual` says how many were left alone).
+/// Supervisor/Admin only.
+export function publishManualCounts(date: string, shift: Shift, applyToOpening = false) {
+  return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; keptManual?: number }>(
     `/manual-counts/publish?date=${date}&shift=${shift}`,
-    {},
+    { applyToOpening },
   );
 }

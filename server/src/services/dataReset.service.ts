@@ -75,8 +75,8 @@ export function releaseResetToken(tokenId: string) {
 /**
  * Wipes all transactional data (stock entries, manual counts, day locks, saved
  * report snapshots, correction requests) and the change log itself (live and
- * archived), leaving products (and the order admins arranged them in), users
- * and settings untouched. Runs as
+ * archived), leaving products (and the order admins arranged them in), saved
+ * product-order templates (order_templates), users and settings untouched. Runs as
  * one transaction so a failure partway through can't leave the system
  * half-wiped, and closes by writing a single new change-log entry recording
  * that the reset happened (who, when) - otherwise the very audit trail this

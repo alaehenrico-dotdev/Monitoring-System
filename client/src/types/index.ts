@@ -95,9 +95,10 @@ export interface ManualCountEntry {
   variance: number | null;
   /// Why the count differs from the system figure (free text).
   remarks?: string | null;
-  /// When the count was published (it then carries into the next shift's opening
-  /// stock); null = saved but not yet published.
+  /// When the count was approved as final; null = saved but not yet published.
   publishedAt?: string | null;
+  /// Published with "use as next day's opening stock" ticked.
+  appliedToOpening?: boolean;
   /// The first count of this product at this location: it seeds the system
   /// rather than auditing it, so it has no variance. On an unsaved row this is
   /// a prediction ("saving it now would make it the opening balance").
