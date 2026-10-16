@@ -116,7 +116,7 @@ export function setCountRemarks(
 
 /// Approves a sheet's saved counts (one date + shift, every location) as final.
 /// With `applyToOpening` they also become the next day's opening stock, except
-/// where an encoder typed one (`keptManual` says how many were left alone).
+/// where an import had set one (`keptManual` says how many were left alone).
 /// Supervisor/Admin only.
 export function publishManualCounts(date: string, shift: Shift, applyToOpening = false) {
   return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; keptManual?: number }>(

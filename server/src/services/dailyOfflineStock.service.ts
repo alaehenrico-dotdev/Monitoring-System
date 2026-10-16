@@ -218,7 +218,7 @@ export async function saveOfflineEntry(
     backloads: extraTotals.backloads ?? input.backloads ?? toNum(existing?.backloads),
     upsellOut: extraTotals.upsellOut ?? input.upsellOut ?? toNum(existing?.upsellOut),
   };
-  // See saveOnlineEntry: a typed/imported opening is flagged as the encoder's own.
+  // See saveOnlineEntry: an opening set by an import is flagged, so it is not rewritten.
   const openingManual = input.openingStock !== undefined ? true : (existing?.openingManual ?? false);
   const { offlineStock, remainingStock } = calculate(openingStock, merged);
 

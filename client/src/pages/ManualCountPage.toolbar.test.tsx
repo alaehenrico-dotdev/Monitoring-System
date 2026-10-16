@@ -299,7 +299,7 @@ describe("ManualCountPage - publishing the sheet", () => {
     fireEvent.click(screen.getByRole("button", { name: "Publish 3" }));
 
     await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), true));
-    expect(await screen.findByText(/now the next day's opening stock · 2 openings typed by an encoder were kept/)).toBeTruthy();
+    expect(await screen.findByText(/now the next day's opening stock · 2 openings set by an import were kept/)).toBeTruthy();
   });
 
   it("says Published once every saved count is, and has nothing left to publish", async () => {

@@ -177,7 +177,7 @@ export async function deleteManualCount(
 /// stock (see getOpeningStock); a counted row's stored system figure and
 /// variance are re-derived as it moves. TOTAL counts are informational only.
 ///
-/// A row whose opening the encoder typed (openingManual) is never rewritten:
+/// A row whose opening was set by an import (openingManual) is never rewritten:
 /// the walk stops there and returns "kept-manual" if that row's opening
 /// differs from what would have carried into it.
 export async function propagateOpeningStock(
@@ -419,7 +419,7 @@ export const MAX_REMARKS_LENGTH = 500;
  * audit only unless `applyToOpening` is set, in which case each ONLINE/OFFLINE
  * count also becomes the next day's opening stock and the periods already
  * saved after it are re-derived straight away - except rows whose opening an
- * encoder typed, which are kept (counted in `keptManual`). Each publish is
+ * import set, which are kept (counted in `keptManual`). Each publish is
  * logged against the count, and re-derived rows name that log line as cause.
  */
 export async function publishManualCounts(entryDate: Date, shift: Shift, userId?: number, applyToOpening = false) {
@@ -536,7 +536,7 @@ export async function getVarianceTrace(productId: number, entryDate: Date, shift
       : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift);
   const actualOpening = entry ? toNum(entry.openingStock) : expectedOpening;
   // Only a count applied to opening stock is ever the source; otherwise it is
-  // the system carry (or what the encoder typed over it - that shows as isBreak).
+  // the system carry (or what an import set over it - that shows as isBreak).
   const prior = previousPeriod(entryDate, shift);
   const latestCount = await manualCountRepository.findLatestBefore(productId, entryDate, shift, location);
   const source =

@@ -3,6 +3,9 @@ import type { StockLocation, TotalStockRow } from "../types";
 import { colors } from "../theme";
 import { sumRounded } from "../utils/gridFormat";
 import { RowGlowScroll } from "./RowGlowScroll";
+import { GridSelectionBar } from "./GridSelectionBar";
+import { copyRowsToClipboard, useRowSelection } from "../hooks/useRowSelection";
+import { toTsv } from "../utils/rowSelection";
 import { ChevronIcon } from "./icons";
 
 /**
@@ -67,9 +70,55 @@ export function TotalStocksTable({
   const columnCount =
     2 + Number(showOnline) + Number(showOffline) + Number(showTotal);
 
+  // Row selection (hooks/useRowSelection.ts): press the SKU/Product cell, Shift+press
+  // for a range, Ctrl/Cmd+press to add or remove one, or press and drag. Read-only,
+  // so what it offers is the selected rows' totals and Copy. A collapsed category's
+  // rows are not on screen and so not part of it.
+  const visibleIds = [...groups.entries()].flatMap(([category, groupRows]) =>
+    expandedOverride[category] ? groupRows.map((r) => r.product.id) : [],
+  );
+  const selection = useRowSelection({
+    visibleIds,
+    onCopy: copySelected,
+  });
+  const selectedRows = selection.selected.flatMap((id) => rows.find((r) => r.product.id === id) ?? []);
+
+  function copySelected(ids: number[]) {
+    const picked = ids.flatMap((id) => rows.find((r) => r.product.id === id) ?? []);
+    copyRowsToClipboard(
+      toTsv(
+        [
+          "SKU",
+          "Product",
+          ...(showOnline ? ["Online Remaining"] : []),
+          ...(showOffline ? ["Offline Remaining"] : []),
+          ...(showTotal ? ["Total Remaining"] : []),
+        ],
+        picked.map((r) => [
+          r.product.sku ?? "",
+          r.product.name,
+          ...(showOnline ? [String(r.onlineRemainingStock)] : []),
+          ...(showOffline ? [String(r.offlineRemainingStock)] : []),
+          ...(showTotal ? [String(r.totalRemainingStock)] : []),
+        ]),
+      ),
+      picked.length,
+    );
+  }
+
   return (
+    <>
+    {selection.selected.length > 0 && (
+      <GridSelectionBar
+        count={selection.selected.length}
+        fillTargets={null}
+        onFill={() => {}}
+        onCopy={() => copySelected(selection.selected)}
+        onDeselect={selection.clear}
+      />
+    )}
     <RowGlowScroll>
-      <table className="ae-table ae-table--center-head ae-table--compact">
+      <table className="ae-table ae-table--center-head ae-table--compact ae-table--pickable">
         <thead>
           <tr>
             {[
@@ -148,9 +197,12 @@ export function TotalStocksTable({
                       key={r.product.id}
                       id={`ae-totalstocks-row-${r.product.id}`}
                       className={
-                        isCollapsed
+                        (isCollapsed
                           ? "ae-cat-row ae-row-collapsed"
-                          : "ae-cat-row"
+                          : "ae-cat-row") +
+                        (selection.selectedSet.has(r.product.id)
+                          ? " ae-row-selected"
+                          : "")
                       }
                       style={
                         // Low Stock takes priority over the variance tint - a
@@ -163,8 +215,19 @@ export function TotalStocksTable({
                             : undefined
                       }
                     >
-                      <td className="ae-cell-sku">{r.product.sku ?? "—"}</td>
-                      <td className="ae-cell-name">
+                      <td
+                        className="ae-cell-sku ae-row-pick"
+                        onMouseDown={(e) => selection.press(e, r.product.id)}
+                        onMouseEnter={() => selection.enter(r.product.id)}
+                      >
+                        {r.product.sku ?? "—"}
+                      </td>
+                      <td
+                        className="ae-cell-name ae-row-pick"
+                        onMouseDown={(e) => selection.press(e, r.product.id)}
+                        onMouseEnter={() => selection.enter(r.product.id)}
+                        title="Click to select the row - Shift+click for a range, Ctrl+click to add"
+                      >
                         {r.product.name}
                         {lowStock && (
                           <span
@@ -244,7 +307,25 @@ export function TotalStocksTable({
             {showTotal && <td>{grandTotal.toLocaleString()}</td>}
           </tr>
         </tbody>
+        {selection.selected.length > 0 && (
+          // The selection's own totals, pinned to the bottom edge.
+          <tfoot className="no-print">
+            <tr className="ae-row-selected-total">
+              <td colSpan={2}>SELECTED ({selection.selected.length})</td>
+              {showOnline && (
+                <td>{sumRounded(selectedRows.map((r) => r.onlineRemainingStock)).toLocaleString()}</td>
+              )}
+              {showOffline && (
+                <td>{sumRounded(selectedRows.map((r) => r.offlineRemainingStock)).toLocaleString()}</td>
+              )}
+              {showTotal && (
+                <td>{sumRounded(selectedRows.map((r) => r.totalRemainingStock)).toLocaleString()}</td>
+              )}
+            </tr>
+          </tfoot>
+        )}
       </table>
     </RowGlowScroll>
+    </>
   );
 }

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { listProducts, reorderProducts } from "../api/products";
-import { deleteOrderTemplate, listOrderTemplates, saveOrderTemplate, type SavedOrderTemplate } from "../api/orderTemplates";
+import { deleteOrderTemplate, listOrderTemplates, type SavedOrderTemplate } from "../api/orderTemplates";
 import type { Product } from "../types";
 import { colors } from "../theme";
-import { Button, Select, TextInput } from "./ui";
+import { Button, Select } from "./ui";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { showToast } from "./Toast";
 import { Modal } from "./Modal";
@@ -12,6 +12,8 @@ import { moveItem } from "../utils/moveItem";
 import { readXlsxColumnA, type XlsxStyledSheet } from "../utils/xlsx";
 import { templateRowsFromColumn, type TemplateRow } from "../utils/orderTemplate";
 import { OrderTemplateReview } from "./OrderTemplateReview";
+import { AddProductForm } from "./AddProductForm";
+import { insertAfterCategory } from "../utils/productPlacement";
 
 /**
  * Toolbar icon (Supervisor/Admin only) that opens the product-order dialog.
@@ -45,6 +47,11 @@ export function ReorderProductsButton({ isAdmin }: { isAdmin: boolean }) {
 function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<Product[] | null>(null);
   const [original, setOriginal] = useState<number[]>([]);
+  // Add product (for one the template does not list): the form is open, and each
+  // product's category by id, so a product added now can be placed in `original`
+  // (the order as saved) the same way the server placed it.
+  const [adding, setAdding] = useState(false);
+  const categoryOf = useRef(new Map<number, string>());
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -57,12 +64,10 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
   const [template, setTemplate] = useState<{ fileName: string; sheets: XlsxStyledSheet[]; sheet: number } | null>(null);
   const [templateRows, setTemplateRows] = useState<TemplateRow[] | null>(null);
   const [templateError, setTemplateError] = useState<string | null>(null);
-  // Templates kept in the database (so they survive a reset or rebuild), the one
-  // currently chosen from them, and the name to save a just-read file under.
+  // Templates kept in the database (so they survive a reset or rebuild) and the one
+  // currently chosen from them. A template read from a file is saved by applying it.
   const [saved, setSaved] = useState<SavedOrderTemplate[]>([]);
   const [activeSaved, setActiveSaved] = useState<number | null>(null);
-  const [saveName, setSaveName] = useState<string | null>(null);
-  const [savingTemplate, setSavingTemplate] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -77,6 +82,7 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
         if (cancelled) return;
         setItems(list);
         setOriginal(list.map((p) => p.id));
+        categoryOf.current = new Map(list.map((p) => [p.id, p.category]));
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load products");
@@ -107,6 +113,23 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
     setOverIndex(null);
   }
 
+  /// The server has already saved the new product, right after the last one of its
+  /// category. Put it in the same place in the list on screen and in the saved
+  /// order, so adding a product is not an unsaved change and any reordering in
+  /// progress is kept.
+  function handleAdded(created: Product) {
+    categoryOf.current.set(created.id, created.category);
+    setItems((cur) => (cur ? insertAfterCategory(cur, created) : [created]));
+    setOriginal((ids) =>
+      insertAfterCategory(
+        ids.map((id) => ({ id, category: categoryOf.current.get(id) ?? "" })),
+        { id: created.id, category: created.category },
+      ).map((x) => x.id),
+    );
+    setAdding(false);
+    showToast(`Added ${created.name} to ${created.category}`, "success");
+  }
+
   /// Reads one sheet of the template into rows for the review.
   function applyTemplate(sheets: XlsxStyledSheet[], sheet: number) {
     const rows = templateRowsFromColumn(sheets[sheet].cells);
@@ -126,7 +149,6 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
     setTemplateError(null);
     try {
       setActiveSaved(null);
-      setSaveName(null);
       const sheets = await readXlsxColumnA(await file.arrayBuffer());
       // The first sheet that has something to read: a workbook may open on a cover page.
       const first = Math.max(0, sheets.findIndex((s) => templateRowsFromColumn(s.cells).length > 0));
@@ -139,28 +161,12 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
     }
   }
 
-  /// Offered for a template that was just read from a file: "Encoder order" or, for a
-  /// workbook with a tab per day, "Encoder order - OCT 8".
-  const suggestedName = template
+  /// The name a template read from a file is saved under when it is applied: the file
+  /// name or, for a workbook with a tab per day, "Encoder order - OCT 8". Applying the
+  /// same file again replaces that template rather than adding another.
+  const saveAs = template
     ? template.fileName.replace(/\.xlsx$/i, "") + (template.sheets.length > 1 ? ` - ${template.sheets[template.sheet].name}` : "")
-    : "";
-  const nameToSave = (saveName ?? suggestedName).trim();
-
-  async function saveCurrentTemplate() {
-    if (!templateRows || !nameToSave) return;
-    setSavingTemplate(true);
-    try {
-      const out = await saveOrderTemplate(nameToSave, templateRows);
-      setSaved((cur) => [...cur.filter((t) => t.id !== out.id), out].sort((a, b) => a.name.localeCompare(b.name)));
-      setActiveSaved(out.id);
-      setTemplate(null);
-      showToast(`Saved "${out.name}" - it will be here after a reset or rebuild`, "success");
-    } catch (e) {
-      setTemplateError(e instanceof Error ? e.message : "Could not save the template");
-    } finally {
-      setSavingTemplate(false);
-    }
-  }
+    : undefined;
 
   async function removeSavedTemplate() {
     const id = activeSaved;
@@ -236,6 +242,18 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
         >
           Select Excel template
         </Button>
+        {!templateRows && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={saving || !items || adding}
+            onClick={() => setAdding(true)}
+            title="Add a product the template does not list"
+          >
+            Add product
+          </Button>
+        )}
         {template && (
           <span style={{ fontSize: 12, color: colors.subtleInk, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }} title={template.fileName}>
             {template.fileName}
@@ -261,21 +279,6 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
           </Select>
         )}
       </div>
-      {template && templateRows && (
-        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 10 }}>
-          <TextInput
-            aria-label="Template name"
-            value={saveName ?? suggestedName}
-            onChange={(e) => setSaveName(e.target.value)}
-            maxLength={100}
-            style={{ width: 220 }}
-          />
-          <Button type="button" variant="secondary" size="sm" disabled={!nameToSave || savingTemplate} loading={savingTemplate} onClick={() => void saveCurrentTemplate()}>
-            Save template
-          </Button>
-          <span style={{ fontSize: 12, color: colors.subtleInk }}>Keeps it in the system, so it is still here after a reset or rebuild.</span>
-        </div>
-      )}
       {templateError && (
         <div role="alert" style={{ color: colors.danger, fontSize: 13, marginBottom: 10 }}>
           {templateError}
@@ -295,11 +298,13 @@ function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
         <OrderTemplateReview
           rows={templateRows}
           existing={items}
+          saveAs={saveAs}
           onBack={() => setTemplateRows(null)}
           onDone={onClose}
         />
       ) : (
         <>
+      {adding && items && <AddProductForm products={items} onAdded={handleAdded} onCancel={() => setAdding(false)} />}
       <p style={{ margin: "0 0 12px", fontSize: 13, color: colors.subtleInk }}>
         Drag a row by its handle, or use the arrows. Each product keeps its SKU. The new order applies to every page
         and report, for everyone.

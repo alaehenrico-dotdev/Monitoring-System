@@ -16,6 +16,8 @@ import { Toast } from "../components/Toast";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
+import { CategoryField } from "../components/CategoryField";
+import { categoriesOf, unitForCategory } from "../utils/productPlacement";
 
 /// Section 4.1 - Admins can add, rename, deactivate, or re-categorize
 /// products without a developer; new SKUs appear in every grid automatically.
@@ -65,7 +67,7 @@ export function ProductsAdminPage() {
     }
     await addSku.run(async () => {
     try {
-      const created = await createProduct({
+      await createProduct({
         sku: sku || undefined,
         name,
         category,
@@ -80,8 +82,9 @@ export function ProductsAdminPage() {
       setCategory("");
       setUnit("");
       setLowStockThreshold("");
-      // Append locally instead of re-fetching the whole (60+ product) list.
-      setProducts((prev) => (prev ? [...prev, created] : [created]));
+      // The server places a new product right after the last one of its category
+      // (and moves what follows), so the list is read again rather than appended to.
+      reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add SKU");
     }
@@ -194,13 +197,17 @@ export function ProductsAdminPage() {
           />
         </Field>
         <Field label="Product name">
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} />
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} style={{ textTransform: "uppercase" }} />
         </Field>
         <Field label="Category">
-          <TextInput
+          <CategoryField
+            categories={categoriesOf(products ?? [])}
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="e.g. New Products"
+            onChange={(c) => {
+              setCategory(c);
+              // The unit the category already uses, unless one was typed.
+              if (unit === "") setUnit(unitForCategory(products ?? [], c));
+            }}
           />
         </Field>
         <Field label="Unit">

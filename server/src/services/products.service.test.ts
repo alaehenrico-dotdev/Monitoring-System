@@ -8,13 +8,15 @@ vi.mock("../repositories/productRepository", () => ({
     create: vi.fn(),
     findById: vi.fn(),
     update: vi.fn(),
+    invalidateCache: vi.fn(),
   },
 }));
 vi.mock("./changeLog.service", () => ({
   recordChange: vi.fn(),
   logSystemEvent: vi.fn(),
 }));
-vi.mock("../lib/prisma", () => ({ prisma: {}, serializableTransaction: vi.fn() }));
+const tx = vi.hoisted(() => ({ product: { findMany: vi.fn(), create: vi.fn(), update: vi.fn() } }));
+vi.mock("../lib/prisma", () => ({ prisma: {}, serializableTransaction: (fn: (t: unknown) => unknown) => fn(tx) }));
 vi.mock("../lib/realtime", () => ({ broadcastRealtimeEvent: vi.fn() }));
 
 import { productRepository } from "../repositories/productRepository";
@@ -34,18 +36,71 @@ describe("listProducts", () => {
 });
 
 describe("createProduct", () => {
-  it("appends to the end of the list when no sort order is given, and records the change", async () => {
-    vi.mocked(productRepository.nextSortOrder).mockResolvedValue(3);
-    const created = { id: 1, name: "Sweet A", category: "Class A", unit: "Liter", sortOrder: 3 };
+  const p = (id: number, name: string, category: string, sortOrder: number) => ({ id, name, category, sortOrder, unit: "Liter", sku: null });
+
+  beforeEach(() => {
+    // Prisma's update returns the whole row, so the fake keeps what was created.
+    const rows = new Map<number, Record<string, unknown>>();
+    let next = 100;
+    tx.product.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+      const row = { id: next++, ...data };
+      rows.set(row.id, row);
+      return row;
+    });
+    tx.product.update.mockImplementation(async ({ where, data }: { where: { id: number }; data: Record<string, unknown> }) => ({ ...rows.get(where.id), id: where.id, ...data }));
+  });
+
+  it("places the new product right after the last product of its category and moves the rest down", async () => {
+    tx.product.findMany.mockResolvedValue([p(1, "Sweet A", "Class A", 1), p(2, "Special A", "Class A", 2), p(3, "Palm Oil", "Oils", 3), p(4, "Salt", "Other", 4)]);
+
+    const result = await createProduct({ name: "More Sweet A", category: "Class A", unit: "Liter" }, 7);
+
+    expect(result).toMatchObject({ id: 100, name: "MORE SWEET A", category: "Class A", sortOrder: 3 });
+    // Everything after it moved down one place; what was before did not change.
+    const moved = tx.product.update.mock.calls.map((c) => [c[0].where.id, c[0].data.sortOrder]);
+    expect(moved).toEqual([[100, 3], [3, 4], [4, 5]]);
+    expect(recordChange).toHaveBeenCalledWith(
+      expect.objectContaining({ tableName: "products", recordId: 100, action: "CREATE", changedById: 7 }),
+      tx,
+    );
+  });
+
+  it("joins an existing category by its own spelling instead of starting a second group", async () => {
+    tx.product.findMany.mockResolvedValue([p(1, "Sweet A", "Class A (Gallon)", 1), p(2, "Salt", "Other", 2)]);
+
+    const result = await createProduct({ name: "Dark A", category: "  class a   (GALLON) ", unit: "Gallon" });
+
+    expect(result.category).toBe("Class A (Gallon)");
+    expect(tx.product.create).toHaveBeenCalledWith({ data: expect.objectContaining({ category: "Class A (Gallon)" }) });
+    expect(result.sortOrder).toBe(2);
+  });
+
+  it("stores the name in uppercase with single spaces, however it was typed", async () => {
+    tx.product.findMany.mockResolvedValue([]);
+
+    const result = await createProduct({ name: "  sweet   chami ", category: "Class A", unit: "Liter" });
+
+    expect(result.name).toBe("SWEET CHAMI");
+  });
+
+  it("puts a product of a brand-new category at the very end, with its name tidied", async () => {
+    tx.product.findMany.mockResolvedValue([p(1, "Sweet A", "Class A", 1), p(2, "Salt", "Other", 2)]);
+
+    const result = await createProduct({ name: "Chili Oil", category: "New   Category", unit: "Bottle" });
+
+    expect(result).toMatchObject({ category: "New Category", sortOrder: 3 });
+    // Nothing else had to move.
+    expect(tx.product.update).not.toHaveBeenCalled();
+  });
+
+  it("keeps an explicit sort order as given, without moving anything", async () => {
+    const created = { id: 1, name: "Sweet A", category: "Class A", unit: "Liter", sortOrder: 9 };
     vi.mocked(productRepository.create).mockResolvedValue(created as never);
 
-    const result = await createProduct({ name: "Sweet A", category: "Class A", unit: "Liter" }, 7);
+    const result = await createProduct({ name: "Sweet A", category: "Class A", unit: "Liter", sortOrder: 9 }, 7);
 
-    expect(productRepository.nextSortOrder).toHaveBeenCalledWith();
-    expect(productRepository.create).toHaveBeenCalledWith(expect.objectContaining({ name: "Sweet A", sortOrder: 3 }));
-    expect(recordChange).toHaveBeenCalledWith(
-      expect.objectContaining({ tableName: "products", action: "CREATE", changedById: 7, newValue: created }),
-    );
+    expect(productRepository.create).toHaveBeenCalledWith(expect.objectContaining({ sortOrder: 9 }));
+    expect(tx.product.findMany).not.toHaveBeenCalled();
     expect(result).toBe(created);
   });
 });
@@ -66,7 +121,7 @@ describe("updateProduct", () => {
 
     const result = await updateProduct(1, { name: "New name" }, 7);
 
-    expect(productRepository.update).toHaveBeenCalledWith(1, { name: "New name" });
+    expect(productRepository.update).toHaveBeenCalledWith(1, { name: "NEW NAME" }); // names are stored in uppercase
     expect(recordChange).toHaveBeenCalledWith(
       expect.objectContaining({ action: "UPDATE", oldValue: existing, newValue: updated }),
     );

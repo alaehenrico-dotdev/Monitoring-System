@@ -35,12 +35,19 @@ export interface ProductSyncResult {
   total: number;
   /// Products merged into another one by this sync.
   merged?: number;
+  /// Products switched off because the sheet did not list them.
+  deactivated?: number;
 }
 
 /// Supervisor/Admin: add the sheet's missing products (no SKU) and apply its
 /// category/product sequence. One request, one transaction, safe to retry.
 /// `mergeFromId` (with `productId`): a product without a SKU that is the same product -
 /// its entries move onto `productId` and it is deleted (see the server's productMerge.service.ts).
-export function syncProducts(items: { category: string; name: string; productId?: number; rename?: boolean; mergeFromId?: number }[]) {
-  return http.post<ProductSyncResult>("/products/sync", { items });
+/// `deactivateUnlisted`: also switch off (never delete) every active product the sheet does
+/// not list, so the lists show exactly the sheet's products.
+export function syncProducts(
+  items: { category: string; name: string; productId?: number; rename?: boolean; mergeFromId?: number }[],
+  options: { deactivateUnlisted?: boolean } = {},
+) {
+  return http.post<ProductSyncResult>("/products/sync", { items, deactivateUnlisted: options.deactivateUnlisted === true });
 }
