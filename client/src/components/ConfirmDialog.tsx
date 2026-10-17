@@ -16,6 +16,7 @@ export function ConfirmDialog({
   children,
   confirmLabel,
   busy = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: {
@@ -23,6 +24,9 @@ export function ConfirmDialog({
   children: ReactNode;
   confirmLabel: string;
   busy?: boolean;
+  /// The confirm button cannot be pressed (the dialog explains why in its body),
+  /// while Cancel still works. For an action that has a blocking problem.
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -33,7 +37,7 @@ export function ConfirmDialog({
         <Button variant="secondary" onClick={onCancel} disabled={busy} autoFocus>
           Cancel
         </Button>
-        <Button variant="primary" onClick={onConfirm} disabled={busy}>
+        <Button variant="primary" onClick={onConfirm} disabled={busy || confirmDisabled}>
           {busy ? "Working…" : confirmLabel}
         </Button>
       </div>

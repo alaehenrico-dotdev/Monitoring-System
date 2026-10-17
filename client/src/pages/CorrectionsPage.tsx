@@ -3,6 +3,7 @@ import {
   approveCorrection,
   listCorrections,
   rejectCorrection,
+  STALE_OPENING_FIELD,
   type Correction,
   type CorrectionStatus,
 } from "../api/ops";
@@ -32,6 +33,11 @@ const TABLE_LABEL: Record<string, string> = {
 
 const TONE: Record<CorrectionStatus, string> = { PENDING: "progress", APPROVED: "done", REJECTED: "bad" };
 
+/// How a request's figure reads: a held opening stock is a re-derivation (the
+/// system files it when an earlier day changed), not a typed figure.
+const isStaleOpening = (c: Correction) => c.field === STALE_OPENING_FIELD;
+const fieldLabel = (c: Correction) => (isStaleOpening(c) ? "opening stock (carried forward)" : c.field);
+
 /// Corrections: a figure that should not be silently overwritten is requested
 /// here with a reason, kept with its before/after values, and applied only when
 /// an admin approves it. Admins see every request; everyone else sees their own.
@@ -50,6 +56,11 @@ export function CorrectionsPage() {
   // The request in flight: which one, and whether it is being approved or rejected.
   const [busyOn, setBusyOn] = useState<{ id: number; kind: "approve" | "reject" } | null>(null);
   const [rejecting, setRejecting] = useState<Correction | null>(null);
+  const [approving, setApproving] = useState<Correction | null>(null);
+  // Also apply the change to the finished days after it. Off unless chosen: each
+  // of those days is then held for its own approval.
+  const [cascade, setCascade] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [note, setNote] = useState("");
   const realtimeVersion = useRealtimeVersion();
 
@@ -113,7 +124,7 @@ export function CorrectionsPage() {
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span className={`ae-dash-chip ae-dash-chip--${TONE[c.status]}`}>{c.status.toLowerCase()}</span>
                   <strong>
-                    {TABLE_LABEL[c.tableName] ?? c.tableName} #{c.recordId} · {c.field}
+                    {TABLE_LABEL[c.tableName] ?? c.tableName} #{c.recordId} · {fieldLabel(c)}
                   </strong>
                   <span>
                     {c.beforeValue} → <strong>{c.proposedValue}</strong>
@@ -125,9 +136,10 @@ export function CorrectionsPage() {
                         className="ae-btn-solid"
                         size="sm"
                         disabled={busyOn !== null}
-                        loading={busyOn?.id === c.id && busyOn.kind === "approve"}
-                        loadingLabel="Approving…"
-                        onClick={() => void decide(c, "approve", () => approveCorrection(c.id))}
+                        onClick={() => {
+                          setCascade(false);
+                          setApproving(c);
+                        }}
                       >
                         Approve
                       </Button>
@@ -146,6 +158,11 @@ export function CorrectionsPage() {
                   )}
                 </div>
                 <div style={{ color: colors.subtleInk, marginTop: 4 }}>Reason: {c.reason}</div>
+                {isStaleOpening(c) && c.status === "PENDING" && (
+                  <div style={{ color: colors.subtleInk, fontSize: 12.5, marginTop: 4 }}>
+                    Approving re-derives this day's opening from the day before it. The figure shown is today's expectation; it is worked out again when you approve.
+                  </div>
+                )}
                 <ol style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.subtleInk, fontSize: 12.5 }}>
                   {c.events.map((ev) => (
                     <li key={ev.id}>
@@ -165,6 +182,48 @@ export function CorrectionsPage() {
         )}
         <Pager page={pager.page} pageSize={pager.pageSize} total={pager.total} onPage={pager.goToPage} onPageSize={pager.setPageSize} loading={pager.loading} label="Correction pages" />
       </div>
+
+      {approving && (
+        <Modal title="Approve correction" onClose={busyOn ? () => {} : () => setApproving(null)} width={460}>
+          <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+            <p style={{ margin: "0 0 10px" }}>
+              {TABLE_LABEL[approving.tableName] ?? approving.tableName} #{approving.recordId} · {fieldLabel(approving)}:{" "}
+              {approving.beforeValue} → <strong>{approving.proposedValue}</strong>. The finished day's report is saved again with the new figure.
+            </p>
+            <label style={{ display: "flex", gap: 8, alignItems: "flex-start", cursor: "pointer" }}>
+              <input type="checkbox" checked={cascade} onChange={(e) => setCascade(e.target.checked)} style={{ marginTop: 3 }} />
+              <span>
+                Also apply to the finished days after it. Their opening stock will change, and so will their reports.
+                <span style={{ display: "block", color: colors.subtleInk, fontSize: 12.5 }}>
+                  Leave this off to review each of those days separately; each one then waits here for its own approval. A closed month always does.
+                </span>
+              </span>
+            </label>
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 16 }}>
+            <Button className="ae-btn-solid" disabled={busyOn !== null} onClick={() => setApproving(null)}>Cancel</Button>
+            <Button
+              className="ae-btn-solid"
+              loading={busyOn?.kind === "approve"}
+              loadingLabel="Approving…"
+              onClick={() => {
+                const target = approving;
+                void decide(target, "approve", async () => {
+                  const result = await approveCorrection(target.id, undefined, cascade);
+                  const refreshed = result.snapshotsRefreshed ?? [];
+                  setNotice(
+                    refreshed.length > 0
+                      ? `Approved. The saved report for ${refreshed.join(", ")} was updated.`
+                      : "Approved.",
+                  );
+                }).then((ok) => ok && setApproving(null));
+              }}
+            >
+              Approve
+            </Button>
+          </div>
+        </Modal>
+      )}
 
       {rejecting && (
         <Modal title="Reject correction" onClose={busyOn ? () => {} : () => setRejecting(null)} width={420}>
@@ -195,6 +254,7 @@ export function CorrectionsPage() {
           </div>
         </Modal>
       )}
+      <Toast message={notice} onDismiss={() => setNotice(null)} variant="success" duration={6000} />
       <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
     </div>
   );

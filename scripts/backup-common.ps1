@@ -53,7 +53,7 @@ function Get-DbConfig {
 }
 
 # Finds mysqldump / mysql: MYSQLDUMP_PATH (same setting the app uses), then
-# PATH, then the usual XAMPP location.
+# PATH, then the usual MySQL Server install location.
 function Find-MySqlTool {
     param([ValidateSet("mysqldump", "mysql")][string]$Name)
     $candidates = @()
@@ -64,7 +64,8 @@ function Find-MySqlTool {
     }
     $cmd = Get-Command $Name -ErrorAction SilentlyContinue
     if ($cmd) { $candidates += $cmd.Source }
-    $candidates += "C:\xampp\mysql\bin\$Name.exe"
+    $candidates += Get-ChildItem "C:\Program Files\MySQL\MySQL Server *\bin\$Name.exe" -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending | ForEach-Object FullName
     foreach ($c in $candidates) { if ($c -and (Test-Path $c)) { return $c } }
     throw "$Name.exe not found. Set MYSQLDUMP_PATH in server\.env (or install the MySQL client tools)."
 }

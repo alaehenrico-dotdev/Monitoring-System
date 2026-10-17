@@ -22,15 +22,17 @@ import { Modal } from "../components/Modal";
 import { Pager } from "../components/Pager";
 import { usePagedList } from "../hooks/usePagedList";
 import { Toast } from "../components/Toast";
+import { MonthCloseTab } from "./MonthCloseTab";
 import { InlineLoading } from "../components/Spinner";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { colors } from "../theme";
 
-type Tab = "queue" | "closing" | "errors" | "archive";
+type Tab = "queue" | "closing" | "months" | "errors" | "archive";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "queue", label: "Needs attention" },
   { key: "closing", label: "Day closing" },
+  { key: "months", label: "Month closing" },
   { key: "errors", label: "Client errors" },
   { key: "archive", label: "Change-log archive" },
 ];
@@ -38,6 +40,9 @@ const TABS: { key: Tab; label: string }[] = [
 const rowStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
+  // Wraps so a row's status, text and buttons stack on a narrow screen
+  // instead of squeezing the text or pushing a button off the edge.
+  flexWrap: "wrap",
   gap: 12,
   padding: "10px 16px",
   borderBottom: `1px solid ${colors.border}`,
@@ -93,6 +98,7 @@ export function AdminQueuePage() {
       <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
         {tab === "queue" && <QueueTab />}
         {tab === "closing" && <ClosingTab />}
+        {tab === "months" && <MonthCloseTab />}
         {tab === "errors" && <ErrorsTab />}
         {tab === "archive" && <ArchiveTab />}
       </div>

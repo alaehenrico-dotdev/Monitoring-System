@@ -8,6 +8,11 @@ import { requestLogger } from "./middleware/requestLogger";
 import routes from "./routes";
 import { prisma } from "./lib/prisma";
 import { asyncHandler } from "./utils/asyncHandler";
+import { makeThrottle } from "./utils/throttle";
+
+// One log line per 30 seconds at most while the database is down, however often
+// a monitor polls /health.
+const healthLogGate = makeThrottle(30_000);
 
 export function createApp() {
   const app = express();
@@ -71,7 +76,21 @@ export function createApp() {
     try {
       await prisma.$queryRaw`SELECT 1`;
       res.json({ status: "ok", database: "ok" });
-    } catch {
+    } catch (err) {
+      // The response stays generic (this endpoint is public), but the cause is
+      // logged: a wrong password (P1000), an unreachable server (P1001) and a
+      // missing database (P1003) all looked identical, and silent, before.
+      if (healthLogGate.allow()) {
+        console.error(
+          JSON.stringify({
+            level: "error",
+            event: "health.database_down",
+            name: err instanceof Error ? err.name : typeof err,
+            code: (err as { errorCode?: unknown; code?: unknown })?.errorCode ?? (err as { code?: unknown })?.code ?? null,
+            message: err instanceof Error ? err.message.split("\n").slice(-3).join(" ").trim() : String(err),
+          }),
+        );
+      }
       res.status(503).json({ status: "unavailable", database: "unreachable" });
     }
   }));

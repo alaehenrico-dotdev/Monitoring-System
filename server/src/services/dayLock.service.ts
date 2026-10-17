@@ -14,10 +14,15 @@ const SHIFT_LABELS: Record<Shift, string> = { MORNING: "Morning", NIGHT: "Night"
 /// explicit, recorded adjustment path, and the one write allowed into a closed
 /// period. Carried by AsyncLocalStorage so the save services need no extra
 /// parameter threaded through every call.
-const adjustment = new AsyncLocalStorage<true>();
+///
+/// `cascade` is whether the approver also accepted the consequences for the
+/// LATER locked days: a corrected figure changes every opening stock after it.
+/// Without it only the corrected row is written, and each later locked day
+/// that would move is held for its own approval instead (staleOpening.service.ts).
+const adjustment = new AsyncLocalStorage<{ cascade: boolean }>();
 
-export function runAsAdjustment<T>(fn: () => Promise<T>): Promise<T> {
-  return adjustment.run(true, fn);
+export function runAsAdjustment<T>(fn: () => Promise<T>, opts: { cascade?: boolean } = {}): Promise<T> {
+  return adjustment.run({ cascade: opts.cascade ?? false }, fn);
 }
 
 /// The two entry pages, which are finished (locked) independently of each other.
@@ -34,6 +39,25 @@ export function isSideLocked(
 
 /// The other entry page - the one a transfer entered on `location` also changes.
 export const otherLocation = (location: EntryLocation): EntryLocation => (location === "ONLINE" ? "OFFLINE" : "ONLINE");
+
+/// "YYYY-MM" of a business date.
+export const yearMonthOf = (entryDate: Date): string => toDateOnlyString(entryDate).slice(0, 7);
+
+/// Whether the calendar month holding `entryDate` has been closed by an admin
+/// (monthClose.service.ts) - the lock layer above a day's own.
+export async function isMonthClosed(entryDate: Date, db: Db = prisma): Promise<boolean> {
+  const row = await db.monthClosure.findUnique({ where: { yearMonth: yearMonthOf(entryDate) } });
+  return !!row?.isClosed;
+}
+
+/// Refuses a write into a closed month. Lifted only by an approved correction,
+/// the one recorded way into a closed period.
+export async function assertMonthOpen(entryDate: Date, db: Db = prisma): Promise<void> {
+  if (adjustment.getStore()) return;
+  if (await isMonthClosed(entryDate, db)) {
+    throw HttpError.conflict(`${yearMonthOf(entryDate)} is a closed month. Ask an admin to reopen it, or request a correction instead.`);
+  }
+}
 
 /// Refuses a write into a closed day. The message names the way out so an
 /// encoder who hits it knows what to ask for.
@@ -52,6 +76,7 @@ export async function assertPeriodOpen(
   location?: EntryLocation,
 ): Promise<void> {
   if (adjustment.getStore()) return;
+  await assertMonthOpen(entryDate, db);
   const row = await db.dayClosure.findUnique({ where: { entryDate_shift: { entryDate, shift } } });
   if (!row) return;
   const locked =
@@ -66,6 +91,20 @@ export async function assertPeriodOpen(
       `${page}${toDateOnlyString(entryDate)} (${SHIFT_LABELS[shift]} shift) ${page ? "are" : "is"} finished and locked. Ask an admin to unlock it, or request a correction instead.`,
     );
   }
+}
+
+/// Whether a LATER period is locked against having its opening stock re-derived
+/// by a carry-forward from an earlier change. Unlike assertPeriodOpen it does
+/// not throw (the caller holds the change for approval instead) and it is not
+/// lifted by an ordinary approved correction: that approval covered one figure,
+/// not every day after it. Only an approval that chose to cascade lifts it.
+export async function isLockedForCarry(entryDate: Date, shift: Shift, location: EntryLocation, db: Db = prisma): Promise<boolean> {
+  // A closed month is the stronger lock: even a cascading approval does not
+  // rewrite it in bulk - each such day is held for its own approval.
+  if (await isMonthClosed(entryDate, db)) return true;
+  if (adjustment.getStore()?.cascade) return false;
+  const row = await db.dayClosure.findUnique({ where: { entryDate_shift: { entryDate, shift } } });
+  return isSideLocked(row, location);
 }
 
 /// Whether the OTHER entry page of this period is locked - the situation in

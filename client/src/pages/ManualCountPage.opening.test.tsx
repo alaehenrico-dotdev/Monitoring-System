@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ManualCountPage } from "./ManualCountPage";
+import { chooseFromMenu } from "./menuTestHelpers";
 
 const api = vi.hoisted(() => ({ getManualCountGrid: vi.fn(), saveManualCount: vi.fn(), getVarianceTrace: vi.fn(), setCountRemarks: vi.fn(), publishManualCounts: vi.fn() }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, name: "Sup", username: "sup", role: "SUPERVISOR_ADMIN" } }) }));
@@ -38,6 +39,9 @@ beforeEach(() => {
   });
 });
 
+// The save status in the toolbar is a status region too; this is the page's own note.
+const openingNote = () => screen.getAllByRole("status").find((el) => /first count/.test(el.textContent ?? ""))!;
+
 describe("ManualCountPage - opening balance", () => {
   it("labels a first count as Opening instead of showing a variance, and explains why", async () => {
     render(
@@ -46,7 +50,7 @@ describe("ManualCountPage - opening balance", () => {
       </MemoryRouter>,
     );
     await screen.findByText("Sauces");
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
 
     const soyRow = (await screen.findByText("Soy Sauce")).closest("tr")!;
     expect(soyRow.textContent).toContain("Opening");
@@ -56,7 +60,7 @@ describe("ManualCountPage - opening balance", () => {
     const vinegarRow = screen.getByText("Vinegar").closest("tr")!;
     expect(vinegarRow.textContent).not.toContain("Opening");
 
-    expect(screen.getByRole("status").textContent).toMatch(/1 first count will be recorded as opening balances/);
-    expect(screen.getByRole("status").textContent).toMatch(/only becomes a shift.s opening stock if you tick the option/);
+    expect(openingNote().textContent).toMatch(/1 first count will be recorded as opening balances/);
+    expect(openingNote().textContent).toMatch(/only becomes a shift.s opening stock if you tick the option/);
   });
 });

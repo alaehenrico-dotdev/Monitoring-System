@@ -7,8 +7,8 @@ import { MoonIcon, SunIcon } from "./icons";
 // CSS transition off while it is present (see the matching rule there): the
 // theme change repaints the whole page at once, and letting dozens of
 // per-element background/color transitions start on top of that - plus the
-// View Transition's own snapshot - is what made toggling stutter. The ripple
-// (or the instant swap) is the only animation a theme switch should have.
+// View Transition's own snapshot - is what made toggling stutter. The short
+// cross-fade (or the instant swap) is the only animation a theme switch has.
 const SWITCHING_CLASS = "ae-theme-switching";
 
 /**
@@ -20,7 +20,6 @@ const SWITCHING_CLASS = "ae-theme-switching";
 export function ThemeToggle() {
   const { theme, toggleTheme } = useTheme();
   const isDark = theme === "dark";
-  const hostRef = useRef<HTMLButtonElement>(null);
   // The in-flight view transition, so a rapid second click can skip it
   // instead of stacking another full-page snapshot on top of it.
   const activeTransition = useRef<ReturnType<Document["startViewTransition"]> | null>(null);
@@ -31,11 +30,9 @@ export function ThemeToggle() {
   );
 
   /**
-   * Dark-mode switch as a circle that expands outward from this button
-   * (not the click point - so it looks the same whether toggled by mouse,
-   * touch, or keyboard) via the View Transition API. `toggleTheme` still
-   * runs unconditionally on unsupported browsers or with reduced motion
-   * requested - only the animation around it is skipped.
+   * Dark-mode switch as a short cross-fade (the View Transition API's own, timed
+   * in index.css). `toggleTheme` still runs unconditionally on unsupported
+   * browsers or with reduced motion requested - only the fade is skipped.
    */
   function handleToggle() {
     const prefersReducedMotion = window.matchMedia?.(
@@ -57,14 +54,6 @@ export function ThemeToggle() {
       return;
     }
 
-    const rect = hostRef.current?.getBoundingClientRect();
-    const x = rect ? rect.left + rect.width / 2 : window.innerWidth / 2;
-    const y = rect ? rect.top + rect.height / 2 : window.innerHeight / 2;
-    const endRadius = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y),
-    );
-
     activeTransition.current?.skipTransition();
 
     const transition = document.startViewTransition(() => {
@@ -74,26 +63,6 @@ export function ThemeToggle() {
       flushSync(() => toggleTheme());
     });
     activeTransition.current = transition;
-
-    transition.ready
-      .then(() => {
-        document.documentElement.animate(
-          {
-            clipPath: [
-              `circle(0px at ${x}px ${y}px)`,
-              `circle(${endRadius}px at ${x}px ${y}px)`,
-            ],
-          },
-          {
-            duration: 550,
-            easing: "ease-in-out",
-            pseudoElement: "::view-transition-new(root)",
-          },
-        );
-      })
-      // `ready` rejects when the transition is skipped (a newer click, or the
-      // browser bailing out) - the theme change itself has still applied.
-      .catch(() => {});
 
     transition.finished
       .catch(() => {})
@@ -108,7 +77,6 @@ export function ThemeToggle() {
 
   return (
     <button
-      ref={hostRef}
       type="button"
       onClick={handleToggle}
       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}

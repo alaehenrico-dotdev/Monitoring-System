@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import { getTotalStocks } from "../api/totalStocks";
 import type { TotalStockRow } from "../types";
-import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
 import { TotalStocksTable } from "../components/TotalStocksTable";
-import {
-  Toolbar,
-  ToolbarControls,
-  ToolbarDivider,
-} from "../components/Toolbar";
+import { PageToolbar } from "../components/PageToolbar";
+import { FilterSlot } from "../components/FilterSlot";
+import { zoomSection } from "../utils/zoomMenu";
+import { DateStepper } from "../components/DateStepper";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { SearchInput } from "../components/SearchInput";
@@ -107,61 +105,61 @@ export function TotalStocksPage() {
         title={`${SOURCE_TITLES[source]} - ${formatDateDisplay(date)}`}
         subtitle="Combined online and offline stock."
       >
-        <Toolbar className="no-print">
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "nowrap",
-              minWidth: 0,
-            }}
-          >
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search SKU or category…"
-            />
-            <CategoryFilter
-              categories={categories}
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-            />
-            <StockSourceFilter value={source} onChange={setSource} />
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={setDate}
-              todayValue={getCurrentShiftAndDate().date}
-              style={{ maxWidth: 180 }}
-            />
-          </div>
-          <ToolbarControls>
-            {csvRows && (
-              <>
-                <CsvTools
-                  filenamePrefix="total-stocks"
-                  date={date}
-                  rows={csvRows}
-                  columns={csvColumns}
-                  onImportRow={async () => {}}
-                  getPendingValue={() => undefined}
-                  canImport={false}
-                  exportFormat="excel"
-                  pdf={{
-                    title: SOURCE_TITLES[source],
-                    subtitle: formatDateDisplay(date),
-                    // Same as TotalStocksTable: only the visible "remaining" columns are summed.
-                    sumKeys: csvColumns.map((c) => c.key),
-                    flagKey: "totalVariance",
-                  }}
+        <PageToolbar
+          activeFilters={(query.trim() !== "" ? 1 : 0) + (categoryFilter !== "" ? 1 : 0)}
+          onClearFilters={() => {
+            setQuery("");
+            setCategoryFilter("");
+          }}
+          label="Total stocks"
+          menus={[{ id: "view", label: "View", sections: [zoomSection(zoom, setZoom)] }]}
+          filters={
+            <>
+              <FilterSlot active={query.trim() !== ""} label="Search">
+                <SearchInput
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search SKU or category…"
                 />
-                <ToolbarDivider />
-              </>
-            )}
-            <ZoomControl zoom={zoom} onChange={setZoom} />
-          </ToolbarControls>
-        </Toolbar>
+              </FilterSlot>
+              <FilterSlot active={categoryFilter !== ""} label="Category">
+                <CategoryFilter
+                  categories={categories}
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                />
+              </FilterSlot>
+              <StockSourceFilter value={source} onChange={setSource} />
+              <DateStepper
+                value={date}
+                onChange={setDate}
+                todayValue={getCurrentShiftAndDate().date}
+              />
+            </>
+          }
+          actions={
+            csvRows && (
+              <CsvTools
+                filenamePrefix="total-stocks"
+                date={date}
+                rows={csvRows}
+                columns={csvColumns}
+                onImportRow={async () => {}}
+                getPendingValue={() => undefined}
+                canImport={false}
+                exportFormat="excel"
+                pdf={{
+                  title: SOURCE_TITLES[source],
+                  subtitle: formatDateDisplay(date),
+                  // Same as TotalStocksTable: only the visible "remaining" columns are summed.
+                  sumKeys: csvColumns.map((c) => c.key),
+                  flagKey: "totalVariance",
+                }}
+              />
+            )
+          }
+          trailing={<ZoomControl zoom={zoom} onChange={setZoom} />}
+        />
       </PageHeader>
       <Toast
         message={error}

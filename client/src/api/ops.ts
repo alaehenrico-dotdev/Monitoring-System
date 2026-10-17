@@ -90,6 +90,63 @@ export const getFinishSummary = (date: string, shift: Shift, location?: EntryLoc
 /// Daily Report snapshot is saved once the other page is finished too.
 export const finishDay = (date: string, shift: Shift, location: EntryLocation) =>
   http.post<FinishSummary & { finished: boolean; reportSaved?: boolean }>("/day-closures/finish", { date, shift, location });
+/* ------------------------------------------------- finish through a date */
+
+export interface FinishPlan {
+  location: EntryLocation;
+  throughDate: string;
+  /// What would be locked, oldest first.
+  periods: { entryDate: string; shift: Shift; saved: number }[];
+  /// Problems that stop it - nothing can be finished until they are fixed.
+  blockers: string[];
+  /// Things to look at; the encoder has to acknowledge them to go on.
+  warnings: string[];
+  canFinish: boolean;
+}
+
+export interface FinishThroughResult {
+  finished: number;
+  periods: string[];
+  warnings: string[];
+  /// Dates whose Daily Report was saved.
+  snapshots: string[];
+}
+
+/// What "finish through this date" would lock for one page. Reads only.
+export const previewFinishThrough = (through: string, location: EntryLocation) =>
+  http.get<FinishPlan>(`/day-closures/finish-through/preview?through=${through}&location=${location}`);
+/// Finishes every unfinished period of one page up to the date, oldest first,
+/// all or nothing. A plan with warnings is refused (409) until acknowledged.
+export const finishThrough = (through: string, location: EntryLocation, acknowledgeWarnings: boolean) =>
+  http.post<FinishThroughResult>("/day-closures/finish-through", { through, location, acknowledgeWarnings });
+
+/* -------------------------------------------------------- month closures */
+
+export interface MonthClosure {
+  id: number;
+  yearMonth: string;
+  isClosed: boolean;
+  closedAt: string;
+  closedBy: { id: number; name: string } | null;
+  unlockedAt: string | null;
+  unlockedBy: { id: number; name: string } | null;
+  unlockReason: string | null;
+}
+
+export interface MonthReadiness {
+  yearMonth: string;
+  ready: boolean;
+  problems: string[];
+  warnings: string[];
+  periodsWithEntries: number;
+}
+
+export const listMonthClosures = () => http.get<MonthClosure[]>("/month-closures");
+export const getMonthStatus = (yearMonth: string) => http.get<{ yearMonth: string; isClosed: boolean }>(`/month-closures/${yearMonth}`);
+export const getMonthReadiness = (yearMonth: string) => http.get<MonthReadiness>(`/month-closures/${yearMonth}/readiness`);
+export const closeMonth = (yearMonth: string) => http.post<MonthClosure & { warnings: string[] }>(`/month-closures/${yearMonth}/close`, {});
+export const unlockMonth = (yearMonth: string, reason: string) => http.post<MonthClosure>(`/month-closures/${yearMonth}/unlock`, { reason });
+
 export const closeDay = (date: string, shift: Shift) => http.post<DayClosure>("/day-closures/close", { date, shift });
 /// `location` unlocks one entry page; leave it out to unlock both.
 export const unlockDay = (date: string, shift: Shift, reason: string, location?: EntryLocation) =>
@@ -131,8 +188,15 @@ export const listCorrections = (status: CorrectionStatus | undefined, offset: nu
   if (status) params.set("status", status);
   return http.get<{ items: Correction[]; total: number }>(`/corrections?${params}`);
 };
-export const approveCorrection = (id: number, note?: string) => http.post<Correction>(`/corrections/${id}/approve`, { note });
+/// `cascade` also applies the change to the finished days after it (their opening
+/// stock moves). Without it each of those days is held for its own approval.
+export const approveCorrection = (id: number, note?: string, cascade?: boolean) =>
+  http.post<Correction & { snapshotsRefreshed?: string[] }>(`/corrections/${id}/approve`, { note, ...(cascade ? { cascade: true } : {}) });
 export const rejectCorrection = (id: number, note: string) => http.post<Correction>(`/corrections/${id}/reject`, { note });
+
+/// A held request for a finished day's opening stock (an earlier day changed, so
+/// what carries into it no longer matches). Filed by the system, never typed.
+export const STALE_OPENING_FIELD = "openingStock";
 
 /* -------------------------------------------------------- client errors */
 

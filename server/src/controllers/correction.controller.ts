@@ -17,7 +17,12 @@ const createSchema = z.object({
   reason: z.string().trim().min(5, "Give a reason (at least 5 characters)").max(500),
 });
 
-const reviewSchema = z.object({ note: z.string().trim().max(500).optional() });
+const reviewSchema = z.object({
+  note: z.string().trim().max(500).optional(),
+  // Also apply the change to the finished days after it (their opening stock
+  // moves). Off by default: each such day is then held for its own approval.
+  cascade: z.boolean().optional(),
+});
 const rejectSchema = z.object({ note: z.string().trim().min(3, "Say why it was rejected").max(500) });
 
 function id(req: Request): number {
@@ -46,7 +51,7 @@ export async function getCorrections(req: Request, res: Response) {
 export async function postApprove(req: Request, res: Response) {
   const parsed = reviewSchema.safeParse(req.body ?? {});
   if (!parsed.success) throw HttpError.badRequest("Invalid review", parsed.error.flatten());
-  res.json(await approveCorrection(id(req), parsed.data.note, req.user?.id));
+  res.json(await approveCorrection(id(req), parsed.data.note, req.user?.id, { cascade: parsed.data.cascade }));
 }
 
 export async function postReject(req: Request, res: Response) {

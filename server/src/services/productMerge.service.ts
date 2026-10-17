@@ -8,7 +8,7 @@ import { recordChange } from "./changeLog.service";
 export interface MergeOutcome {
   from: Product;
   into: Product;
-  moved: { online: number; offline: number; extras: number; counts: number };
+  moved: { online: number; offline: number; extras: number; counts: number; pendingReleases: number };
   /// Rows of the merged-away product with nothing in them, dropped rather than
   /// treated as a clash with the other product's row for the same period.
   droppedBlank: number;
@@ -104,11 +104,16 @@ export async function mergeProductInto(tx: Db, fromId: number, intoId: number, u
 
   if (blankOnline.length) await tx.dailyOnlineStock.deleteMany({ where: { id: { in: blankOnline } } });
   if (blankOffline.length) await tx.dailyOfflineStock.deleteMany({ where: { id: { in: blankOffline } } });
-  const [online, offline, counts, extras] = await Promise.all([
+  // Every table that points at a product has to move with it: the product is
+  // deleted below, and any row still pointing at it would stop that delete (or,
+  // worse, be left describing a product that no longer exists). Awaiting-release
+  // items are one of them.
+  const [online, offline, counts, extras, pendingReleases] = await Promise.all([
     tx.dailyOnlineStock.updateMany({ where: { productId: fromId }, data: { productId: intoId } }),
     tx.dailyOfflineStock.updateMany({ where: { productId: fromId }, data: { productId: intoId } }),
     tx.manualCount.updateMany({ where: { productId: fromId }, data: { productId: intoId } }),
     tx.dailyStockExtra.updateMany({ where: { productId: fromId }, data: { productId: intoId } }),
+    tx.pendingRelease.updateMany({ where: { productId: fromId }, data: { productId: intoId } }),
   ]);
 
   await tx.product.delete({ where: { id: fromId } });
@@ -117,7 +122,7 @@ export async function mergeProductInto(tx: Db, fromId: number, intoId: number, u
   return {
     from,
     into,
-    moved: { online: online.count, offline: offline.count, extras: extras.count, counts: counts.count },
+    moved: { online: online.count, offline: offline.count, extras: extras.count, counts: counts.count, pendingReleases: pendingReleases.count },
     droppedBlank: blankOnline.length + blankOffline.length,
   };
 }

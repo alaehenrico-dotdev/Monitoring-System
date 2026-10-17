@@ -48,8 +48,8 @@ GRANT ALL PRIVILEGES ON ala_eh_stocks.* TO 'alaeh_app'@'127.0.0.1';
 ```
 
 Keep MySQL bound to localhost; do not open port 3306 to the Internet. Confirm
-with `bind-address = 127.0.0.1` in the server config (MariaDB's `my.cnf`, or
-`my.ini` under XAMPP) and verify from another machine that port 3306 refuses
+with `bind-address = 127.0.0.1` in the server config (`my.ini` under
+`C:\ProgramData\MySQL\MySQL Server 8.4` on Windows, or `my.cnf`) and verify from another machine that port 3306 refuses
 connections. Use a supported release - MariaDB 10.3 and 10.4 no longer get
 security fixes. Set
 `DATABASE_URL` in `server/.env` to the MySQL connection string. URL-encode

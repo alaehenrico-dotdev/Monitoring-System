@@ -20,15 +20,19 @@ export function ShiftFilter({
   value,
   onChange,
   includeAll = false,
+  labelPrefix,
 }: {
   value: Shift | "";
   onChange: (value: Shift | "") => void;
   includeAll?: boolean;
+  /// "Shift" => the trigger reads "Shift: Night".
+  labelPrefix?: string;
 }) {
   return (
     <Dropdown
       aria-label="Shift"
       icon={<ClockIcon />}
+      labelPrefix={labelPrefix}
       value={value}
       onChange={(v) => onChange(v as Shift | "")}
       options={[

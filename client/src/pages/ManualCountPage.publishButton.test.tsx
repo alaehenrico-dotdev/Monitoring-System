@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ManualCountPage } from "./ManualCountPage";
+import { chooseFromMenu } from "./menuTestHelpers";
 
 const api = vi.hoisted(() => ({ getManualCountGrid: vi.fn(), saveManualCount: vi.fn(), getVarianceTrace: vi.fn(), setCountRemarks: vi.fn(), publishManualCounts: vi.fn() }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, name: "Sup", username: "sup", role: "SUPERVISOR_ADMIN" } }) }));
@@ -47,38 +48,38 @@ async function open() {
 const publishButton = () => screen.getAllByRole("button", { name: /^Publish$/ })[0];
 
 describe("ManualCountPage - Publish button", () => {
-  it("sits beside the shift selector, in the filter group, with a Publish label", async () => {
+  it("sits in the bar's action group, beside Save, with a Publish label", async () => {
     grid(null);
     await open();
     const btn = publishButton();
     expect(btn.textContent).toContain("Publish");
-    // In the filter group (not the right-hand action group), immediately
-    // after the shift selector.
-    expect(btn.parentElement!.classList.contains("ae-toolbar-controls")).toBe(false);
-    expect(btn.previousElementSibling?.textContent).toMatch(/Morning|Night/);
+    // In the right-hand action group, after Save (the consequential action sits
+    // apart from the filters).
+    expect(btn.closest(".ae-mb-actions")).not.toBeNull();
+    expect(screen.getAllByRole("button", { name: /^Save/ })[0].compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("glows (ready) once the counts are saved and nothing is staged", async () => {
     grid(null);
     await open();
-    expect(publishButton().classList.contains("ae-toolbar-publish--ready")).toBe(true);
-    expect((publishButton() as HTMLButtonElement).disabled).toBe(false);
+    expect(publishButton().closest(".ae-split")!.classList.contains("ae-split--attention")).toBe(true);
+    expect(publishButton().getAttribute("aria-disabled")).toBeNull();
   });
 
   it("does not glow when everything saved is already published", async () => {
     grid("2026-10-09T10:00:00.000Z");
     await open();
-    expect(publishButton().classList.contains("ae-toolbar-publish--ready")).toBe(false);
-    expect((publishButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(publishButton().closest(".ae-split")!.classList.contains("ae-split--attention")).toBe(false);
+    expect(publishButton().getAttribute("aria-disabled")).toBe("true");
   });
 
   it("stops glowing while counts are still being added or edited", async () => {
     grid(null);
     await open();
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
     fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
-    expect(publishButton().classList.contains("ae-toolbar-publish--ready")).toBe(false);
-    expect((publishButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(publishButton().closest(".ae-split")!.classList.contains("ae-split--attention")).toBe(false);
+    expect(publishButton().getAttribute("aria-disabled")).toBe("true");
   });
 });

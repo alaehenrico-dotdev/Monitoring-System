@@ -39,6 +39,7 @@ export const navGroups: NavGroup[] = [
       { to: "/manual-count", label: "Audit", roles: ALL_ROLES },
       { to: "/online", label: "Online Entry", roles: ALL_ROLES },
       { to: "/offline", label: "Offline Entry", roles: ALL_ROLES },
+      { to: "/awaiting-release", label: "Awaiting Release", roles: ALL_ROLES },
       { to: "/total-stocks", label: "Total Stocks", roles: ALL_ROLES },
     ],
   },
@@ -73,10 +74,10 @@ export const navGroups: NavGroup[] = [
     ],
   },
   {
-    heading: "Admin",
+    heading: "System",
     links: [
       { to: "/products", label: "SKUs", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/settings", label: "Settings", roles: ["SUPERVISOR_ADMIN"] },
+      { to: "/settings", label: "Settings", roles: ALL_ROLES },
     ],
   },
 ];

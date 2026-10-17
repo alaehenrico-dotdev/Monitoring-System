@@ -120,6 +120,46 @@ async function main() {
   assert.equal(forbiddenWrite.status, 403, "offline encoders cannot write online stock");
   logPass("role-based write permissions");
 
+  // Awaiting release, month close and Finish pending days: the role boundaries
+  // hold at the API (not just in the UI), and each new query runs against the
+  // real tables the migration created. Read-only or refused before any write,
+  // so they leave the database as they found it.
+  const anonymousList = await request("/pending-releases");
+  assert.equal(anonymousList.status, 401, "the awaiting-release list needs a login");
+  const encoderCloseMonth = await request("/month-closures/2020-01/close", { method: "POST", token: onlineUser.token, body: {} });
+  assert.equal(encoderCloseMonth.status, 403, "encoders cannot close a month");
+  const encoderUnlockMonth = await request("/month-closures/2020-01/unlock", {
+    method: "POST",
+    token: offlineUser.token,
+    body: { reason: "an encoder is not allowed to do this" },
+  });
+  assert.equal(encoderUnlockMonth.status, 403, "encoders cannot unlock a month");
+  const encoderWriteOff = await request("/pending-releases/1/cancel", { method: "POST", token: onlineUser.token, body: { note: "not allowed" } });
+  assert.equal(encoderWriteOff.status, 403, "only an admin writes an awaiting item off");
+  const wrongPageItem = await request("/pending-releases", {
+    method: "POST",
+    token: onlineUser.token,
+    body: { location: "OFFLINE", productId: product.id, quantity: 1, madeDate: date, madeShift: "NIGHT", reason: "e2e: wrong page" },
+  });
+  assert.equal(wrongPageItem.status, 403, "an Online encoder cannot record an Offline item");
+  const wrongPageFinish = await request("/day-closures/finish-through/preview?through=2020-01-02&location=OFFLINE", { token: onlineUser.token });
+  assert.equal(wrongPageFinish.status, 403, "an Online encoder cannot plan an Offline finish");
+  logPass("role boundaries on awaiting release, month close and finish pending days");
+
+  const pendingSummary = await expectJson(await request("/pending-releases/summary", { token: admin.token }), 200, "awaiting-release summary");
+  assert.equal(typeof pendingSummary.awaiting, "number");
+  const pendingList = await expectJson(await request("/pending-releases?status=AWAITING", { token: admin.token }), 200, "awaiting-release list");
+  assert.ok(Array.isArray(pendingList.items));
+  const readiness = await expectJson(await request("/month-closures/2020-01/readiness", { token: admin.token }), 200, "month readiness");
+  assert.equal(readiness.ready, false, "a month with no entries is not ready to close");
+  const finishPlan = await expectJson(
+    await request("/day-closures/finish-through/preview?through=2020-01-02&location=ONLINE", { token: onlineUser.token }),
+    200,
+    "finish pending days preview",
+  );
+  assert.ok(Array.isArray(finishPlan.periods));
+  logPass("new tables and queries run against the real database");
+
   const save = await request(stockPath, {
     method: "PUT",
     token: onlineUser.token,

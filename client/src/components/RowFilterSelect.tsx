@@ -13,8 +13,11 @@ export function RowFilterSelect({
   value,
   onChange,
   changedCount,
+  labelPrefix,
 }: {
   value: RowFilter;
+  /// "Rows" => the trigger reads "Rows: All".
+  labelPrefix?: string;
   onChange: (value: RowFilter) => void;
   /// Shown on the "Only changed" option so the count is visible before the
   /// filter is applied, not only after.
@@ -24,17 +27,19 @@ export function RowFilterSelect({
     <Dropdown
       aria-label="Filter rows"
       icon={<AlertTriangleIcon />}
+      labelPrefix={labelPrefix}
       value={value}
       onChange={(v) => onChange(v as RowFilter)}
       options={[
-        { value: "all", label: ROW_FILTER_LABELS.all },
+        { value: "all", label: ROW_FILTER_LABELS.all, shortLabel: "All" },
         {
           value: "changed",
           label: changedCount
             ? `${ROW_FILTER_LABELS.changed} (${changedCount})`
             : ROW_FILTER_LABELS.changed,
+          shortLabel: "Changed",
         },
-        { value: "negative", label: ROW_FILTER_LABELS.negative },
+        { value: "negative", label: ROW_FILTER_LABELS.negative, shortLabel: "Negative" },
       ]}
     />
   );

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ManualCountPage } from "./ManualCountPage";
+import { chooseFromMenu } from "./menuTestHelpers";
 
 const api = vi.hoisted(() => ({ getManualCountGrid: vi.fn(), saveManualCount: vi.fn(), getVarianceTrace: vi.fn(), setCountRemarks: vi.fn(), publishManualCounts: vi.fn() }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, name: "Sup", username: "sup", role: "SUPERVISOR_ADMIN" } }) }));
@@ -45,7 +46,7 @@ async function open() {
   );
   await screen.findByText("Sauces");
   // Categories start collapsed; only rows on screen can be selected.
-  fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+  chooseFromMenu("View", /Expand all categories/);
 }
 
 const press = (name: string, mods: Record<string, boolean> = {}) => fireEvent.mouseDown(screen.getByText(name), { button: 0, ...mods });

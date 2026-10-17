@@ -1,31 +1,17 @@
 import { useBusyAction } from "../hooks/useBusyAction";
-import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { rememberSheet, resumeSheet } from "../utils/sheetView";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { getOnlineGrid, saveOnlineEntry } from "../api/onlineStock";
 import { useAuth } from "../context/AuthContext";
-import { ReorderProductsButton } from "../components/ReorderProductsButton";
 import { Button } from "../components/ui";
-import { DatePicker } from "../components/DatePicker";
-import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
-import { Toolbar, ToolbarControls } from "../components/Toolbar";
-import { DayLockBanner, FinishDayButton, FinishEarlierDayBanner } from "../components/FinishDay";
+import { useZoom, zoomStyle } from "../components/ZoomControl";
+import { DayLockBanner, FinishEarlierDayBanner } from "../components/FinishDay";
+import { EntryToolbar } from "../components/EntryToolbar";
+import { belowZeroWarnings } from "../utils/finishWarnings";
 import { useDayLock } from "../hooks/useDayLock";
+import { useSaveShortcut } from "../hooks/useSaveShortcut";
 import { PageHeader } from "../components/PageHeader";
-import {
-  ClearIcon,
-  PrinterIcon,
-  SaveIcon,
-  ReportIcon,
-  UndoIcon,
-  CollapseAllIcon,
-  ExpandAllIcon,
-} from "../components/icons";
-import { SearchInput } from "../components/SearchInput";
-import { CategoryFilter } from "../components/CategoryFilter";
-import { RowFilterSelect } from "../components/RowFilterSelect";
-import { ShiftFilter } from "../components/ShiftFilter";
 import { TableSkeleton } from "../components/Skeleton";
 import { LoadingOverlay } from "../components/Spinner";
 import { useTopProgress } from "../hooks/useTopProgress";
@@ -39,7 +25,6 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { Modal } from "../components/Modal";
 import { Toast } from "../components/Toast";
 import { PendingChangesPreview } from "../components/PendingChangesPreview";
-import { CopyPreviousButton } from "../components/CopyPreviousButton";
 import { invalidateRecordHistory } from "../utils/cellHistory";
 import { ConflictResolution } from "../components/ConflictResolution";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
@@ -116,7 +101,6 @@ function computeOnlineFigures(
 }
 
 export function OnlineEntryPage() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const progress = useTopProgress();
   // Defaults to whatever shift+date an encoder opening this page right now
@@ -143,6 +127,12 @@ export function OnlineEntryPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [rowFilter, setRowFilter] = useRowFilter("ala-eh-rowfilter:online");
   const [saving, setSaving] = useState(false);
+  // The save status beside the Save button: when the last save on THIS sheet went
+  // through, and whether the last attempt failed.
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
+  // Bumped by Edit > Refresh to re-read the sheet from the server.
+  const [refreshTick, setRefreshTick] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   // Real per-item percent (see handleSaveAll) for LoadingOverlay's ring -
@@ -286,9 +276,16 @@ export function OnlineEntryPage() {
 
   // Ctrl+Z / Ctrl+Shift+Z over staged edits, while any exist to undo.
   useUndoRedoKeys(undo, redo, canEdit);
+  // Ctrl+S opens the same review the Save button opens (and does nothing with no
+  // changes); on an editable sheet it also keeps the browser's "Save page as".
+  useSaveShortcut(() => {
+    if (pendingCount > 0 && !saving && conflicts.length === 0) setShowPreview(true);
+  }, canEdit);
 
   useResetOnKeyChange(`${date}:${shift}`, () => {
     setRows(null);
+    setSavedAt(null);
+    setSaveFailed(false);
     // Pending edits aren't cleared here - usePendingEntryChanges re-derives
     // its own state from storage as soon as its date+shift-keyed storageKey
     // changes, so the shift being left keeps whatever it had staged (still
@@ -310,7 +307,7 @@ export function OnlineEntryPage() {
     return () => {
       cancelled = true;
     };
-  }, [date, shift, realtimeVersion, reconnects]);
+  }, [date, shift, realtimeVersion, reconnects, refreshTick]);
 
   // Best-effort check of whether the *other* shift already has saved
   // entries for this date - surfaced as a banner below, so switching (or
@@ -416,8 +413,10 @@ export function OnlineEntryPage() {
   // whether it's safe to let a "Save & Print" through.
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
+    setSaveFailed(false);
     if (!online) {
       setError("Server unreachable. Reconnect before saving changes.");
+      setSaveFailed(true);
       return false;
     }
     if (conflicts.length > 0) {
@@ -440,6 +439,7 @@ export function OnlineEntryPage() {
           ? `Couldn't check for newer changes: ${e.message}`
           : "Couldn't check for newer changes.",
       );
+      setSaveFailed(true);
       return false;
     }
     setSaving(true);
@@ -540,7 +540,12 @@ export function OnlineEntryPage() {
         `${heldNames.join(", ")}: the transfer change was not applied because Offline is already finished for this shift. It was sent to an admin for approval (Corrections) and applies to both pages once approved. Everything else was saved.`,
       );
     // Deleted columns are gone from the server now too.
-    if (failed.length === 0) markSaved();
+    if (failed.length === 0) {
+      markSaved();
+      setSavedAt(Date.now());
+    } else {
+      setSaveFailed(true);
+    }
     return failed.length === 0;
   }
 
@@ -597,183 +602,60 @@ export function OnlineEntryPage() {
         title={`Daily Online Stock Monitoring - ${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`}
         subtitle="Stocks In/Out transfers also update the Offline table."
       >
-        <Toolbar className="no-print ae-toolbar-entry">
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "nowrap",
-              minWidth: 0,
-            }}
-          >
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() =>
-                setCatCommand({ expanded: !anyCatExpanded, id: Date.now() })
-              }
-              disabled={!visibleRows}
-              aria-label={
-                anyCatExpanded
-                  ? "Collapse every category"
-                  : "Expand every category"
-              }
-              title={
-                anyCatExpanded
-                  ? "Collapse every category"
-                  : "Expand every category"
-              }
-              className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
-            >
-              {anyCatExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
-              <span className="ae-toolbar-btn-label">
-                {anyCatExpanded ? "Collapse all" : "Expand all"}
-              </span>
-            </Button>
-            <ReorderProductsButton isAdmin={user?.role === "SUPERVISOR_ADMIN"} />
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search SKU or category…"
-            />
-            <CategoryFilter
-              categories={categories}
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-            />
-            <RowFilterSelect
-              value={rowFilter}
-              onChange={setRowFilter}
-              changedCount={pendingCount}
-            />
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={setDate}
-              todayValue={getCurrentShiftAndDate().date}
-              style={{ maxWidth: 180 }}
-            />
-            <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-          </div>
-          <ToolbarControls>
-            {/* Counts cells, not products: four edits on one product are four
-                changes to the person who made them, while the Save button's
-                own (N) counts the products it will submit. */}
-            {canEdit && pendingCellCount > 0 && (
-              <span className="ae-unsaved-badge" aria-live="polite">
-                {pendingCellCount} unsaved change
-                {pendingCellCount === 1 ? "" : "s"}
-              </span>
-            )}
-            {canEdit && (
-              <CopyPreviousButton
-                current={{ date, shift }}
-                columns={gridColumns}
-                rows={rows}
-                fetchPeriod={(d, s) =>
-                  getOnlineGrid(d, s).then(
-                    (data) => data as unknown as GridRow[],
-                  )
+        <EntryToolbar
+          location="ONLINE"
+          date={date}
+          shift={shift}
+          onDateChange={setDate}
+          onShiftChange={setShift}
+          query={query}
+          onQueryChange={setQuery}
+          categories={categories}
+          category={categoryFilter}
+          onCategoryChange={setCategoryFilter}
+          rowFilter={rowFilter}
+          onRowFilterChange={setRowFilter}
+          changedCount={pendingCount}
+          canEdit={canEdit}
+          saving={saving}
+          pendingCount={pendingCount}
+          pendingCellCount={pendingCellCount}
+          canUndo={canUndo}
+          canRedo={canRedo}
+          onUndo={undo}
+          onRedo={redo}
+          onDiscard={() => setShowClearConfirm(true)}
+          onRefresh={() => setRefreshTick((t) => t + 1)}
+          copyPrevious={
+            canEdit
+              ? {
+                  current: { date, shift },
+                  columns: gridColumns,
+                  rows,
+                  fetchPeriod: (d, s) => getOnlineGrid(d, s).then((data) => data as unknown as GridRow[]),
+                  pending,
+                  getSavedValue,
+                  onApply: handleCommitMany,
                 }
-                pending={pending}
-                getSavedValue={getSavedValue}
-                onApply={handleCommitMany}
-              />
-            )}
-            {canEdit && (canUndo || canRedo) && (
-              <Button
-                className="ae-toolbar-save"
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={undo}
-                disabled={!canUndo}
-                title="Undo the last staged edit (Ctrl+Z)"
-              >
-                <UndoIcon />
-                <span className="ae-toolbar-btn-label">Undo</span>
-              </Button>
-            )}
-            {canEdit && (
-              <Button
-                className="ae-toolbar-save ae-toolbar-primary"
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowPreview(true)}
-                disabled={pendingCount === 0}
-                title="Review and save changes"
-              >
-                <SaveIcon />
-                <span className="ae-toolbar-btn-label">
-                  Save{pendingCount > 0 ? ` (${pendingCount})` : ""}
-                </span>
-              </Button>
-            )}
-            {canEdit && (
-              <Button
-                className="ae-toolbar-save"
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowClearConfirm(true)}
-                disabled={pendingCount === 0 || saving}
-                title="Discard unsaved changes on this sheet"
-              >
-                <ClearIcon />
-                <span className="ae-toolbar-btn-label">Clear</span>
-              </Button>
-            )}
-            <Button
-              className="ae-toolbar-save"
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void pdfAction.run(handlePdf)}
-              loading={pdfAction.busy}
-              loadingLabel={<span className="ae-toolbar-btn-label">PDF</span>}
-              disabled={pendingCount > 0 || !visibleRows}
-              title={
-                pendingCount > 0
-                  ? "Save your changes first - PDF reflects only saved data"
-                  : "Download as PDF"
-              }
-            >
-              <PrinterIcon />
-              <span className="ae-toolbar-btn-label">PDF</span>
-            </Button>
-            <Button
-              className="ae-toolbar-save"
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/daily-report?date=${date}&auto=1`)}
-              disabled={pendingCount > 0}
-              title={
-                pendingCount > 0
-                  ? "Save your changes first - the report only reads saved data"
-                  : "Open the Daily Report for this date"
-              }
-            >
-              <ReportIcon />
-              <span className="ae-toolbar-btn-label">Report</span>
-            </Button>
-            {!dayLock.locked && dayLock.loaded && !dayLock.blockedBy && (
-              <FinishDayButton
-                date={date}
-                shift={shift}
-                location="ONLINE"
-                disabled={pendingCount > 0}
-                disabledReason="Save or discard your changes first - they would be locked out"
-                onFinished={dayLock.refresh}
-                onError={setError}
-              />
-            )}
-            <ZoomControl zoom={zoom} onChange={setZoom} />
-          </ToolbarControls>
-        </Toolbar>
+              : null
+          }
+          onSave={() => setShowPreview(true)}
+          saveState={saving ? "saving" : saveFailed && pendingCount > 0 ? "failed" : savedAt !== null ? "saved" : "idle"}
+          savedAt={savedAt ?? undefined}
+          onRetrySave={() => void handleSaveAll()}
+          hasRows={!!visibleRows}
+          anyExpanded={anyCatExpanded}
+          onToggleExpandAll={() => setCatCommand({ expanded: !anyCatExpanded, id: Date.now() })}
+          isAdmin={user?.role === "SUPERVISOR_ADMIN"}
+          zoom={zoom}
+          onZoomChange={setZoom}
+          pdfBusy={pdfAction.busy}
+          onPdf={() => void pdfAction.run(handlePdf)}
+          dayLock={dayLock}
+          onFinished={dayLock.refresh}
+          onError={setError}
+          finishWarnings={belowZeroWarnings(rows)}
+        />
       </PageHeader>
       <Toast
         message={

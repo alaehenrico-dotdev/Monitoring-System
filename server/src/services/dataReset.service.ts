@@ -123,13 +123,18 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
     //    would write into nothing;
     //  - archived change log: the cold-storage half of the change log, which
     //    "wipe the change log" has to include or it is only half wiped;
-    //  - idempotency keys: a stored response for an old save must not replay.
+    //  - idempotency keys: a stored response for an old save must not replay;
+    //  - month closures: a closed month would refuse every new entry dated in it;
+    //  - awaiting-release items: goods recorded against a stock history that is
+    //    gone, which could only ever be released into a fresh sheet by mistake.
     const dayClosures = await tx.dayClosure.deleteMany();
     const reportSnapshots = await tx.dailyReportSnapshot.deleteMany();
     const extraColumnLabels = await tx.extraColumnLabel.deleteMany();
     const corrections = await tx.correctionRequest.deleteMany();
     const changeLogArchive = await tx.changeLogArchive.deleteMany();
     const idempotencyKeys = await tx.idempotencyKey.deleteMany();
+    const monthClosures = await tx.monthClosure.deleteMany();
+    const pendingReleases = await tx.pendingRelease.deleteMany();
 
     const deleted = {
       onlineStock: onlineStock.count,
@@ -145,6 +150,8 @@ export async function resetAllData(resetToken: string, user: AuthUser) {
       corrections: corrections.count,
       changeLogArchive: changeLogArchive.count,
       idempotencyKeys: idempotencyKeys.count,
+      monthClosures: monthClosures.count,
+      pendingReleases: pendingReleases.count,
     };
 
     await tx.changeLog.create({

@@ -11,6 +11,10 @@ services:
       MYSQL_USER: alaeh_app
       MYSQL_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD in .env}
+    # Host access for MySQL Workbench. 3306 is for a native MySQL Server and
+    # 3307 is used by another project's container, so use 3308.
+    ports:
+      - "127.0.0.1:3308:3306"
     volumes:
       - db_data:/var/lib/mysql
     healthcheck:

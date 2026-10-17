@@ -18,8 +18,8 @@ import {
   NeedsRestockCard,
   useDaysOfStock,
 } from "../components/RestockCards";
-import { DatePicker } from "../components/DatePicker";
-import { Toolbar } from "../components/Toolbar";
+import { PageToolbar } from "../components/PageToolbar";
+import { DateStepper } from "../components/DateStepper";
 import { Button } from "../components/ui";
 import { EndOfDayPackDialog } from "../components/EndOfDayPackDialog";
 import { PageHeader } from "../components/PageHeader";
@@ -30,6 +30,7 @@ import {
   LayersIcon,
   ReportIcon,
   ChevronRightIcon,
+  DownloadIcon,
 } from "../components/icons";
 import { colors } from "../theme";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
@@ -351,42 +352,34 @@ export function DashboardPage() {
         }
         subtitleClassName="ae-dash-subtitle"
       >
-        <Toolbar className="no-print">
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "nowrap",
-              minWidth: 0,
-            }}
-          >
-            <DatePicker
-              aria-label="Dashboard date"
+        <PageToolbar
+          label="Dashboard"
+          menus={[
+            {
+              id: "export",
+              label: "Export",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "pack",
+                      label: "End-of-day pack…",
+                      icon: <DownloadIcon />,
+                      onSelect: () => setShowPack(true),
+                    },
+                  ],
+                },
+              ],
+            },
+          ]}
+          filters={
+            <DateStepper
               value={viewDate}
               onChange={(d) => setPickedDate(d === today ? null : d)}
               todayValue={today}
-              style={{ maxWidth: 180 }}
             />
-            {!isToday && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setPickedDate(null)}
-              >
-                Back to today
-              </Button>
-            )}
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowPack(true)}
-              title="Daily Report + Variance Report + database backup, saved as one .zip"
-            >
-              End-of-day pack
-            </Button>
-          </div>
-        </Toolbar>
+          }
+        />
       </PageHeader>
 
       {showPack && (

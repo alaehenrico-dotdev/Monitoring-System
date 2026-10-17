@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { motion } from "motion/react";
 import { downloadCsv, parseCsv, toCsv } from "../utils/csv";
 import { pickSheetForDate, readXlsx } from "../utils/xlsx";
 import { splitCombinedSheet, type SheetProduct } from "../utils/combinedSheet";
@@ -34,7 +33,6 @@ import { DatePicker } from "./DatePicker";
 import { Dropdown } from "./Dropdown";
 import { ShiftFilter } from "./ShiftFilter";
 import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
-import { toolbarLayoutTransition } from "../motion";
 import {
   ClearIcon,
   DownloadIcon,
@@ -1111,26 +1109,18 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
           flexWrap: "wrap",
         }}
       >
-        {/* `layout` on the group and every segment button - compact mode
-          (index.css's .ae-toolbar--compact rules) turns this from one
-          joined pill with text labels into individually circular icon
-          buttons purely via a CSS class swap, which otherwise pops
-          instantly. `layout` makes that whole reshape (background,
-          border-radius, each button's own width) animate smoothly via
-          Framer's FLIP projection instead. */}
-        <motion.div
-          layout
-          transition={toolbarLayoutTransition}
+        {/* The group and its buttons are plain elements: in compact mode (the
+            toolbar's own tiers, index.css's .ae-toolbar--compact rules) they
+            turn from one joined pill with text labels into individual icon
+            buttons by a CSS class swap, which takes effect at once. */}
+        <div
           className="ae-segment-group"
           aria-label="Export/Import"
           title="Export/Import"
         >
           {showExport && (
             <>
-              <motion.button
-                layout
-                transition={toolbarLayoutTransition}
-                whileTap={{ scale: 0.94 }}
+              <button
                 type="button"
                 className="ae-segment-btn"
                 onClick={handleExport}
@@ -1141,15 +1131,12 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 <span className="ae-segment-label">
                   {asExcel ? "Export Excel" : "Export"}
                 </span>
-              </motion.button>
+              </button>
               {showPdf && <div className="ae-segment-divider" />}
             </>
           )}
           {showPdf && (
-            <motion.button
-              layout
-              transition={toolbarLayoutTransition}
-              whileTap={{ scale: 0.94 }}
+            <button
               type="button"
               className="ae-segment-btn"
               onClick={() => void pdfAction.run(handlePdf)}
@@ -1163,17 +1150,14 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             >
               {pdfAction.busy ? <Spinner size="sm" /> : <PrinterIcon />}
               <span className="ae-segment-label">PDF</span>
-            </motion.button>
+            </button>
           )}
           {canImport && (
             <>
               {(showExport || showPdf) && (
                 <div className="ae-segment-divider" />
               )}
-              <motion.button
-                layout
-                transition={toolbarLayoutTransition}
-                whileTap={{ scale: 0.94 }}
+              <button
                 type="button"
                 className="ae-segment-btn"
                 onClick={() => {
@@ -1187,7 +1171,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 <span className="ae-segment-label">
                   {busy ? "Importing…" : "Import"}
                 </span>
-              </motion.button>
+              </button>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1209,7 +1193,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               />
             </>
           )}
-        </motion.div>
+        </div>
         {canImport && (
           <Button
             type="button"

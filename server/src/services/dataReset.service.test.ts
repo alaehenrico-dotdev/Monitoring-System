@@ -20,6 +20,8 @@ const db = vi.hoisted(() => ({
   correctionRequest: [] as Record<string, unknown>[],
   changeLogArchive: [] as Record<string, unknown>[],
   idempotencyKey: [] as Record<string, unknown>[],
+  monthClosure: [] as Record<string, unknown>[],
+  pendingRelease: [] as Record<string, unknown>[],
 }));
 
 function makeModel(table: Record<string, unknown>[]) {
@@ -54,6 +56,8 @@ vi.mock("../lib/prisma", () => ({
         correctionRequest: makeModel(db.correctionRequest),
         changeLogArchive: makeModel(db.changeLogArchive),
         idempotencyKey: makeModel(db.idempotencyKey),
+        monthClosure: makeModel(db.monthClosure),
+        pendingRelease: makeModel(db.pendingRelease),
       }),
   },
 }));
@@ -93,14 +97,16 @@ describe("resetAllData", () => {
     db.correctionRequest.push({ id: 1, tableName: "daily_online_stock", recordId: 10, field: "stockInOffToOl", status: "PENDING" });
     db.changeLogArchive.push({ id: 5, tableName: "daily_online_stock", recordId: 10 });
     db.idempotencyKey.push({ id: 1, key: "abc", userId: 1 });
+    db.monthClosure.push({ id: 1, yearMonth: "2026-06", isClosed: true });
+    db.pendingRelease.push({ id: 1, productId: 3, quantity: 12, status: "AWAITING" });
 
     const token = verifyPasscode(env.dataResetPasscode, USER);
     if (!token) throw new Error("test setup: passcode didn't verify against env.dataResetPasscode");
     const result = await resetAllData(token, USER);
 
-    for (const table of [db.dayClosure, db.dailyReportSnapshot, db.extraColumnLabel, db.correctionRequest, db.changeLogArchive, db.idempotencyKey]) {
+    for (const table of [db.dayClosure, db.dailyReportSnapshot, db.extraColumnLabel, db.correctionRequest, db.changeLogArchive, db.idempotencyKey, db.monthClosure, db.pendingRelease]) {
       expect(table).toHaveLength(0);
     }
-    expect(result.deleted).toMatchObject({ dayClosures: 1, reportSnapshots: 1, extraColumnLabels: 1, corrections: 1, changeLogArchive: 1, idempotencyKeys: 1 });
+    expect(result.deleted).toMatchObject({ dayClosures: 1, reportSnapshots: 1, extraColumnLabels: 1, corrections: 1, changeLogArchive: 1, idempotencyKeys: 1, monthClosures: 1, pendingReleases: 1 });
   });
 });
