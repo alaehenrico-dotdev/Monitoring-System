@@ -5,7 +5,8 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
-import { assertPeriodOpen } from "./dayLock.service";
+import { assertPeriodOpen, isLockedForCarry } from "./dayLock.service";
+import { holdStaleOpening } from "./staleOpening.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import {
   calculateOfflineRemaining,
@@ -168,6 +169,20 @@ export async function deleteManualCount(
   return true;
 }
 
+export interface PropagateOptions {
+  /// Where the walk starts. "day" (the default, for counts) begins past this
+  /// date's Night shift: a count opens the next DAY. "period" (entry saves)
+  /// begins right after the saved period itself, so a corrected Morning also
+  /// re-derives that same day's Night, which opens with Morning's remaining.
+  /// An explicit period begins right after that one.
+  from?: "day" | "period" | { entryDate: Date; shift: Shift };
+  /// A row an admin has just approved: written even though its period is
+  /// finished. The walk past it is held again as usual.
+  approvedRowId?: number;
+}
+
+export type PropagateOutcome = "kept-manual" | "held-locked" | undefined;
+
 /// Section 4.6 - carry-forward of Remaining Stock into the next saved
 /// period's opening stock. A next-period row that was already saved has its
 /// opening stock stored, so it must be re-derived here or it keeps carrying
@@ -180,6 +195,11 @@ export async function deleteManualCount(
 /// A row whose opening was set by an import (openingManual) is never rewritten:
 /// the walk stops there and returns "kept-manual" if that row's opening
 /// differs from what would have carried into it.
+///
+/// A row of a FINISHED period is not rewritten either, and the save that
+/// reached it does not fail: the walk stops there, files a pending stale-opening
+/// request for an admin (staleOpening.service.ts) and returns "held-locked".
+/// Approving it continues the walk from that row.
 export async function propagateOpeningStock(
   productId: number,
   entryDate: Date,
@@ -190,10 +210,12 @@ export async function propagateOpeningStock(
   /// The change_log row that started this walk - stamped on every follow-on
   /// row it writes, so they read as consequences of that change.
   causedById?: number,
-): Promise<"kept-manual" | undefined> {
+  opts: PropagateOptions = {},
+): Promise<PropagateOutcome> {
   if (location === "TOTAL") return;
-  // A count opens the next DAY: start the walk past this date's Night shift.
-  let cursor = { entryDate, shift: "NIGHT" as Shift };
+  const from = opts.from ?? "day";
+  let cursor =
+    typeof from === "object" ? { entryDate: from.entryDate, shift: from.shift } : { entryDate, shift: from === "period" ? shift : ("NIGHT" as Shift) };
   for (;;) {
     let nextPeriod: { entryDate: Date; shift: Shift };
 
@@ -204,8 +226,11 @@ export async function propagateOpeningStock(
       const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
       if (next.openingManual) return "kept-manual";
-      // A carry-forward must not quietly rewrite a closed day.
-      await assertPeriodOpen(next.entryDate, next.shift, db, "entry", "ONLINE");
+      // A carry-forward must not quietly rewrite a closed day: hold it.
+      if (next.id !== opts.approvedRowId && (await isLockedForCarry(next.entryDate, next.shift, "ONLINE", db))) {
+        await holdStaleOpening("ONLINE", next, openingStock, userId, db, causedById);
+        return "held-locked";
+      }
       const onlineStock = calculateOnlineStock(openingStock, toNum(next.stockInOffToOl), toNum(next.stockOutOlToOff));
       const remainingStock = calculateOnlineRemaining(onlineStock, toNum(next.productionIn), toNum(next.fulfillmentOut), toNum(next.rts));
       const updated = await dailyOnlineStockRepository.upsert(
@@ -237,7 +262,10 @@ export async function propagateOpeningStock(
       const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
       if (openingStock === toNum(next.openingStock)) return;
       if (next.openingManual) return "kept-manual";
-      await assertPeriodOpen(next.entryDate, next.shift, db, "entry", "OFFLINE");
+      if (next.id !== opts.approvedRowId && (await isLockedForCarry(next.entryDate, next.shift, "OFFLINE", db))) {
+        await holdStaleOpening("OFFLINE", next, openingStock, userId, db, causedById);
+        return "held-locked";
+      }
       const offlineStock = calculateOfflineStock(openingStock, toNum(next.stockInOlToOff), toNum(next.stockOutOffToOl));
       const remainingStock = calculateOfflineRemaining(
         offlineStock,
@@ -440,6 +468,7 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
           ])
         : [new Set<number>(), new Set<number>()];
       let keptManual = 0;
+      let heldLocked = 0;
       for (const count of pending) {
         // TOTAL is a combined view and can never be split into an opening.
         const apply = applyToOpening && count.location !== "TOTAL";
@@ -452,9 +481,10 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
         if (apply && hasLater.has(count.productId)) {
           const outcome = await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId);
           if (outcome === "kept-manual") keptManual++;
+          if (outcome === "held-locked") heldLocked++;
         }
       }
-      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, keptManual };
+      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, keptManual, heldLocked };
     },
     { timeout: 120_000, maxWait: 10_000 },
   );

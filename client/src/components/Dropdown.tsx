@@ -37,6 +37,9 @@ const TYPEAHEAD_RESET_MS = 700;
 export interface DropdownOption {
   value: string;
   label: string;
+  /// What the trigger shows instead of `label` when the dropdown has a
+  /// `labelPrefix` ("Category: All" rather than "Category: All categories").
+  shortLabel?: string;
   /// Full text shown as a hover tooltip - lets an option carry a longer
   /// description than the label that's shown in the (possibly narrow,
   /// toolbar-compact-tier) trigger and list, mirroring ShiftFilter's old
@@ -61,6 +64,9 @@ interface DropdownProps {
   /// Optional leading icon shown inside the trigger (toolbar filters use it
   /// to say what they filter). Hidden by CSS in the narrower toolbar tiers.
   icon?: ReactNode;
+  /// A word that names what this filters, shown before the value in the trigger
+  /// ("Category: All"). Opt-in: a dropdown without one looks exactly as before.
+  labelPrefix?: string;
 }
 
 type Position = {
@@ -80,6 +86,7 @@ export function Dropdown({
   disabled,
   title,
   icon,
+  labelPrefix,
   "aria-label": ariaLabel,
 }: DropdownProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -257,7 +264,7 @@ export function Dropdown({
     setActiveIndex(next);
   }
 
-  const triggerLabel = selected ? selected.label : placeholder;
+  const triggerLabel = selected ? (labelPrefix ? (selected.shortLabel ?? selected.label) : selected.label) : placeholder;
   const dialogLabel = ariaLabel
     ? `Choose ${ariaLabel.toLowerCase()}`
     : "Choose option";
@@ -271,7 +278,10 @@ export function Dropdown({
         style={style}
         disabled={disabled}
         title={title ?? selected?.title}
-        aria-label={ariaLabel}
+        // With a visible prefix the accessible name is the visible text itself
+        // ("Category: All"): a name that does not contain what is on screen is a
+        // mismatch for voice control and screen readers alike.
+        aria-label={labelPrefix ? `${labelPrefix}: ${triggerLabel}` : ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => (open ? closeMenu() : openMenu())}
@@ -282,7 +292,10 @@ export function Dropdown({
             {icon}
           </span>
         )}
-        <span className="ae-select-trigger-text">{triggerLabel}</span>
+        <span className="ae-select-trigger-text">
+          {labelPrefix && <span className="ae-select-trigger-prefix">{labelPrefix}: </span>}
+          {triggerLabel}
+        </span>
         <span className="ae-select-trigger-icon" aria-hidden>
           <ChevronIcon />
         </span>
@@ -308,10 +321,9 @@ export function Dropdown({
               initial={{
                 opacity: 0,
                 y: pos.bottom !== undefined ? 6 : -6,
-                scale: 0.98,
               }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.08 } }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.08 } }}
               transition={{ duration: 0.14, ease: "easeOut" }}
               // React events from a portal still bubble to the portal's React
               // ancestors - a click would hit an enclosing Modal's

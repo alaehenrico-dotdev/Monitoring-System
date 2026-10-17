@@ -2,6 +2,7 @@ import {
   ArrowDownUp,
   ArrowUp,
   ArrowUpFromLine,
+  Ban,
   Calendar,
   Check,
   ChevronDown,
@@ -11,6 +12,7 @@ import {
   ChevronsUpDown,
   Clock,
   Download,
+  Ellipsis,
   FileChartColumnIncreasing,
   History,
   Layers,
@@ -31,6 +33,7 @@ import {
   Upload,
   X,
   ZoomIn,
+  createLucideIcon,
 } from "lucide-react";
 
 /// Toolbar and card icons - thin wrappers around Lucide (named imports only, so
@@ -180,6 +183,31 @@ export function ExpandAllIcon() {
 /// Arrange product order: an up arrow beside a down arrow.
 export function ReorderIcon() {
   return <ArrowDownUp {...look(15, 1.6)} />;
+}
+
+/// Lucide has no padlock with a check, so this is its own Lock drawing (the same
+/// body and shackle) with a check inside the body, built with Lucide's own icon
+/// builder so it takes the same props and stroke as every other icon here.
+const LockCheck = createLucideIcon("lock-check", [
+  ["rect", { width: "18", height: "11", x: "3", y: "11", rx: "2", ry: "2", key: "body" }],
+  ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4", key: "shackle" }],
+  ["path", { d: "m9.5 16.5 1.8 1.8 3.4-3.6", key: "check" }],
+]);
+
+/// "Lock this" - the Finish day / Finish pending days buttons, which lock a sheet.
+export function LockCheckIcon({ size = 16 }: { size?: number }) {
+  return <LockCheck {...look(size, 1.6)} />;
+}
+
+/// A circle with a slash: the "not available right now" mark on a disabled menu
+/// item, so being disabled is never shown by dimming alone.
+export function BanIcon() {
+  return <Ban {...look(14, 1.6)} />;
+}
+
+/// "More actions" - the overflow menu's trigger.
+export function EllipsisIcon() {
+  return <Ellipsis {...look(18, 1.8)} />;
 }
 
 export function LockIcon({ size = 16 }: { size?: number }) {

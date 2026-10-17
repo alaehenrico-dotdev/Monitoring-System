@@ -81,6 +81,47 @@ describe("FinishDayButton", () => {
   });
 });
 
+describe("FinishDayButton confirmation lists what is wrong", () => {
+  it("BLOCKS when nothing is saved on the page: says so and the confirm button cannot be pressed", async () => {
+    api.getFinishSummary.mockResolvedValue(summary(0, 10));
+    const { button } = setup();
+    await waitFor(() => expect(api.getFinishSummary).toHaveBeenCalled());
+    fireEvent.click(button());
+    expect(await screen.findByRole("alert")).toBeTruthy();
+    expect(screen.getByText(/Blocked: nothing has been saved on the Online page/)).toBeTruthy();
+    const confirm = screen.getByRole("button", { name: /Finish & lock/ }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(true);
+    fireEvent.click(confirm);
+    expect(api.finishDay).not.toHaveBeenCalled();
+    // Cancel still works: the person is never stuck in the dialog.
+    expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("shows the warnings it is given, without blocking", async () => {
+    api.getFinishSummary.mockResolvedValue(summary(60, 60));
+    api.finishDay.mockResolvedValue({ ...summary(60, 60, true), finished: true, reportSaved: true });
+    const { button } = setup({ warnings: ["2 products end below zero stock on this sheet."] });
+    await waitFor(() => expect(api.getFinishSummary).toHaveBeenCalled());
+    fireEvent.click(button());
+    const warnings = await screen.findByRole("list", { name: "Warnings" });
+    expect(warnings.textContent).toContain("2 products end below zero stock");
+    const confirm = screen.getByRole("button", { name: /Finish & lock/ }) as HTMLButtonElement;
+    expect(confirm.disabled).toBe(false);
+    fireEvent.click(confirm);
+    await waitFor(() => expect(api.finishDay).toHaveBeenCalledTimes(1));
+  });
+
+  it("a half-done sheet is a warning, not a block", async () => {
+    api.getFinishSummary.mockResolvedValue(summary(40, 60));
+    const { button } = setup();
+    await waitFor(() => expect(api.getFinishSummary).toHaveBeenCalled());
+    fireEvent.click(button());
+    expect(await screen.findByText(/Some products have no saved entry yet/)).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect((screen.getByRole("button", { name: /Finish & lock/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
 describe("FinishEarlierDayBanner", () => {
   it("names the day to finish first and jumps to it", () => {
     const onGo = vi.fn();

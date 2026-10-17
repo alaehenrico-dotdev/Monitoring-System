@@ -7,7 +7,7 @@ import {
   type CSSProperties,
   type KeyboardEvent,
 } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CategoryColorMenu,
   type CategoryMenuTarget,
@@ -26,14 +26,15 @@ import type {
   StockLocation,
 } from "../types";
 import { Button, NumberCellInput } from "../components/ui";
-import { DatePicker } from "../components/DatePicker";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
-import {
-  Toolbar,
-  ToolbarControls,
-  ToolbarDivider,
-} from "../components/Toolbar";
+import { BarButton, PageToolbar } from "../components/PageToolbar";
+import { FilterSlot } from "../components/FilterSlot";
+import { SaveStatus, type SaveState } from "../components/SaveStatus";
+import { DateStepper } from "../components/DateStepper";
+import { SplitButton } from "../components/SplitButton";
+import type { MenuDef } from "../components/MenuBar";
+import { zoomSection } from "../utils/zoomMenu";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { SearchInput } from "../components/SearchInput";
@@ -47,6 +48,7 @@ import {
   ExpandAllIcon,
   HistoryIcon,
   PrinterIcon,
+  ReorderIcon,
   ReportIcon,
   SaveIcon,
   UndoIcon,
@@ -77,9 +79,10 @@ import type { Shift } from "../types";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { useUndoRedoKeys } from "../hooks/useGridView";
-import { ReorderProductsButton } from "../components/ReorderProductsButton";
+import { ReorderProductsDialog } from "../components/ReorderProductsButton";
 import { useAuth } from "../context/AuthContext";
 import { useTopProgress } from "../hooks/useTopProgress";
+import { useCategoryReveal } from "../hooks/useCategoryReveal";
 import type { ToastVariant } from "../components/Toast";
 
 /// The two places stock is physically counted. Both are entered on this one
@@ -298,6 +301,8 @@ export function ManualCountPage() {
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
+  // Fades a category's rows in and out when it is toggled (hooks/useCategoryReveal.ts).
+  const reveal = useCategoryReveal();
   // Staged-but-unsaved counts, persisted to sessionStorage under this
   // date+shift's own keys - same reasoning as usePendingEntryChanges
   // (Online/Offline Entry): survives navigating to a different page and back,
@@ -354,6 +359,9 @@ export function ManualCountPage() {
   // The product whose Variance details panel is open.
   const [detailsProductId, setDetailsProductId] = useState<number | null>(null);
   const navigate = useNavigate();
+  const [reorderOpen, setReorderOpen] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | undefined>(undefined);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   // Real per-item percent for LoadingOverlay's ring (see handleSaveAll) - same
   // overlay Online/Offline Entry and CSV import use, so all saves look alike.
@@ -553,17 +561,22 @@ export function ManualCountPage() {
     setPublishing(true);
     setError(null);
     try {
-      const { published, keptManual = 0 } = await publishManualCounts(date, shift, applyToOpening);
+      const { published, keptManual = 0, heldLocked = 0 } = await publishManualCounts(date, shift, applyToOpening);
       setShowPublishConfirm(false);
       setApplyToOpening(false);
       const kept = keptManual
         ? ` · ${keptManual} opening${keptManual === 1 ? "" : "s"} set by an import ${keptManual === 1 ? "was" : "were"} kept`
         : "";
+      // A later day that is already finished is not rewritten: its new opening
+      // waits in Corrections for an admin.
+      const held = heldLocked
+        ? ` · ${heldLocked} finished later day${heldLocked === 1 ? " is" : "s are"} waiting in Corrections for approval`
+        : "";
       setNotice({
         message: `Published ${published} count${published === 1 ? "" : "s"} - ${
           applyToOpening ? "now the next day's opening stock" : "now final for reporting"
-        }${kept}`,
-        variant: "success",
+        }${kept}${held}`,
+        variant: heldLocked ? "warning" : "success",
       });
       // The server broadcasts the change; re-read now so the badge and button
       // do not wait for it.
@@ -696,6 +709,8 @@ export function ManualCountPage() {
     setSaving(false);
     setShowConfirm(false);
     if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
+    setSaveFailed(failed.length > 0);
+    if (failed.length === 0) setSavedAt(Date.now());
   }
 
   // CSV import stages each row's Manual Count as a draft for the chosen
@@ -1146,6 +1161,115 @@ export function ManualCountPage() {
     color: value !== null && value < 0 ? colors.danger : undefined,
   });
 
+  const saveState: SaveState = saving ? "saving" : saveFailed ? "failed" : savedAt !== undefined ? "saved" : "idle";
+  const saveReason =
+    pendingCount === 0 ? "No changes to save" : saving ? "Saving…" : undefined;
+  const publishReason =
+    pendingCount > 0
+      ? "Save your changes first"
+      : unpublishedCount === 0
+        ? "Nothing to publish - every saved count is already published"
+        : publishing || saving
+          ? "Wait for the current save or publish to finish"
+          : undefined;
+  const manualMenus: MenuDef[] = [
+    {
+      id: "edit",
+      label: "Edit",
+      sections: [
+        {
+          items: [
+            {
+              id: "undo",
+              label: "Undo",
+              icon: <UndoIcon />,
+              shortcut: "Ctrl+Z",
+              disabledReason: saving
+                ? "Wait for the save to finish"
+                : past.length === 0
+                  ? "Nothing to undo"
+                  : undefined,
+              onSelect: undo,
+            },
+            {
+              id: "clear",
+              label: "Clear unsaved counts…",
+              icon: <ClearIcon />,
+              tone: "danger",
+              disabledReason: saving
+                ? "Wait for the save to finish"
+                : pendingCount === 0
+                  ? "No changes to discard"
+                  : undefined,
+              onSelect: () => setShowClearConfirm(true),
+            },
+          ],
+        },
+      ],
+    },
+    {
+      id: "view",
+      label: "View",
+      sections: [
+        {
+          items: [
+            {
+              id: "expand-all",
+              label: anyExpanded ? "Collapse all categories" : "Expand all categories",
+              icon: anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />,
+              disabledReason: auditRows ? undefined : "The sheet is still loading",
+              onSelect: () => setAllExpanded(!anyExpanded),
+            },
+            {
+              id: "reorder",
+              label: "Reorder products…",
+              icon: <ReorderIcon />,
+              disabledReason: canPublish ? undefined : "Only an admin can change the product order",
+              onSelect: () => setReorderOpen(true),
+            },
+          ],
+        },
+        zoomSection(zoom, setZoom),
+      ],
+    },
+    {
+      id: "export",
+      label: "Export",
+      sections: [
+        {
+          items: [
+            {
+              id: "pdf",
+              label: "Download PDF",
+              icon: <PrinterIcon />,
+              disabledReason: pendingCount > 0
+                ? "Save your changes first - PDF reflects only saved data"
+                : !visibleRows
+                  ? "The sheet is still loading"
+                  : pdfAction.busy
+                    ? "Preparing the PDF…"
+                    : undefined,
+              onSelect: () => void pdfAction.run(() => handlePdf()),
+            },
+            {
+              id: "report",
+              label: "Variance report…",
+              icon: <ReportIcon />,
+              disabledReason: pendingCount > 0 ? "Save your counts first - the report only reads saved data" : undefined,
+              onSelect: () => navigate(`/variance-report?date=${date}`),
+            },
+            {
+              id: "history",
+              label: "Audit history…",
+              icon: <HistoryIcon />,
+              onSelect: () => navigate("/audit-history"),
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
   return (
     <div>
       <PageHeader
@@ -1157,277 +1281,169 @@ export function ManualCountPage() {
         }
         subtitle="Review and correct manual counts."
       >
-        <Toolbar className="no-print">
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              alignItems: "center",
-              flexWrap: "nowrap",
-              minWidth: 0,
-            }}
-          >
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setAllExpanded(!anyExpanded)}
-              disabled={!auditRows}
-              aria-label={
-                anyExpanded
-                  ? "Collapse every category"
-                  : "Expand every category"
-              }
-              title={
-                anyExpanded
-                  ? "Collapse every category"
-                  : "Expand every category"
-              }
-              className="ae-tap-target ae-toolbar-icon-btn ae-toolbar-collapse-btn"
-            >
-              {anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />}
-              <span className="ae-toolbar-btn-label">
-                {anyExpanded ? "Collapse all" : "Expand all"}
-              </span>
-            </Button>
-            <ReorderProductsButton isAdmin={canPublish} />
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search SKU or category…"
-            />
-            <CategoryFilter
-              categories={categories}
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-            />
-            <Dropdown
-              aria-label="Filter rows"
-              value={rowFilter}
-              onChange={(v) => setRowFilter(v as typeof rowFilter)}
-              options={[
-                { value: "all", label: "All rows" },
-                {
-                  value: "flagged",
-                  label: flaggedCount
-                    ? `Flagged only (${flaggedCount})`
-                    : "Flagged only",
-                  title: "Only counts whose variance is not zero",
-                },
-                {
-                  value: "changed",
-                  label: pendingCount
-                    ? `Only changed (${pendingCount})`
-                    : "Only changed",
-                  title: "Only counts staged but not saved yet",
-                },
-              ]}
-            />
-            {!lockedLocation && (
-              <StockSourceFilter
-                value={sourceFilter}
-                onChange={setSourceFilter}
+        <PageToolbar
+          activeFilters={(query.trim() !== "" ? 1 : 0) + (categoryFilter !== "" ? 1 : 0) + (rowFilter !== "all" ? 1 : 0)}
+          onClearFilters={() => {
+            setQuery("");
+            setCategoryFilter("");
+            setRowFilter("all");
+          }}
+          label="Manual count"
+          menus={manualMenus}
+          filters={
+            <>
+              <FilterSlot active={query.trim() !== ""} label="Search">
+                <SearchInput
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search SKU or category…"
+                />
+              </FilterSlot>
+              <FilterSlot active={categoryFilter !== ""} label="Category">
+                <CategoryFilter
+                  categories={categories}
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                />
+              </FilterSlot>
+              <FilterSlot active={rowFilter !== "all"} label="Rows">
+                <Dropdown
+                  aria-label="Filter rows"
+                  value={rowFilter}
+                  onChange={(v) => setRowFilter(v as typeof rowFilter)}
+                  options={[
+                    { value: "all", label: "All rows" },
+                    {
+                      value: "flagged",
+                      label: flaggedCount
+                        ? `Flagged only (${flaggedCount})`
+                        : "Flagged only",
+                      title: "Only counts whose variance is not zero",
+                    },
+                    {
+                      value: "changed",
+                      label: pendingCount
+                        ? `Only changed (${pendingCount})`
+                        : "Only changed",
+                      title: "Only counts staged but not saved yet",
+                    },
+                  ]}
+                />
+              </FilterSlot>
+              {!lockedLocation && (
+                <StockSourceFilter
+                  value={sourceFilter}
+                  onChange={setSourceFilter}
+                />
+              )}
+              <DateStepper
+                value={date}
+                onChange={setDate}
+                todayValue={getCurrentShiftAndDate().date}
               />
-            )}
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={setDate}
-              todayValue={getCurrentShiftAndDate().date}
-            />
-            <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
-            {canPublish && (
-              <Button
-                className={`ae-toolbar-publish${publishReady ? " ae-toolbar-publish--ready" : ""}`}
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowPublishConfirm(true)}
-                disabled={
-                  pendingCount > 0 ||
-                  unpublishedCount === 0 ||
-                  publishing ||
-                  saving
-                }
-                title={
-                  pendingCount > 0
-                    ? "Save your changes first"
-                    : unpublishedCount === 0
-                      ? "Nothing to publish - every saved count is already published"
-                      : "Publish the saved counts: approve them as final (optionally also as the next day's opening stock)"
-                }
-              >
-                <PublishIcon />
-                <span className="ae-toolbar-btn-label">Publish</span>
-              </Button>
-            )}
-            {flaggedCount > 0 && (
-              <span
-                style={{
-                  color: colors.warningText,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
+              <ShiftFilter value={shift} onChange={(s) => s && setShift(s)} />
+              {flaggedCount > 0 && (
+                <span
+                  className="ae-mb-flagged"
+                  title={`${flaggedCount} product(s) with a non-zero variance`}
+                >
+                  ⚠ {flaggedCount} flagged
+                </span>
+              )}
+            </>
+          }
+          actions={
+            <>
+              {pendingCount > 0 && (
+                <span className="ae-unsaved-badge" aria-live="polite">
+                  {pendingCount} unsaved change{pendingCount === 1 ? "" : "s"}
+                </span>
+              )}
+              {savedCounts.length > 0 && (
+                <span
+                  className="ae-unsaved-badge"
+                  style={
+                    unpublishedCount === 0
+                      ? { color: colors.subtleInk }
+                      : undefined
+                  }
+                  title={
+                    unpublishedCount === 0
+                      ? "These counts are approved and final for reporting"
+                      : "Saved counts are only final for reporting once a supervisor publishes them"
+                  }
+                >
+                  {unpublishedCount === 0
+                    ? "Published"
+                    : `${unpublishedCount} unpublished`}
+                </span>
+              )}
+              <CsvTools
+                filenamePrefix={`manual-count-${csvLocation.toLowerCase()}-${shift.toLowerCase()}`}
+                date={date}
+                rows={csvRows ?? []}
+                disabled={!csvRows}
+                importTarget={{ date, shift, location: csvLocation }}
+                onImportTargetChange={(t) => {
+                  setDateShift({ date: t.date, shift: t.shift });
+                  if (t.location === "ONLINE" || t.location === "OFFLINE") {
+                    setImportLocation(t.location);
+                    // A location-specific view follows the import target so the
+                    // staged counts land in the column being looked at.
+                    if (sourceFilter !== "TOTAL") setSourceFilter(t.location);
+                  }
                 }}
-                title={`${flaggedCount} product(s) with a non-zero variance`}
-              >
-                ⚠ {flaggedCount}
-                <span className="ae-toolbar-btn-label"> flagged</span>
-              </span>
-            )}
-          </div>
-          <ToolbarControls>
-            {pendingCount > 0 && (
-              <span className="ae-unsaved-badge" aria-live="polite">
-                {pendingCount} unsaved change{pendingCount === 1 ? "" : "s"}
-              </span>
-            )}
-            {(past.length > 0 || future.length > 0) && (
-              <Button
-                className="ae-toolbar-save"
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={undo}
-                disabled={past.length === 0 || saving}
-                title="Undo the last staged edit (Ctrl+Z)"
-              >
-                <UndoIcon />
-                <span className="ae-toolbar-btn-label">Undo</span>
-              </Button>
-            )}
-            {savedCounts.length > 0 && (
-              <span
-                className="ae-unsaved-badge"
-                style={
-                  unpublishedCount === 0
-                    ? { color: colors.subtleInk }
-                    : undefined
+                importLocations={
+                  lockedLocation ? [lockedLocation] : COUNT_LOCATIONS
                 }
-                title={
-                  unpublishedCount === 0
-                    ? "These counts are approved and final for reporting"
-                    : "Saved counts are only final for reporting once a supervisor publishes them"
-                }
-              >
-                {unpublishedCount === 0
-                  ? "Published"
-                  : `${unpublishedCount} unpublished`}
-              </span>
-            )}
-            <Button
-              className="ae-toolbar-save ae-toolbar-primary"
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowConfirm(true)}
-              disabled={pendingCount === 0 || saving}
-              title="Review and save changes"
-            >
-              <SaveIcon />
-              <span className="ae-toolbar-btn-label">
-                {saving
-                  ? "Saving…"
-                  : `Save${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
-              </span>
-            </Button>
-            <Button
-              className="ae-toolbar-save"
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowClearConfirm(true)}
-              disabled={pendingCount === 0 || saving}
-              title="Discard unsaved counts on this sheet"
-            >
-              <ClearIcon />
-              <span className="ae-toolbar-btn-label">Clear</span>
-            </Button>
-            <Button
-              className="ae-toolbar-save"
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => void pdfAction.run(() => handlePdf())}
-              loading={pdfAction.busy}
-              loadingLabel={<span className="ae-toolbar-btn-label">PDF</span>}
-              disabled={pendingCount > 0 || !visibleRows}
-              title={
-                pendingCount > 0
-                  ? "Save your changes first - PDF reflects only saved data"
-                  : "Download as PDF"
-              }
-            >
-              <PrinterIcon />
-              <span className="ae-toolbar-btn-label">PDF</span>
-            </Button>
-            <Button
-              className="ae-toolbar-save"
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(`/variance-report?date=${date}`)}
-              disabled={pendingCount > 0}
-              title={
-                pendingCount > 0
-                  ? "Save your counts first - the report only reads saved data"
-                  : "Open the Variance Report for this date"
-              }
-            >
-              <ReportIcon />
-              <span className="ae-toolbar-btn-label">Report</span>
-            </Button>
-            <Link
-              to="/audit-history"
-              className="ae-btn ae-btn-secondary ae-btn-sm ae-toolbar-save"
-              style={{ textDecoration: "none" }}
-              title="Previously downloaded Audit sheets"
-            >
-              <HistoryIcon />
-              <span className="ae-toolbar-btn-label">History</span>
-            </Link>
-            <CsvTools
-              filenamePrefix={`manual-count-${csvLocation.toLowerCase()}-${shift.toLowerCase()}`}
-              date={date}
-              rows={csvRows ?? []}
-              disabled={!csvRows}
-              importTarget={{ date, shift, location: csvLocation }}
-              onImportTargetChange={(t) => {
-                setDateShift({ date: t.date, shift: t.shift });
-                if (t.location === "ONLINE" || t.location === "OFFLINE") {
-                  setImportLocation(t.location);
-                  // A location-specific view follows the import target so the
-                  // staged counts land in the column being looked at.
-                  if (sourceFilter !== "TOTAL") setSourceFilter(t.location);
-                }
-              }}
-              importLocations={
-                lockedLocation ? [lockedLocation] : COUNT_LOCATIONS
-              }
-              importTodayValue={getCurrentShiftAndDate().date}
-              columns={csvColumns}
-              // Import reads ONLY the file's Manual Count column (never
-              // Remaining Stocks); blank cells count as 0. Imported values
-              // are staged as drafts for the chosen location, same as typing -
-              // Save commits them.
-              onImportRow={handleImportRow}
-              getPendingValue={(productId) => {
-                const d = drafts[csvLocation][productId];
-                return d === undefined || d === "" ? undefined : Number(d);
-              }}
-              canImport
-              importKeys={["manualCount"]}
-              canManageProducts={canPublish}
-              onProductsChanged={() => setProductsVersion((v) => v + 1)}
-              blankAsZero
-              showExport={false}
-              showPdf={false}
-            />
-            <ToolbarDivider />
-            <ZoomControl zoom={zoom} onChange={setZoom} />
-          </ToolbarControls>
-        </Toolbar>
+                importTodayValue={getCurrentShiftAndDate().date}
+                columns={csvColumns}
+                // Import reads ONLY the file's Manual Count column (never
+                // Remaining Stocks); blank cells count as 0. Imported values
+                // are staged as drafts for the chosen location, same as typing -
+                // Save commits them.
+                onImportRow={handleImportRow}
+                getPendingValue={(productId) => {
+                  const d = drafts[csvLocation][productId];
+                  return d === undefined || d === "" ? undefined : Number(d);
+                }}
+                canImport
+                importKeys={["manualCount"]}
+                canManageProducts={canPublish}
+                onProductsChanged={() => setProductsVersion((v) => v + 1)}
+                blankAsZero
+                showExport={false}
+                showPdf={false}
+              />
+              <SaveStatus state={saveState} savedAt={savedAt} onRetry={() => setShowConfirm(true)} />
+              <BarButton
+                primary
+                icon={<SaveIcon />}
+                label={saving ? "Saving…" : `Save${pendingCount > 0 ? ` (${pendingCount})` : ""}`}
+                disabledReason={saveReason}
+                title="Review and save changes"
+                onClick={() => setShowConfirm(true)}
+              />
+              {canPublish && (
+                <SplitButton
+                  label="Publish"
+                  icon={<PublishIcon />}
+                  tone="warn"
+                  attention={publishReady}
+                  disabledReason={publishReason}
+                  title="Publish the saved counts: approve them as final (optionally also as the next day's opening stock)"
+                  onClick={() => setShowPublishConfirm(true)}
+                  menuLabel="Publish options"
+                  items={[]}
+                />
+              )}
+            </>
+          }
+          trailing={<ZoomControl zoom={zoom} onChange={setZoom} />}
+        />
+        {reorderOpen && canPublish && (
+          <ReorderProductsDialog onClose={() => setReorderOpen(false)} />
+        )}
       </PageHeader>
       {catMenu && (
         <CategoryColorMenu
@@ -1521,10 +1537,9 @@ export function ManualCountPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              setExpandedOverride((e) => ({
-                                ...e,
-                                [category]: !isExpanded,
-                              }))
+                              reveal.toggle(category, isExpanded, !hasPending, () =>
+                                setExpandedOverride((e) => ({ ...e, [category]: !isExpanded })),
+                              )
                             }
                             aria-expanded={!isCollapsed}
                             title={
@@ -1554,11 +1569,12 @@ export function ManualCountPage() {
                               <span
                                 style={{
                                   display: "inline-flex",
-                                  transform: isCollapsed
-                                    ? "rotate(-90deg)"
-                                    : "none",
+                                  transform:
+                                    isCollapsed || reveal.closing(category)
+                                      ? "rotate(-90deg)"
+                                      : "none",
                                   transition:
-                                    "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                                    "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
                                 }}
                               >
                                 <ChevronIcon />
@@ -1626,6 +1642,7 @@ export function ManualCountPage() {
                               (isCollapsed
                                 ? "ae-cat-row ae-row-collapsed"
                                 : "ae-cat-row") +
+                              reveal.rowClass(category) +
                               (selection.selectedSet.has(r.product.id)
                                 ? " ae-row-selected"
                                 : "")

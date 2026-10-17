@@ -82,8 +82,7 @@ export function Sidebar() {
         initial={false}
         animate={{
           opacity: open ? 1 : 0,
-          scale: open ? 1 : 0.92,
-          y: open ? 0 : -8,
+          y: open ? 0 : -6,
         }}
         transition={sidebarSpring}
         style={{

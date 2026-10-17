@@ -26,7 +26,9 @@ about the transfer actually changed).
 
 ### 1. Database
 
-Any MySQL-compatible server works, including XAMPP's bundled MariaDB. Create a database, then
+Any MySQL-compatible server works; on Windows the recommended setup is MySQL Server 8.4 plus
+MySQL Workbench (`winget install Oracle.MySQL Oracle.MySQLWorkbench`; set the root password in
+the MySQL configurator). Create a database, then
 copy the server's env file:
 
 ```bash
@@ -35,7 +37,7 @@ cp .env.example .env
 # edit .env - set DATABASE_URL, JWT_SECRET, and DATA_RESET_PASSCODE - the
 # server refuses to start if any of these are missing, with no insecure
 # fallback.
-# XAMPP default: mysql://root:@localhost:3306/ala_eh_stocks (no password)
+# e.g. mysql://root:YOUR_ROOT_PASSWORD@localhost:3306/ala_eh_stocks
 ```
 
 `JWT_SECRET` and `DATA_RESET_PASSCODE` both need a real random value —

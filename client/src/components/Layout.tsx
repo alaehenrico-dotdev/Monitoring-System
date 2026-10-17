@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
-import { CursorAura } from "./CursorAura";
 import { Toast, ToastHost } from "./Toast";
 import { QuickJump } from "./QuickJump";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -56,7 +55,6 @@ export function Layout() {
           overflow: "hidden",
         }}
       >
-        <CursorAura />
         <Sidebar />
         {/* Ctrl+K from anywhere - mounted here, not per page, so the
             shortcut and the header's search button work on every route. */}

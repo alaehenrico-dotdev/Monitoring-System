@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ManualCountPage } from "./ManualCountPage";
+import { chooseFromMenu, menuItem } from "./menuTestHelpers";
 
 const api = vi.hoisted(() => ({ getManualCountGrid: vi.fn(), saveManualCount: vi.fn(), getVarianceTrace: vi.fn(), setCountRemarks: vi.fn(), publishManualCounts: vi.fn() }));
 const auth = vi.hoisted(() => ({ role: "SUPERVISOR_ADMIN" }));
@@ -83,7 +84,7 @@ describe("ManualCountPage - toolbar from the entry pages", () => {
     fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
 
-    fireEvent.click(screen.getAllByRole("button", { name: /Clear/ })[0]);
+    chooseFromMenu("Edit", /Clear unsaved counts/);
     fireEvent.click(await screen.findByRole("button", { name: "Discard" }));
 
     await waitFor(() => expect(screen.queryAllByText(/unsaved change/)).toHaveLength(0));
@@ -95,7 +96,7 @@ describe("ManualCountPage - toolbar from the entry pages", () => {
     const collapsed = (name: string) => screen.getByText(name).closest("tr")!.classList.contains("ae-row-collapsed");
     expect(collapsed("Soy Sauce")).toBe(true);
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
 
     await waitFor(() => expect(collapsed("Soy Sauce")).toBe(false));
     expect(collapsed("Rice")).toBe(false);
@@ -103,7 +104,7 @@ describe("ManualCountPage - toolbar from the entry pages", () => {
 
   it("filters to flagged rows only", async () => {
     await open();
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
     await screen.findByText("Rice");
 
     fireEvent.click(screen.getAllByRole("button", { name: /Filter rows/i })[0]);
@@ -118,7 +119,7 @@ describe("ManualCountPage - toolbar from the entry pages", () => {
 describe("ManualCountPage - clearing a saved 0", () => {
   it("is not a change: Save stays quiet and the 0 comes back", async () => {
     await open();
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
     const cell = (await waitFor(() => {
       const el = document.querySelector<HTMLInputElement>('input[data-cell="manual-count-ONLINE-3"]');
       if (!el) throw new Error("not rendered");
@@ -149,7 +150,7 @@ describe("ManualCountPage - variance details", () => {
       history: [],
     });
     await open();
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
 
     fireEvent.click(await screen.findByRole("button", { name: "Variance details for Soy Sauce" }));
 
@@ -159,7 +160,7 @@ describe("ManualCountPage - variance details", () => {
 
   it("shows no details button where the count matches the system", async () => {
     await open();
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
     await screen.findByRole("button", { name: "Variance details for Soy Sauce" });
 
     // Vinegar (5 vs 5) and Rice (0 vs 0) are counted and correct.
@@ -169,7 +170,7 @@ describe("ManualCountPage - variance details", () => {
 
   it("gives the button its own Remarks column", async () => {
     await open();
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
     const button = await screen.findByRole("button", { name: "Variance details for Soy Sauce" });
 
     const cell = button.closest("td")!;
@@ -185,17 +186,17 @@ describe("ManualCountPage - variance details", () => {
       return Promise.resolve([loc === "ONLINE" ? { ...r, entry: { ...r.entry, remarks: "Spoilage" } } : r]);
     });
     await open();
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
     expect(await screen.findByText("Spoilage")).toBeTruthy();
   });
 });
 
 describe("ManualCountPage - undo of staged edits", () => {
   const badges = () => screen.queryAllByText(/unsaved change/);
-  const undo = () => fireEvent.click(screen.getAllByRole("button", { name: /Undo/ })[0]);
+  const undo = () => chooseFromMenu("Edit", /^Undo/);
 
   async function expandAndGet(loc: "ONLINE" | "OFFLINE", id: number) {
-    fireEvent.click(screen.getAllByRole("button", { name: "Expand every category" })[0]);
+    chooseFromMenu("View", /Expand all categories/);
     return (await waitFor(() => {
       const el = document.querySelector<HTMLInputElement>(`input[data-cell="manual-count-${loc}-${id}"]`);
       if (!el) throw new Error("not rendered");
@@ -205,7 +206,7 @@ describe("ManualCountPage - undo of staged edits", () => {
 
   it("has no Undo until something has been staged", async () => {
     await open();
-    expect(screen.queryAllByRole("button", { name: /Undo/ })).toHaveLength(0);
+    expect(menuItem("Edit", /^Undo/).getAttribute("aria-disabled")).toBe("true");
   });
 
   it("undoes Clear all in one step", async () => {
@@ -310,14 +311,14 @@ describe("ManualCountPage - publishing the sheet", () => {
     );
     await open();
     expect((await screen.findAllByText("Published")).length).toBeGreaterThan(0);
-    expect((screen.getAllByRole("button", { name: /Publish/ })[0] as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByRole("button", { name: /^Publish$/ })[0].getAttribute("aria-disabled")).toBe("true");
   });
 
   it("will not publish while counts are staged but unsaved", async () => {
     await open();
     fireEvent.click(screen.getAllByText("Clear all")[0]);
     await screen.findAllByText(/unsaved change/);
-    expect((screen.getAllByRole("button", { name: /Publish/ })[0] as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getAllByRole("button", { name: /^Publish$/ })[0].getAttribute("aria-disabled")).toBe("true");
   });
 
   it("is a supervisor's step: encoders do not get the button", async () => {

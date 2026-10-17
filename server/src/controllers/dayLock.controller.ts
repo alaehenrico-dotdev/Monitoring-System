@@ -4,6 +4,7 @@ import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
 import { finishDay, getFinishSummary } from "../services/dayFinish.service";
+import { finishThrough, previewFinishThrough } from "../services/finishThrough.service";
 import { closeDay, closeReadiness, getClosureStatus, listClosures, unlockDay, type EntryLocation } from "../services/dayLock.service";
 
 const unlockSchema = z.object({
@@ -63,4 +64,29 @@ export async function postFinish(req: Request, res: Response) {
     throw HttpError.forbidden("You can only finish your own entry page.");
   }
   res.json(await finishDay(parseDateOnly(req.body?.date), parseShift(req.body?.shift), location, req.user?.id));
+}
+
+/// An encoder can only finish their own page; an admin can finish either.
+function finishLocation(req: Request, value: unknown): EntryLocation {
+  const location = parseLocation(value);
+  if (!location) throw HttpError.badRequest("Say which page to finish (location: ONLINE or OFFLINE)");
+  const role = req.user?.role;
+  if ((role === "ONLINE_ENCODER" && location !== "ONLINE") || (role === "OFFLINE_ENCODER" && location !== "OFFLINE")) {
+    throw HttpError.forbidden("You can only finish your own entry page.");
+  }
+  return location;
+}
+
+/// What "finish through this date" would lock, with blockers and warnings.
+export async function getFinishThroughPreview(req: Request, res: Response) {
+  res.json(await previewFinishThrough(parseDateOnly(req.query.through), finishLocation(req, req.query.location)));
+}
+
+/// Finishes every unfinished period of one page up to the date, oldest first, all
+/// or nothing. Warnings must be acknowledged; blockers cannot be.
+export async function postFinishThrough(req: Request, res: Response) {
+  const location = finishLocation(req, req.body?.location);
+  res.json(
+    await finishThrough(parseDateOnly(req.body?.through), location, req.user?.id, { acknowledgeWarnings: req.body?.acknowledgeWarnings === true }),
+  );
 }

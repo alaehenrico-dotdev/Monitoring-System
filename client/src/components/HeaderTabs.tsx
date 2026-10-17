@@ -14,14 +14,14 @@ interface Edges {
   right: number;
 }
 let lastEdges: Edges | null = null;
+// Likewise the strip's sideways scroll (on a narrow window it overflows): a new
+// instance starts where the last one was, so the tabs do not jump back to the
+// left on every page change.
+let lastScrollLeft = 0;
 
-// Windows 11 taskbar-style indicator: the line is two independent edges on
-// critically damped springs (damping = 2 * sqrt(stiffness), so no overshoot
-// or bounce). The edge heading toward the new tab leads slightly and the
-// trailing edge follows a beat later, giving a soft, brief stretch while it
-// glides to the new tab and settles cleanly.
-const LEAD_SPRING = { stiffness: 600, damping: 49 };
-const TRAIL_SPRING = { stiffness: 380, damping: 39 };
+// The active-tab line slides to the new tab in one short ease-out: both edges
+// move together, so it never stretches or lags behind.
+const SLIDE = { duration: 0.2, ease: "easeOut" } as const;
 
 // Matches the 10px side padding of .ae-header-tab: the line spans the label.
 const TAB_INSET = 10;
@@ -40,6 +40,11 @@ export function HeaderTabs() {
     const nav = navRef.current;
     const bar = barRef.current;
     if (!nav || !bar) return;
+    nav.scrollLeft = lastScrollLeft;
+    const remember = () => {
+      lastScrollLeft = nav.scrollLeft;
+    };
+    nav.addEventListener("scroll", remember, { passive: true });
 
     const place = (left: number, right: number) => {
       bar.style.transform = `translateX(${left}px)`;
@@ -66,7 +71,7 @@ export function HeaderTabs() {
     if (!target) {
       bar.style.opacity = "0";
       lastEdges = null;
-      return;
+      return () => nav.removeEventListener("scroll", remember);
     }
     bar.style.opacity = "1";
     bar.style.top = `${target.top}px`;
@@ -85,21 +90,18 @@ export function HeaderTabs() {
       place(target.left, target.right);
     } else {
       animatingRef.current = true;
-      const movingRight = target.left > from.left;
       const cur = { ...from };
       const draw = () => place(cur.left, cur.right);
       draw();
       const leftAnim = animate(from.left, target.left, {
-        type: "spring",
-        ...(movingRight ? TRAIL_SPRING : LEAD_SPRING),
+        ...SLIDE,
         onUpdate: (v) => {
           cur.left = v;
           draw();
         },
       });
       const rightAnim = animate(from.right, target.right, {
-        type: "spring",
-        ...(movingRight ? LEAD_SPRING : TRAIL_SPRING),
+        ...SLIDE,
         onUpdate: (v) => {
           cur.right = v;
           draw();
@@ -121,7 +123,7 @@ export function HeaderTabs() {
     }
 
     // Tabs can shift without a navigation (window resize, zoom control,
-    // fonts loading) - re-snap the line unless it is mid-spring.
+    // fonts loading) - re-snap the line unless it is mid-slide.
     const ro = new ResizeObserver(() => {
       if (animatingRef.current) return;
       const t = measure();
@@ -135,6 +137,7 @@ export function HeaderTabs() {
       cancelled = true;
       ro.disconnect();
       stop?.();
+      nav.removeEventListener("scroll", remember);
     };
   }, [pathname, user?.role]);
 

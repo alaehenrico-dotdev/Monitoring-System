@@ -7,9 +7,9 @@ import {
   type FormEvent,
 } from "react";
 import { getVarianceReport } from "../api/manualCounts";
-import { Button, TextInput } from "../components/ui";
+import { TextInput } from "../components/ui";
 import { DatePicker } from "../components/DatePicker";
-import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageToolbar } from "../components/PageToolbar";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { colors } from "../theme";
@@ -248,63 +248,79 @@ export function VarianceReportPage() {
         title="Variance Report"
         subtitle="Compare recorded stock with manual counts."
       >
-        <Toolbar className="no-print">
-          <form
-            onSubmit={(e) => void runAction.run(() => runReport(e))}
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "nowrap",
-              minWidth: 0,
-            }}
-          >
-            <TextInput
-              aria-label="Category (optional)"
-              value={category}
-              onChange={(e) => changeCategory(e.target.value)}
-              placeholder="e.g. Premium (Liter)"
-              style={{ maxWidth: 200 }}
-            />
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={changeDate}
-              style={{ maxWidth: 160 }}
-            />
-            <Button type="submit" loading={runAction.busy} loadingLabel="Running…">
-              <PlayIcon /> Run report
-            </Button>
-          </form>
-          <ToolbarControls>
-            {rows && (
-              <Button
-                variant="secondary"
-                onClick={() => void pdfAction.run(handlePdf)}
-                loading={pdfAction.busy}
-                loadingLabel="PDF"
-                title="Download as PDF"
+        <PageToolbar
+          label="Variance report"
+          menus={[
+            {
+              id: "export",
+              label: "Export",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "pdf",
+                      label: "Download PDF",
+                      icon: <PrinterIcon />,
+                      disabledReason: !rows
+                        ? "Run the report first"
+                        : pdfAction.busy
+                          ? "Preparing the PDF…"
+                          : undefined,
+                      onSelect: () => void pdfAction.run(handlePdf),
+                    },
+                  ],
+                },
+              ],
+            },
+          ]}
+          filters={
+            <form
+              className="ae-mb-form"
+              onSubmit={(e) => void runAction.run(() => runReport(e))}
+            >
+              <TextInput
+                aria-label="Category (optional)"
+                value={category}
+                onChange={(e) => changeCategory(e.target.value)}
+                placeholder="e.g. Premium (Liter)"
+                style={{ maxWidth: 200 }}
+              />
+              <DatePicker
+                aria-label="Date"
+                value={date}
+                onChange={changeDate}
+                style={{ maxWidth: 160 }}
+              />
+              <button
+                type="submit"
+                className="ae-mb-btn ae-mb-btn--primary"
+                aria-disabled={runAction.busy || undefined}
+                title={runAction.busy ? "Running…" : "Run the report for this date"}
               >
-                <PrinterIcon /> PDF
-              </Button>
-            )}
-            <Link
-              to="/variance-ledger"
-              className="ae-btn ae-btn-secondary"
-              style={{ textDecoration: "none" }}
-              title="Which SKUs keep coming up off, by how much and who was counting"
-            >
-              <HistoryIcon /> Ledger
-            </Link>
-            <Link
-              to="/variance-report-history"
-              className="ae-btn ae-btn-secondary"
-              style={{ textDecoration: "none" }}
-            >
-              <HistoryIcon /> Variance History
-            </Link>
-          </ToolbarControls>
-        </Toolbar>
+                <PlayIcon /> <span>{runAction.busy ? "Running…" : "Run report"}</span>
+              </button>
+            </form>
+          }
+          actions={
+            <>
+              <Link
+                to="/variance-ledger"
+                className="ae-mb-btn"
+                style={{ textDecoration: "none" }}
+                title="Which SKUs keep coming up off, by how much and who was counting"
+              >
+                <HistoryIcon /> <span>Ledger</span>
+              </Link>
+              <Link
+                to="/variance-report-history"
+                className="ae-mb-btn"
+                style={{ textDecoration: "none" }}
+              >
+                <HistoryIcon /> <span>Variance History</span>
+              </Link>
+            </>
+          }
+        />
       </PageHeader>
 
       <Toast

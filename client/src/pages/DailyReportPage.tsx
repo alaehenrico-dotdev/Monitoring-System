@@ -2,12 +2,12 @@ import { useBusyAction } from "../hooks/useBusyAction";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { getDayExtraNames, type DayExtraNames } from "../api/extraLabels";
-import { Button } from "../components/ui";
 import { Dropdown } from "../components/Dropdown";
-import { DatePicker } from "../components/DatePicker";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
-import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageToolbar } from "../components/PageToolbar";
+import { FilterSlot } from "../components/FilterSlot";
+import { DateStepper } from "../components/DateStepper";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { CategoryFilter } from "../components/CategoryFilter";
@@ -410,78 +410,92 @@ export function DailyReportPage() {
         title={`Daily Report - ${formatDateDisplay(date)}`}
         subtitle="Print a stock snapshot for any date."
       >
-        <Toolbar className="no-print">
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "nowrap",
-              minWidth: 0,
-            }}
-          >
-            {report && (
-              <CategoryFilter
-                categories={categories}
-                value={categoryFilter}
-                onChange={setCategoryFilter}
-              />
-            )}
-            <Dropdown
-              aria-label="Report section"
-              value={reportSection}
-              onChange={(v) => setReportSection(v as ReportSection)}
-              title="Which section to view/export"
-              options={(Object.keys(SECTION_LABELS) as ReportSection[]).map(
-                (s) => ({ value: s, label: SECTION_LABELS[s] }),
+        <PageToolbar
+          activeFilters={categoryFilter !== "" ? 1 : 0}
+          onClearFilters={() => {
+            setCategoryFilter("");
+          }}
+          label="Daily report"
+          menus={[
+            {
+              id: "export",
+              label: "Export",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "excel",
+                      label: "Export Excel",
+                      icon: <DownloadIcon />,
+                      disabledReason: report ? undefined : "Generate the report first",
+                      onSelect: handleExport,
+                    },
+                    {
+                      id: "pdf",
+                      label: "Download PDF",
+                      icon: <PrinterIcon />,
+                      disabledReason: !report
+                        ? "Generate the report first"
+                        : pdfAction.busy
+                          ? "Preparing the PDF…"
+                          : undefined,
+                      onSelect: () => void pdfAction.run(handlePdf),
+                    },
+                  ],
+                },
+              ],
+            },
+          ]}
+          filters={
+            <>
+              {report && (
+                <FilterSlot active={categoryFilter !== ""} label="Category">
+                  <CategoryFilter
+                    categories={categories}
+                    value={categoryFilter}
+                    onChange={setCategoryFilter}
+                  />
+                </FilterSlot>
               )}
-            />
-            <DatePicker
-              aria-label="Date"
-              value={date}
-              onChange={changeDate}
-              todayValue={getCurrentShiftAndDate().date}
-            />
-            <Button onClick={() => load()} disabled={generating}>
-              <PlayIcon /> {generating ? "Generating…" : "Generate"}
-            </Button>
-          </div>
-          <ToolbarControls>
-            {report && (
-              <>
-                <Button
-                  variant="secondary"
-                  onClick={handleExport}
-                  title={
-                    reportSection === "all"
-                      ? "Export all sections as one Excel file"
-                      : `Export just the ${SECTION_LABELS[reportSection]} as an Excel file`
-                  }
-                >
-                  <DownloadIcon /> Export Excel
-                </Button>
-                <Button
-                  variant="secondary"
-                  onClick={() => void pdfAction.run(handlePdf)}
-                  loading={pdfAction.busy}
-                  loadingLabel="PDF"
-                  title="Download as PDF"
-                >
-                  <PrinterIcon /> PDF
-                </Button>
-              </>
-            )}
-            {user?.role === "SUPERVISOR_ADMIN" && (
+              <Dropdown
+                aria-label="Report section"
+                value={reportSection}
+                onChange={(v) => setReportSection(v as ReportSection)}
+                title="Which section to view/export"
+                options={(Object.keys(SECTION_LABELS) as ReportSection[]).map(
+                  (s) => ({ value: s, label: SECTION_LABELS[s] }),
+                )}
+              />
+              <DateStepper
+                value={date}
+                onChange={changeDate}
+                todayValue={getCurrentShiftAndDate().date}
+              />
+            </>
+          }
+          actions={
+            user?.role === "SUPERVISOR_ADMIN" && (
               <Link
                 to="/daily-report-history"
-                className="ae-btn ae-btn-secondary"
+                className="ae-mb-btn"
                 style={{ textDecoration: "none" }}
               >
-                <HistoryIcon /> Daily History
+                <HistoryIcon /> <span>Daily History</span>
               </Link>
-            )}
-          </ToolbarControls>
-        </Toolbar>
+            )
+          }
+          primary={
+            <button
+              type="button"
+              className="ae-mb-btn ae-mb-btn--primary"
+              aria-disabled={generating || undefined}
+              title={generating ? "Generating…" : "Generate the report for this date"}
+              onClick={() => !generating && load()}
+            >
+              <PlayIcon /> <span>{generating ? "Generating…" : "Generate"}</span>
+            </button>
+          }
+        />
       </PageHeader>
 
       <Toast

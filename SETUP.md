@@ -252,7 +252,8 @@ before changing the other's `CLIENT_ORIGIN`.
    docker run -d --name ala-eh-dev-db -p 3306:3306 `
      -e MYSQL_ROOT_PASSWORD=devpassword -e MYSQL_DATABASE=ala_eh_stocks mysql:8.0
    ```
-   (XAMPP's MySQL/MariaDB also works.)
+   (A native MySQL Server 8.4 + Workbench install also works: `winget install Oracle.MySQL Oracle.MySQLWorkbench`.
+   Note the Docker stack in `docker-compose.yml` and a native server are separate databases - they do not share data.)
 2. **Install packages** (from the project root; one command covers server and client):
    ```powershell
    npm install

@@ -7,6 +7,7 @@ import { GridSelectionBar } from "./GridSelectionBar";
 import { copyRowsToClipboard, useRowSelection } from "../hooks/useRowSelection";
 import { toTsv } from "../utils/rowSelection";
 import { ChevronIcon } from "./icons";
+import { useCategoryReveal } from "../hooks/useCategoryReveal";
 
 /**
  * Section 4.5 - the Total Stocks grid, extracted so both TotalStocksPage and
@@ -51,6 +52,8 @@ export function TotalStocksTable({
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
+  // Fades a category's rows in and out when it is toggled (hooks/useCategoryReveal.ts).
+  const reveal = useCategoryReveal();
 
   const groups = new Map<string, TotalStockRow[]>();
   for (const row of rows) {
@@ -158,10 +161,9 @@ export function TotalStocksTable({
                     <button
                       type="button"
                       onClick={() =>
-                        setExpandedOverride((e) => ({
-                          ...e,
-                          [category]: isCollapsed,
-                        }))
+                        reveal.toggle(category, !isCollapsed, true, () =>
+                          setExpandedOverride((e) => ({ ...e, [category]: isCollapsed })),
+                        )
                       }
                       aria-expanded={!isCollapsed}
                       aria-controls={groupRows
@@ -178,9 +180,12 @@ export function TotalStocksTable({
                         <span
                           style={{
                             display: "inline-flex",
-                            transform: isCollapsed ? "rotate(-90deg)" : "none",
+                            transform:
+                              isCollapsed || reveal.closing(category)
+                                ? "rotate(-90deg)"
+                                : "none",
                             transition:
-                              "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                              "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
                           }}
                         >
                           <ChevronIcon />
@@ -200,6 +205,7 @@ export function TotalStocksTable({
                         (isCollapsed
                           ? "ae-cat-row ae-row-collapsed"
                           : "ae-cat-row") +
+                        reveal.rowClass(category) +
                         (selection.selectedSet.has(r.product.id)
                           ? " ae-row-selected"
                           : "")

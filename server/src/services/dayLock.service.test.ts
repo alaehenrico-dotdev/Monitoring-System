@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   dayClosure: { findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn() },
+  monthClosure: { findUnique: vi.fn() },
   dailyOnlineStock: { groupBy: vi.fn() },
   dailyOfflineStock: { groupBy: vi.fn() },
 }));
@@ -9,11 +10,21 @@ vi.mock("../lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 vi.mock("../lib/realtime", () => ({ broadcastRealtimeEvent: vi.fn() }));
 
-import { assertEarlierDaysFinished, assertPeriodOpen, findUnfinishedEarlierPeriod, isCounterpartLocked, runAsAdjustment } from "./dayLock.service";
+import {
+  assertEarlierDaysFinished,
+  assertPeriodOpen,
+  findUnfinishedEarlierPeriod,
+  isCounterpartLocked,
+  isLockedForCarry,
+  runAsAdjustment,
+} from "./dayLock.service";
 
 const DATE = new Date("2026-10-12T00:00:00.000Z");
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  prismaMock.monthClosure.findUnique.mockResolvedValue(null);
+});
 
 describe("assertPeriodOpen", () => {
   it("allows a day with no closure row", async () => {
@@ -142,5 +153,54 @@ describe("each entry page is locked on its own", () => {
     const next = new Date("2026-10-12T00:00:00.000Z");
     expect(await findUnfinishedEarlierPeriod(next, undefined, "ONLINE")).toBeNull();
     expect(await findUnfinishedEarlierPeriod(next, undefined, "OFFLINE")).toEqual({ entryDate: "2026-10-09", shift: "NIGHT" });
+  });
+});
+
+describe("closed months", () => {
+  const closedMonth = { yearMonth: "2026-10", isClosed: true };
+
+  it("refuses an entry write and a count write into a closed month, even on an unlocked day", async () => {
+    prismaMock.monthClosure.findUnique.mockResolvedValue(closedMonth);
+    prismaMock.dayClosure.findUnique.mockResolvedValue(null);
+    await expect(assertPeriodOpen(DATE, "NIGHT")).rejects.toMatchObject({ status: 409, message: expect.stringContaining("2026-10 is a closed month") });
+    await expect(assertPeriodOpen(DATE, "NIGHT", undefined, "count")).rejects.toMatchObject({ status: 409 });
+    expect(prismaMock.monthClosure.findUnique).toHaveBeenCalledWith({ where: { yearMonth: "2026-10" } });
+  });
+
+  it("allows a month that was closed and then unlocked", async () => {
+    prismaMock.monthClosure.findUnique.mockResolvedValue({ yearMonth: "2026-10", isClosed: false });
+    prismaMock.dayClosure.findUnique.mockResolvedValue(null);
+    await expect(assertPeriodOpen(DATE, "NIGHT")).resolves.toBeUndefined();
+  });
+
+  it("lets an approved adjustment through a closed month", async () => {
+    prismaMock.monthClosure.findUnique.mockResolvedValue(closedMonth);
+    await expect(runAsAdjustment(() => assertPeriodOpen(DATE, "NIGHT"))).resolves.toBeUndefined();
+  });
+});
+
+describe("isLockedForCarry", () => {
+  const finished = { onlineLocked: true, offlineLocked: false };
+
+  it("is true for a finished page and false for the other one", async () => {
+    prismaMock.dayClosure.findUnique.mockResolvedValue(finished);
+    expect(await isLockedForCarry(DATE, "NIGHT", "ONLINE")).toBe(true);
+    expect(await isLockedForCarry(DATE, "NIGHT", "OFFLINE")).toBe(false);
+  });
+
+  it("is NOT lifted by an ordinary approved correction - that approval covered one figure", async () => {
+    prismaMock.dayClosure.findUnique.mockResolvedValue(finished);
+    expect(await runAsAdjustment(() => isLockedForCarry(DATE, "NIGHT", "ONLINE"))).toBe(true);
+  });
+
+  it("is lifted by a cascading approval for a finished day...", async () => {
+    prismaMock.dayClosure.findUnique.mockResolvedValue(finished);
+    expect(await runAsAdjustment(() => isLockedForCarry(DATE, "NIGHT", "ONLINE"), { cascade: true })).toBe(false);
+  });
+
+  it("...but never for a day in a closed month", async () => {
+    prismaMock.monthClosure.findUnique.mockResolvedValue({ yearMonth: "2026-10", isClosed: true });
+    prismaMock.dayClosure.findUnique.mockResolvedValue(null);
+    expect(await runAsAdjustment(() => isLockedForCarry(DATE, "NIGHT", "OFFLINE"), { cascade: true })).toBe(true);
   });
 });

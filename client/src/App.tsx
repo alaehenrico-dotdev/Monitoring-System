@@ -87,6 +87,9 @@ const AdminQueuePage = lazy(() =>
 const CorrectionsPage = lazy(() =>
   import("./pages/CorrectionsPage").then((m) => ({ default: m.CorrectionsPage })),
 );
+const AwaitingReleasePage = lazy(() =>
+  import("./pages/AwaitingReleasePage").then((m) => ({ default: m.AwaitingReleasePage })),
+);
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -119,6 +122,9 @@ export default function App() {
                     {/* Every role can read the report (the server already allows it); the entry pages link here. */}
                     <Route path="/daily-report" element={<DailyReportPage />} />
                     <Route path="/corrections" element={<CorrectionsPage />} />
+                    <Route path="/awaiting-release" element={<AwaitingReleasePage />} />
+                    {/* Every role: Appearance is a per-browser preference. The admin tabs inside are hidden from others and the server refuses them anyway. */}
+                    <Route path="/settings" element={<SettingsPage />} />
 
                     <Route
                       element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}
@@ -143,7 +149,6 @@ export default function App() {
                       <Route path="/admin-queue" element={<AdminQueuePage />} />
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
-                      <Route path="/settings" element={<SettingsPage />} />
                     </Route>
                   </Route>
                 </Route>

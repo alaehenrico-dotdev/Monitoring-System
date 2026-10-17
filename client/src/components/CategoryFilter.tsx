@@ -9,19 +9,23 @@ export function CategoryFilter({
   categories,
   value,
   onChange,
+  labelPrefix,
 }: {
   categories: string[];
   value: string;
   onChange: (value: string) => void;
+  /// "Category" => the trigger reads "Category: All".
+  labelPrefix?: string;
 }) {
   return (
     <Dropdown
       aria-label="Filter by category"
       icon={<TagIcon />}
+      labelPrefix={labelPrefix}
       value={value}
       onChange={onChange}
       options={[
-        { value: "", label: "All categories" },
+        { value: "", label: "All categories", shortLabel: "All" },
         ...categories.map((c) => ({ value: c, label: c })),
       ]}
     />

@@ -1,7 +1,5 @@
 import type { ButtonHTMLAttributes, CSSProperties, InputHTMLAttributes, KeyboardEvent, MouseEvent, LabelHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
-import { motion } from "motion/react";
 import { colors } from "../theme";
-import { toolbarLayoutTransition } from "../motion";
 import { Spinner } from "./Spinner";
 
 /**
@@ -89,7 +87,7 @@ export function Select({ className = "", children, ...rest }: SelectHTMLAttribut
 // Omits the handful of event props (drag/animation lifecycle) where React's
 // own DOM event type and Framer Motion's gesture/animation-definition type
 // of the same name conflict - no caller here ever passes these anyway.
-interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onAnimationStart" | "onAnimationEnd" | "onDrag" | "onDragEnd" | "onDragStart"> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "md" | "sm";
   /// An async action is running: the button is disabled (so it cannot be
@@ -101,13 +99,10 @@ interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onA
   loadingLabel?: ReactNode;
 }
 
-/// `motion.button` with `layout` - most callers render this inside a
-/// Toolbar (Section: toolbar), where the Save/PDF/Undo buttons resize
-/// (e.g. "Save (3)" collapsing to a bare icon circle in compact mode, see
-/// index.css's .ae-toolbar--compact rules) as a plain, un-transitioned CSS
-/// class swap otherwise snaps instantly. `layout` makes any such box-size
-/// change animate smoothly via Framer's FLIP projection instead - it's a
-/// no-op everywhere else this button doesn't actually change size.
+/// The shared button. A plain <button>: when a toolbar changes size (Toolbar.tsx)
+/// its buttons simply take their new size at once - animating that reshape
+/// squashed them mid-resize, so nothing animates it any more. Hover and press
+/// feedback comes from `.ae-btn` in index.css.
 export function Button({
   variant = "primary",
   size = "md",
@@ -120,10 +115,7 @@ export function Button({
 }: ButtonProps) {
   const sizeClass = size === "sm" ? "ae-btn-sm" : "";
   return (
-    <motion.button
-      layout
-      transition={toolbarLayoutTransition}
-      whileTap={{ scale: 0.94 }}
+    <button
       className={`ae-btn ae-btn-${variant} ${sizeClass} ${className}`.trim()}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
@@ -137,7 +129,7 @@ export function Button({
       ) : (
         children
       )}
-    </motion.button>
+    </button>
   );
 }
 

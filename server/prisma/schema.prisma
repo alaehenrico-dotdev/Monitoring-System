@@ -68,6 +68,10 @@ model User {
   correctionsRequested CorrectionRequest[]   @relation("CorrectionRequestedBy")
   correctionsReviewed  CorrectionRequest[]   @relation("CorrectionReviewedBy")
   correctionEvents     CorrectionEvent[]     @relation("CorrectionEventBy")
+  pendingReleasesMade  PendingRelease[]      @relation("PendingReleaseCreatedBy")
+  pendingReleasesDone  PendingRelease[]      @relation("PendingReleaseReleasedBy")
+  monthClosuresClosed  MonthClosure[]        @relation("MonthClosedBy")
+  monthClosuresOpened  MonthClosure[]        @relation("MonthUnlockedBy")
 
   @@map("users")
 }
@@ -96,6 +100,7 @@ model Product {
   offlineStocks DailyOfflineStock[]
   manualCounts  ManualCount[]
   stockExtras   DailyStockExtra[]
+  pendingReleases PendingRelease[]
 
   // Retained for compatibility with existing databases; the client no
   // longer exposes a sync endpoint.
@@ -635,4 +640,69 @@ model OrderTemplate {
   updatedAt   DateTime @updatedAt
 
   @@map("order_templates")
+}
+
+enum ReleaseStatus {
+  AWAITING
+  RELEASED
+  CANCELLED
+}
+
+/// Finished goods that physically exist but cannot be sold yet - no label, no
+/// sticker, awaiting packaging - so they are NOT stock. They are kept out of the
+/// day's entries and counts instead of being forced into a finished day, and
+/// listed here so they cannot be forgotten. Releasing one records its quantity
+/// as Production (In) on the shift it actually became sellable, never back-dated:
+/// the stock chain and every finished day stay exactly as they were reported.
+model PendingRelease {
+  id                Int           @id @default(autoincrement())
+  /// ONLINE or OFFLINE - the grid the goods will be produced into. TOTAL is in
+  /// the enum but is never valid here (enforced by the service).
+  location          StockLocation
+  productId         Int
+  product           Product       @relation(fields: [productId], references: [id])
+  quantity          Decimal       @db.Decimal(14, 2)
+  /// When they were made - for ageing the list, not for the stock figures.
+  madeDate          DateTime      @db.Date
+  madeShift         Shift
+  reason            String        @db.VarChar(200)
+  status            ReleaseStatus @default(AWAITING)
+  createdById       Int?
+  createdBy         User?         @relation("PendingReleaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime      @default(now())
+  releasedAt        DateTime?
+  releasedById      Int?
+  releasedBy        User?         @relation("PendingReleaseReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
+  /// The period whose Production (In) the release was added to.
+  releasedEntryDate DateTime?     @db.Date
+  releasedShift     Shift?
+  /// Why it was cancelled (written off / never completed), or a release note.
+  resolutionNote    String?       @db.VarChar(500)
+  updatedAt         DateTime      @updatedAt
+
+  @@index([status, location])
+  @@index([productId, location, status])
+  @@map("pending_releases")
+}
+
+/// A closed calendar month ("2026-09"): the layer above day locks. Closing is an
+/// admin act and needs every day in the month finished, every count published and
+/// no correction still pending. While closed, the entry/count services refuse
+/// writes to any date in the month (an approved correction is still the one
+/// recorded way in) and no carry-forward rewrites into it quietly. Unlocking needs
+/// a reason, like a day.
+model MonthClosure {
+  id           Int       @id @default(autoincrement())
+  /// "YYYY-MM"
+  yearMonth    String    @unique @db.VarChar(7)
+  isClosed     Boolean   @default(true)
+  closedAt     DateTime  @default(now())
+  closedById   Int?
+  closedBy     User?     @relation("MonthClosedBy", fields: [closedById], references: [id], onDelete: SetNull)
+  unlockedAt   DateTime?
+  unlockedById Int?
+  unlockedBy   User?     @relation("MonthUnlockedBy", fields: [unlockedById], references: [id], onDelete: SetNull)
+  unlockReason String?   @db.VarChar(500)
+
+  @@map("month_closures")
 }

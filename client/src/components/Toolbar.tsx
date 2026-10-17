@@ -6,8 +6,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { motion, MotionConfig } from "motion/react";
-import { toolbarLayoutTransition } from "../motion";
 
 // Hysteresis buffers: how much *extra* spare room is required before
 // stepping back up a tier (circle <- compact <- full). Without this, a
@@ -21,10 +19,10 @@ const CIRCLE_EXIT_BUFFER = 16;
 // without this a row that "just fits" can end up ~1px too narrow and overflow.
 const FIT_SLACK = 2;
 
-// Three tiers, and no "wrap to a second row" tier: controls shed their
-// labels (compact), then their rectangular shape (circle), but the row
-// itself always stays one line. If there are ever more controls than fit
-// even as circles, the row scrolls horizontally (see index.css).
+// Three tiers: controls shed their labels (compact), then their rectangular
+// shape (circle). Full and compact stay on one line. The smallest tier (circle)
+// wraps onto a second row - filters on the first, actions on the second -
+// instead of scrolling sideways out of sight (see index.css).
 type ToolbarMode = "full" | "compact" | "circle";
 
 // Lets descendants know which tier they are being rendered in. The hidden
@@ -36,17 +34,15 @@ const ToolbarModeContext = createContext<ToolbarMode>("full");
  * filters on one side and its action controls (CSV export/import, PDF, zoom)
  * on the other.
  *
- * The border is a plain static line drawn by `.ae-toolbar` in index.css, so
- * it is always visible. (The previous animated gradient overlay was drawn on
- * top of a transparent border, and its black gradient stops made the border
- * vanish for long stretches.)
+ * Nothing here animates: the toolbar answers the window's size, so it takes
+ * its new shape at once instead of morphing, which squashed buttons mid-resize.
  *
  * Responsiveness is a three-tier ladder, measured exactly rather than
  * guessed from a width breakpoint:
  *
  *   full     Filters and action buttons (with labels) side by side.
  *   compact  Action buttons drop their labels (`.ae-toolbar--compact`).
- *   circle   Fixed-diameter round icon buttons (`.ae-toolbar--circle`).
+ *   circle   Fixed-size icon buttons, wrapping to two rows (`.ae-toolbar--circle`).
  *
  * Three hidden clones of the children (one per tier) are measured at their
  * natural width and compared with the real row's width, so a tier only
@@ -168,33 +164,21 @@ export function Toolbar({
           but the filters in the hidden clones - so the row and its
           measurements disagreed, which is what left blank space.) The
           spotlight is therefore a ::before pseudo-element in CSS. */}
-      <motion.div
-        // "position" only: if the row's own WIDTH changes (a vertical page
-        // scrollbar appearing once content below grows, a window resize),
-        // it snaps instead of being animated as a scale transform, which
-        // visibly squashed the buttons and inputs for a moment. Child
-        // groups (ToolbarControls) still animate their own layout.
-        layout="position"
-        transition={toolbarLayoutTransition}
+      <div
         className={`ae-toolbar ${compact ? "ae-toolbar--compact" : ""} ${circle ? "ae-toolbar--circle" : ""} ${className}`.trim()}
         style={{ WebkitOverflowScrolling: "touch" }}
         ref={rowRef}
       >
         {children}
-      </motion.div>
+      </div>
 
       {/* Three hidden clones of the same children, siblings of the real row
          (not children) - `.ae-toolbar--compact` / `--circle` are plain
          descendant selectors, so nesting a sizer inside the real row would
          let the row's own tier class corrupt the measurement.
 
-         MotionConfig duration:0 is load-bearing: children can contain their
-         own `motion.div layout` elements whose width changes for unrelated
-         reasons; Framer Motion animates that via a transform, so a clone
-         measured mid-animation would report a transient width and the tier
-         decision could flip back and forth. With zero-duration transitions
-         the clones always sit at their final size. Only the visible row
-         (outside this MotionConfig) animates. */}
+         Nothing in the row animates its size, so a clone always reports its
+         final width and the tier decision cannot flip on a transient one. */}
       <div
         aria-hidden
         style={{
@@ -204,50 +188,48 @@ export function Toolbar({
           overflow: "hidden",
         }}
       >
-        <MotionConfig transition={{ duration: 0 }}>
-          <ToolbarModeContext.Provider value="full">
-            <div
-              ref={fullSizerRef}
-              className="ae-toolbar ae-toolbar--sizer"
-              style={{
-                position: "absolute",
-                visibility: "hidden",
-                flexWrap: "nowrap",
-                width: "max-content",
-              }}
-            >
-              {children}
-            </div>
-          </ToolbarModeContext.Provider>
-          <ToolbarModeContext.Provider value="compact">
-            <div
-              ref={compactSizerRef}
-              className="ae-toolbar ae-toolbar--sizer ae-toolbar--compact"
-              style={{
-                position: "absolute",
-                visibility: "hidden",
-                flexWrap: "nowrap",
-                width: "max-content",
-              }}
-            >
-              {children}
-            </div>
-          </ToolbarModeContext.Provider>
-          <ToolbarModeContext.Provider value="circle">
-            <div
-              ref={circleSizerRef}
-              className="ae-toolbar ae-toolbar--sizer ae-toolbar--compact ae-toolbar--circle"
-              style={{
-                position: "absolute",
-                visibility: "hidden",
-                flexWrap: "nowrap",
-                width: "max-content",
-              }}
-            >
-              {children}
-            </div>
-          </ToolbarModeContext.Provider>
-        </MotionConfig>
+        <ToolbarModeContext.Provider value="full">
+          <div
+            ref={fullSizerRef}
+            className="ae-toolbar ae-toolbar--sizer"
+            style={{
+              position: "absolute",
+              visibility: "hidden",
+              flexWrap: "nowrap",
+              width: "max-content",
+            }}
+          >
+            {children}
+          </div>
+        </ToolbarModeContext.Provider>
+        <ToolbarModeContext.Provider value="compact">
+          <div
+            ref={compactSizerRef}
+            className="ae-toolbar ae-toolbar--sizer ae-toolbar--compact"
+            style={{
+              position: "absolute",
+              visibility: "hidden",
+              flexWrap: "nowrap",
+              width: "max-content",
+            }}
+          >
+            {children}
+          </div>
+        </ToolbarModeContext.Provider>
+        <ToolbarModeContext.Provider value="circle">
+          <div
+            ref={circleSizerRef}
+            className="ae-toolbar ae-toolbar--sizer ae-toolbar--compact ae-toolbar--circle"
+            style={{
+              position: "absolute",
+              visibility: "hidden",
+              flexWrap: "nowrap",
+              width: "max-content",
+            }}
+          >
+            {children}
+          </div>
+        </ToolbarModeContext.Provider>
       </div>
     </ToolbarModeContext.Provider>
   );
@@ -261,13 +243,7 @@ export function ToolbarControls({ children }: { children: ReactNode }) {
   useContext(ToolbarModeContext);
 
   return (
-    <motion.div
-      layout
-      transition={toolbarLayoutTransition}
-      className="ae-toolbar-controls"
-    >
-      {children}
-    </motion.div>
+    <div className="ae-toolbar-controls">{children}</div>
   );
 }
 

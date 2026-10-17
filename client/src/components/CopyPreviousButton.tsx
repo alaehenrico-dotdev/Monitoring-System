@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "./ui";
 import { SyncIcon } from "./icons";
@@ -15,7 +15,7 @@ import {
   type Period,
 } from "../utils/copyPrevious";
 
-interface CopyPreviousButtonProps {
+export interface CopyPreviousButtonProps {
   /// The sheet currently open - what "previous" is measured back from.
   current: Period;
   columns: GridColumn[];
@@ -30,6 +30,13 @@ interface CopyPreviousButtonProps {
   onApply: (edits: CopyEdit[]) => void;
   /// Read-only role, or a sheet that can't be edited right now.
   disabled?: boolean;
+  /// Driven from outside - a menu item opens it - instead of by its own button:
+  /// `open` / `onOpenChange` control the popover, `anchorEl` is what it hangs
+  /// under, and `hideTrigger` leaves the button out.
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  anchorEl?: HTMLElement | null;
+  hideTrigger?: boolean;
 }
 
 /**
@@ -54,8 +61,25 @@ export function CopyPreviousButton({
   getSavedValue,
   onApply,
   disabled,
+  open: openProp,
+  onOpenChange,
+  anchorEl,
+  hideTrigger = false,
 }: CopyPreviousButtonProps) {
-  const [open, setOpen] = useState(false);
+  const [openInner, setOpenInner] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openInner;
+  const onOpenChangeRef = useRef(onOpenChange);
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  });
+  const setOpen = useCallback(
+    (next: boolean) => {
+      if (!controlled) setOpenInner(next);
+      onOpenChangeRef.current?.(next);
+    },
+    [controlled],
+  );
   const [source, setSource] = useState<CopySource>("previous-shift");
   const [keys, setKeys] = useState<string[]>(() => defaultCopyKeys(columns));
   const [overwrite, setOverwrite] = useState(false);
@@ -71,7 +95,7 @@ export function CopyPreviousButton({
 
   useLayoutEffect(() => {
     if (!open) return;
-    const anchor = btnRef.current?.getBoundingClientRect();
+    const anchor = (anchorEl ?? btnRef.current)?.getBoundingClientRect();
     const panel = panelRef.current?.getBoundingClientRect();
     if (!anchor || !panel) return;
     // Nudged inside the viewport, same as ColumnHeaderMenu - the toolbar
@@ -81,14 +105,15 @@ export function CopyPreviousButton({
       top: Math.min(anchor.bottom + 6, window.innerHeight - panel.height - 8),
     });
     panelRef.current?.focus();
-  }, [open]);
+  }, [open, anchorEl]);
 
   useEffect(() => {
     if (!open) return;
     function onPointerDown(e: MouseEvent) {
       if (
         !panelRef.current?.contains(e.target as Node) &&
-        !btnRef.current?.contains(e.target as Node)
+        !btnRef.current?.contains(e.target as Node) &&
+        !anchorEl?.contains(e.target as Node)
       ) {
         setOpen(false);
       }
@@ -102,7 +127,7 @@ export function CopyPreviousButton({
       window.removeEventListener("scroll", close, true);
       window.removeEventListener("resize", close);
     };
-  }, [open]);
+  }, [open, anchorEl, setOpen]);
 
   function toggleKey(key: string) {
     setKeys((prev) =>
@@ -156,6 +181,7 @@ export function CopyPreviousButton({
 
   return (
     <>
+      {!hideTrigger && (
       <span ref={btnRef} style={{ display: "inline-flex" }}>
       <Button
         className="ae-toolbar-save"
@@ -165,13 +191,14 @@ export function CopyPreviousButton({
         disabled={disabled || !rows}
         aria-expanded={open}
         aria-haspopup="dialog"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(!open)}
         title="Copy movement figures from the previous shift or day"
       >
         <SyncIcon />
         <span className="ae-toolbar-btn-label">Copy previous</span>
       </Button>
       </span>
+      )}
 
       {open &&
         createPortal(

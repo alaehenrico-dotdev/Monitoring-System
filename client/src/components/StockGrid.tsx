@@ -51,6 +51,7 @@ import {
 } from "../utils/gridPaste";
 import { showToast } from "./Toast";
 import { GridSelectionBar } from "./GridSelectionBar";
+import { useCategoryReveal } from "../hooks/useCategoryReveal";
 import {
   dragTo,
   EMPTY_SELECTION,
@@ -478,6 +479,8 @@ export function StockGrid({
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
+  // Fades a category's rows in and out when it is toggled (hooks/useCategoryReveal.ts).
+  const reveal = useCategoryReveal();
   // Which header's right-click menu is open, if any (null = none). Held here
   // rather than per-header so only one can ever be open at a time.
   const [menu, setMenu] = useState<ColumnMenuTarget | null>(null);
@@ -1239,10 +1242,9 @@ export function StockGrid({
                       <button
                         type="button"
                         onClick={() =>
-                          setExpandedOverride((e) => ({
-                            ...e,
-                            [category]: !isExpanded,
-                          }))
+                          reveal.toggle(category, isExpanded, !hasPending, () =>
+                            setExpandedOverride((e) => ({ ...e, [category]: !isExpanded })),
+                          )
                         }
                         aria-expanded={!isCollapsed}
                         aria-controls={groupRows
@@ -1271,11 +1273,12 @@ export function StockGrid({
                           <span
                             style={{
                               display: "inline-flex",
-                              transform: isCollapsed
-                                ? "rotate(-90deg)"
-                                : "none",
+                              transform:
+                                isCollapsed || reveal.closing(category)
+                                  ? "rotate(-90deg)"
+                                  : "none",
                               transition:
-                                "transform 260ms cubic-bezier(0.22, 1, 0.36, 1)",
+                                "transform 160ms cubic-bezier(0.22, 1, 0.36, 1)",
                             }}
                           >
                             <ChevronIcon />
@@ -1318,6 +1321,7 @@ export function StockGrid({
                         (isCollapsed
                           ? "ae-cat-row ae-row-collapsed"
                           : "ae-cat-row") +
+                        reveal.rowClass(category) +
                         (selectedSet.has(row.product.id)
                           ? " ae-row-selected"
                           : "")

@@ -6,7 +6,12 @@ import { recordChange } from "./changeLog.service";
 import { runAsAdjustment } from "./dayLock.service";
 import { saveOnlineEntry } from "./dailyOnlineStock.service";
 import { saveOfflineEntry } from "./dailyOfflineStock.service";
-import { saveManualCount } from "./manualCounts.service";
+import { propagateOpeningStock, saveManualCount } from "./manualCounts.service";
+import { STALE_OPENING_FIELD } from "./staleOpening.service";
+import { refreshFrozenSnapshots } from "./snapshotRefresh.service";
+import { broadcastRealtimeEvent } from "../lib/realtime";
+import { previousPeriod } from "../utils/shift";
+import { toDateOnlyString } from "../utils/date";
 
 export const CORRECTIONS_TABLE = "correction_requests";
 
@@ -90,24 +95,55 @@ async function loadPending(id: number) {
   return req;
 }
 
+/// Re-derives one finished row's opening stock from what actually carries into
+/// it (a stale-opening request - see staleOpening.service.ts). The figure is
+/// computed now, not replayed from the request, and written by the same
+/// carry-forward walk as any other, so it is never pinned as a typed opening.
+async function applyStaleOpening(tableName: string, recordId: number, snap: RecordSnapshot, userId?: number) {
+  const location = tableName === "daily_online_stock" ? "ONLINE" : "OFFLINE";
+  await prisma.$transaction(
+    (tx) =>
+      propagateOpeningStock(snap.productId, snap.entryDate, snap.shift, location, userId, tx, undefined, {
+        from: previousPeriod(snap.entryDate, snap.shift),
+        approvedRowId: recordId,
+      }),
+    { timeout: 60_000 },
+  );
+  broadcastRealtimeEvent();
+}
+
 /// Applies the figure through the normal save service - same validation, same
 /// before/after change-log row, same carry-forward - but flagged as an
 /// adjustment so a closed day accepts it. The request itself keeps who asked,
 /// who approved, the value before and the value written.
-export async function approveCorrection(id: number, note: string | undefined, userId?: number) {
+///
+/// The approval covers that one figure. Later finished days whose opening
+/// stock would move are held for their own approval, unless `cascade` says the
+/// approver accepts those consequences too (the Corrections screen shows them
+/// first). Either way the frozen Daily Report of every day written to is
+/// re-saved, so a finished day never keeps reporting figures its ledger no
+/// longer has.
+export async function approveCorrection(id: number, note: string | undefined, userId?: number, opts: { cascade?: boolean } = {}) {
   const req = await loadPending(id);
   const snap = await loadRecord(req.tableName, req.recordId, req.field);
   const value = Number(req.proposedValue);
 
-  await runAsAdjustment(async () => {
-    if (req.tableName === "daily_online_stock") {
-      await saveOnlineEntry(snap.productId, snap.entryDate, snap.shift, { [req.field]: value }, userId);
-    } else if (req.tableName === "daily_offline_stock") {
-      await saveOfflineEntry(snap.productId, snap.entryDate, snap.shift, { [req.field]: value }, userId);
-    } else {
-      await saveManualCount(snap.productId, snap.entryDate, snap.shift, snap.location!, value, userId);
-    }
-  });
+  await runAsAdjustment(
+    async () => {
+      if (req.field === STALE_OPENING_FIELD) {
+        await applyStaleOpening(req.tableName, req.recordId, snap, userId);
+      } else if (req.tableName === "daily_online_stock") {
+        await saveOnlineEntry(snap.productId, snap.entryDate, snap.shift, { [req.field]: value }, userId);
+      } else if (req.tableName === "daily_offline_stock") {
+        await saveOfflineEntry(snap.productId, snap.entryDate, snap.shift, { [req.field]: value }, userId);
+      } else {
+        await saveManualCount(snap.productId, snap.entryDate, snap.shift, snap.location!, value, userId);
+      }
+    },
+    { cascade: opts.cascade },
+  );
+
+  const refreshed = await refreshFrozenSnapshots(snap.entryDate, { cascade: opts.cascade, userId });
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.correctionRequest.update({
@@ -125,7 +161,7 @@ export async function approveCorrection(id: number, note: string | undefined, us
       { tableName: CORRECTIONS_TABLE, recordId: id, action: "UPDATE", changedById: userId, oldValue: req, newValue: updated },
       tx,
     );
-    return updated;
+    return { ...updated, snapshotsRefreshed: refreshed.map(toDateOnlyString) };
   });
 }
 

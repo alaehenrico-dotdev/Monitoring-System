@@ -14,13 +14,14 @@ import {
 } from "../api/changeLog";
 import { listProducts } from "../api/products";
 import type { ChangeLogEntry, Product } from "../types";
-import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageToolbar } from "../components/PageToolbar";
+import { FilterSlot } from "../components/FilterSlot";
+import { DownloadIcon } from "../components/icons";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { SearchInput } from "../components/SearchInput";
 import { Dropdown } from "../components/Dropdown";
 import { DateRangePicker } from "../components/DateRangePicker";
-import { Button } from "../components/ui";
 import { Pager } from "../components/Pager";
 import { usePagedList } from "../hooks/usePagedList";
 import { matchesSearch } from "../utils/search";
@@ -206,129 +207,161 @@ export function ChangeLogPage() {
         title="Change Log"
         subtitle="See who changed what, and when. Click a row for details."
       >
-        <Toolbar>
-          {/* The filter cluster must be the toolbar's first child (see
-              .ae-toolbar > :first-child in index.css). */}
-          <div>
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search by table, action, user, or SKU…"
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="Table"
-              value={tableFilter}
-              onChange={setTableFilter}
-              options={TABLE_FILTERS.map((t) => ({
-                value: t,
-                label: t ? tableLabel(t) : "All tables",
-              }))}
-            />
-            <DateRangePicker
-              className="ae-fit"
-              aria-label="Date range"
-              from={dateFrom}
-              to={dateTo}
-              onChange={(from, to) => {
-                setDateFrom(from);
-                setDateTo(to);
-              }}
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="User"
-              value={userId}
-              onChange={setUserId}
-              options={[
-                { value: "", label: "All users" },
-                ...users.map((u) => ({ value: String(u.id), label: u.name })),
-              ]}
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="Action"
-              value={action}
-              onChange={setAction}
-              options={[
-                { value: "", label: "All actions" },
-                { value: "CREATE", label: "Create" },
-                { value: "UPDATE", label: "Update" },
-                { value: "DELETE", label: "Delete" },
-              ]}
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="Product or SKU"
-              value={productId}
-              onChange={setProductId}
-              options={[
-                { value: "", label: "All products" },
-                ...products.map((p) => ({
-                  value: String(p.id),
-                  label: p.sku ? `${p.sku} · ${p.name}` : p.name,
-                })),
-              ]}
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="Shift"
-              value={shift}
-              onChange={setShift}
-              options={[
-                { value: "", label: "Both shifts" },
-                { value: "MORNING", label: "Morning" },
-                { value: "NIGHT", label: "Night" },
-              ]}
-            />
-            {tableFilter === REPORTS_TABLE && (
-              <>
+        <PageToolbar
+          activeFilters={[query.trim() !== "", tableFilter !== "", userId !== "", action !== "", productId !== "", shift !== "", importOnly].filter(Boolean).length}
+          onClearFilters={() => {
+            setQuery("");
+            setTableFilter("");
+            setUserId("");
+            setAction("");
+            setProductId("");
+            setShift("");
+            setImportOnly(false);
+          }}
+          label="Change log"
+          menus={[
+            {
+              id: "export",
+              label: "Export",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "csv",
+                      label: "Export CSV",
+                      icon: <DownloadIcon />,
+                      disabledReason: exporting ? "Exporting…" : undefined,
+                      onSelect: exportCsv,
+                    },
+                  ],
+                },
+              ],
+            },
+          ]}
+          filters={
+            <>
+              <FilterSlot active={query.trim() !== ""} label="Search">
+                <SearchInput
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search by table, action, user, or SKU…"
+                />
+              </FilterSlot>
+              <FilterSlot active={tableFilter !== ""} label="Table">
                 <Dropdown
                   className="ae-fit"
-                  aria-label="Report type"
-                  value={reportType}
-                  onChange={setReportType}
-                  options={[
-                    { value: "", label: "All reports" },
-                    { value: "Daily Report", label: "Daily Report" },
-                    { value: "Variance Report", label: "Variance Report" },
-                    { value: "Audit Report", label: "Audit Report" },
-                  ]}
+                  aria-label="Table"
+                  value={tableFilter}
+                  onChange={setTableFilter}
+                  options={TABLE_FILTERS.map((t) => ({
+                    value: t,
+                    label: t ? tableLabel(t) : "All tables",
+                  }))}
                 />
-                <Dropdown
-                  className="ae-fit"
-                  aria-label="Report section"
-                  value={reportSection}
-                  onChange={setReportSection}
-                  options={[
-                    { value: "", label: "Online + Offline" },
-                    { value: "online", label: "Online" },
-                    { value: "offline", label: "Offline" },
-                    { value: "all", label: "Full (combined)" },
-                  ]}
-                />
-              </>
-            )}
-            <label style={importOnlyStyle}>
-              <input
-                type="checkbox"
-                checked={importOnly}
-                onChange={(e) => setImportOnly(e.target.checked)}
+              </FilterSlot>
+              <DateRangePicker
+                className="ae-fit"
+                aria-label="Date range"
+                from={dateFrom}
+                to={dateTo}
+                onChange={(from, to) => {
+                  setDateFrom(from);
+                  setDateTo(to);
+                }}
               />
-              From CSV import
-            </label>
-          </div>
-          <ToolbarControls>
-            <Button
-              variant="secondary"
-              onClick={exportCsv}
-              disabled={exporting}
-              title="Download everything matching the filters (not just the rows loaded)"
-            >
-              {exporting ? "Exporting…" : "Export CSV"}
-            </Button>
-          </ToolbarControls>
-        </Toolbar>
+              <FilterSlot active={userId !== ""} label="User">
+                <Dropdown
+                  className="ae-fit"
+                  aria-label="User"
+                  value={userId}
+                  onChange={setUserId}
+                  options={[
+                    { value: "", label: "All users" },
+                    ...users.map((u) => ({ value: String(u.id), label: u.name })),
+                  ]}
+                />
+              </FilterSlot>
+              <FilterSlot active={action !== ""} label="Action">
+                <Dropdown
+                  className="ae-fit"
+                  aria-label="Action"
+                  value={action}
+                  onChange={setAction}
+                  options={[
+                    { value: "", label: "All actions" },
+                    { value: "CREATE", label: "Create" },
+                    { value: "UPDATE", label: "Update" },
+                    { value: "DELETE", label: "Delete" },
+                  ]}
+                />
+              </FilterSlot>
+              <FilterSlot active={productId !== ""} label="Product">
+                <Dropdown
+                  className="ae-fit"
+                  aria-label="Product or SKU"
+                  value={productId}
+                  onChange={setProductId}
+                  options={[
+                    { value: "", label: "All products" },
+                    ...products.map((p) => ({
+                      value: String(p.id),
+                      label: p.sku ? `${p.sku} · ${p.name}` : p.name,
+                    })),
+                  ]}
+                />
+              </FilterSlot>
+              <FilterSlot active={shift !== ""} label="Shift">
+                <Dropdown
+                  className="ae-fit"
+                  aria-label="Shift"
+                  value={shift}
+                  onChange={setShift}
+                  options={[
+                    { value: "", label: "Both shifts" },
+                    { value: "MORNING", label: "Morning" },
+                    { value: "NIGHT", label: "Night" },
+                  ]}
+                />
+              </FilterSlot>
+              {tableFilter === REPORTS_TABLE && (
+                <>
+                  <Dropdown
+                    className="ae-fit"
+                    aria-label="Report type"
+                    value={reportType}
+                    onChange={setReportType}
+                    options={[
+                      { value: "", label: "All reports" },
+                      { value: "Daily Report", label: "Daily Report" },
+                      { value: "Variance Report", label: "Variance Report" },
+                      { value: "Audit Report", label: "Audit Report" },
+                    ]}
+                  />
+                  <Dropdown
+                    className="ae-fit"
+                    aria-label="Report section"
+                    value={reportSection}
+                    onChange={setReportSection}
+                    options={[
+                      { value: "", label: "Online + Offline" },
+                      { value: "online", label: "Online" },
+                      { value: "offline", label: "Offline" },
+                      { value: "all", label: "Full (combined)" },
+                    ]}
+                  />
+                </>
+              )}
+              <label style={importOnlyStyle}>
+                <input
+                  type="checkbox"
+                  checked={importOnly}
+                  onChange={(e) => setImportOnly(e.target.checked)}
+                />
+                From CSV import
+              </label>
+            </>
+          }
+        />
       </PageHeader>
 
       <Toast

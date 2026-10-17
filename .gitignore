@@ -1,8 +1,6 @@
 node_modules/
 dist/
 build/
-.env
-.env.local
 *.log
 .DS_Store
 coverage/
@@ -11,5 +9,49 @@ server/generated/
 client/vite.config.js
 client/vite.config.d.ts
 
+# --- Secrets -----------------------------------------------------------------
+# Every real environment file, at any depth: .env, .env.local, .env.production,
+# .env.docker ... The committed templates (*.example) are the only exceptions, so
+# a new setting still has to be documented in one. (A bare ".env" used to be the
+# only rule, which left .env.production and the like unprotected.)
+.env
+.env.*
+!.env.example
+!.env.*.example
+
 # TLS certificates / keys for docker-compose.tls.yml
 certs/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# --- Data that must never be committed ----------------------------------------
+# Database dumps and backups. The backup scripts write outside the repo by default
+# (C:\ala-eh-backups, /var/backups/ala-eh); this catches one pointed inside it.
+# Deliberately NOT "*.sql": the migrations under server/prisma/migrations are SQL
+# and are source.
+*.sql.gz
+*.sql.gz.*
+*.dump
+backups/
+snapshots/
+
+# --- Local tooling and test output --------------------------------------------
+# Personal Claude Code settings (the shared agents/skills under .claude/ stay tracked).
+.claude/settings.local.json
+.claude/**/*.local.*
+# Vite leaves these behind when its config fails to load.
+vite.config.*.timestamp-*
+# Test and process output.
+test-results/
+playwright-report/
+logs/
+.pm2/
+*.tgz
+
+# --- Editors and OS ------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+Thumbs.db

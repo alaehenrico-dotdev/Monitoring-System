@@ -20,6 +20,8 @@ import clientErrorRoutes from "./clientError.routes";
 import correctionRoutes from "./correction.routes";
 import actionQueueRoutes from "./actionQueue.routes";
 import orderTemplatesRoutes from "./orderTemplates.routes";
+import pendingReleaseRoutes from "./pendingRelease.routes";
+import monthCloseRoutes from "./monthClose.routes";
 import { idempotency } from "../middleware/idempotency";
 
 /// Single mount point for every feature's router (Section 3 - the app is
@@ -48,6 +50,8 @@ router.use("/dashboard", dashboardRoutes);
 router.use("/import-batches", retrySafe, importBatchRoutes);
 router.use("/report-history", retrySafe, reportHistoryRoutes);
 router.use("/day-closures", retrySafe, dayLockRoutes);
+router.use("/month-closures", retrySafe, monthCloseRoutes);
+router.use("/pending-releases", retrySafe, pendingReleaseRoutes);
 router.use("/extra-labels", retrySafe, extraColumnLabelsRoutes);
 router.use("/corrections", retrySafe, correctionRoutes);
 router.use("/action-queue", actionQueueRoutes);

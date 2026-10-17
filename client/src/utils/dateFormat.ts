@@ -33,3 +33,11 @@ export function formatRelativeTime(iso: string): string {
   if (days < 7) return `${days}d ago`;
   return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
+
+/// "21:42" - a time of day the way the shop floor reads it (24-hour, leading
+/// zeros), not a locale's 12-hour form.
+export function formatClock(ms: number): string {
+  const d = new Date(ms);
+  const pad = (v: number) => String(v).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

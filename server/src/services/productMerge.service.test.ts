@@ -30,6 +30,7 @@ function fakeTx(data: {
     dailyOfflineStock: { findMany: pick(data.fromOffline, data.intoOffline), deleteMany: vi.fn(async () => ({})), updateMany: update() },
     manualCount: { findMany: pick(data.fromCounts, data.intoCounts), updateMany: update() },
     dailyStockExtra: { findMany: pick(data.fromExtras, data.intoExtras), updateMany: update() },
+    pendingRelease: { updateMany: update() },
   };
 }
 
@@ -44,12 +45,30 @@ describe("mergeProductInto", () => {
 
     const out = await mergeProductInto(tx as never, 1, 2, 7);
 
-    for (const table of [tx.dailyOnlineStock, tx.dailyOfflineStock, tx.manualCount, tx.dailyStockExtra]) {
+    for (const table of [tx.dailyOnlineStock, tx.dailyOfflineStock, tx.manualCount, tx.dailyStockExtra, tx.pendingRelease]) {
       expect(table.updateMany).toHaveBeenCalledWith({ where: { productId: 1 }, data: { productId: 2 } });
     }
     expect(tx.product.delete).toHaveBeenCalledWith({ where: { id: 1 } });
-    expect(out.moved).toEqual({ online: 2, offline: 2, extras: 2, counts: 2 });
+    expect(out.moved).toEqual({ online: 2, offline: 2, extras: 2, counts: 2, pendingReleases: 2 });
     expect(recordChange).toHaveBeenCalledWith(expect.objectContaining({ tableName: "products", recordId: 1, action: "DELETE", changedById: 7 }), tx);
+  });
+
+  it("moves awaiting-release items before deleting the duplicate, so the delete is not blocked by them", async () => {
+    const tx = fakeTx({ products: [NEW, ORIGINAL] });
+    const order: string[] = [];
+    tx.pendingRelease.updateMany.mockImplementation(async () => {
+      order.push("pending-moved");
+      return { count: 3 };
+    });
+    tx.product.delete.mockImplementation(async () => {
+      order.push("product-deleted");
+      return {};
+    });
+
+    const out = await mergeProductInto(tx as never, 1, 2);
+
+    expect(order).toEqual(["pending-moved", "product-deleted"]);
+    expect(out.moved.pendingReleases).toBe(3);
   });
 
   it("stops and changes nothing when both products have entries for the same period", async () => {

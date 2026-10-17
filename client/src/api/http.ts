@@ -36,7 +36,7 @@ export function setUnauthorizedHandler(fn: (() => void) | null) {
 const READ_TIMEOUT_MS = 4_000;
 const WRITE_TIMEOUT_MS = 30_000;
 const BULK_TIMEOUT_MS = 120_000;
-const BULK_PATH = /^\/(data-reset\/|manual-counts\/publish|import-batches)/;
+const BULK_PATH = /^\/(data-reset\/|manual-counts\/publish|import-batches|day-closures\/finish-through|month-closures\/)/;
 
 function timeoutFor(path: string, method: string | undefined): number {
   if (BULK_PATH.test(path)) return BULK_TIMEOUT_MS;
@@ -48,7 +48,7 @@ function timeoutFor(path: string, method: string | undefined): number {
 /// attempt fails in a way where the server may still have committed it (a
 /// timeout, a dropped connection, a 5xx), the identical retry reuses the same
 /// key, so the server replays the first result instead of saving twice.
-const IDEMPOTENT_PATH = /^\/(online-stock|offline-stock|manual-counts|products|import-batches|report-history|day-closures|corrections|extra-labels)(\/|$|\?)/;
+const IDEMPOTENT_PATH = /^\/(online-stock|offline-stock|manual-counts|products|import-batches|report-history|day-closures|month-closures|pending-releases|corrections|extra-labels)(\/|$|\?)/;
 const retryKeys = new Map<string, string>();
 const MAX_RETRY_KEYS = 100;
 

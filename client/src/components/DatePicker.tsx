@@ -246,9 +246,9 @@ export function DatePicker({ value, onChange, className = "", style, disabled, t
               tabIndex={-1}
               className="ae-datepicker no-print"
               style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom }}
-              initial={{ opacity: 0, y: pos.bottom !== undefined ? 6 : -6, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.08 } }}
+              initial={{ opacity: 0, y: pos.bottom !== undefined ? 6 : -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.08 } }}
               transition={{ duration: 0.14, ease: "easeOut" }}
               // React events from a portal still bubble to the portal's React
               // ancestors: a click would hit an enclosing Modal's

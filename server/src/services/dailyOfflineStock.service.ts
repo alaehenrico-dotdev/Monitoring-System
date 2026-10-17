@@ -279,8 +279,8 @@ export async function saveOfflineEntry(
   // Recompute later saved periods from this corrected balance. The mirrored
   // transfer can also change Online's balance, so propagate both locations
   // in the transaction that saves the two sides.
-  await propagateOpeningStock(productId, entryDate, shift, "OFFLINE", userId, db, changeId);
-  await propagateOpeningStock(productId, entryDate, shift, "ONLINE", userId, db, changeId);
+  await propagateOpeningStock(productId, entryDate, shift, "OFFLINE", userId, db, changeId, { from: "period" });
+  await propagateOpeningStock(productId, entryDate, shift, "ONLINE", userId, db, changeId, { from: "period" });
 
   // Not broadcast here - the `!db` branch above does it once the transaction
   // that wraps this whole function has actually committed. A caller that

@@ -44,7 +44,7 @@ export function ReorderProductsButton({ isAdmin }: { isAdmin: boolean }) {
   );
 }
 
-function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
+export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<Product[] | null>(null);
   const [original, setOriginal] = useState<number[]>([]);
   // Add product (for one the template does not list): the form is open, and each

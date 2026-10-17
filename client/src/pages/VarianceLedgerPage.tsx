@@ -2,7 +2,8 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getVarianceReport } from "../api/manualCounts";
 import { PageHeader } from "../components/PageHeader";
-import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageToolbar } from "../components/PageToolbar";
+import { FilterSlot } from "../components/FilterSlot";
 import { DateRangePicker } from "../components/DateRangePicker";
 import { Dropdown } from "../components/Dropdown";
 import { SearchInput } from "../components/SearchInput";
@@ -106,72 +107,89 @@ export function VarianceLedgerPage() {
         title="Variance Ledger"
         subtitle="SKUs that are often short or over, with amounts, counters, and reasons."
       >
-        <Toolbar className="no-print">
-          <div>
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search SKU, product or counter…"
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="Show"
-              value={scope}
-              onChange={(v) => setScope(v as Scope)}
-              options={[
-                { value: "off", label: "SKUs that were off" },
-                { value: "recurring", label: "Recurring (off 2+ times)" },
-                { value: "all", label: "Every counted SKU" },
-              ]}
-            />
-            <Dropdown
-              className="ae-fit"
-              aria-label="Location"
-              value={location}
-              onChange={(v) => changeFilters(() => setLocation(v))}
-              options={[
-                { value: "", label: "Online + Offline" },
-                { value: "ONLINE", label: "Online" },
-                { value: "OFFLINE", label: "Offline" },
-              ]}
-            />
-            <DateRangePicker
-              className="ae-fit"
-              aria-label="Date range"
-              from={from}
-              to={to}
-              onChange={(f, t) =>
-                changeFilters(() => {
-                  setFrom(f);
-                  setTo(t);
-                })
-              }
-            />
-          </div>
-          <ToolbarControls>
-            <button
-              type="button"
-              className="ae-btn ae-btn-secondary"
-              disabled={rows.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  `variance-ledger-${from}-to-${to}.csv`,
-                  varianceLedgerCsv(rows),
-                )
-              }
-              title="Download the listed SKUs as a CSV file"
-            >
-              <DownloadIcon /> Export CSV
-            </button>
-            <Link
-              to="/variance-report"
-              className="ae-btn ae-btn-secondary"
-              style={{ textDecoration: "none" }}
-            >
-              <HistoryIcon /> Variance Report
+        <PageToolbar
+          activeFilters={(query.trim() !== "" ? 1 : 0) + (location !== "" ? 1 : 0)}
+          onClearFilters={() => {
+            setQuery("");
+            changeFilters(() => setLocation(""));
+          }}
+          label="Variance ledger"
+          menus={[
+            {
+              id: "export",
+              label: "Export",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "csv",
+                      label: "Export CSV",
+                      icon: <DownloadIcon />,
+                      disabledReason: rows.length === 0 ? "No SKUs are listed" : undefined,
+                      onSelect: () =>
+                        downloadCsv(
+                          `variance-ledger-${from}-to-${to}.csv`,
+                          varianceLedgerCsv(rows),
+                        ),
+                    },
+                  ],
+                },
+              ],
+            },
+          ]}
+          filters={
+            <>
+              <FilterSlot active={query.trim() !== ""} label="Search">
+                <SearchInput
+                  value={query}
+                  onChange={setQuery}
+                  placeholder="Search SKU, product or counter…"
+                />
+              </FilterSlot>
+              <Dropdown
+                className="ae-fit"
+                aria-label="Show"
+                value={scope}
+                onChange={(v) => setScope(v as Scope)}
+                options={[
+                  { value: "off", label: "SKUs that were off" },
+                  { value: "recurring", label: "Recurring (off 2+ times)" },
+                  { value: "all", label: "Every counted SKU" },
+                ]}
+              />
+              <FilterSlot active={location !== ""} label="Location">
+                <Dropdown
+                  className="ae-fit"
+                  aria-label="Location"
+                  value={location}
+                  onChange={(v) => changeFilters(() => setLocation(v))}
+                  options={[
+                    { value: "", label: "Online + Offline" },
+                    { value: "ONLINE", label: "Online" },
+                    { value: "OFFLINE", label: "Offline" },
+                  ]}
+                />
+              </FilterSlot>
+              <DateRangePicker
+                className="ae-fit"
+                aria-label="Date range"
+                from={from}
+                to={to}
+                onChange={(f, t) =>
+                  changeFilters(() => {
+                    setFrom(f);
+                    setTo(t);
+                  })
+                }
+              />
+            </>
+          }
+          actions={
+            <Link to="/variance-report" className="ae-mb-btn" style={{ textDecoration: "none" }}>
+              <HistoryIcon /> <span>Variance Report</span>
             </Link>
-          </ToolbarControls>
-        </Toolbar>
+          }
+        />
       </PageHeader>
 
       <Toast

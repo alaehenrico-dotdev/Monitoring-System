@@ -10,7 +10,7 @@ import { reportHistoryCsv } from "../utils/reportHistoryCsv";
 import { downloadCsv } from "../utils/csv";
 import { localDateStamp } from "../utils/dateFormat";
 import { CalendarIcon, ClockIcon, DownloadIcon, HistoryIcon } from "../components/icons";
-import { Toolbar, ToolbarControls } from "../components/Toolbar";
+import { PageToolbar } from "../components/PageToolbar";
 import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
 import { Toast } from "../components/Toast";
@@ -113,38 +113,44 @@ export function ReportHistoryPage({
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle}>
-        <Toolbar className="no-print">
-          <div>
-            <Link
-              to={backTo}
-              className="ae-btn ae-btn-secondary"
-              style={{ textDecoration: "none" }}
-            >
-              {backLabel}
-            </Link>
-            <SearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder="Search by date or category…"
-            />
-          </div>
-          <ToolbarControls>
-            <button
-              type="button"
-              className="ae-btn ae-btn-secondary"
-              disabled={visible.length === 0}
-              onClick={() =>
-                downloadCsv(
-                  `${type.toLowerCase().replace(/\s+/g, "-")}-history-${localDateStamp()}.csv`,
-                  reportHistoryCsv(visible),
-                )
-              }
-              title="Download the listed reports as a CSV file"
-            >
-              <DownloadIcon /> Export CSV
-            </button>
-          </ToolbarControls>
-        </Toolbar>
+        <PageToolbar
+          label="Report history"
+          menus={[
+            {
+              id: "export",
+              label: "Export",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "csv",
+                      label: "Export CSV",
+                      icon: <DownloadIcon />,
+                      disabledReason: visible.length === 0 ? "No reports are listed" : undefined,
+                      onSelect: () =>
+                        downloadCsv(
+                          `${type.toLowerCase().replace(/\s+/g, "-")}-history-${localDateStamp()}.csv`,
+                          reportHistoryCsv(visible),
+                        ),
+                    },
+                  ],
+                },
+              ],
+            },
+          ]}
+          filters={
+            <>
+              <Link to={backTo} className="ae-mb-btn" style={{ textDecoration: "none" }}>
+                {backLabel}
+              </Link>
+              <SearchInput
+                value={query}
+                onChange={setQuery}
+                placeholder="Search by date or category…"
+              />
+            </>
+          }
+        />
       </PageHeader>
 
       <Toast
