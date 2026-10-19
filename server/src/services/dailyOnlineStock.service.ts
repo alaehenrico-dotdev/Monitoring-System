@@ -23,7 +23,6 @@ import {
   calculateOfflineStock,
   calculateOnlineRemaining,
   calculateOnlineStock,
-  isNegativeStock,
   toNum,
 } from "../utils/stockMath";
 
@@ -197,15 +196,11 @@ export async function saveOnlineEntry(
   const openingManual = input.openingStock !== undefined ? true : (existing?.openingManual ?? false);
   const { onlineStock, remainingStock } = calculate(openingStock, merged);
 
-  // Negative-stock guard (Section: Stock Out cannot exceed what's on hand) -
-  // checked against Remaining Stock, the actual current balance, not the
-  // onlineStock subtotal alone (Production/RTS can legitimately bring a
-  // dip back up before it's actually persisted).
-  if (isNegativeStock(remainingStock)) {
-    throw HttpError.badRequest(
-      `This would take ${product.name}'s Online stock below zero (would end at ${remainingStock}). Reduce Fulfillment (Out) or the transfer out to Offline, or add Production (In)/RTS first.`
-    );
-  }
+  // Negative stock is allowed on save: Out figures are often entered before the
+  // matching In (production handed in later), and refusing the save leaves the
+  // Out unrecorded. The row is flagged negative instead, Finish Day will not lock
+  // it without a supervisor's sign-off (dayFinish.service.ts), and the Admin
+  // Queue lists it. Remaining Stock is stored as computed.
 
   if (existing && isNoopSave(existing, openingStock, merged, columnKeysOf(extras).length + (input.clearExtraColumns?.length ?? 0))) {
     return withHeld(existing);
@@ -300,17 +295,7 @@ async function mirrorTransferToOffline(
   const offlineStock = calculateOfflineStock(openingStock, merged.stockInOlToOff, merged.stockOutOffToOl);
   const remainingStock = calculateOfflineRemaining(offlineStock, merged.productionIn, merged.deliveryOut, merged.backloads, merged.upsellOut);
 
-  // Same guard as saveOnlineEntry's own, applied to the side actually being
-  // drained here: pulling stock INTO Online FROM Offline (stockInOffToOl on
-  // the Online entry) mirrors as Offline's stockOutOffToOl - a real Stock
-  // Out for Offline that can't exceed what Offline actually has on hand,
-  // even though the transfer itself was entered on the Online grid.
-  if (isNegativeStock(remainingStock)) {
-    const product = await productRepository.findActiveById(productId, db);
-    throw HttpError.badRequest(
-      `This transfer would take ${product?.name ?? `product #${productId}`}'s Offline stock below zero (would end at ${remainingStock}).`
-    );
-  }
+  // Same as the own-side save: a mirrored transfer may leave this side negative.
 
   const data = {
     productId,

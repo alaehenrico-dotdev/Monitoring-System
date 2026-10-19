@@ -271,6 +271,14 @@ to the host. Only publish ports you mean to expose.
 
 ## 6. Deploy updates
 
+**Docker:** the `api` container takes a database snapshot by itself whenever
+migrations are pending, before applying them (`server/docker/start.sh`). If the
+snapshot fails, it stops without migrating. Snapshots are `premigrate_<time>.sql.gz`
+in the `api_backups` volume (newest 10 kept; `PREMIGRATE_KEEP` changes that).
+Copy them off the machine with `docker compose cp api:/backups ./backups`, and
+restore one with `gunzip -c premigrate_<time>.sql.gz | docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" ala_eh_stocks'`.
+This is a safety net, not a replacement for the scheduled backups below.
+
 Run tests and lint in CI before deployment. On the VPS, take and copy a fresh
 backup before applying schema migrations:
 

@@ -136,20 +136,19 @@ export function PageHeader({
               <h2>{title}</h2>
               <HeaderExtras />
             </div>
-            {/* The subtitle line under the h2 is no longer shown; pages still
-                pass `subtitle`, it is just not rendered. */}
+            {/* The subtitle line under the h2 is no longer shown (pages still
+                pass `subtitle`); the Toolbar sits in its place, directly under
+                the title and beside the logo, so there is no gap. It collapses
+                with the header. */}
+            {children && (
+              <div className="ae-page-header-collapsible ae-page-header-collapsible--toolbar">
+                <div className="ae-page-header-collapsible-inner">
+                  <div className="ae-page-header-toolbar-slot">{children}</div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        {/* The Toolbar is its own full-width row below the logo/title row (not
-            inside the titles column beside the logo), so it starts at the
-            card's left end under the logo. It collapses with the subtitle. */}
-        {children && (
-          <div className="ae-page-header-collapsible ae-page-header-collapsible--toolbar">
-            <div className="ae-page-header-collapsible-inner">
-              <div className="ae-page-header-toolbar-slot">{children}</div>
-            </div>
-          </div>
-        )}
         <button
           type="button"
           className="ae-page-header-collapse-btn no-print"

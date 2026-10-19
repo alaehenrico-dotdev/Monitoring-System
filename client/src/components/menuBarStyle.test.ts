@@ -58,8 +58,8 @@ describe("menu-bar toolbar style", () => {
 
   it("steps down in three tiers by the bar's own width: wide, medium chips, narrow overflow", () => {
     expect(block).toMatch(/container-type: inline-size/);
-    expect(block).toMatch(/@container ae-mb \(max-width: 1480px\)/);
-    expect(block).toMatch(/@container ae-mb \(max-width: 1200px\)[^}]*\{[^}]*\.ae-mb-menus/);
+    expect(block).toMatch(/@container ae-mb \(max-width: 1700px\)/);
+    expect(block).toMatch(/@container ae-mb \(max-width: 1100px\)[^}]*\{[^}]*\.ae-mb-menus/);
     // The menus really go at narrow widths: the shared toolbar rule that makes a
     // toolbar's first child display:flex out-specifies a plain display:none.
     expect(block).toMatch(/\.ae-mb-menus\s*\{\s*display: none !important/);

@@ -128,6 +128,7 @@ export function EntryToolbar(p: EntryToolbarProps) {
     onError: p.onError,
     warnings: p.finishWarnings,
     enabled: finishable,
+    canSignOff: p.isAdmin,
   });
 
   const activeFilters = (p.query.trim() !== "" ? 1 : 0) + (p.category !== "" ? 1 : 0) + (p.rowFilter !== "all" ? 1 : 0);

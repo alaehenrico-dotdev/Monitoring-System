@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => {
   const m = {
-    dailyOnlineStock: { count: vi.fn() },
-    dailyOfflineStock: { count: vi.fn() },
+    dailyOnlineStock: { count: vi.fn(), findMany: vi.fn() },
+    dailyOfflineStock: { count: vi.fn(), findMany: vi.fn() },
     product: { count: vi.fn() },
     dayClosure: { findUnique: vi.fn() },
     $transaction: vi.fn(),
@@ -27,8 +27,10 @@ const saveSnapshot = vi.hoisted(() => vi.fn());
 vi.mock("./dailyReportSnapshot.service", () => ({ saveSnapshot }));
 const recordReportHistoryIn = vi.hoisted(() => vi.fn());
 vi.mock("./reportHistory.service", () => ({ recordReportHistoryIn }));
+const logSystemEvent = vi.hoisted(() => vi.fn());
+vi.mock("./changeLog.service", () => ({ logSystemEvent }));
 
-import { finishDay } from "./dayFinish.service";
+import { finishDay, getFinishSummary } from "./dayFinish.service";
 
 const DATE = new Date("2026-10-14T00:00:00.000Z");
 
@@ -43,7 +45,13 @@ function summary(online: number, offline: number, locked: { online?: boolean; of
   );
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  prismaMock.dailyOnlineStock.findMany.mockResolvedValue([]);
+  prismaMock.dailyOfflineStock.findMany.mockResolvedValue([]);
+});
+
+const negativeRow = { productId: 3, remainingStock: "-5.00", product: { name: "APPLE" } };
 
 describe("finishDay", () => {
   it("refuses a shift with nothing saved", async () => {
@@ -112,5 +120,39 @@ describe("finishDay", () => {
     expect(closePeriod).not.toHaveBeenCalled();
     expect(saveSnapshot).not.toHaveBeenCalled();
     expect(recordReportHistoryIn).not.toHaveBeenCalled();
+  });
+
+  describe("negative stock", () => {
+    beforeEach(() => {
+      summary(58, 60);
+      prismaMock.dailyOnlineStock.findMany.mockResolvedValue([negativeRow]);
+    });
+
+    it("lists the negative products in the finish summary", async () => {
+      const s = await getFinishSummary(DATE, "NIGHT", "ONLINE");
+      expect(s.negatives).toEqual([{ productId: 3, name: "APPLE", remainingStock: -5 }]);
+    });
+
+    it("stops an encoder finishing over negative stock", async () => {
+      await expect(finishDay(DATE, "NIGHT", "ONLINE", 1)).rejects.toMatchObject({ status: 409 });
+      expect(closePeriod).not.toHaveBeenCalled();
+    });
+
+    it("needs a reason from a supervisor", async () => {
+      await expect(finishDay(DATE, "NIGHT", "ONLINE", 1, { allowed: true })).rejects.toMatchObject({ status: 400 });
+      await expect(finishDay(DATE, "NIGHT", "ONLINE", 1, { allowed: true, reason: " x " })).rejects.toMatchObject({ status: 400 });
+      expect(closePeriod).not.toHaveBeenCalled();
+    });
+
+    it("lets a supervisor finish with a reason, and records the sign-off", async () => {
+      const result = await finishDay(DATE, "NIGHT", "ONLINE", 9, { allowed: true, reason: "Production In arrives tomorrow" });
+      expect(result.finished).toBe(true);
+      expect(closePeriod).toHaveBeenCalled();
+      expect(logSystemEvent).toHaveBeenCalledWith(
+        "negative_stock_signoff",
+        expect.objectContaining({ shift: "NIGHT", location: "ONLINE", reason: "Production In arrives tomorrow" }),
+        9,
+      );
+    });
   });
 });

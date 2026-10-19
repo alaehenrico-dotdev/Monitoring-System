@@ -5,12 +5,16 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import {
   createProduct,
   deactivateProduct,
+  deleteProductPermanently,
   listProducts,
   updateProduct,
 } from "../api/products";
 import type { Product } from "../types";
 import { Button, Field, TextInput } from "../components/ui";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { ContextMenu, type ContextMenuItem } from "../components/ContextMenu";
+import { EllipsisIcon } from "../components/icons";
+import { Modal } from "../components/Modal";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { colors } from "../theme";
@@ -35,6 +39,14 @@ export function ProductsAdminPage() {
     Record<number, string>
   >({});
   const [thresholdBusyId, setThresholdBusyId] = useState<number | null>(null);
+  // The row's "..." menu (anchored under its button), the product being edited in
+  // the Edit dialog, and the one waiting for a delete confirmation.
+  const [rowMenu, setRowMenu] = useState<{ product: Product; x: number; y: number } | null>(null);
+  const [editing, setEditing] = useState<Product | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Product | null>(null);
+  // SKU codes being edited in their cells, and the row currently saving one.
+  const [skuDrafts, setSkuDrafts] = useState<Record<number, string>>({});
+  const [skuBusyId, setSkuBusyId] = useState<number | null>(null);
   // The SKU the confirm dialog is currently asking about, and which row (if
   // any) has a request in flight.
   const [pendingDeactivate, setPendingDeactivate] = useState<Product | null>(
@@ -132,6 +144,68 @@ export function ProductsAdminPage() {
         return rest;
       });
     }
+  }
+
+  // The SKU code is edited in its cell: typed freely (hyphens, a new numbering...),
+  // saved on Enter or when the cell loses focus, Escape puts the old one back. A code
+  // another product already has is refused by the server, with that product's name.
+  async function commitSku(p: Product) {
+    const draft = skuDrafts[p.id];
+    const clear = () =>
+      setSkuDrafts((d) => {
+        const { [p.id]: _drop, ...rest } = d;
+        return rest;
+      });
+    if (draft === undefined) return;
+    const next = draft.trim();
+    if (next === (p.sku ?? "")) return clear();
+    setSkuBusyId(p.id);
+    setError(null);
+    try {
+      const updated = await updateProduct(p.id, { sku: next === "" ? null : next });
+      setProducts((prev) => prev?.map((row) => (row.id === p.id ? updated : row)) ?? prev);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to update the SKU code");
+    } finally {
+      setSkuBusyId(null);
+      clear();
+    }
+  }
+
+  async function confirmDelete() {
+    if (!pendingDelete) return;
+    const target = pendingDelete;
+    setError(null);
+    setBusyId(target.id);
+    try {
+      await deleteProductPermanently(target.id);
+      setProducts((prev) => prev?.filter((p) => p.id !== target.id) ?? prev);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete the product");
+    } finally {
+      setBusyId(null);
+      setPendingDelete(null);
+    }
+  }
+
+  function rowMenuItems(p: Product): ContextMenuItem[] {
+    return [
+      { id: "edit", label: "Edit…", title: "Change the name, SKU code, category or unit", run: () => setEditing(p) },
+      {
+        id: "update-sku",
+        label: "Update SKU code",
+        title: "Jump to this row's SKU cell",
+        run: () => {
+          const el = document.getElementById(`sku-${p.id}`) as HTMLInputElement | null;
+          el?.focus();
+          el?.select();
+        },
+      },
+      p.isActive
+        ? { id: "deactivate", label: "Deactivate…", title: "Hide it from the grids; history stays", run: () => setPendingDeactivate(p) }
+        : { id: "reactivate", label: "Reactivate", run: () => void handleReactivate(p) },
+      { id: "delete", label: "Delete…", danger: true, title: "Only for a product that was never used", run: () => setPendingDelete(p) },
+    ];
   }
 
   // Both actions update the row in place (flip isActive) rather than
@@ -279,13 +353,26 @@ export function ProductsAdminPage() {
                   style={p.isActive ? undefined : { opacity: 0.55 }}
                 >
                   <td style={{ whiteSpace: "nowrap" }}>{p.category}</td>
-                  <td
-                    style={{
-                      whiteSpace: "nowrap",
-                      color: p.sku ? colors.yellow : colors.subtleInk,
-                    }}
-                  >
-                    {p.sku ?? "—"}
+                  <td style={{ whiteSpace: "nowrap" }}>
+                    <TextInput
+                      id={`sku-${p.id}`}
+                      aria-label={`SKU code of ${p.name}`}
+                      value={skuDrafts[p.id] ?? p.sku ?? ""}
+                      onChange={(e) => setSkuDrafts((d) => ({ ...d, [p.id]: e.target.value }))}
+                      onBlur={() => void commitSku(p)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                        if (e.key === "Escape")
+                          setSkuDrafts((d) => {
+                            const { [p.id]: _drop, ...rest } = d;
+                            return rest;
+                          });
+                      }}
+                      disabled={skuBusyId === p.id}
+                      placeholder="No SKU"
+                      maxLength={64}
+                      style={{ width: 130, color: colors.yellow }}
+                    />
                   </td>
                   <td style={{ whiteSpace: "nowrap" }}>
                     {p.name}
@@ -338,33 +425,66 @@ export function ProductsAdminPage() {
                       </span>
                     )}
                   </td>
-                  <td>
-                    {p.isActive ? (
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        disabled={busyId === p.id}
-                        onClick={() => setPendingDeactivate(p)}
-                        style={{ color: colors.yellow }}
-                      >
-                        Deactivate
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        disabled={busyId === p.id}
-                        onClick={() => handleReactivate(p)}
-                      >
-                        {busyId === p.id ? "Reactivating…" : "Reactivate"}
-                      </Button>
-                    )}
+                  <td style={{ textAlign: "right", width: 44 }}>
+                    <button
+                      type="button"
+                      className="ae-row-menu-btn"
+                      aria-label={`Actions for ${p.name}`}
+                      aria-haspopup="menu"
+                      disabled={busyId === p.id}
+                      onClick={(e) => {
+                        const r = e.currentTarget.getBoundingClientRect();
+                        setRowMenu({ product: p, x: r.right - 160, y: r.bottom + 4 });
+                      }}
+                    >
+                      <EllipsisIcon />
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </RowGlowScroll>
+      )}
+
+      {rowMenu && (
+        <ContextMenu
+          anchor={{ x: rowMenu.x, y: rowMenu.y }}
+          title={rowMenu.product.name}
+          ariaLabel={`Actions for ${rowMenu.product.name}`}
+          items={rowMenuItems(rowMenu.product)}
+          onClose={() => setRowMenu(null)}
+        />
+      )}
+
+      {editing && (
+        <EditProductDialog
+          product={editing}
+          categories={categoriesOf(products ?? [])}
+          onClose={() => setEditing(null)}
+          onSaved={(updated) => {
+            setProducts((prev) => prev?.map((row) => (row.id === updated.id ? updated : row)) ?? prev);
+            setEditing(null);
+          }}
+        />
+      )}
+
+      {pendingDelete && (
+        <ConfirmDialog
+          title="Delete product?"
+          confirmLabel="Delete"
+          busy={busyId === pendingDelete.id}
+          onConfirm={() => void confirmDelete()}
+          onCancel={() => setPendingDelete(null)}
+        >
+          <p style={{ margin: "0 0 10px" }}>
+            <strong>{pendingDelete.name}</strong>
+            {pendingDelete.sku ? ` (${pendingDelete.sku})` : ""} will be removed from the list for good.
+          </p>
+          <p style={{ margin: 0, color: colors.subtleInk }}>
+            This only works for a product that was never used. One with stock history can't be deleted - deactivate it instead.
+          </p>
+        </ConfirmDialog>
       )}
 
       {pendingDeactivate && (
@@ -387,5 +507,80 @@ export function ProductsAdminPage() {
         </ConfirmDialog>
       )}
     </div>
+  );
+}
+
+/// The row menu's "Edit...": name, SKU code, category and unit in one place. Only
+/// what changed is sent; the server refuses a SKU another product already has and
+/// says which one.
+function EditProductDialog({
+  product,
+  categories,
+  onClose,
+  onSaved,
+}: {
+  product: Product;
+  categories: string[];
+  onClose: () => void;
+  onSaved: (updated: Product) => void;
+}) {
+  const [sku, setSku] = useState(product.sku ?? "");
+  const [name, setName] = useState(product.name);
+  const [category, setCategory] = useState(product.category);
+  const [unit, setUnit] = useState(product.unit);
+  const [error, setError] = useState<string | null>(null);
+  const save = useBusyAction();
+
+  const changes: Parameters<typeof updateProduct>[1] = {};
+  if (sku.trim() !== (product.sku ?? "")) changes.sku = sku.trim() === "" ? null : sku.trim();
+  if (name.trim() !== product.name) changes.name = name;
+  if (category.trim() !== product.category) changes.category = category;
+  if (unit.trim() !== product.unit) changes.unit = unit;
+  const valid = name.trim() !== "" && category.trim() !== "" && unit.trim() !== "";
+
+  return (
+    <Modal title="Edit product" onClose={save.busy ? () => {} : onClose} width={460}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!valid || Object.keys(changes).length === 0) return;
+          void save.run(async () => {
+            setError(null);
+            try {
+              onSaved(await updateProduct(product.id, changes));
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Failed to save the product");
+            }
+          });
+        }}
+        style={{ display: "grid", gap: 12 }}
+      >
+        <Field label="SKU code">
+          <TextInput value={sku} onChange={(e) => setSku(e.target.value)} placeholder="No SKU" maxLength={64} autoFocus />
+        </Field>
+        <Field label="Product name">
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} style={{ textTransform: "uppercase" }} />
+        </Field>
+        <Field label="Category">
+          <CategoryField categories={categories} value={category} onChange={setCategory} />
+        </Field>
+        <Field label="Unit">
+          <TextInput value={unit} onChange={(e) => setUnit(e.target.value)} />
+        </Field>
+        {error && (
+          <p role="alert" style={{ margin: 0, color: colors.danger }}>
+            {error}
+          </p>
+        )}
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={save.busy}>
+            Cancel
+          </Button>
+          <Button type="submit" loading={save.busy} loadingLabel="Saving…" disabled={!valid || Object.keys(changes).length === 0}>
+            Save
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }

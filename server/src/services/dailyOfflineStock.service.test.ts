@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { HttpError } from "../utils/HttpError";
 
 // saveOfflineEntry now wraps itself in prisma.$transaction (see its own doc
 // comment) - every repository call below is already mocked out regardless of
@@ -77,11 +76,15 @@ describe("saveOfflineEntry - Stock In/Out per channel", () => {
     );
   });
 
-  it("rejects a Stock Out that would take Offline below zero, without persisting anything", async () => {
+  it("saves a Delivery Out that takes Offline below zero (the Production In may be entered later), storing the negative balance", async () => {
     vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(10);
 
-    await expect(saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryOut: 20 })).rejects.toThrow(HttpError);
-    expect(dailyOfflineStockRepository.upsert).not.toHaveBeenCalled();
+    await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { deliveryOut: 20 });
+    expect(dailyOfflineStockRepository.upsert).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ remainingStock: -10 }),
+      expect.anything(),
+    );
   });
 
   it("keeps the two channels independent - a Delivery-only save never touches Online's table", async () => {
@@ -92,7 +95,7 @@ describe("saveOfflineEntry - Stock In/Out per channel", () => {
     expect(dailyOnlineStockRepository.upsert).not.toHaveBeenCalled();
   });
 
-  it("rejects a transfer that would drain Online below zero, even though Offline's own balance is fine", async () => {
+  it("saves a transfer that leaves Online below zero, writing the negative balance to its mirror", async () => {
     vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(0);
     vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({
       id: 50,
@@ -105,7 +108,8 @@ describe("saveOfflineEntry - Stock In/Out per channel", () => {
       encodedById: null,
     } as never);
 
-    await expect(saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { stockInOlToOff: 50 })).rejects.toThrow(/Online stock below zero/);
+    await saveOfflineEntry(PRODUCT_ID, DATE, SHIFT, { stockInOlToOff: 50 });
+    expect(dailyOnlineStockRepository.upsert).toHaveBeenCalledWith(50, expect.objectContaining({ remainingStock: -30 }), expect.anything());
   });
 });
 

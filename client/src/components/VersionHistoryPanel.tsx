@@ -58,8 +58,10 @@ export function VersionHistoryPanel({
   const [tab, setTab] = useState<Tab>("versions");
   const [versions, setVersions] = useState<SheetVersion[] | null>(null);
   const [publishes, setPublishes] = useState<PublishEvent[] | null>(null);
-  const [selected, setSelected] = useState<Selection | null>(null);
-  const [view, setView] = useState<SheetVersionRows | null>(null);
+  const [picked, setSelected] = useState<Selection | null>(null);
+  // The loaded rows, tagged with what they were loaded for, so a stale response or a
+  // new selection never shows the previous version's rows.
+  const [loaded, setLoaded] = useState<{ key: string; data: SheetVersionRows } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,25 +87,24 @@ export function VersionHistoryPanel({
     };
   }, [sheet, date, shift, realtimeVersion]);
 
-  // Open the newest version by default, like Sheets does.
-  useEffect(() => {
-    if (!selected && versions && versions.length > 0) {
-      const v = versions[0];
-      setSelected({ key: `v${v.upTo}`, upTo: v.upTo, after: v.after, title: `Version of ${stamp(v.endedAt)}` });
-    }
-  }, [versions, selected]);
+  // Until one is picked, the newest version is open, like Sheets does.
+  const newest = versions && versions.length > 0 ? versions[0] : null;
+  const selected: Selection | null =
+    picked ?? (newest ? { key: `v${newest.upTo}`, upTo: newest.upTo, after: newest.after, title: `Version of ${stamp(newest.endedAt)}` } : null);
+  const selectedKey = selected ? `${selected.key}:${selected.upTo}:${selected.after}` : null;
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected || !selectedKey) return;
     let live = true;
-    setView(null);
     getSheetVersion(sheet, date, shift, selected.upTo, selected.after)
-      .then((r) => live && setView(r))
+      .then((r) => live && setLoaded({ key: selectedKey, data: r }))
       .catch((e) => live && setError(e instanceof Error ? e.message : "Could not load that version"));
     return () => {
       live = false;
     };
-  }, [sheet, date, shift, selected]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheet, date, shift, selectedKey]);
+  const view = loaded && loaded.key === selectedKey ? loaded.data : null;
 
   const columns = useMemo(() => {
     const seen: string[] = [];

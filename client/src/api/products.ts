@@ -17,6 +17,11 @@ export function updateProduct(id: number, data: Partial<Pick<Product, "sku" | "n
   return http.patch<Product>(`/products/${id}`, data);
 }
 
+/// Deletes a never-used product for good; the server refuses one with history.
+export function deleteProductPermanently(id: number) {
+  return http.delete<{ id: number }>(`/products/${id}/permanent`);
+}
+
 export function deactivateProduct(id: number) {
   return http.delete<Product>(`/products/${id}`);
 }

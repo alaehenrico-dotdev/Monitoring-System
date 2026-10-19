@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { createProduct, deactivateProduct, listProducts, reorderProducts, updateProduct } from "../services/products.service";
+import { createProduct, deactivateProduct, deleteProductPermanently, listProducts, reorderProducts, updateProduct } from "../services/products.service";
 import { HttpError } from "../utils/HttpError";
 import { syncProductsFromSheet } from "../services/productSync.service";
 
@@ -13,7 +13,7 @@ const createSchema = z.object({
   lowStockThreshold: z.number().nonnegative().nullable().optional(),
 });
 
-const updateSchema = createSchema.partial().extend({ isActive: z.boolean().optional(), sku: z.string().min(1).nullable().optional() });
+const updateSchema = createSchema.partial().extend({ isActive: z.boolean().optional(), sku: z.string().max(64).nullable().optional() });
 
 export async function getProducts(req: Request, res: Response) {
   const includeInactive = req.query.includeInactive === "true";
@@ -30,6 +30,10 @@ export async function patchProduct(req: Request, res: Response) {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid product payload", parsed.error.flatten());
   res.json(await updateProduct(Number(req.params.id), parsed.data, req.user?.id));
+}
+
+export async function deleteProductForever(req: Request, res: Response) {
+  res.json(await deleteProductPermanently(Number(req.params.id), req.user?.id));
 }
 
 export async function deleteProduct(req: Request, res: Response) {

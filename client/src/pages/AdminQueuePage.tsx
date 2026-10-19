@@ -51,6 +51,7 @@ const rowStyle: CSSProperties = {
 };
 
 const KIND_LABEL: Record<QueueItem["kind"], string> = {
+  "negative-open": "Below zero",
   variance: "Variance",
   "low-stock": "Stock",
   "missing-entry": "Missing entry",

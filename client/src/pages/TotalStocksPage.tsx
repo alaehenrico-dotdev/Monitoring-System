@@ -4,9 +4,12 @@ import type { TotalStockRow } from "../types";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CsvTools } from "../components/CsvTools";
 import { TotalStocksTable } from "../components/TotalStocksTable";
+import { isLowStock } from "../utils/lowStock";
 import { PageToolbar } from "../components/PageToolbar";
 import { FilterSlot } from "../components/FilterSlot";
 import { zoomSection } from "../utils/zoomMenu";
+import { Dropdown } from "../components/Dropdown";
+import { CollapseAllIcon, ExpandAllIcon, SyncIcon } from "../components/icons";
 import { DateStepper } from "../components/DateStepper";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
@@ -38,6 +41,8 @@ function csvColumnsFor(source: StockLocation) {
   return allCsvColumns;
 }
 
+type StockRowFilter = "all" | "negative" | "low";
+
 const SOURCE_TITLES: Record<StockLocation, string> = {
   TOTAL: "Total Stocks (Online + Offline)",
   ONLINE: "Total Stocks (Online only)",
@@ -55,6 +60,12 @@ export function TotalStocksPage() {
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [source, setSource] = useState<StockLocation>("TOTAL");
+  const [rowFilter, setRowFilter] = useState<StockRowFilter>("all");
+  // Bumped by View > Refresh to re-read the figures from the server.
+  const [refreshTick, setRefreshTick] = useState(0);
+  // Expand/collapse every category (the table applies a new `id` once).
+  const [catCommand, setCatCommand] = useState<{ expanded: boolean; id: number } | null>(null);
+  const [anyExpanded, setAnyExpanded] = useState(false);
   const realtimeVersion = useRealtimeVersion();
 
   useResetOnKeyChange(date, () => {
@@ -69,7 +80,7 @@ export function TotalStocksPage() {
           e instanceof Error ? e.message : "Failed to load total stocks",
         ),
       );
-  }, [date, realtimeVersion]);
+  }, [date, realtimeVersion, refreshTick]);
 
   // CsvTools expects {product, entry} rows; nulls become "" (not 0) so an
   // uncounted product reads as blank in the export rather than implying a
@@ -96,8 +107,12 @@ export function TotalStocksPage() {
         [r.product.sku, r.product.name, r.product.category],
         query,
       ) &&
-      (categoryFilter === "" || r.product.category === categoryFilter),
+      (categoryFilter === "" || r.product.category === categoryFilter) &&
+      (rowFilter === "all" ||
+        (rowFilter === "negative" ? r.totalRemainingStock < 0 || r.onlineRemainingStock < 0 || r.offlineRemainingStock < 0 : isLowStock(r) || r.totalRemainingStock < 0)),
   );
+  const negativeCount = (rows ?? []).filter((r) => r.totalRemainingStock < 0 || r.onlineRemainingStock < 0 || r.offlineRemainingStock < 0).length;
+  const lowCount = (rows ?? []).filter((r) => isLowStock(r) || r.totalRemainingStock < 0).length;
 
   return (
     <div>
@@ -106,13 +121,34 @@ export function TotalStocksPage() {
         subtitle="Combined online and offline stock."
       >
         <PageToolbar
-          activeFilters={(query.trim() !== "" ? 1 : 0) + (categoryFilter !== "" ? 1 : 0)}
+          activeFilters={(query.trim() !== "" ? 1 : 0) + (categoryFilter !== "" ? 1 : 0) + (rowFilter !== "all" ? 1 : 0)}
           onClearFilters={() => {
             setQuery("");
             setCategoryFilter("");
+            setRowFilter("all");
           }}
           label="Total stocks"
-          menus={[{ id: "view", label: "View", sections: [zoomSection(zoom, setZoom)] }]}
+          menus={[
+            {
+              id: "view",
+              label: "View",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "expand-all",
+                      label: anyExpanded ? "Collapse all categories" : "Expand all categories",
+                      icon: anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />,
+                      disabledReason: rows ? undefined : "The sheet is still loading",
+                      onSelect: () => setCatCommand({ expanded: !anyExpanded, id: Date.now() }),
+                    },
+                    { id: "refresh", label: "Refresh", icon: <SyncIcon />, onSelect: () => setRefreshTick((t) => t + 1) },
+                  ],
+                },
+                zoomSection(zoom, setZoom),
+              ],
+            },
+          ]}
           filters={
             <>
               <FilterSlot active={query.trim() !== ""} label="Search">
@@ -127,6 +163,18 @@ export function TotalStocksPage() {
                   categories={categories}
                   value={categoryFilter}
                   onChange={setCategoryFilter}
+                />
+              </FilterSlot>
+              <FilterSlot active={rowFilter !== "all"} label="Rows">
+                <Dropdown
+                  aria-label="Filter rows"
+                  value={rowFilter}
+                  onChange={(v) => setRowFilter(v as StockRowFilter)}
+                  options={[
+                    { value: "all", label: "All rows" },
+                    { value: "negative", label: negativeCount ? `Only negative (${negativeCount})` : "Only negative", title: "Products whose stock is below zero" },
+                    { value: "low", label: lowCount ? `Low or negative (${lowCount})` : "Low or negative", title: "Products at or under their alert level, or below zero" },
+                  ]}
                 />
               </FilterSlot>
               <StockSourceFilter value={source} onChange={setSource} />
@@ -184,6 +232,8 @@ export function TotalStocksPage() {
             key={`${date}-${source}`}
             rows={visibleRows ?? []}
             source={source}
+            expandAllCommand={catCommand}
+            onAnyExpandedChange={setAnyExpanded}
           />
         </div>
       )}

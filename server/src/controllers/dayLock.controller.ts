@@ -63,7 +63,10 @@ export async function postFinish(req: Request, res: Response) {
   if ((role === "ONLINE_ENCODER" && location !== "ONLINE") || (role === "OFFLINE_ENCODER" && location !== "OFFLINE")) {
     throw HttpError.forbidden("You can only finish your own entry page.");
   }
-  res.json(await finishDay(parseDateOnly(req.body?.date), parseShift(req.body?.shift), location, req.user?.id));
+  const reason = typeof req.body?.negativeReason === "string" ? req.body.negativeReason : undefined;
+  res.json(
+    await finishDay(parseDateOnly(req.body?.date), parseShift(req.body?.shift), location, req.user?.id, { allowed: role === "SUPERVISOR_ADMIN", reason }),
+  );
 }
 
 /// An encoder can only finish their own page; an admin can finish either.

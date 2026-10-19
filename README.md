@@ -138,8 +138,10 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
   it can't be unambiguously split back between the two pools.
 - Auto-mirrored Online↔Offline transfer figures (Section 4.3), written once and reflected on both
   sides without duplicate typing. A Stock Out (Fulfillment/Delivery, or a transfer to the other
-  channel) that would take a channel's Remaining Stock below zero is rejected server-side, on
-  either side of the transfer, rather than silently persisted as a negative balance.
+  channel) may be saved before the In that covers it, so Remaining Stock can go negative on a
+  sheet that is still open. Nothing is hidden: the row is flagged, the Admin Queue lists the open
+  sheet, and Finish Day refuses to lock it for an encoder. A supervisor/admin can finish with a
+  written reason, which is recorded in the Change Log (`negative_stock_signoff`).
 - Server-calculated subtotal / Remaining Stock columns — never client-editable.
 - Manual Counting & system-calculated Variance (Section 4.4), flagged rows for non-zero variance.
 - Realtime sync: a shared WebSocket connection tells every open page to refresh the moment any

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { deleteProduct, getProducts, patchProduct, postProduct, putProductOrder, postProductSync } from "../controllers/products.controller";
+import { deleteProduct, deleteProductForever, getProducts, patchProduct, postProduct, putProductOrder, postProductSync } from "../controllers/products.controller";
 
 const router = Router();
 
@@ -13,6 +13,7 @@ router.post("/", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(p
 router.post("/sync", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(postProductSync));
 router.put("/order", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(putProductOrder));
 router.patch("/:id", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(patchProduct));
+router.delete("/:id/permanent", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(deleteProductForever));
 router.delete("/:id", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(deleteProduct));
 
 export default router;

@@ -41,6 +41,9 @@ services:
       # nginx reaches the API over the compose network, so trust that subnet
       # for X-Forwarded-For (per-visitor rate limiting).
       TRUST_PROXY: 172.28.0.0/16
+    # Snapshots taken before pending migrations are applied (server/docker/start.sh).
+    volumes:
+      - api_backups:/backups
     networks: [internal]
 
   web:
@@ -55,6 +58,7 @@ services:
 
 volumes:
   db_data:
+  api_backups:
 
 networks:
   internal:

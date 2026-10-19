@@ -55,3 +55,7 @@ logs/
 .vscode/
 *.swp
 Thumbs.db
+Desktop.ini
+# Office lock/temp files left beside an open spreadsheet (e.g. the encoder order .xlsx).
+~$*
+*.tmp

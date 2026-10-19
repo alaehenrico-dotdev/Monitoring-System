@@ -45,6 +45,34 @@ describe("FinishDayButton", () => {
     expect(api.finishDay).toHaveBeenCalledWith("2026-10-14", "NIGHT", "ONLINE");
   });
 
+  describe("negative stock", () => {
+    const withNegatives = () => ({ ...summary(60, 60), negatives: [{ productId: 3, name: "APPLE", remainingStock: -5 }] });
+
+    it("blocks an encoder and says to ask a supervisor", async () => {
+      api.getFinishSummary.mockResolvedValue(withNegatives());
+      const { button } = setup();
+      await waitFor(() => expect(api.getFinishSummary).toHaveBeenCalled());
+      fireEvent.click(button());
+      expect(await screen.findByText(/APPLE \(-5\)/)).toBeTruthy();
+      expect(screen.getByText(/ask a supervisor/)).toBeTruthy();
+      expect((screen.getByRole("button", { name: /Finish & lock/ }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("lets a supervisor finish once a reason is given, and sends it", async () => {
+      api.getFinishSummary.mockResolvedValue(withNegatives());
+      api.finishDay.mockResolvedValue({ ...summary(60, 60, true), finished: true, reportSaved: false });
+      const { button } = setup({ canSignOff: true });
+      await waitFor(() => expect(api.getFinishSummary).toHaveBeenCalled());
+      fireEvent.click(button());
+      const lock = await screen.findByRole("button", { name: /Finish & lock/ });
+      expect((lock as HTMLButtonElement).disabled).toBe(true);
+      fireEvent.change(screen.getByLabelText(/Reason to finish with negative stock/), { target: { value: "In arrives next shift" } });
+      expect((lock as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(lock);
+      await waitFor(() => expect(api.finishDay).toHaveBeenCalledWith("2026-10-14", "NIGHT", "ONLINE", "In arrives next shift"));
+    });
+  });
+
   it("glows once every product is saved in both grids", async () => {
     api.getFinishSummary.mockResolvedValue(summary(60, 60));
     const { button } = setup();
