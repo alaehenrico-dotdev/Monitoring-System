@@ -1,7 +1,8 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import type { StockLocation, TotalStockRow } from "../types";
 import { colors } from "../theme";
 import { sumRounded } from "../utils/gridFormat";
+import { isLowStock } from "../utils/lowStock";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { GridSelectionBar } from "./GridSelectionBar";
 import { copyRowsToClipboard, useRowSelection } from "../hooks/useRowSelection";
@@ -21,22 +22,18 @@ import { useCategoryReveal } from "../hooks/useCategoryReveal";
 // it sits right under the header rather than overlapping it.
 const HEADER_ROW_HEIGHT = 26;
 
-/// A product is "low stock" only once an admin has configured a threshold
-/// for it (ProductsAdminPage) - null means no alert is configured, not an
-/// alert at zero, so it never fires for the majority of SKUs that have
-/// never had one set.
-function isLowStock(row: TotalStockRow): boolean {
-  return (
-    row.product.lowStockThreshold !== null &&
-    row.totalRemainingStock <= row.product.lowStockThreshold
-  );
-}
-
 export function TotalStocksTable({
   rows,
   source = "TOTAL",
+  expandAllCommand,
+  onAnyExpandedChange,
 }: {
   rows: TotalStockRow[];
+  /// Same contract as StockGrid's: a new `id` expands or collapses every category.
+  expandAllCommand?: { expanded: boolean; id: number } | null;
+  /// Reports whether any category is open, so the page's menu can say
+  /// "Expand all" or "Collapse all".
+  onAnyExpandedChange?: (anyExpanded: boolean) => void;
   // Which remaining-stock column(s) to show - "TOTAL" (default) keeps the
   // original Online + Offline + Total layout so DailyReportPage's existing
   // call (which never passes this) is unaffected. "ONLINE"/"OFFLINE" narrow
@@ -61,6 +58,20 @@ export function TotalStocksTable({
     list.push(row);
     groups.set(row.product.category, list);
   }
+
+  const anyExpanded = [...groups.keys()].some((c) => expandedOverride[c]);
+  const appliedCommandId = useRef(expandAllCommand?.id);
+  useEffect(() => {
+    if (!expandAllCommand || expandAllCommand.id === appliedCommandId.current) return;
+    appliedCommandId.current = expandAllCommand.id;
+    const next: Record<string, boolean> = {};
+    for (const category of groups.keys()) next[category] = expandAllCommand.expanded;
+    setExpandedOverride(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandAllCommand]);
+  useEffect(() => {
+    onAnyExpandedChange?.(anyExpanded);
+  }, [anyExpanded, onAnyExpandedChange]);
 
   const grandTotal = sumRounded(rows.map((r) => r.totalRemainingStock));
 

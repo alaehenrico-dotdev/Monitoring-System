@@ -48,7 +48,7 @@ function timeoutFor(path: string, method: string | undefined): number {
 /// attempt fails in a way where the server may still have committed it (a
 /// timeout, a dropped connection, a 5xx), the identical retry reuses the same
 /// key, so the server replays the first result instead of saving twice.
-const IDEMPOTENT_PATH = /^\/(online-stock|offline-stock|manual-counts|products|import-batches|report-history|day-closures|month-closures|pending-releases|corrections|extra-labels)(\/|$|\?)/;
+const IDEMPOTENT_PATH = /^\/(online-stock|offline-stock|manual-counts|products|import-batches|report-history|day-closures|month-closures|pending-releases|corrections|extra-labels|order-templates)(\/|$|\?)/;
 const retryKeys = new Map<string, string>();
 const MAX_RETRY_KEYS = 100;
 

@@ -26,7 +26,7 @@ const key = (d: Date, s: string) => `${toDateOnlyString(d)}|${s}`;
 
 export interface QueueItem {
   id: string;
-  kind: "variance" | "low-stock" | "missing-entry" | "backup" | "correction";
+  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction";
   severity: "high" | "medium" | "low";
   title: string;
   detail: string;
@@ -40,7 +40,7 @@ export async function getActionQueue(now = new Date()) {
   const varianceFrom = addDays(today, -VARIANCE_LOOKBACK_DAYS);
   const yesterday = addDays(today, -1);
 
-  const [online, offline, manual, variances, stockRows, health, pending, pendingCount] = await Promise.all([
+  const [online, offline, manual, variances, stockRows, health, pending, pendingCount, negOnline, negOffline, closures] = await Promise.all([
     prisma.dailyOnlineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
     prisma.dailyOfflineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
     prisma.manualCount.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
@@ -64,6 +64,11 @@ export async function getActionQueue(now = new Date()) {
       select: { id: true, tableName: true, field: true, beforeValue: true, proposedValue: true, requestedAt: true, requestedBy: { select: { name: true } } },
     }),
     countPendingCorrections(),
+    // Sheets still open with a product below zero (an Out keyed before its In):
+    // each needs the In entered, or a supervisor's sign-off at Finish Day.
+    prisma.dailyOnlineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: today }, remainingStock: { lt: 0 } }, _count: { _all: true } }),
+    prisma.dailyOfflineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: today }, remainingStock: { lt: 0 } }, _count: { _all: true } }),
+    prisma.dayClosure.findMany({ where: { entryDate: { gte: from, lte: today } }, select: { entryDate: true, shift: true, onlineLocked: true, offlineLocked: true } }),
   ]);
 
   const items: QueueItem[] = [];
@@ -78,6 +83,25 @@ export async function getActionQueue(now = new Date()) {
       title: `${v._count._all} unexplained variance${v._count._all === 1 ? "" : "s"} - ${date} ${v.shift.toLowerCase()}`,
       detail: "Counts that differ from the system and have no remark yet.",
       link: `/variance-report?date=${date}`,
+    });
+  }
+
+  // Negative stock on sheets that are not finished yet.
+  const lockedOnline = new Set(closures.filter((c) => c.onlineLocked).map((c) => key(c.entryDate, c.shift)));
+  const lockedOffline = new Set(closures.filter((c) => c.offlineLocked).map((c) => key(c.entryDate, c.shift)));
+  const negatives = [
+    ...negOnline.filter((r) => !lockedOnline.has(key(r.entryDate, r.shift))).map((r) => ({ r, page: "Online", route: "/online" })),
+    ...negOffline.filter((r) => !lockedOffline.has(key(r.entryDate, r.shift))).map((r) => ({ r, page: "Offline", route: "/offline" })),
+  ].sort((a, b) => b.r.entryDate.getTime() - a.r.entryDate.getTime());
+  for (const { r, page, route } of negatives) {
+    const date = toDateOnlyString(r.entryDate);
+    items.push({
+      id: `negative-open:${page}:${date}:${r.shift}`,
+      kind: "negative-open",
+      severity: "high",
+      title: `${r._count._all} product${r._count._all === 1 ? "" : "s"} below zero - ${page} ${date} ${r.shift.toLowerCase()}`,
+      detail: "Usually an Out entered before its In. Enter the missing In, or a supervisor signs off at Finish Day.",
+      link: `${route}?date=${date}&shift=${r.shift}`,
     });
   }
 

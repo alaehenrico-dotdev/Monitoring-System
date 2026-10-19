@@ -68,6 +68,12 @@
   --ae-border: #e7dfc9;
   --ae-border-soft: #f1ebd8;
   --ae-row-hover: rgba(12, 12, 12, 0.035);
+  /* Alternating column fills for every table: odd columns / even columns. Light
+     theme keeps two quiet paper shades; dark theme is charcoal and black. */
+  --ae-col-a: #ffffff;
+  --ae-col-b: #f6f0de;
+  --ae-colh-a: #ece3c8; /* column headers: a step deeper than the body */
+  --ae-colh-b: #ddd2b0;
   /* The focused row (RowGlowScroll's .ae-row-focus overlay) - same gold
      family as --ae-toolbar-border/the ring sweep, at an alpha that tints a
      row clearly against --ae-row-hover without hiding the numbers/inputs
@@ -185,6 +191,10 @@
   --ae-border: #3d3d3d;
   --ae-border-soft: #2e2e2e;
   --ae-row-hover: rgba(255, 255, 255, 0.045);
+  --ae-col-a: #262626; /* charcoal */
+  --ae-col-b: #131313; /* black */
+  --ae-colh-a: #333333; /* column headers: charcoal / black, a touch stronger */
+  --ae-colh-b: #0a0a0a;
   /* More opaque than the light-theme value - the same alpha reads noticeably
      fainter against these dark surfaces. */
   --ae-row-focus-bg: rgba(245, 192, 0, 0.22);
@@ -335,6 +345,29 @@ table input[type="number"] {
 }
 .ae-table tbody tr:hover td {
   background-color: var(--ae-row-hover);
+}
+/* Alternating columns - body cells AND column headers - on every table: two shades, odd and even. Written with
+   :where() so the rules that already colour a cell - subtotal and grand-total
+   rows, selected rows, the sticky identity cells, the category bar - keep winning.
+   Column tints (a translucent background-image) and cell highlights still draw on
+   top; hover lightens the stripe instead of replacing it. */
+:where(.ae-table tbody td):nth-child(odd) {
+  background-color: var(--ae-col-a);
+}
+:where(.ae-table tbody td):nth-child(even) {
+  background-color: var(--ae-col-b);
+}
+.ae-table thead th:not(.ae-sticky-sku):not(.ae-sticky-name):not(.ae-sticky-subtotal):nth-child(odd) {
+  background: var(--ae-colh-a);
+}
+.ae-table thead th:not(.ae-sticky-sku):not(.ae-sticky-name):not(.ae-sticky-subtotal):nth-child(even) {
+  background: var(--ae-colh-b);
+}
+.ae-table tbody tr:hover:not(.ae-row-selected):not(.ae-row-grand):not(.ae-row-subtotal):not(.ae-cat-row) td:nth-child(odd) {
+  background-color: color-mix(in srgb, var(--ae-col-a) 88%, var(--ae-text));
+}
+.ae-table tbody tr:hover:not(.ae-row-selected):not(.ae-row-grand):not(.ae-row-subtotal):not(.ae-cat-row) td:nth-child(even) {
+  background-color: color-mix(in srgb, var(--ae-col-b) 88%, var(--ae-text));
 }
 .ae-table--left td {
   text-align: left;
@@ -952,6 +985,10 @@ table input[type="number"] {
   white-space: nowrap;
   cursor: pointer;
 }
+.ae-date-trigger.ae-input:hover:not(:disabled):not(:focus):not([aria-expanded="true"]) {
+  /* No hover border on a date picker: keep the resting one. */
+  border-color: #525252;
+}
 .ae-date-trigger[aria-expanded="true"] {
   border-color: rgba(212, 160, 0, 0.5);
   box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
@@ -1452,6 +1489,31 @@ table input[type="number"] {
   background: transparent;
   border-color: #c1272d;
   color: #c1272d;
+}
+
+/* The "..." button at the end of a table row (opens that row's action menu). */
+.ae-row-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ae-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.ae-row-menu-btn:hover:not(:disabled),
+.ae-row-menu-btn[aria-expanded="true"] {
+  background: var(--ae-row-hover);
+  color: var(--ae-text);
+}
+.ae-row-menu-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* =========================================================================
@@ -2635,13 +2697,12 @@ table input[type="number"] {
   opacity: 0;
   transition: opacity 100ms ease-out;
 }
-/* The toolbar is no longer inside the titles column (which sits to the
-   right of the logo): it is its own full-width row below the logo/title
-   row, so it starts at the card's left end under the logo. The -8px side
-   margin lives on this wrapper, not the toolbar, because the inner element
-   clips (overflow: hidden) and would cut off a toolbar that overhangs it. */
+/* The toolbar sits in the titles column, directly under the h2 (where the
+   subtitle used to be) and beside the logo. The side margin lives on this
+   wrapper, not the toolbar, because the inner element clips (overflow:
+   hidden) and would cut off a toolbar that overhangs it. */
 .ae-page-header-collapsible--toolbar {
-  margin: 0 -8px;
+  margin: 0 -8px 0 -5px;
 }
 .ae-page-header-toolbar-slot {
   min-width: 0;
@@ -5655,6 +5716,26 @@ table input[type="number"] {
   }
 }
 
+/* ---- Toolbar filters: no boxes -----------------------------------------------
+   Category, Rows, source, shift and date controls in the page toolbar carry no
+   border at rest, on hover, when open or when focused - the shared .ae-input /
+   .ae-select-trigger rules would otherwise put a yellow border and glow on them.
+   Hover is a soft background; open or keyboard-focused adds the accent underline
+   (the same cue an active filter uses), so a state is never shown by colour alone. */
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select),
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select):is(:hover, :focus, :focus-visible, [aria-expanded="true"]) {
+  border: 0;
+  box-shadow: none;
+}
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger):hover:not(:disabled) {
+  background: var(--ae-tb-field-bg-hover);
+}
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger):is(:focus-visible, [aria-expanded="true"]) {
+  background: var(--ae-tb-field-bg-hover);
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--ae-glass-accent);
+}
+
 /* =========================================================================
    Menu-bar toolbar (components/EntryToolbar.tsx, MenuBar.tsx, SplitButton.tsx).
 
@@ -6040,7 +6121,7 @@ table input[type="number"] {
            dropdown (also in the View menu) and the unsaved-cells badge (Save
            shows the count) step aside. Menus, Save and Finish keep their text.
    narrow  search, the date and Save stay; everything else is in the "..." menu. */
-@container ae-mb (max-width: 1480px) {
+@container ae-mb (max-width: 1700px) {
   .ae-mb-filters .ae-mb-optional .ae-select-trigger {
     border: var(--ae-mb-line-w) solid var(--ae-mb-line);
     border-radius: var(--ae-mb-radius);
@@ -6061,10 +6142,34 @@ table input[type="number"] {
     justify-content: center;
   }
   .ae-mb-trigger {
-    padding: 0 8px;
+    padding: 0 6px;
+  }
+  /* Compact: a 14-inch laptop gives the bar only ~1200-1400px once the logo
+     and card padding are taken off, so tighten the spacing, label size and
+     chips (the text stays; only the air around it goes). */
+  .ae-mb {
+    --ae-mb-gap: 3px;
+  }
+  .ae-mb-btn,
+  .ae-mb-trigger {
+    font-size: 12.5px;
+    gap: 4px;
+  }
+  .ae-mb-btn {
+    padding: 0 5px;
+  }
+  .ae-mb-filters .ae-mb-optional .ae-select-trigger {
+    padding: 0 6px;
+    max-width: 128px;
+  }
+  .ae-datestep-today {
+    padding: 0 6px;
+  }
+  .ae-split {
+    margin-left: 3px;
   }
 }
-@container ae-mb (max-width: 1200px) {
+@container ae-mb (max-width: 1100px) {
   /* !important: the shared ".ae-toolbar > div:first-child" rule gives a toolbar's
      first child display:flex, with higher specificity than a plain class. */
   .ae-mb-menus {

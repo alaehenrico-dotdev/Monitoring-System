@@ -5,7 +5,7 @@ import type { Shift } from "../types";
 
 export interface QueueItem {
   id: string;
-  kind: "variance" | "low-stock" | "missing-entry" | "backup" | "correction";
+  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction";
   severity: "high" | "medium" | "low";
   title: string;
   detail: string;
@@ -79,6 +79,9 @@ export interface FinishSummary {
   offlineLocked: boolean;
   /// For the page asked about.
   alreadyFinished: boolean;
+  /// Products below zero on the page asked about. Finishing needs a supervisor's
+  /// sign-off while there are any.
+  negatives: { productId: number; name: string; remainingStock: number }[];
 }
 
 /// Open to every role - an encoder has to know a sheet is locked before typing.
@@ -88,8 +91,9 @@ export const getFinishSummary = (date: string, shift: Shift, location?: EntryLoc
   http.get<FinishSummary>(`/day-closures/finish-summary?date=${date}&shift=${shift}${location ? `&location=${location}` : ""}`);
 /// The encoder's Finish day for their own entry page: locks that page only. The
 /// Daily Report snapshot is saved once the other page is finished too.
-export const finishDay = (date: string, shift: Shift, location: EntryLocation) =>
-  http.post<FinishSummary & { finished: boolean; reportSaved?: boolean }>("/day-closures/finish", { date, shift, location });
+/// `negativeReason` is a supervisor's sign-off for finishing with negative stock.
+export const finishDay = (date: string, shift: Shift, location: EntryLocation, negativeReason?: string) =>
+  http.post<FinishSummary & { finished: boolean; reportSaved?: boolean }>("/day-closures/finish", { date, shift, location, negativeReason });
 /* ------------------------------------------------- finish through a date */
 
 export interface FinishPlan {

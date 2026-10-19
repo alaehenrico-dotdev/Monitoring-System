@@ -82,9 +82,47 @@ export async function updateProduct(
   const existing = await productRepository.findById(id);
   if (!existing) throw HttpError.notFound("Product not found");
 
-  const updated = await productRepository.update(id, data.name === undefined ? data : { ...data, name: normalizeProductName(data.name) });
+  const patch = { ...data };
+  if (patch.name !== undefined) patch.name = normalizeProductName(patch.name);
+  if (patch.unit !== undefined) patch.unit = patch.unit.trim();
+  if (patch.category !== undefined) {
+    // Joins an existing category the way createProduct does (case and spacing
+    // ignored), so an edit cannot start a second group that looks the same.
+    const wanted = strictKey(patch.category);
+    const all = await productRepository.findAll(true);
+    patch.category = all.find((p) => strictKey(p.category) === wanted)?.category ?? patch.category.trim().replace(/\s+/g, " ");
+  }
+  if (patch.sku !== undefined) {
+    // A SKU code is edited freely (hyphens, spacing, a new numbering...): trimmed,
+    // and blank clears it. It must stay unique, so say who has it rather than
+    // letting the database's generic conflict message through.
+    const sku = patch.sku === null ? "" : patch.sku.trim();
+    patch.sku = sku === "" ? null : sku;
+    if (patch.sku !== null && patch.sku !== existing.sku) {
+      const holder = await productRepository.findBySku(patch.sku);
+      if (holder && holder.id !== id) throw HttpError.conflict(`SKU ${patch.sku} is already used by ${holder.name}.`);
+    }
+  }
+
+  const updated = await productRepository.update(id, patch);
   await recordChange({ tableName: "products", recordId: id, action: "UPDATE", changedById, oldValue: existing, newValue: updated });
   return updated;
+}
+
+/// Deletes a product for good - only one that was never used (a typo, a duplicate
+/// added by mistake). Anything with entries, counts, extras or awaiting-release
+/// items keeps its history and has to be deactivated instead.
+export async function deleteProductPermanently(id: number, changedById?: number) {
+  const existing = await productRepository.findById(id);
+  if (!existing) throw HttpError.notFound("Product not found");
+  const used = await productRepository.countReferences(id);
+  if (used > 0) {
+    throw HttpError.conflict(`${existing.name} has stock history (${used} record${used === 1 ? "" : "s"}), so it cannot be deleted. Deactivate it instead - its history stays.`);
+  }
+  await productRepository.delete(id);
+  await recordChange({ tableName: "products", recordId: id, action: "DELETE", changedById, oldValue: existing });
+  broadcastRealtimeEvent();
+  return { id };
 }
 
 /// Products are never hard-deleted (Section 4.1: "Allows retiring a SKU

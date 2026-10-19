@@ -7,6 +7,9 @@ vi.mock("../repositories/productRepository", () => ({
     nextSortOrder: vi.fn(),
     create: vi.fn(),
     findById: vi.fn(),
+    findBySku: vi.fn(),
+    countReferences: vi.fn(),
+    delete: vi.fn(),
     update: vi.fn(),
     invalidateCache: vi.fn(),
   },
@@ -21,7 +24,7 @@ vi.mock("../lib/realtime", () => ({ broadcastRealtimeEvent: vi.fn() }));
 
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
-import { createProduct, deactivateProduct, listProducts, updateProduct } from "./products.service";
+import { createProduct, deactivateProduct, deleteProductPermanently, listProducts, updateProduct } from "./products.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -126,6 +129,73 @@ describe("updateProduct", () => {
       expect.objectContaining({ action: "UPDATE", oldValue: existing, newValue: updated }),
     );
     expect(result).toBe(updated);
+  });
+});
+
+describe("updateProduct - SKU code", () => {
+  const existing = { id: 1, sku: "AFP007", name: "SWEET A", category: "Class A", unit: "Liter", sortOrder: 1 };
+  beforeEach(() => {
+    vi.mocked(productRepository.findById).mockResolvedValue(existing as never);
+    vi.mocked(productRepository.update).mockImplementation((async (_id: number, d: object) => ({ ...existing, ...d })) as never);
+    vi.mocked(productRepository.findBySku).mockResolvedValue(null);
+  });
+
+  it("changes the SKU code, trimmed, and records it", async () => {
+    const result = await updateProduct(1, { sku: "  AFP-007 " }, 7);
+    expect(productRepository.update).toHaveBeenCalledWith(1, { sku: "AFP-007" });
+    expect(result.sku).toBe("AFP-007");
+    expect(recordChange).toHaveBeenCalledWith(expect.objectContaining({ action: "UPDATE", oldValue: existing }));
+  });
+
+  it("clears the SKU when it is blank", async () => {
+    await updateProduct(1, { sku: "   " }, 7);
+    expect(productRepository.update).toHaveBeenCalledWith(1, { sku: null });
+  });
+
+  it("refuses a SKU another product already has, naming it", async () => {
+    vi.mocked(productRepository.findBySku).mockResolvedValue({ id: 2, name: "SWEET B" });
+    await expect(updateProduct(1, { sku: "AFP-008" }, 7)).rejects.toMatchObject({ status: 409, message: "SKU AFP-008 is already used by SWEET B." });
+    expect(productRepository.update).not.toHaveBeenCalled();
+  });
+
+  it("does not look for a duplicate when the SKU is unchanged", async () => {
+    await updateProduct(1, { sku: "AFP007" }, 7);
+    expect(productRepository.findBySku).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateProduct - category", () => {
+  it("joins an existing category by its own spelling", async () => {
+    const existing = { id: 1, sku: null, name: "SWEET A", category: "Class B", unit: "Liter", sortOrder: 1 };
+    vi.mocked(productRepository.findById).mockResolvedValue(existing as never);
+    vi.mocked(productRepository.findAll).mockResolvedValue([{ category: "Class A (Gallon)" }] as never);
+    vi.mocked(productRepository.update).mockResolvedValue(existing as never);
+    await updateProduct(1, { category: "class a  (gallon)", unit: " Gallon " }, 7);
+    expect(productRepository.update).toHaveBeenCalledWith(1, { category: "Class A (Gallon)", unit: "Gallon" });
+  });
+});
+
+describe("deleteProductPermanently", () => {
+  const existing = { id: 5, name: "TYPO PRODUCT" };
+
+  it("deletes a product that was never used, and records it", async () => {
+    vi.mocked(productRepository.findById).mockResolvedValue(existing as never);
+    vi.mocked(productRepository.countReferences).mockResolvedValue(0);
+    await deleteProductPermanently(5, 7);
+    expect(productRepository.delete).toHaveBeenCalledWith(5);
+    expect(recordChange).toHaveBeenCalledWith(expect.objectContaining({ action: "DELETE", recordId: 5, oldValue: existing }));
+  });
+
+  it("refuses one with history and points to deactivating", async () => {
+    vi.mocked(productRepository.findById).mockResolvedValue(existing as never);
+    vi.mocked(productRepository.countReferences).mockResolvedValue(12);
+    await expect(deleteProductPermanently(5, 7)).rejects.toMatchObject({ status: 409, message: expect.stringContaining("Deactivate it instead") });
+    expect(productRepository.delete).not.toHaveBeenCalled();
+  });
+
+  it("404s on an unknown product", async () => {
+    vi.mocked(productRepository.findById).mockResolvedValue(null);
+    await expect(deleteProductPermanently(9, 7)).rejects.toMatchObject({ status: 404 });
   });
 });
 

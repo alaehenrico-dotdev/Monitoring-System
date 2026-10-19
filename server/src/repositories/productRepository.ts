@@ -56,6 +56,30 @@ export const productRepository = {
     return db.product.findFirst({ where: { id, isActive: true } });
   },
 
+  /// Whoever holds this SKU code (the column is unique; matching follows the
+  /// column's case-insensitive collation), for a duplicate check before an edit.
+  findBySku(sku: string) {
+    return prisma.product.findFirst({ where: { sku }, select: { id: true, name: true } });
+  },
+
+  /// Rows anywhere that point at this product. Any of them means it has history
+  /// and must be deactivated, not deleted (the foreign keys would refuse anyway).
+  async countReferences(id: number): Promise<number> {
+    const [online, offline, extras, counts, pending] = await Promise.all([
+      prisma.dailyOnlineStock.count({ where: { productId: id } }),
+      prisma.dailyOfflineStock.count({ where: { productId: id } }),
+      prisma.dailyStockExtra.count({ where: { productId: id } }),
+      prisma.manualCount.count({ where: { productId: id } }),
+      prisma.pendingRelease.count({ where: { productId: id } }),
+    ]);
+    return online + offline + extras + counts + pending;
+  },
+
+  delete(id: number) {
+    invalidatePrefix(CACHE_PREFIX);
+    return prisma.product.delete({ where: { id } });
+  },
+
   findByNameAndCategory(name: string, category: string) {
     return prisma.product.findFirst({ where: { name, category } });
   },

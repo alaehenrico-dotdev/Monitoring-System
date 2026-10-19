@@ -34,6 +34,9 @@ export interface FinishDayOptions {
   /// False when this sheet cannot be finished right now (already finished, or an
   /// earlier day is pending): the hook then makes no request at all. Default true.
   enabled?: boolean;
+  /// A supervisor/admin may finish over negative stock by giving a reason; an
+  /// encoder cannot (the server enforces the same). Default false.
+  canSignOff?: boolean;
 }
 
 /**
@@ -52,7 +55,7 @@ export interface FinishDayOptions {
  * with unsaved edits says why it cannot go ahead, and one with products still
  * missing asks before locking a half-done day.
  */
-export function useFinishDay({ date, shift, location, disabled, disabledReason, onFinished, onError, warnings = [], enabled = true }: FinishDayOptions) {
+export function useFinishDay({ date, shift, location, disabled, disabledReason, onFinished, onError, warnings = [], enabled = true, canSignOff = false }: FinishDayOptions) {
   const [step, setStep] = useState<"idle" | "confirm" | "done">("idle");
   // Whether finishing this page also saved the day's report (the other page was
   // already finished), for the "done" message.
@@ -61,6 +64,7 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
   // How complete the sheet is right now, for the glow (kept apart from
   // `summary`, which is the snapshot the open dialog is showing).
   const [progress, setProgress] = useState<FinishSummary | null>(null);
+  const [signOffReason, setSignOffReason] = useState("");
   const action = useBusyAction();
   const realtimeVersion = useRealtimeVersion();
 
@@ -86,6 +90,7 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
     }
     try {
       setSummary(await getFinishSummary(date, shift, location));
+      setSignOffReason("");
       setStep("confirm");
     } catch (e) {
       onError(e instanceof Error ? e.message : "Couldn't check this shift");
@@ -95,7 +100,7 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
   async function confirm() {
     await action.run(async () => {
       try {
-        const result = await finishDay(date, shift, location);
+        const result = negatives.length > 0 ? await finishDay(date, shift, location, signOffReason.trim()) : await finishDay(date, shift, location);
         setReportSaved(result.reportSaved ?? false);
         setStep("done");
         onFinished();
@@ -112,6 +117,9 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
   // its own encoder and its own Finish day.
   const ready = enabled && !disabled && !!progress && !progress.alreadyFinished && complete(mine(progress));
   const nothingSaved = summary ? mine(summary).saved === 0 : false;
+  const negatives = summary?.negatives ?? [];
+  // Negative stock blocks an encoder, and needs a reason from a supervisor.
+  const negativeBlocked = negatives.length > 0 && (!canSignOff || signOffReason.trim().length < 3);
   const thin = summary ? !complete(mine(summary)) && !nothingSaved : false;
   const otherName = PAGE_LABEL[other(location)];
   const otherDone = summary ? (location === "ONLINE" ? summary.offlineLocked : summary.onlineLocked) : false;
@@ -123,7 +131,7 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
           title={`Finish ${PAGE_LABEL[location]} · ${formatDateDisplay(date)} · ${SHIFT_LABELS[shift]}?`}
           confirmLabel="Finish & lock"
           busy={action.busy}
-          confirmDisabled={nothingSaved}
+          confirmDisabled={nothingSaved || negativeBlocked}
           onConfirm={() => void confirm()}
           onCancel={() => setStep("idle")}
         >
@@ -141,6 +149,36 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
             <p role="alert" style={{ margin: 0, color: colors.danger }}>
               Blocked: nothing has been saved on the {PAGE_LABEL[location]} page for this shift yet, so there is nothing to finish.
             </p>
+          )}
+          {negatives.length > 0 && (
+            <div role="alert" style={{ margin: "0 0 10px", color: colors.danger }}>
+              <p style={{ margin: "0 0 6px" }}>
+                {negatives.length} product{negatives.length === 1 ? "" : "s"} end{negatives.length === 1 ? "s" : ""} below zero stock - usually an Out entered before its In:
+              </p>
+              <ul style={{ margin: "0 0 6px", paddingLeft: 18 }}>
+                {negatives.slice(0, 8).map((n) => (
+                  <li key={n.productId}>
+                    {n.name} ({n.remainingStock})
+                  </li>
+                ))}
+                {negatives.length > 8 && <li>and {negatives.length - 8} more</li>}
+              </ul>
+              {canSignOff ? (
+                <label style={{ display: "block", color: colors.ink }}>
+                  Reason to finish with negative stock (recorded in the Change Log)
+                  <input
+                    className="ae-input"
+                    style={{ display: "block", width: "100%", marginTop: 4 }}
+                    value={signOffReason}
+                    onChange={(e) => setSignOffReason(e.target.value)}
+                    maxLength={200}
+                    placeholder="e.g. Production In arrives next shift"
+                  />
+                </label>
+              ) : (
+                <p style={{ margin: 0 }}>Enter the missing In figures, or ask a supervisor to finish this day with a sign-off.</p>
+              )}
+            </div>
           )}
           {thin && (
             <p style={{ margin: 0, color: colors.warningText }}>Some products have no saved entry yet. Make sure everyone is done before finishing.</p>
