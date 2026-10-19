@@ -483,7 +483,7 @@ function ArchiveTab() {
         <label style={{ fontSize: 13 }}>
           Archive entries older than{" "}
           <input
-            type="number"
+            type="number" onWheel={(e) => e.currentTarget.blur()}
             min={1}
             max={120}
             className="ae-input"

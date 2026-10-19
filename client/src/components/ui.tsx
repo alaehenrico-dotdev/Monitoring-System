@@ -11,8 +11,14 @@ import { Spinner } from "./Spinner";
  * focus/hover states (which inline styles can't express) stay centralized too.
  */
 
-export function TextInput({ className = "", ...rest }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={`ae-input ${className}`.trim()} {...rest} />;
+/// A focused number input steps its value when the mouse wheel scrolls over it,
+/// so scrolling a page past a cell silently changes the figure. Blurring on
+/// wheel drops focus (the browser only steps a focused input) and lets the page
+/// scroll as normal.
+const blurOnWheel = (e: { currentTarget: HTMLInputElement }) => e.currentTarget.blur();
+
+export function TextInput({ className = "", onWheel, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+  return <input className={`ae-input ${className}`.trim()} onWheel={rest.type === "number" ? (e) => { blurOnWheel(e); onWheel?.(e); } : onWheel} {...rest} />;
 }
 
 interface NumberCellInputProps {
@@ -65,6 +71,7 @@ export function NumberCellInput({ value, onChange, onBlur, onFocus, onKeyDown, s
         }}
         onBlur={onBlur}
         onKeyDown={onKeyDown}
+        onWheel={blurOnWheel}
         {...rest}
       />
       <span className="ae-number-cell-spin">

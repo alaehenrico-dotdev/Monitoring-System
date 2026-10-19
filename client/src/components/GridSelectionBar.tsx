@@ -62,7 +62,7 @@ export function GridSelectionBar({
             ))}
           </Select>
           <TextInput
-            type="number"
+            type="number" onWheel={(e) => e.currentTarget.blur()}
             min={0}
             inputMode="decimal"
             aria-label="Value to fill"
