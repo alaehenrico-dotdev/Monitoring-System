@@ -163,4 +163,25 @@ export const changeLogRepository = {
       orderBy: { id: "desc" },
     });
   },
+
+  /// Every row that touched one sheet (a stock table's records for one date and
+  /// shift), oldest first - the raw material of the sheet's version history.
+  /// The sheet is identified by the snapshot's own entryDate/shift (JSON path
+  /// filters), on newValue or oldValue so a deleted record still shows up.
+  /// Capped: a sheet is a few hundred products, so this is generous, but it
+  /// stops one call reading an unbounded audit trail.
+  findForSheet(tableName: string, entryDate: string, shift: Shift, take = 5000) {
+    const on = (field: "newValue" | "oldValue"): Prisma.ChangeLogWhereInput => ({
+      AND: [
+        { [field]: { path: "$.entryDate", string_starts_with: entryDate } },
+        { [field]: { path: "$.shift", equals: shift } },
+      ],
+    });
+    return prisma.changeLog.findMany({
+      where: { tableName, OR: [on("newValue"), on("oldValue")] },
+      include: { changedBy: { select: { id: true, name: true } } },
+      orderBy: { id: "asc" },
+      take,
+    });
+  },
 };

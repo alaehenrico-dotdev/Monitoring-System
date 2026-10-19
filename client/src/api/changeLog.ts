@@ -106,3 +106,53 @@ export function getCellHistory(params: {
   if (params.limit) qs.set("limit", String(params.limit));
   return http.get<CellHistoryEntry[]>(`/change-log/cell?${qs}`);
 }
+
+export type SheetKind = "online" | "offline" | "manual";
+
+export interface SheetVersion {
+  /// Pass as `upTo` to see the sheet as it stood when this version ended.
+  upTo: number;
+  /// Pass as `after` to highlight what this version changed.
+  after: number;
+  startedAt: string;
+  endedAt: string;
+  user: { id: number; name: string } | null;
+  changes: number;
+  products: number;
+}
+
+export interface SheetVersionRows {
+  upTo: number;
+  after: number;
+  rows: {
+    recordId: number;
+    productId: number | null;
+    sku: string | null;
+    name: string | null;
+    values: Record<string, string | number | boolean | null>;
+    changed: string[];
+  }[];
+}
+
+export interface PublishEvent {
+  publishedAt: string;
+  upTo: number;
+  user: { id: number; name: string } | null;
+  counts: number;
+  appliedToOpening: boolean;
+}
+
+/// Version history of one sheet and shift (Supervisor/Admin only).
+export function getSheetVersions(sheet: SheetKind, date: string, shift: "MORNING" | "NIGHT") {
+  return http.get<{ versions: SheetVersion[] }>(`/change-log/sheet/versions?sheet=${sheet}&date=${date}&shift=${shift}`);
+}
+
+/// The sheet as it stood at change `upTo`, flagging cells that differ from `after`.
+export function getSheetVersion(sheet: SheetKind, date: string, shift: "MORNING" | "NIGHT", upTo: number, after = 0) {
+  return http.get<SheetVersionRows>(`/change-log/sheet/version?sheet=${sheet}&date=${date}&shift=${shift}&upTo=${upTo}&after=${after}`);
+}
+
+/// Each publish of a Manual Count sheet.
+export function getSheetPublishes(date: string, shift: "MORNING" | "NIGHT") {
+  return http.get<{ publishes: PublishEvent[] }>(`/change-log/sheet/publishes?date=${date}&shift=${shift}`);
+}
