@@ -11,7 +11,7 @@ import { CopyPreviousButton, type CopyPreviousButtonProps } from "./CopyPrevious
 import { DateStepper } from "./DateStepper";
 import { FinishThroughDialog } from "./FinishThrough";
 import { ClearFilters, FilterSlot } from "./FilterSlot";
-import { ClockIcon, CollapseAllIcon, EllipsisIcon, ExpandAllIcon, LockCheckIcon, PrinterIcon, ReorderIcon, ReportIcon, SaveIcon, SyncIcon, UndoIcon } from "./icons";
+import { ClockIcon, CollapseAllIcon, EllipsisIcon, ExpandAllIcon, HistoryIcon, LockCheckIcon, PrinterIcon, ReorderIcon, ReportIcon, SaveIcon, SyncIcon, UndoIcon } from "./icons";
 import { MenuBar, type MenuDef, type MenuItemDef, type MenuSection } from "./MenuBar";
 import { ReorderProductsDialog } from "./ReorderProductsButton";
 import { RowFilterSelect } from "./RowFilterSelect";
@@ -19,6 +19,7 @@ import { SaveStatus, type SaveState } from "./SaveStatus";
 import { SearchInput } from "./SearchInput";
 import { ShiftFilter } from "./ShiftFilter";
 import { SplitButton } from "./SplitButton";
+import { VersionHistoryPanel } from "./VersionHistoryPanel";
 import { ZoomControl } from "./ZoomControl";
 
 const ZOOM_MIN = 50;
@@ -108,6 +109,7 @@ export function EntryToolbar(p: EntryToolbarProps) {
   const [copyAnchor, setCopyAnchor] = useState<HTMLElement | null>(null);
   const [reorderOpen, setReorderOpen] = useState(false);
   const [throughOpen, setThroughOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const unsaved = p.pendingCount > 0;
   const current = getCurrentShiftAndDate();
@@ -202,6 +204,13 @@ export function EntryToolbar(p: EntryToolbarProps) {
           icon: <ReorderIcon />,
           disabledReason: p.isAdmin ? undefined : "Only an admin can change the product order",
           onSelect: () => setReorderOpen(true),
+        },
+        {
+          id: "version-history",
+          label: "Version history",
+          icon: <HistoryIcon />,
+          disabledReason: p.isAdmin ? undefined : "Only an admin can see version history",
+          onSelect: () => setHistoryOpen(true),
         },
       ],
     },
@@ -379,6 +388,9 @@ export function EntryToolbar(p: EntryToolbarProps) {
         />
       )}
       {reorderOpen && p.isAdmin && <ReorderProductsDialog onClose={() => setReorderOpen(false)} />}
+      {historyOpen && p.isAdmin && (
+        <VersionHistoryPanel sheet={p.location === "ONLINE" ? "online" : "offline"} date={p.date} shift={p.shift} onClose={() => setHistoryOpen(false)} />
+      )}
       {p.copyPrevious && (
         <CopyPreviousButton {...p.copyPrevious} disabled={!p.canEdit} hideTrigger open={copyOpen} onOpenChange={setCopyOpen} anchorEl={copyAnchor} />
       )}

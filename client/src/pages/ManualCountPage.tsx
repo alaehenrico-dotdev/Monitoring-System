@@ -27,6 +27,7 @@ import type {
 } from "../types";
 import { Button, NumberCellInput } from "../components/ui";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
+import { VersionHistoryPanel } from "../components/VersionHistoryPanel";
 import { CsvTools } from "../components/CsvTools";
 import { BarButton, PageToolbar } from "../components/PageToolbar";
 import { FilterSlot } from "../components/FilterSlot";
@@ -342,6 +343,7 @@ export function ManualCountPage() {
   );
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   // Publish-dialog choice: also make the counts the next day's opening stock.
   // Off by default - counts are an audit only unless a supervisor opts in.
@@ -1227,6 +1229,13 @@ export function ManualCountPage() {
               disabledReason: canPublish ? undefined : "Only an admin can change the product order",
               onSelect: () => setReorderOpen(true),
             },
+            {
+              id: "version-history",
+              label: "Version history",
+              icon: <HistoryIcon />,
+              disabledReason: canPublish ? undefined : "Only an admin can see version history",
+              onSelect: () => setHistoryOpen(true),
+            },
           ],
         },
         zoomSection(zoom, setZoom),
@@ -1441,6 +1450,9 @@ export function ManualCountPage() {
           }
           trailing={<ZoomControl zoom={zoom} onChange={setZoom} />}
         />
+        {historyOpen && canPublish && (
+          <VersionHistoryPanel sheet="manual" date={date} shift={shift} onClose={() => setHistoryOpen(false)} />
+        )}
         {reorderOpen && canPublish && (
           <ReorderProductsDialog onClose={() => setReorderOpen(false)} />
         )}

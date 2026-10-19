@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { exportChangeLog, getArchive, getCellHistoryHandler, getChangeLog, postArchiveRun } from "../controllers/changeLog.controller";
+import { exportChangeLog, getArchive, getCellHistoryHandler, getChangeLog, getSheetPublishHistory, getSheetVersionRows, getSheetVersions, postArchiveRun } from "../controllers/changeLog.controller";
 
 const router = Router();
 
@@ -22,5 +22,12 @@ router.get("/export", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHand
 // the full Change Log above - the handler restricts it to the grid tables and
 // returns only the one field asked for, never a whole row snapshot.
 router.get("/cell", authenticate, asyncHandler(getCellHistoryHandler));
+
+// Version history of a stock sheet (Online, Offline, Manual Count) and the
+// Manual Count's publish history, rebuilt from change_log - no extra storage.
+// Supervisor/Admin only, like the Change Log it reads from.
+router.get("/sheet/versions", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getSheetVersions));
+router.get("/sheet/version", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getSheetVersionRows));
+router.get("/sheet/publishes", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getSheetPublishHistory));
 
 export default router;

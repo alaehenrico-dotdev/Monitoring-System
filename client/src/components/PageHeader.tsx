@@ -60,8 +60,6 @@ interface PageHeaderProps {
 /// the tab strip on MS Office apps.
 export function PageHeader({
   title,
-  subtitle,
-  subtitleClassName,
   children,
 }: PageHeaderProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -138,13 +136,8 @@ export function PageHeader({
               <h2>{title}</h2>
               <HeaderExtras />
             </div>
-            {subtitle && (
-              <div className="ae-page-header-collapsible">
-                <div className="ae-page-header-collapsible-inner">
-                  <p className={subtitleClassName}>{subtitle}</p>
-                </div>
-              </div>
-            )}
+            {/* The subtitle line under the h2 is no longer shown; pages still
+                pass `subtitle`, it is just not rendered. */}
           </div>
         </div>
         {/* The Toolbar is its own full-width row below the logo/title row (not

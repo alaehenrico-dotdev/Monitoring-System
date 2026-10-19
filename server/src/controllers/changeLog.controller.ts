@@ -11,6 +11,7 @@ import {
 import { HttpError } from "../utils/HttpError";
 import { env } from "../config/env";
 import { listArchive, runArchive } from "../services/changeLogArchive.service";
+import { getSheetVersion, listPublishHistory, listSheetVersions } from "../services/sheetHistory.service";
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -113,4 +114,32 @@ export async function postArchiveRun(req: Request, res: Response) {
   if (!parsed.success) throw HttpError.badRequest("Invalid archive request", parsed.error.flatten());
   const months = parsed.data.months ?? (env.changeLogRetentionMonths || 12);
   res.json(await runArchive(months, req.user?.id));
+}
+
+const sheetSchema = z.object({
+  sheet: z.enum(["online", "offline", "manual"]),
+  date: z.string().regex(DATE_ONLY),
+  shift: z.enum(["MORNING", "NIGHT"]),
+});
+
+export async function getSheetVersions(req: Request, res: Response) {
+  const parsed = sheetSchema.safeParse(req.query);
+  if (!parsed.success) throw HttpError.badRequest("Invalid version history query", parsed.error.flatten());
+  const { sheet, date, shift } = parsed.data;
+  res.json({ versions: await listSheetVersions(sheet, date, shift) });
+}
+
+export async function getSheetVersionRows(req: Request, res: Response) {
+  const parsed = sheetSchema
+    .extend({ upTo: z.coerce.number().int().positive(), after: z.coerce.number().int().min(0).default(0) })
+    .safeParse(req.query);
+  if (!parsed.success) throw HttpError.badRequest("Invalid version query", parsed.error.flatten());
+  const { sheet, date, shift, upTo, after } = parsed.data;
+  res.json(await getSheetVersion(sheet, date, shift, upTo, after));
+}
+
+export async function getSheetPublishHistory(req: Request, res: Response) {
+  const parsed = sheetSchema.omit({ sheet: true }).safeParse(req.query);
+  if (!parsed.success) throw HttpError.badRequest("Invalid publish history query", parsed.error.flatten());
+  res.json({ publishes: await listPublishHistory(parsed.data.date, parsed.data.shift) });
 }
