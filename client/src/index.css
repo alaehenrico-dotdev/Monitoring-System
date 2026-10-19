@@ -818,16 +818,17 @@ table input[type="number"] {
 .ae-input:focus,
 .ae-select:focus {
   outline: none;
-  border-color: #d4a000;
-  box-shadow: 0 0 0 3px rgba(212, 160, 0, 0.18);
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
 }
 /* The :focus rule above removes the outline, leaving only a hairline border and
    a faint glow. This is the visible indicator. Grid cells (.ae-input-cell) have
    their own focus design and are left alone. */
 .ae-input:not(.ae-input-cell):focus-visible,
 .ae-select:focus-visible {
-  outline: 2px solid var(--ae-focus-ring);
-  outline-offset: 1px;
+  outline: none;
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
 }
 .ae-input:disabled,
 .ae-select:disabled {
@@ -952,8 +953,8 @@ table input[type="number"] {
   cursor: pointer;
 }
 .ae-date-trigger[aria-expanded="true"] {
-  border-color: #d4a000;
-  box-shadow: 0 0 0 3px rgba(212, 160, 0, 0.18);
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
 }
 .ae-date-trigger-text {
   min-width: 0;
@@ -1224,8 +1225,8 @@ table input[type="number"] {
   cursor: pointer;
 }
 .ae-select-trigger[aria-expanded="true"] {
-  border-color: #d4a000;
-  box-shadow: 0 0 0 3px rgba(212, 160, 0, 0.18);
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
 }
 .ae-select-trigger-text {
   min-width: 0;
@@ -1374,14 +1375,19 @@ table input[type="number"] {
   color: #e5e5e5;
 }
 .ae-btn-secondary {
-  background: transparent;
-  border-color: #d4a000;
-  color: var(--ae-text);
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+  color: var(--ae-btn-yellow-text);
 }
 /* Solid brand-yellow button - same fill as the toolbar's primary action, with
    no border. Used where a secondary action should read as a button rather
    than an outlined box (Settings). Declared after .ae-btn-secondary so it wins
    when both classes are present. */
+.ae-btn-secondary:hover:not(:disabled),
+.ae-btn-ghost:hover:not(:disabled) {
+  background: var(--ae-btn-yellow-hover);
+  filter: none;
+}
 .ae-btn-solid {
   background: var(--ae-btn-yellow);
   border-color: transparent;
@@ -1438,9 +1444,9 @@ table input[type="number"] {
 }
 
 .ae-btn-ghost {
-  background: transparent;
-  border-color: #d4a000;
-  color: #d4a000;
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+  color: var(--ae-btn-yellow-text);
 }
 .ae-btn-danger {
   background: transparent;
@@ -5319,15 +5325,15 @@ table input[type="number"] {
 }
 :root[data-ui="enterprise"] .ae-btn-primary {
   background: var(--ae-btn-yellow);
-  border-color: var(--ae-btn-yellow-active);
+  border-color: transparent;
   color: var(--ae-btn-yellow-text);
 }
 :root[data-ui="enterprise"] .ae-btn-secondary {
-  background: var(--ae-surface);
-  border-color: var(--ae-border-strong);
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
 }
 :root[data-ui="enterprise"] .ae-btn-secondary:hover:not(:disabled) {
-  border-color: var(--ae-btn-yellow-active);
+  background: var(--ae-btn-yellow-hover);
   filter: none;
 }
 
@@ -5596,6 +5602,11 @@ table input[type="number"] {
   outline: 2px solid var(--ae-focus-ring);
   outline-offset: 2px;
 }
+/* Text fields glow softly instead of showing the thick ring. */
+:where(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
+}
 :where(a, button, [role="tab"], [role="switch"], label, summary, select) {
   touch-action: manipulation;
 }
@@ -5836,9 +5847,10 @@ table input[type="number"] {
   display: inline-flex;
   align-items: stretch;
   height: var(--ae-mb-h);
-  border: var(--ae-mb-line-w) solid var(--ae-mb-warn);
+  border: 0;
   border-radius: var(--ae-mb-radius);
-  color: var(--ae-mb-warn);
+  background: var(--ae-btn-yellow);
+  color: var(--ae-btn-yellow-text);
   margin-left: 6px;
 }
 .ae-split .ae-mb-btn {
@@ -5849,7 +5861,7 @@ table input[type="number"] {
   color: inherit;
 }
 .ae-split .ae-mb-btn:hover {
-  background: color-mix(in srgb, var(--ae-mb-warn) 14%, transparent);
+  background: var(--ae-btn-yellow-hover);
 }
 .ae-split .ae-split-main {
   border-top-left-radius: calc(var(--ae-mb-radius) - 1px);
@@ -5857,16 +5869,20 @@ table input[type="number"] {
 }
 .ae-split .ae-split-chevron {
   padding: 0 6px;
-  border-left: var(--ae-mb-line-w) solid var(--ae-mb-warn);
+  border-left: 0;
   border-top-right-radius: calc(var(--ae-mb-radius) - 1px);
   border-bottom-right-radius: calc(var(--ae-mb-radius) - 1px);
 }
 .ae-split:has(.ae-split-main[aria-disabled="true"]) {
-  border-style: dashed;
+  opacity: 0.6;
+}
+.ae-split .ae-mb-btn[aria-disabled="true"] {
+  border: 0;
+  opacity: 1;
 }
 /* "Ready": a tint and heavier text - a state you can read, not a pulse. */
 .ae-split--attention {
-  background: color-mix(in srgb, var(--ae-mb-warn) 14%, transparent);
+  background: var(--ae-btn-yellow-hover);
   font-weight: 700;
 }
 

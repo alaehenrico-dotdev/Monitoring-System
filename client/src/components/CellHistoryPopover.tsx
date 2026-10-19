@@ -185,7 +185,7 @@ export function CellHistoryPopover({
       {requesting && (
         <div style={{ display: "grid", gap: 6, padding: "8px 10px" }}>
           <input
-            type="number"
+            type="number" onWheel={(e) => e.currentTarget.blur()}
             min={0}
             step="any"
             className="ae-input"
