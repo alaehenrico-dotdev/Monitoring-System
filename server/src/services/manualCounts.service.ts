@@ -1,10 +1,11 @@
-import { ManualCount, Shift, StockLocation } from "@prisma/client";
+import { ManualCount, Prisma, Shift, StockLocation } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 import { manualCountRepository } from "../repositories/manualCountRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { recordChange } from "./changeLog.service";
+import { recordReportHistoryIn } from "./reportHistory.service";
 import { assertPeriodOpen, isLockedForCarry } from "./dayLock.service";
 import { holdStaleOpening } from "./staleOpening.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
@@ -469,10 +470,12 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
         : [new Set<number>(), new Set<number>()];
       let keptManual = 0;
       let heldLocked = 0;
+      const releasedCounts: ManualCount[] = [];
       for (const count of pending) {
         // TOTAL is a combined view and can never be split into an opening.
         const apply = applyToOpening && count.location !== "TOTAL";
         const published = await manualCountRepository.markPublished(count.id, userId ?? null, now, apply, tx);
+        releasedCounts.push(published);
         const changeId = await recordChange(
           { tableName: TABLE, recordId: count.id, action: "UPDATE", changedById: userId, oldValue: count, newValue: published },
           tx,
@@ -484,13 +487,78 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
           if (outcome === "held-locked") heldLocked++;
         }
       }
-      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, keptManual, heldLocked };
+      // Every publish leaves a frozen copy and an Audit History entry, whether or
+      // not the counts were applied to the next day's opening stock.
+      const snapshotId = await saveAuditSnapshot(entryDate, shift, now, releasedCounts, applyToOpening, userId, tx);
+      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, keptManual, heldLocked, snapshotId };
     },
     { timeout: 120_000, maxWait: 10_000 },
   );
   broadcastRealtimeEvent();
   return result;
 }
+/// One row of a published audit, as it was released.
+export interface AuditSnapshotRow {
+  location: StockLocation;
+  productId: number;
+  sku: string | null;
+  name: string;
+  category: string;
+  systemRemainingStock: number;
+  manualCount: number;
+  variance: number;
+  isOpeningBalance: boolean;
+  remarks: string | null;
+}
+
+/// Stores what a publish released and files it in Audit History, inside the
+/// publish's own transaction: the history entry cannot exist without the copy it
+/// opens, and a failed publish leaves neither.
+async function saveAuditSnapshot(entryDate: Date, shift: Shift, publishedAt: Date, counts: ManualCount[], appliedToOpening: boolean, userId: number | undefined, tx: Db) {
+  const products = await tx.product.findMany({
+    where: { id: { in: [...new Set(counts.map((c) => c.productId))] } },
+    select: { id: true, sku: true, name: true, category: true },
+  });
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const rows: AuditSnapshotRow[] = counts.map((c) => ({
+    location: c.location,
+    productId: c.productId,
+    sku: byId.get(c.productId)?.sku ?? null,
+    name: byId.get(c.productId)?.name ?? `#${c.productId}`,
+    category: byId.get(c.productId)?.category ?? "",
+    systemRemainingStock: toNum(c.systemRemainingStock),
+    manualCount: toNum(c.manualCount),
+    variance: toNum(c.variance),
+    isOpeningBalance: c.isOpeningBalance,
+    remarks: c.remarks ?? null,
+  }));
+  const snapshot = await tx.auditSnapshot.create({
+    data: { entryDate, shift, publishedAt, publishedById: userId ?? null, appliedToOpening, payload: { rows } as unknown as Prisma.InputJsonValue },
+  });
+  await recordReportHistoryIn(
+    tx,
+    { type: "Audit Report", scope: toDateOnlyString(entryDate), route: `/manual-count?history=1&snapshot=${snapshot.id}&date=${toDateOnlyString(entryDate)}&shift=${shift}&source=TOTAL`, section: "all" },
+    userId,
+  );
+  return snapshot.id;
+}
+
+/// A published audit exactly as it was released (Audit History). Open to every
+/// role that can open the Audit page, like the Audit Report history itself.
+export async function getAuditSnapshot(id: number) {
+  const snapshot = await prisma.auditSnapshot.findUnique({ where: { id } });
+  if (!snapshot) throw HttpError.notFound("That published audit no longer exists");
+  const payload = snapshot.payload as unknown as { rows?: AuditSnapshotRow[] };
+  return {
+    id: snapshot.id,
+    entryDate: toDateOnlyString(snapshot.entryDate),
+    shift: snapshot.shift,
+    publishedAt: snapshot.publishedAt.toISOString(),
+    appliedToOpening: snapshot.appliedToOpening,
+    rows: payload.rows ?? [],
+  };
+}
+
 /// Longest period the Variance Report / Ledger will read in one request.
 export const MAX_VARIANCE_RANGE_DAYS = 366;
 

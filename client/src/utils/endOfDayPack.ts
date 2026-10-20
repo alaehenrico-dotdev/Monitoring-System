@@ -148,7 +148,7 @@ async function buildDailyPdf(
         title: `OFFLINE STOCK MONITORING - ${report.date}`,
       }),
       totalStocksSection(report.total, {
-        title: `TOTAL STOCKS - ${report.date}`,
+        title: `CONSOLIDATED STOCKS - ${report.date}`,
       }),
     ],
   });

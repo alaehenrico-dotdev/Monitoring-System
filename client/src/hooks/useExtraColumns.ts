@@ -74,12 +74,12 @@ export function extraColumnLabel(
 
 /**
  * One product's staged changes with every added-column amount filtered out -
- * what actually goes to the entry save endpoint under "Save total only".
+ * what goes to the entry save endpoint as the ordinary figures. The amounts
+ * themselves travel separately, as `extras` (useGridExtraColumns.buildSavePayload).
  *
- * Nothing is lost by dropping them: the main column is staged as their sum
+ * Nothing is lost by dropping them here: the main column is staged as their sum
  * (useGridExtraColumns.commitExtraCell), so the figure they add up to is
- * already in this object under the main column's own key. "Save individually"
- * (Phase 2) is what additionally stores the amounts themselves.
+ * already in this object under the main column's own key.
  */
 export function withoutExtraColumns(
   changes: Record<string, number>,
@@ -211,56 +211,6 @@ function loadExtras(storageKey: string | undefined): ExtraColumnsByKey {
 }
 
 // ---------------------------------------------------------------------------
-// Save mode, remembered per column
-// ---------------------------------------------------------------------------
-
-/// "total" saves the main column's sum and drops the added columns;
-/// "individual" additionally stores each added amount so it comes back as its
-/// own column after a reload (Phase 2 - server-backed).
-export type ExtraSaveMode = "total" | "individual";
-
-const SAVE_MODE_STORAGE_KEY = "ala-eh-extra-savemode";
-
-function loadSaveModes(): Record<string, ExtraSaveMode> {
-  try {
-    const raw = localStorage.getItem(SAVE_MODE_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, ExtraSaveMode>) : {};
-  } catch {
-    return {};
-  }
-}
-
-/// Remembers the last "total only" / "individually" choice per column, across
-/// sessions (localStorage - it's a per-viewer preference, like zoom, not
-/// in-progress work). `scope` namespaces Online from Offline, which have
-/// columns of the same key.
-export function useExtraSaveModes(scope: string) {
-  const [modes, setModes] = useState<Record<string, ExtraSaveMode>>(loadSaveModes);
-
-  const setMode = useCallback(
-    (mainKey: string, mode: ExtraSaveMode) => {
-      setModes((prev) => {
-        const next = { ...prev, [`${scope}:${mainKey}`]: mode };
-        try {
-          localStorage.setItem(SAVE_MODE_STORAGE_KEY, JSON.stringify(next));
-        } catch {
-          // A preference - fine to lose rather than block the dialog.
-        }
-        return next;
-      });
-    },
-    [scope],
-  );
-
-  const getMode = useCallback(
-    (mainKey: string): ExtraSaveMode => modes[`${scope}:${mainKey}`] ?? "total",
-    [modes, scope],
-  );
-
-  return { getMode, setMode };
-}
-
-// ---------------------------------------------------------------------------
 // The grid-side hook
 // ---------------------------------------------------------------------------
 
@@ -269,16 +219,6 @@ interface StagedEdit {
   key: string;
   value: number;
   savedValue: number;
-}
-
-export interface ExtraSaveColumn {
-  mainKey: string;
-  label: string;
-  /// How many added columns this main column currently has.
-  count: number;
-  /// The sum of every staged amount across every product and added column -
-  /// what "Save total only" will write into the main column.
-  total: number;
 }
 
 export interface UseGridExtraColumnsArgs {
@@ -547,24 +487,6 @@ export function useGridExtraColumns({
     [extras, readCell, getSavedValue],
   );
 
-  /// Drops the added columns for these main columns outright - what a
-  /// successful "Save total only" does once their amounts are folded into the
-  /// saved main column and there's nothing left for them to hold.
-  const clearColumns = useCallback((mainKeys: string[]) => {
-    if (mainKeys.length === 0) return;
-    setExtras((prev) => {
-      const next = { ...prev };
-      for (const key of mainKeys) delete next[key];
-      return next;
-    });
-    // These columns no longer exist on the server either, so there is nothing
-    // left for a dismissal to suppress - and keeping one would stop the same
-    // slot number being adopted again if the column is later re-added.
-    for (const key of dismissed.current) {
-      if (mainKeys.some((main) => key.startsWith(`${main}:`))) dismissed.current.delete(key);
-    }
-  }, []);
-
   /**
    * What one product's save sends about its added columns: every slot's amount
    * (so the columns come back after a reload), plus the main columns whose
@@ -598,29 +520,6 @@ export function useGridExtraColumns({
     dismissed.current.clear();
   }, []);
 
-  /// Added columns that currently hold at least one staged amount - the ones
-  /// the Save dialog has to ask about. Columns added but never typed into
-  /// aren't listed: there's nothing to decide for them.
-  const saveColumns = useMemo<ExtraSaveColumn[]>(() => {
-    const out: ExtraSaveColumn[] = [];
-    for (const col of columns) {
-      const slots = extras[col.key];
-      if (!slots?.length) continue;
-      let total = 0;
-      let any = false;
-      for (const changes of Object.values(pending)) {
-        for (const slot of slots) {
-          const v = changes[extraColumnKey(col.key, slot)];
-          if (v === undefined) continue;
-          total += v;
-          any = true;
-        }
-      }
-      if (any) out.push({ mainKey: col.key, label: col.label, count: slots.length, total });
-    }
-    return out;
-  }, [columns, extras, pending]);
-
   /// The added columns as {key,label}, for the Preview dialog and conflict
   /// detection.
   const extraColumnDefs = useMemo(
@@ -632,12 +531,10 @@ export function useGridExtraColumns({
     extras,
     addColumns,
     removeColumns,
-    clearColumns,
     markSaved,
     commitExtraCell,
     withExtraTotals,
     buildSavePayload,
-    saveColumns,
     extraColumnDefs,
   };
 }

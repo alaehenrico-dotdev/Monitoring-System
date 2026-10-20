@@ -3,6 +3,9 @@ import {
   columnKeysOf,
   DELIVERY_LEGACY_SLOTS,
   deliveryExtrasFromLegacy,
+  layoutCells,
+  layoutCellsFor,
+  sheetHasDeliveryBreakdown,
   splitDeliveryExtras,
   EXTRA_COLUMNS,
   extraCellKey,
@@ -140,6 +143,17 @@ describe("Delivery (Out)'s legacy slot columns", () => {
     expect(deliveryExtrasFromLegacy({ delivery1: 0, delivery2: 0, delivery3: 0, delivery4: 0, delivery5: 0 })).toEqual([]);
   });
 
+  it("surfaces a single-destination product once the sheet is known to be split", () => {
+    const single = { delivery1: 0, delivery2: 7, delivery3: 0, delivery4: 0, delivery5: 0 };
+    expect(deliveryExtrasFromLegacy(single)).toEqual([extra("deliveryOut", 2, 7)]);
+    const slotOne = { delivery1: 9, delivery2: 0, delivery3: 0, delivery4: 0, delivery5: 0 };
+    expect(deliveryExtrasFromLegacy(slotOne)).toEqual([]);
+    expect(deliveryExtrasFromLegacy(slotOne, true)).toEqual([extra("deliveryOut", 1, 9)]);
+    const split = { delivery1: 20, delivery2: 5, delivery3: 0, delivery4: 0, delivery5: 0 };
+    expect(sheetHasDeliveryBreakdown([slotOne, split])).toBe(true);
+    expect(sheetHasDeliveryBreakdown([slotOne])).toBe(false);
+  });
+
   it("round-trips a full five-column breakdown", () => {
     const row: Record<string, number> = {};
     for (let slot = 1; slot <= DELIVERY_LEGACY_SLOTS; slot++) row[`delivery${slot}`] = slot;
@@ -147,5 +161,38 @@ describe("Delivery (Out)'s legacy slot columns", () => {
     expect(read).toHaveLength(DELIVERY_LEGACY_SLOTS);
     expect(totalsFromExtras(read)).toEqual({ deliveryOut: 15 });
     expect(splitDeliveryExtras(read).legacy).toEqual(row);
+  });
+});
+
+describe("layoutCells", () => {
+  it("turns a stored layout into zero-valued cells under the client's keys", () => {
+    expect(layoutCells([{ columnKey: "deliveryOut", slotIndex: 1 }, { columnKey: "deliveryOut", slotIndex: 3 }])).toEqual({
+      deliveryOut__x1: 0,
+      deliveryOut__x3: 0,
+    });
+    expect(layoutCells([])).toEqual({});
+  });
+});
+
+describe("layoutCellsFor", () => {
+  const layout = [
+    { columnKey: "deliveryOut", slotIndex: 1 },
+    { columnKey: "deliveryOut", slotIndex: 2 },
+  ];
+
+  it("keeps a flat total visible by seeding it into the first added column", () => {
+    expect(layoutCellsFor(layout, [], { deliveryOut: "9.00" })).toEqual({ deliveryOut__x1: 9, deliveryOut__x2: 0 });
+  });
+
+  it("leaves a row that already has amounts for the column to those amounts", () => {
+    expect(layoutCellsFor(layout, [{ columnKey: "deliveryOut" }], { deliveryOut: "9.00" })).toEqual({ deliveryOut__x1: 0, deliveryOut__x2: 0 });
+  });
+
+  it("adds nothing for a zero total", () => {
+    expect(layoutCellsFor(layout, [], { deliveryOut: "0.00" })).toEqual({ deliveryOut__x1: 0, deliveryOut__x2: 0 });
+  });
+
+  it("seeds into the lowest slot even when it is not slot 1", () => {
+    expect(layoutCellsFor([{ columnKey: "rts", slotIndex: 3 }, { columnKey: "rts", slotIndex: 2 }], [], { rts: 4 })).toEqual({ rts__x3: 0, rts__x2: 4 });
   });
 });

@@ -27,7 +27,7 @@ import type { StockLocation } from "../types";
 const allCsvColumns = [
   { key: "onlineRemainingStock", label: "Online Remaining" },
   { key: "offlineRemainingStock", label: "Offline Remaining" },
-  { key: "totalRemainingStock", label: "Total Remaining" },
+  { key: "totalRemainingStock", label: "Consolidated Remaining" },
 ];
 
 // Narrows the export (Excel/PDF) columns to match whatever the
@@ -44,9 +44,9 @@ function csvColumnsFor(source: StockLocation) {
 type StockRowFilter = "all" | "negative" | "low";
 
 const SOURCE_TITLES: Record<StockLocation, string> = {
-  TOTAL: "Total Stocks (Online + Offline)",
-  ONLINE: "Total Stocks (Online only)",
-  OFFLINE: "Total Stocks (Offline only)",
+  TOTAL: "Consolidated (Online + Offline)",
+  ONLINE: "Consolidated (Online only)",
+  OFFLINE: "Consolidated (Offline only)",
 };
 
 /// Section 4.5 - a read-only, always-current grid combining Online + Offline
@@ -77,7 +77,7 @@ export function TotalStocksPage() {
       .then(setRows)
       .catch((e) =>
         setError(
-          e instanceof Error ? e.message : "Failed to load total stocks",
+          e instanceof Error ? e.message : "Failed to load consolidated stocks",
         ),
       );
   }, [date, realtimeVersion, refreshTick]);
@@ -118,7 +118,7 @@ export function TotalStocksPage() {
     <div>
       <PageHeader
         title={`${SOURCE_TITLES[source]} - ${formatDateDisplay(date)}`}
-        subtitle="Combined online and offline stock."
+        subtitle="Online and offline remaining stock for the date, added together."
       >
         <PageToolbar
           activeFilters={(query.trim() !== "" ? 1 : 0) + (categoryFilter !== "" ? 1 : 0) + (rowFilter !== "all" ? 1 : 0)}
@@ -127,7 +127,7 @@ export function TotalStocksPage() {
             setCategoryFilter("");
             setRowFilter("all");
           }}
-          label="Total stocks"
+          label="Consolidated"
           menus={[
             {
               id: "view",
@@ -188,7 +188,7 @@ export function TotalStocksPage() {
           actions={
             csvRows && (
               <CsvTools
-                filenamePrefix="total-stocks"
+                filenamePrefix="consolidated"
                 date={date}
                 rows={csvRows}
                 columns={csvColumns}
@@ -219,7 +219,7 @@ export function TotalStocksPage() {
         <TableSkeleton
           headers={["SKU", "Product", ...csvColumns.map((c) => c.label)]}
           minWidth={640}
-          label="Loading total stocks…"
+          label="Loading consolidated stocks…"
         />
       ) : (
         <div className="ae-grid-fill" style={zoomStyle(zoom)}>

@@ -4,7 +4,8 @@ const prismaMock = vi.hoisted(() => {
   const m = {
     dailyOnlineStock: { count: vi.fn(), findMany: vi.fn() },
     dailyOfflineStock: { count: vi.fn(), findMany: vi.fn() },
-    product: { count: vi.fn() },
+    product: { count: vi.fn(), findMany: vi.fn() },
+    manualCount: { findMany: vi.fn() },
     dayClosure: { findUnique: vi.fn() },
     $transaction: vi.fn(),
   };
@@ -30,7 +31,7 @@ vi.mock("./reportHistory.service", () => ({ recordReportHistoryIn }));
 const logSystemEvent = vi.hoisted(() => vi.fn());
 vi.mock("./changeLog.service", () => ({ logSystemEvent }));
 
-import { finishDay, getFinishSummary } from "./dayFinish.service";
+import { finishDay, getFinishChecklist, getFinishSummary } from "./dayFinish.service";
 
 const DATE = new Date("2026-10-14T00:00:00.000Z");
 
@@ -154,5 +155,32 @@ describe("finishDay", () => {
         9,
       );
     });
+  });
+});
+
+describe("getFinishChecklist", () => {
+  it("names products with no saved entry and counts saved ones with no manual count", async () => {
+    prismaMock.dailyOfflineStock.findMany.mockResolvedValue([{ productId: 1 }, { productId: 2 }]);
+    prismaMock.product.findMany.mockResolvedValue([
+      { id: 1, name: "APPLE" },
+      { id: 2, name: "BANANA" },
+      { id: 3, name: "CHERRY" },
+    ]);
+    prismaMock.manualCount.findMany.mockResolvedValue([{ productId: 1 }]);
+    expect(await getFinishChecklist(DATE, "NIGHT", "OFFLINE")).toEqual({
+      missing: [{ productId: 3, name: "CHERRY" }],
+      missingCount: 1,
+      uncounted: 1,
+    });
+  });
+
+  it("caps the named products but still reports how many are missing", async () => {
+    prismaMock.dailyOnlineStock.findMany.mockResolvedValue([]);
+    prismaMock.product.findMany.mockResolvedValue(Array.from({ length: 14 }, (_, i) => ({ id: i + 1, name: `P${i + 1}` })));
+    prismaMock.manualCount.findMany.mockResolvedValue([]);
+    const r = await getFinishChecklist(DATE, "NIGHT", "ONLINE");
+    expect(r.missing).toHaveLength(10);
+    expect(r.missingCount).toBe(14);
+    expect(r.uncounted).toBe(0);
   });
 });

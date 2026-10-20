@@ -106,7 +106,7 @@ export function TotalStocksTable({
           "Product",
           ...(showOnline ? ["Online Remaining"] : []),
           ...(showOffline ? ["Offline Remaining"] : []),
-          ...(showTotal ? ["Total Remaining"] : []),
+          ...(showTotal ? ["Consolidated Remaining"] : []),
         ],
         picked.map((r) => [
           r.product.sku ?? "",
@@ -140,7 +140,7 @@ export function TotalStocksTable({
               "Product",
               ...(showOnline ? ["Online Remaining"] : []),
               ...(showOffline ? ["Offline Remaining"] : []),
-              ...(showTotal ? ["Total Remaining"] : []),
+              ...(showTotal ? ["Consolidated Remaining"] : []),
             ].map((h) => (
               <th key={h}>{h}</th>
             ))}

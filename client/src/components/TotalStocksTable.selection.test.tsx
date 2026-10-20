@@ -76,7 +76,7 @@ describe("TotalStocksTable - selecting rows", () => {
     fireEvent.keyDown(document.body, { key: "c", ctrlKey: true });
 
     expect(writeText).toHaveBeenCalledWith(
-      ["SKU\tProduct\tOnline Remaining\tOffline Remaining\tTotal Remaining", "SKU1\tSoy Sauce\t10\t5\t15", "SKU3\tRice\t7\t7\t14"].join("\n"),
+      ["SKU\tProduct\tOnline Remaining\tOffline Remaining\tConsolidated Remaining", "SKU1\tSoy Sauce\t10\t5\t15", "SKU3\tRice\t7\t7\t14"].join("\n"),
     );
   });
 });

@@ -313,7 +313,7 @@ export function OrderTemplateReview({
               <span style={{ display: "block", color: colors.subtleInk }}>
                 Leave this off to keep every product: those not in the template stay, beside their own category. Hidden products
                 disappear from every sheet and report but keep their entries and history, and can be switched back on from the SKU
-                list. Their stock no longer shows in Total Stocks.
+                list. Their stock no longer shows in Consolidated.
               </span>
             </span>
           </label>
@@ -370,7 +370,7 @@ export function OrderTemplateReview({
           {hideCount > 0 && (
             <p style={{ margin: 0 }}>
               {hideCount} product{hideCount === 1 ? "" : "s"} not in the template will be hidden from every sheet and report. Their
-              entries and history are kept, their stock no longer shows in Total Stocks, and you can switch them back on from the
+              entries and history are kept, their stock no longer shows in Consolidated, and you can switch them back on from the
               SKU list.
             </p>
           )}

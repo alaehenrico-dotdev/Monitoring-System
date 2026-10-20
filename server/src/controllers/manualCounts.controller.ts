@@ -11,6 +11,7 @@ import {
   getSystemRemainingStock,
   getVarianceReport,
   getVarianceTrace,
+  getAuditSnapshot,
   publishManualCounts,
   saveManualCount,
   setCountRemarks,
@@ -99,6 +100,13 @@ export async function getTrace(req: Request, res: Response) {
   const { productId, entryDate, shift, location } = countKey(req);
   if (location === "TOTAL") throw HttpError.badRequest("A trace is per location - choose ONLINE or OFFLINE");
   res.json(await getVarianceTrace(productId, entryDate, shift, location));
+}
+
+/// GET /manual-counts/snapshots/:id - a published audit as it was released.
+export async function getAuditSnapshotHandler(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) throw HttpError.badRequest("Invalid snapshot id");
+  res.json(await getAuditSnapshot(id));
 }
 
 /// POST /manual-counts/publish?date&shift - approve a sheet's saved counts as

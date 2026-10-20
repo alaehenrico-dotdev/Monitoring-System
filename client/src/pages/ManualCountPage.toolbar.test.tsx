@@ -5,7 +5,8 @@ import { MemoryRouter } from "react-router-dom";
 import { ManualCountPage } from "./ManualCountPage";
 import { chooseFromMenu, menuItem } from "./menuTestHelpers";
 
-const api = vi.hoisted(() => ({ getManualCountGrid: vi.fn(), saveManualCount: vi.fn(), getVarianceTrace: vi.fn(), setCountRemarks: vi.fn(), publishManualCounts: vi.fn() }));
+const api = vi.hoisted(() => ({ getManualCountGrid: vi.fn(), saveManualCount: vi.fn(), getVarianceTrace: vi.fn(), setCountRemarks: vi.fn(), publishManualCounts: vi.fn(), getAuditSnapshot: vi.fn() }));
+const pdf = vi.hoisted(() => ({ downloadTablePdf: vi.fn() }));
 const auth = vi.hoisted(() => ({ role: "SUPERVISOR_ADMIN" }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, name: "Sup", username: "sup", role: auth.role } }) }));
 vi.mock("../api/manualCounts", () => api);
@@ -15,7 +16,8 @@ vi.mock("../components/PageHeader", () => ({
 }));
 // CSV tools (import modal, history) are not what these tests are about.
 vi.mock("../components/CsvTools", () => ({ CsvTools: () => null }));
-vi.mock("../hooks/useTopProgress", () => ({ useTopProgress: () => ({ start: vi.fn(), done: vi.fn() }) }));
+vi.mock("../hooks/useTopProgress", () => ({ useTopProgress: () => ({ start: vi.fn(), done: vi.fn(), track: (fn: () => unknown) => fn() }) }));
+vi.mock("../utils/tablePdf", () => pdf);
 vi.mock("../context/RealtimeContext", () => ({ useRealtimeVersion: () => 0 }));
 
 const product = (id: number, name: string, category: string) => ({
@@ -56,9 +58,9 @@ beforeEach(() => {
   );
 });
 
-async function open() {
+async function open(url = "/") {
   render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[url]}>
       <ManualCountPage />
     </MemoryRouter>,
   );
@@ -314,6 +316,17 @@ describe("ManualCountPage - publishing the sheet", () => {
     expect(screen.getAllByRole("button", { name: /^Publish$/ })[0].getAttribute("aria-disabled")).toBe("true");
   });
 
+  it("shows a published sheet's count cells blank, ready for the next audit", async () => {
+    api.getManualCountGrid.mockImplementation((_d: string, _s: string, loc: "ONLINE" | "OFFLINE") =>
+      Promise.resolve([row(1, "Soy Sauce", "Sauces", loc, 10, 8)].map((r) => ({ ...r, entry: { ...r.entry, publishedAt: "2026-10-09T20:00:00.000Z" } }))),
+    );
+    await open();
+    await screen.findAllByText("Published");
+    // Nothing on the sheet counts as a saved count any more, so there is nothing for Clear all to clear.
+    fireEvent.click(screen.getAllByText("Clear all")[0]);
+    expect(screen.queryAllByText(/unsaved change/)).toHaveLength(0);
+  });
+
   it("will not publish while counts are staged but unsaved", async () => {
     await open();
     fireEvent.click(screen.getAllByText("Clear all")[0]);
@@ -329,3 +342,23 @@ describe("ManualCountPage - publishing the sheet", () => {
   });
 });
 
+describe("ManualCountPage - opening a published audit from Audit History", () => {
+  it("downloads the frozen copy that the publish saved, instead of rebuilding from the live counts", async () => {
+    api.getAuditSnapshot.mockResolvedValue({
+      id: 5,
+      entryDate: "2026-10-09",
+      shift: "NIGHT",
+      publishedAt: "2026-10-10T01:00:00.000Z",
+      appliedToOpening: false,
+      rows: [{ location: "ONLINE", productId: 1, sku: "SKU1", name: "Soy Sauce", category: "Sauces", systemRemainingStock: 10, manualCount: 8, variance: 2, isOpeningBalance: false, remarks: null }],
+    });
+    render(
+      <MemoryRouter initialEntries={["/manual-count?history=1&snapshot=5"]}>
+        <ManualCountPage />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(pdf.downloadTablePdf).toHaveBeenCalledTimes(1));
+    expect(api.getAuditSnapshot).toHaveBeenCalledWith(5);
+    expect(pdf.downloadTablePdf.mock.calls[0][0]).toMatchObject({ filename: "audit-published-2026-10-09-night.pdf", title: "Manual Counting & Variance" });
+  });
+});

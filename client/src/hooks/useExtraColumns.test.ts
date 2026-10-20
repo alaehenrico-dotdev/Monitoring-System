@@ -101,8 +101,8 @@ describe("extra column keys", () => {
   });
 });
 
-describe("saving with \"Save total only\"", () => {
-  it("submits the main column's sum and no added-column amounts", () => {
+describe("staged changes on save", () => {
+  it("sends the main column's sum as the figure, with the added amounts kept out of it", () => {
     const { pending, render } = harness();
     const { result, rerender } = render();
     act(() => {
@@ -116,23 +116,6 @@ describe("saving with \"Save total only\"", () => {
 
     // 6 moved into +1 when the columns appeared, plus the 4 just typed.
     expect(withoutExtraColumns(pending[1])).toEqual({ stockIn: 10 });
-  });
-
-  it("clears the affected columns once the save succeeds", () => {
-    const { render } = harness();
-    const { result, rerender } = render();
-    act(() => {
-      result.current.addColumns("stockIn", 2);
-    });
-    rerender();
-    expect(result.current.saveColumns.map((c) => c.mainKey)).toEqual(["stockIn"]);
-
-    act(() => {
-      result.current.clearColumns(result.current.saveColumns.map((c) => c.mainKey));
-    });
-    rerender();
-    expect(result.current.extras).toEqual({});
-    expect(result.current.extraColumnDefs).toEqual([]);
   });
 });
 
@@ -277,26 +260,6 @@ describe("useGridExtraColumns", () => {
     ).toBe(false);
   });
 
-  it("lists only the columns that actually hold a staged amount", () => {
-    const { render } = harness();
-    const { result, rerender } = render();
-    act(() => {
-      result.current.addColumns("openingStock", 1);
-    });
-    rerender();
-    // Opening Stock was 10 on both rows, so adding a column moved 10+10 in.
-    expect(result.current.saveColumns).toEqual([
-      { mainKey: "openingStock", label: "Opening", count: 1, total: 20 },
-    ]);
-
-    act(() => {
-      result.current.clearColumns(["openingStock"]);
-    });
-    rerender();
-    expect(result.current.saveColumns).toEqual([]);
-    expect(result.current.extras.openingStock).toBeUndefined();
-  });
-
   it("persists which columns exist under the sheet's own storage key", () => {
     const data = rows();
     const args = {
@@ -315,5 +278,32 @@ describe("useGridExtraColumns", () => {
 
     const second = renderHook(() => useGridExtraColumns(args));
     expect(second.result.current.extras.stockIn).toEqual([1, 2]);
+  });
+
+  it("redraws saved added columns when the sheet is revisited", () => {
+    const saved: GridRow[] = rows().map((r) => ({
+      ...r,
+      entry: { ...r.entry, stockIn__x1: 2, stockIn__x2: 4 },
+    }));
+    const base = {
+      pending: {} as PendingByProduct,
+      stageMany: vi.fn(),
+      getSavedValue: () => undefined,
+      columns,
+    };
+    const { result, rerender } = renderHook(
+      (p: { storageKey: string; rows: GridRow[] | null }) =>
+        useGridExtraColumns({ ...base, ...p }),
+      { initialProps: { storageKey: "a", rows: saved as GridRow[] | null } },
+    );
+    expect(result.current.extras.stockIn).toEqual([1, 2]);
+
+    // Another date with no breakdown, then back to the first.
+    rerender({ storageKey: "b", rows: null });
+    rerender({ storageKey: "b", rows: rows() });
+    expect(result.current.extras.stockIn).toBeUndefined();
+    rerender({ storageKey: "a", rows: null });
+    rerender({ storageKey: "a", rows: saved });
+    expect(result.current.extras.stockIn).toEqual([1, 2]);
   });
 });

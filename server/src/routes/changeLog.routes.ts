@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { exportChangeLog, getArchive, getCellHistoryHandler, getChangeLog, getSheetPublishHistory, getSheetVersionRows, getSheetVersions, postArchiveRun } from "../controllers/changeLog.controller";
+import { exportChangeLog, getArchive, getCellHistoryHandler, getChangeLog, getSheetPublishHistory, getSheetVersionRows, getSheetVersions, postArchiveRun, postRestoreSheetVersion } from "../controllers/changeLog.controller";
 
 const router = Router();
 
@@ -29,5 +29,7 @@ router.get("/cell", authenticate, asyncHandler(getCellHistoryHandler));
 router.get("/sheet/versions", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getSheetVersions));
 router.get("/sheet/version", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getSheetVersionRows));
 router.get("/sheet/publishes", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getSheetPublishHistory));
+// Apply a version: writes that version's figures back through the normal entry save.
+router.post("/sheet/restore", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(postRestoreSheetVersion));
 
 export default router;

@@ -156,3 +156,9 @@ export function getSheetVersion(sheet: SheetKind, date: string, shift: "MORNING"
 export function getSheetPublishes(date: string, shift: "MORNING" | "NIGHT") {
   return http.get<{ publishes: PublishEvent[] }>(`/change-log/sheet/publishes?date=${date}&shift=${shift}`);
 }
+
+/// Applies a version: writes that version's figures back through the normal entry
+/// save (Online/Offline sheets only; Supervisor/Admin).
+export function restoreSheetVersion(sheet: "online" | "offline", date: string, shift: "MORNING" | "NIGHT", upTo: number) {
+  return http.post<{ restored: number; held: number; skipped: number }>("/change-log/sheet/restore", { sheet, date, shift, upTo });
+}

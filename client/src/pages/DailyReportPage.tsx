@@ -1,5 +1,5 @@
 import { useBusyAction } from "../hooks/useBusyAction";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { getDayExtraNames, type DayExtraNames } from "../api/extraLabels";
 import { Dropdown } from "../components/Dropdown";
@@ -9,6 +9,9 @@ import { PageToolbar } from "../components/PageToolbar";
 import { FilterSlot } from "../components/FilterSlot";
 import { DateStepper } from "../components/DateStepper";
 import { PageHeader } from "../components/PageHeader";
+import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
+import { CollapseAllIcon, ExpandAllIcon, SyncIcon } from "../components/icons";
+import { zoomSection } from "../utils/zoomMenu";
 import { Toast } from "../components/Toast";
 import { CategoryFilter } from "../components/CategoryFilter";
 import {
@@ -58,10 +61,10 @@ function today(): string {
 type ReportSection = "all" | "online" | "offline" | "total";
 
 const SECTION_LABELS: Record<ReportSection, string> = {
-  all: "Full Report (Online + Offline + Total)",
+  all: "Full Report (Online + Offline + Consolidated)",
   online: "Online Only",
   offline: "Offline Only",
-  total: "Total Stocks Only",
+  total: "Consolidated Only",
 };
 
 // Not every row the report returns is real data: a date nobody has entered
@@ -137,6 +140,15 @@ export function DailyReportPage() {
   const [reportVersion, setReportVersion] = useState(0);
   const printAfterLoad = useRef(searchParams.get("history") === "1");
   const realtimeVersion = useRealtimeVersion();
+  const [zoom, setZoom] = useZoom("daily-report");
+  // View > Expand/Collapse all categories: one command for every table on the
+  // page; each table reports whether any of its categories is open.
+  const [catCommand, setCatCommand] = useState<{ expanded: boolean; id: number } | null>(null);
+  const [expandedBySection, setExpandedBySection] = useState({ online: false, offline: false, total: false });
+  const anyExpanded = Object.values(expandedBySection).some(Boolean);
+  const onOnlineExpanded = useCallback((v: boolean) => setExpandedBySection((p) => ({ ...p, online: v })), []);
+  const onOfflineExpanded = useCallback((v: boolean) => setExpandedBySection((p) => ({ ...p, offline: v })), []);
+  const onTotalExpanded = useCallback((v: boolean) => setExpandedBySection((p) => ({ ...p, total: v })), []);
   const { user } = useAuth();
   const [generating, setGenerating] = useState(false);
   // Only the newest request may update the page - a slow earlier response
@@ -187,14 +199,17 @@ export function DailyReportPage() {
   // `silent` is the realtime refresh of a report that's already on screen: it
   // quietly swaps in the fresh numbers, and never pops a dialog, clears the
   // report or shows an error just because someone else is mid-edit.
-  function load({ silent = false }: { silent?: boolean } = {}) {
+  /// `notify` is for a refresh the person asked for (View > Refresh): it keeps
+  /// the report and its collapsed categories like a silent one, but still says so
+  /// when it cannot run (unsaved edits) or fails, rather than doing nothing.
+  function load({ silent = false, notify = false }: { silent?: boolean; notify?: boolean } = {}) {
     if (!silent) setError(null);
 
     // A report only reads saved data - staged edits for this date would be
     // silently left out of it.
     const unsaved = findUnsavedWork({ from: date, to: date });
     if (unsaved.length > 0) {
-      if (!silent) setUnsavedWork(unsaved);
+      if (!silent || notify) setUnsavedWork(unsaved);
       return;
     }
 
@@ -232,7 +247,7 @@ export function DailyReportPage() {
         if (!silent) setReportVersion((v) => v + 1);
       })
       .catch((e) => {
-        if (id !== requestId.current || silent) return;
+        if (id !== requestId.current || (silent && !notify)) return;
         setError(e instanceof Error ? e.message : "Failed to build report");
       })
       .finally(() => {
@@ -376,7 +391,7 @@ export function DailyReportPage() {
     if (reportSection === "all" || reportSection === "total") {
       sections.push(
         totalStocksSection(byCategory(report.total), {
-          title: `TOTAL STOCKS - ${report.date}`,
+          title: `CONSOLIDATED STOCKS - ${report.date}`,
         }),
       );
     }
@@ -417,6 +432,31 @@ export function DailyReportPage() {
           }}
           label="Daily report"
           menus={[
+            {
+              id: "view",
+              label: "View",
+              sections: [
+                {
+                  items: [
+                    {
+                      id: "expand-all",
+                      label: anyExpanded ? "Collapse all categories" : "Expand all categories",
+                      icon: anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />,
+                      disabledReason: report ? undefined : "Generate the report first",
+                      onSelect: () => setCatCommand({ expanded: !anyExpanded, id: Date.now() }),
+                    },
+                    {
+                      id: "refresh",
+                      label: "Refresh",
+                      icon: <SyncIcon />,
+                      disabledReason: report ? undefined : "Generate the report first",
+                      onSelect: () => load({ silent: true, notify: true }),
+                    },
+                  ],
+                },
+                zoomSection(zoom, setZoom),
+              ],
+            },
             {
               id: "export",
               label: "Export",
@@ -495,6 +535,7 @@ export function DailyReportPage() {
               <PlayIcon /> <span>{generating ? "Generating…" : "Generate"}</span>
             </button>
           }
+          trailing={<ZoomControl zoom={zoom} onChange={setZoom} />}
         />
       </PageHeader>
 
@@ -524,7 +565,7 @@ export function DailyReportPage() {
       )}
 
       {report && (
-        <div>
+        <div style={zoomStyle(zoom)}>
           {(reportSection === "all" || reportSection === "online") && (
             <>
               <h3 style={{ marginBottom: 8 }}>Online — {report.date}</h3>
@@ -536,6 +577,8 @@ export function DailyReportPage() {
                   extraColumns={onlineExtras}
                   extraNames={extraNames.ONLINE}
                   onCommit={noop}
+                  expandAllCommand={catCommand}
+                  onAnyExpandedChange={onOnlineExpanded}
                   readOnly
                 />
               </div>
@@ -553,6 +596,8 @@ export function DailyReportPage() {
                   extraColumns={offlineExtras}
                   extraNames={extraNames.OFFLINE}
                   onCommit={noop}
+                  expandAllCommand={catCommand}
+                  onAnyExpandedChange={onOfflineExpanded}
                   readOnly
                 />
               </div>
@@ -561,10 +606,12 @@ export function DailyReportPage() {
 
           {(reportSection === "all" || reportSection === "total") && (
             <>
-              <h3 style={{ marginBottom: 8 }}>Total Stocks — {report.date}</h3>
+              <h3 style={{ marginBottom: 8 }}>Consolidated — {report.date}</h3>
               <TotalStocksTable
                 key={`total-${reportVersion}`}
                 rows={byCategory(report.total)}
+                expandAllCommand={catCommand}
+                onAnyExpandedChange={onTotalExpanded}
               />
             </>
           )}
@@ -628,7 +675,7 @@ function totalSection(date: string, rows: DailyReport["total"]): string {
     "Product",
     "Online Remaining",
     "Offline Remaining",
-    "Total Remaining",
+    "Consolidated Remaining",
     "Manual Count",
     "Variance",
   ];
@@ -642,5 +689,5 @@ function totalSection(date: string, rows: DailyReport["total"]): string {
     r.totalManualCount ?? "",
     r.totalVariance ?? "",
   ]);
-  return toExcelTable(headers, excelRows, `TOTAL STOCKS - ${date}`);
+  return toExcelTable(headers, excelRows, `CONSOLIDATED STOCKS - ${date}`);
 }
