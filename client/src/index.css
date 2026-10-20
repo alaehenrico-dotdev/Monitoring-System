@@ -5448,6 +5448,1103 @@ table input[type="number"] {
   color: #f1ecde !important;
 }
 
+/* =========================================================================
+   Neobrutalism theme (Settings > Appearance > Theme). Loud, flat and graphic:
+   thick ink outlines, hard offset shadows with no blur, square corners, heavy
+   type, and NO gradients or glass. The colours stay the app's own - the
+   original cream page (and charcoal in dark mode) are left exactly as they are;
+   brand gold fills the header, tabs and table headers, banner red is the
+   primary action, and ink black is the line. The "line" colour flips to cream
+   in dark mode so outlines and shadows still show. Only colours, borders and
+   shadows change - never padding, heights or font sizes - so grids lay out as
+   in Classic (outlines are drawn with box-shadow rings, not extra border
+   width). Every rule is scoped to :root[data-ui="brutal"].
+   ========================================================================= */
+:root[data-ui="brutal"] {
+  --ae-nb-line: #0c0c0c;
+  --ae-nb-gold: #f5c000;
+  --ae-nb-red: #c1272d;
+  --ae-glass-blur: none;
+}
+:root[data-ui="brutal"]:not([data-theme="dark"]) {
+  --ae-border: #b9b19a;
+  --ae-border-soft: #dcd4bc;
+  --ae-surface-glass: #ffffff;
+  --ae-header-glass: #f3ecd8;
+  --ae-row-hover: rgba(245, 192, 0, 0.18);
+}
+:root[data-ui="brutal"][data-theme="dark"] {
+  --ae-nb-line: #f1ecde;
+  --ae-border: #5f5a4a;
+  --ae-border-soft: #3a372e;
+  --ae-surface-glass: #262626;
+  --ae-header-glass: #2a2a2a;
+  --ae-row-hover: rgba(245, 192, 0, 0.12);
+}
+
+/* ---- Page: flat. The seal watermark is a soft flourish, so it goes -------- */
+:root[data-ui="brutal"] .app-shell::before {
+  display: none;
+}
+
+/* ---- Page header: a flat gold slab, thick outline, hard shadow ------------ */
+:root[data-ui="brutal"] .ae-page-header {
+  --ae-glass-text: #0c0c0c;
+  --ae-glass-text-muted: #3a3426;
+  --ae-glass-accent: #7a1216;
+  --ae-glass-divider: rgba(12, 12, 12, 0.45);
+  --ae-tb-bg: rgba(12, 12, 12, 0.06);
+  --ae-tb-border: #0c0c0c;
+  --ae-tb-field-bg: #fffcf5;
+  --ae-tb-field-bg-hover: #ffffff;
+  --ae-tb-field-bg-active: #ffe066;
+  --ae-tb-hairline: rgba(12, 12, 12, 0.5);
+  --ae-tb-text: #0c0c0c;
+  --ae-tb-text-muted: #3a3426;
+  background: var(--ae-nb-gold);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #0c0c0c;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 4px 0 #0c0c0c;
+  border-bottom: 3px solid #0c0c0c;
+}
+:root[data-ui="brutal"][data-theme="dark"] .ae-page-header {
+  box-shadow: 0 4px 0 var(--ae-nb-line);
+  border-bottom-color: var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-page-header.ae-page-header--offline {
+  background: var(--ae-nb-red);
+  --ae-glass-text: #ffffff;
+  --ae-glass-text-muted: #ffe9e9;
+  color: #ffffff;
+}
+:root[data-ui="brutal"] .ae-page-header h2 {
+  color: inherit;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+:root[data-ui="brutal"] .ae-page-header p {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* ---- Tab strip: ruled band; the active tab is a gold block ---------------- */
+:root[data-ui="brutal"] .ae-sticky-head > .ae-header-tabs {
+  background: var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 3px solid var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-header-tabs-bar,
+:root[data-ui="brutal"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="brutal"] .ae-header-tab {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 0;
+}
+:root[data-ui="brutal"] .ae-header-tab:hover {
+  background: rgba(245, 192, 0, 0.35);
+}
+:root[data-ui="brutal"] .ae-header-tab[aria-current="page"] {
+  background: var(--ae-nb-gold);
+  color: #0c0c0c;
+  box-shadow:
+    inset 0 0 0 2px var(--ae-nb-line),
+    3px 3px 0 var(--ae-nb-line);
+}
+
+/* ---- Cards and tables: outlined, square, hard shadow ---------------------- */
+:root[data-ui="brutal"] .ae-panel,
+:root[data-ui="brutal"] .ae-dash-stat {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 2px solid var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-dash-stat--alert {
+  box-shadow: 5px 5px 0 var(--ae-nb-red);
+}
+:root[data-ui="brutal"] .ae-table-scroll,
+:root[data-ui="brutal"] .ae-table-wrap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 2px var(--ae-nb-line),
+    6px 6px 0 2px var(--ae-nb-line);
+}
+/* Headers: flat gold laid over the column fills (an image layer, so the sticky
+   headers keep their opaque colour underneath) with a thick ink rule. */
+:root[data-ui="brutal"] .ae-table thead th {
+  background-image: linear-gradient(var(--ae-nb-gold), var(--ae-nb-gold));
+  color: #0c0c0c;
+  font-weight: 800;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 -3px 0 var(--ae-nb-line),
+    inset -1px 0 0 rgba(12, 12, 12, 0.5);
+}
+:root[data-ui="brutal"] .ae-table td {
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border),
+    inset -1px 0 0 var(--ae-border-soft);
+}
+
+/* ---- Buttons: outlined blocks that press into their shadow ---------------- */
+:root[data-ui="brutal"] .ae-btn {
+  border-radius: 0;
+  border-color: var(--ae-nb-line);
+  font-weight: 800;
+  box-shadow:
+    inset 0 0 0 1px var(--ae-nb-line),
+    3px 3px 0 var(--ae-nb-line);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    background-color var(--ae-dur-micro) ease-out;
+}
+:root[data-ui="brutal"] .ae-btn-primary {
+  background: var(--ae-nb-red);
+  color: #ffffff;
+}
+:root[data-ui="brutal"] .ae-btn-secondary {
+  background: var(--ae-nb-gold);
+  color: #0c0c0c;
+}
+:root[data-ui="brutal"] .ae-btn:hover:not(:disabled) {
+  filter: none;
+  transform: translate(-1px, -1px);
+  box-shadow:
+    inset 0 0 0 1px var(--ae-nb-line),
+    4px 4px 0 var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-btn-primary:hover:not(:disabled) {
+  background: #d02f35;
+}
+:root[data-ui="brutal"] .ae-btn-secondary:hover:not(:disabled) {
+  background: #ffd22e;
+}
+:root[data-ui="brutal"] .ae-btn:active:not(:disabled) {
+  filter: none;
+  transform: translate(3px, 3px);
+  box-shadow: inset 0 0 0 1px var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-btn:disabled {
+  box-shadow: inset 0 0 0 1px var(--ae-nb-line);
+}
+
+/* ---- Fields: square, outlined --------------------------------------------- */
+:root[data-ui="brutal"] .ae-input:not(.ae-input-cell),
+:root[data-ui="brutal"] .ae-select {
+  border-color: var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-input-cell {
+  border-radius: 0;
+}
+
+/* ---- Dialogs: thick frame, hard shadow, gold header ----------------------- */
+:root[data-ui="brutal"] .ae-modal-panel {
+  border: 3px solid var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: 8px 8px 0 var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="brutal"] .ae-modal-header {
+  background: var(--ae-nb-gold);
+  color: #0c0c0c;
+  border-bottom: 3px solid var(--ae-nb-line) !important;
+}
+:root[data-ui="brutal"] .ae-modal-header h3 {
+  color: #0c0c0c;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+:root[data-ui="brutal"] .ae-modal-header button {
+  color: #0c0c0c !important;
+}
+
+/* =========================================================================
+   Flat Design theme (Settings > Appearance > Theme). Solid colour blocks and
+   nothing else: no shadows, no gradients, no outlines, no blur. Hierarchy comes
+   from colour alone - brand gold for the header, ink for the active tab and the
+   table headers, banner red for the main action - on a plain flat cream page
+   (charcoal in dark mode). Scoped to :root[data-ui="flat"].
+   ========================================================================= */
+:root[data-ui="flat"] {
+  --ae-glass-blur: none;
+}
+:root[data-ui="flat"]:not([data-theme="dark"]) {
+  --ae-bg: #f2eee3;
+  --ae-bg-alt: #e8e2d1;
+  --ae-border: #e4ddc9;
+  --ae-border-soft: #ece6d4;
+  --ae-surface-glass: #ffffff;
+  --ae-header-glass: #e8e2d1;
+  --ae-row-hover: rgba(245, 192, 0, 0.16);
+}
+:root[data-ui="flat"][data-theme="dark"] {
+  --ae-border: #2f2f2f;
+  --ae-border-soft: #2a2a2a;
+  --ae-surface-glass: #262626;
+  --ae-header-glass: #303030;
+  --ae-row-hover: rgba(245, 192, 0, 0.1);
+}
+:root[data-ui="flat"] .app-shell::before {
+  display: none;
+}
+:root[data-ui="flat"] .ae-page-header {
+  --ae-glass-text: #0c0c0c;
+  --ae-glass-text-muted: #3a3426;
+  --ae-glass-accent: #7a1216;
+  --ae-glass-divider: rgba(12, 12, 12, 0.3);
+  --ae-tb-bg: rgba(12, 12, 12, 0.07);
+  --ae-tb-border: transparent;
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.55);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.85);
+  --ae-tb-field-bg-active: #ffffff;
+  --ae-tb-hairline: rgba(12, 12, 12, 0.25);
+  --ae-tb-text: #0c0c0c;
+  --ae-tb-text-muted: #3a3426;
+  background: #f5c000;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #0c0c0c;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+}
+:root[data-ui="flat"] .ae-page-header.ae-page-header--offline {
+  background: #c1272d;
+  --ae-glass-text: #ffffff;
+  --ae-glass-text-muted: #ffe9e9;
+  color: #ffffff;
+  box-shadow: none;
+}
+:root[data-ui="flat"] .ae-page-header h2,
+:root[data-ui="flat"] .ae-page-header p {
+  color: inherit;
+}
+:root[data-ui="flat"] .ae-sticky-head > .ae-header-tabs {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 0;
+}
+:root[data-ui="flat"] .ae-header-tabs-bar,
+:root[data-ui="flat"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="flat"] .ae-header-tab {
+  border-radius: 4px;
+  font-weight: 600;
+}
+:root[data-ui="flat"] .ae-header-tab:hover {
+  background: rgba(12, 12, 12, 0.07);
+}
+:root[data-ui="flat"] .ae-header-tab[aria-current="page"] {
+  background: #0c0c0c;
+  color: #f5c000;
+}
+:root[data-ui="flat"][data-theme="dark"] .ae-header-tab[aria-current="page"] {
+  background: #f5c000;
+  color: #0c0c0c;
+}
+:root[data-ui="flat"] .ae-panel,
+:root[data-ui="flat"] .ae-dash-stat,
+:root[data-ui="flat"] .ae-table-scroll,
+:root[data-ui="flat"] .ae-table-wrap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: transparent;
+  border-radius: 4px;
+  box-shadow: none;
+}
+:root[data-ui="flat"] .ae-dash-stat--alert {
+  background-color: var(--ae-danger-bg);
+}
+:root[data-ui="flat"] .ae-table thead th {
+  background-image: linear-gradient(#0c0c0c, #0c0c0c);
+  color: #f5c000;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+:root[data-ui="flat"] .ae-table td {
+  box-shadow: inset 0 -1px 0 var(--ae-border-soft);
+}
+:root[data-ui="flat"] .ae-btn {
+  border-radius: 4px;
+  border-color: transparent;
+  box-shadow: none;
+}
+:root[data-ui="flat"] .ae-btn-primary {
+  background: #c1272d;
+  color: #ffffff;
+}
+:root[data-ui="flat"] .ae-btn-secondary {
+  background: #f5c000;
+  color: #0c0c0c;
+}
+:root[data-ui="flat"] .ae-btn:hover:not(:disabled) {
+  filter: none;
+}
+:root[data-ui="flat"] .ae-btn-primary:hover:not(:disabled) {
+  background: #a81f25;
+}
+:root[data-ui="flat"] .ae-btn-secondary:hover:not(:disabled) {
+  background: #dcaa00;
+}
+:root[data-ui="flat"] .ae-input:not(.ae-input-cell),
+:root[data-ui="flat"] .ae-select {
+  background: var(--ae-bg-alt);
+  border-color: transparent;
+  border-radius: 4px;
+  box-shadow: none;
+}
+:root[data-ui="flat"] .ae-modal-panel {
+  border: 0;
+  border-radius: 4px;
+  box-shadow: none;
+}
+:root[data-ui="flat"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="flat"] .ae-modal-header {
+  background: #f5c000;
+  color: #0c0c0c;
+  border-bottom: 0 !important;
+}
+:root[data-ui="flat"] .ae-modal-header h3,
+:root[data-ui="flat"] .ae-modal-header button {
+  color: #0c0c0c !important;
+}
+
+/* =========================================================================
+   Glassmorphism theme (Settings > Appearance > Theme). Frosted translucent
+   panes floating over a vivid, blurred background of brand gold, red and green
+   light. Panels, the header, tabs, buttons, fields and dialogs are all
+   semi-transparent with a backdrop blur, a bright hairline edge and a soft
+   shadow. Grid cells stay opaque (sticky columns must hide what scrolls under
+   them), so the frosting is on the frames around them. Scoped to
+   :root[data-ui="glass"].
+   ========================================================================= */
+:root[data-ui="glass"] {
+  --ae-glass-blur: blur(20px) saturate(160%);
+  --ae-gl-edge: rgba(255, 255, 255, 0.65);
+  --ae-gl-shadow: 0 8px 32px rgba(90, 60, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+:root[data-ui="glass"]:not([data-theme="dark"]) {
+  --ae-bg: #f3e9cf;
+  --ae-surface-glass: rgba(255, 255, 255, 0.55);
+  --ae-header-glass: rgba(255, 250, 235, 0.62);
+  --ae-glass-bg: rgba(255, 255, 255, 0.42);
+  --ae-border: rgba(120, 90, 20, 0.22);
+  --ae-border-soft: rgba(120, 90, 20, 0.12);
+  --ae-col-a: #fffaf0;
+  --ae-col-b: #f9f0d9;
+}
+:root[data-ui="glass"][data-theme="dark"] {
+  --ae-bg: #0f0d0a;
+  --ae-surface-glass: rgba(255, 255, 255, 0.07);
+  --ae-header-glass: rgba(255, 255, 255, 0.1);
+  --ae-glass-bg: rgba(255, 255, 255, 0.07);
+  --ae-gl-edge: rgba(255, 255, 255, 0.16);
+  --ae-gl-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --ae-border: rgba(255, 255, 255, 0.16);
+  --ae-border-soft: rgba(255, 255, 255, 0.08);
+  --ae-col-a: #211d17;
+  --ae-col-b: #191611;
+}
+:root[data-ui="glass"] .app-shell {
+  background:
+    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.55), transparent 60%),
+    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.38), transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.32), transparent 60%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.03;
+}
+:root[data-ui="glass"][data-theme="dark"] .app-shell {
+  background:
+    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.3), transparent 60%),
+    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.34), transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.3), transparent 60%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.3;
+}
+:root[data-ui="glass"] .ae-page-header {
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 20px;
+  box-shadow: var(--ae-gl-shadow);
+}
+:root[data-ui="glass"] .ae-sticky-head > .ae-header-tabs {
+  background: transparent;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+:root[data-ui="glass"] .ae-header-tabs-bar,
+:root[data-ui="glass"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="glass"] .ae-header-tab {
+  border-radius: 999px;
+  font-weight: 600;
+}
+:root[data-ui="glass"] .ae-header-tab:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+:root[data-ui="glass"] .ae-header-tab[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px var(--ae-gl-edge), 0 4px 14px rgba(90, 60, 0, 0.18);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-header-tab[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.14);
+}
+:root[data-ui="glass"] .ae-panel,
+:root[data-ui="glass"] .ae-dash-stat,
+:root[data-ui="glass"] .ae-table-scroll,
+:root[data-ui="glass"] .ae-table-wrap {
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 18px;
+  box-shadow: var(--ae-gl-shadow);
+}
+:root[data-ui="glass"] .ae-table thead th {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.1));
+}
+:root[data-ui="glass"] .ae-btn {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+:root[data-ui="glass"] .ae-btn-primary {
+  background: rgba(193, 39, 45, 0.84);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(193, 39, 45, 0.35);
+}
+:root[data-ui="glass"] .ae-btn-secondary {
+  background: rgba(245, 192, 0, 0.82);
+  color: #0c0c0c;
+  box-shadow: 0 4px 14px rgba(200, 150, 0, 0.3);
+}
+:root[data-ui="glass"] .ae-btn-primary:hover:not(:disabled) {
+  background: rgba(209, 47, 54, 0.92);
+}
+:root[data-ui="glass"] .ae-btn-secondary:hover:not(:disabled) {
+  background: rgba(253, 208, 35, 0.92);
+}
+:root[data-ui="glass"] .ae-input:not(.ae-input-cell),
+:root[data-ui="glass"] .ae-select {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 12px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-input:not(.ae-input-cell),
+:root[data-ui="glass"][data-theme="dark"] .ae-select {
+  background: rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="glass"] .ae-modal-panel {
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  backdrop-filter: blur(26px) saturate(170%);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 22px;
+  box-shadow: 0 20px 60px rgba(60, 40, 0, 0.35);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-modal-panel {
+  background: rgba(30, 28, 24, 0.8);
+}
+:root[data-ui="glass"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="glass"] .ae-modal-header {
+  background: rgba(245, 192, 0, 0.3);
+  color: var(--ae-text);
+  border-bottom: 1px solid var(--ae-gl-edge) !important;
+}
+:root[data-ui="glass"] .ae-modal-header h3,
+:root[data-ui="glass"] .ae-modal-header button {
+  color: var(--ae-text) !important;
+}
+
+/* =========================================================================
+   Card-Based UI theme (Settings > Appearance > Theme). Every region is its own
+   white card lifted off a neutral grey page: soft layered shadows, 14px
+   corners, a gold edge on the header card, tabs as small cards, and a gentle
+   lift when you hover a dashboard tile. Scoped to :root[data-ui="card"].
+   ========================================================================= */
+:root[data-ui="card"] {
+  --ae-glass-blur: none;
+  --ae-card-shadow: 0 1px 2px rgba(20, 18, 10, 0.06), 0 6px 16px -4px rgba(20, 18, 10, 0.12);
+  --ae-card-shadow-hover: 0 2px 4px rgba(20, 18, 10, 0.08), 0 14px 28px -6px rgba(20, 18, 10, 0.2);
+}
+:root[data-ui="card"]:not([data-theme="dark"]) {
+  --ae-bg: #ecebe6;
+  --ae-bg-alt: #e3e1d9;
+  --ae-border: #e6e3da;
+  --ae-border-soft: #efede6;
+  --ae-surface-glass: #ffffff;
+  --ae-header-glass: #f4f2ec;
+  --ae-row-hover: rgba(12, 12, 12, 0.035);
+}
+:root[data-ui="card"][data-theme="dark"] {
+  --ae-bg: #141414;
+  --ae-border: #303030;
+  --ae-border-soft: #2a2a2a;
+  --ae-surface-glass: #232323;
+  --ae-header-glass: #2a2a2a;
+  --ae-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px -6px rgba(0, 0, 0, 0.55);
+  --ae-card-shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 32px -8px rgba(0, 0, 0, 0.7);
+}
+:root[data-ui="card"] .app-shell::before {
+  display: none;
+}
+:root[data-ui="card"] .ae-page-header {
+  background: var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ae-border);
+  border-top: 4px solid #f5c000;
+  border-radius: 14px;
+  box-shadow: var(--ae-card-shadow);
+}
+:root[data-ui="card"] .ae-page-header.ae-page-header--offline {
+  border-top-color: var(--ae-danger-text);
+  box-shadow: var(--ae-card-shadow);
+}
+:root[data-ui="card"] .ae-sticky-head > .ae-header-tabs {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 0;
+}
+:root[data-ui="card"] .ae-header-tabs-bar,
+:root[data-ui="card"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="card"] .ae-header-tab {
+  background: var(--ae-surface);
+  border-radius: 10px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(20, 18, 10, 0.1);
+  transition:
+    box-shadow var(--ae-dur-micro) ease-out,
+    background-color var(--ae-dur-micro) ease-out;
+}
+:root[data-ui="card"] .ae-header-tab:hover {
+  box-shadow: var(--ae-card-shadow);
+}
+:root[data-ui="card"] .ae-header-tab[aria-current="page"] {
+  background: #f5c000;
+  color: #0c0c0c;
+  box-shadow: 0 3px 10px -2px rgba(200, 150, 0, 0.55);
+}
+:root[data-ui="card"] .ae-panel,
+:root[data-ui="card"] .ae-dash-stat,
+:root[data-ui="card"] .ae-table-scroll,
+:root[data-ui="card"] .ae-table-wrap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ae-border);
+  border-radius: 14px;
+  box-shadow: var(--ae-card-shadow);
+}
+:root[data-ui="card"] .ae-dash-stat {
+  transition:
+    transform var(--ae-dur-enter) var(--ae-ease-out),
+    box-shadow var(--ae-dur-enter) var(--ae-ease-out);
+}
+:root[data-ui="card"] .ae-dash-stat:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ae-card-shadow-hover);
+}
+:root[data-ui="card"] .ae-table thead th {
+  color: var(--ae-text-muted);
+  letter-spacing: 0.02em;
+  text-transform: none;
+  box-shadow: inset 0 -1px 0 var(--ae-border);
+}
+:root[data-ui="card"] .ae-btn {
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(20, 18, 10, 0.18);
+}
+:root[data-ui="card"] .ae-btn:hover:not(:disabled) {
+  box-shadow: 0 4px 10px -2px rgba(20, 18, 10, 0.3);
+}
+:root[data-ui="card"] .ae-input:not(.ae-input-cell),
+:root[data-ui="card"] .ae-select {
+  border-color: var(--ae-border);
+  border-radius: 10px;
+}
+:root[data-ui="card"] .ae-modal-panel {
+  border: 1px solid var(--ae-border);
+  border-radius: 16px;
+  box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.45);
+}
+:root[data-ui="card"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="card"] .ae-modal-header {
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  border-bottom: 1px solid var(--ae-border) !important;
+}
+:root[data-ui="card"] .ae-modal-header h3,
+:root[data-ui="card"] .ae-modal-header button {
+  color: var(--ae-text) !important;
+}
+
+/* =========================================================================
+   Skeuomorphism theme (Settings > Appearance > Theme). Things that look like
+   real objects: a parchment desk, a stitched leather header, paper cards with
+   a lit top edge, embossed metal table headers, glossy gold and red push
+   buttons that press in, and recessed input wells. Scoped to
+   :root[data-ui="skeuo"]; sizes are untouched.
+   ========================================================================= */
+:root[data-ui="skeuo"] {
+  --ae-glass-blur: none;
+  --ae-sk-paper: 0 2px 4px rgba(60, 40, 0, 0.25), 0 8px 16px -6px rgba(60, 40, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+:root[data-ui="skeuo"]:not([data-theme="dark"]) {
+  --ae-bg: #e9dfc6;
+  --ae-bg-alt: #dccfae;
+  --ae-surface: #fdf8ea;
+  --ae-surface-hover: #f3ead0;
+  --ae-border: #b8a77c;
+  --ae-border-soft: #d4c7a3;
+  --ae-surface-glass: #fdf8ea;
+  --ae-header-glass: #d9ccaa;
+  --ae-col-a: #fdf8ea;
+  --ae-col-b: #f4ecd6;
+  --ae-colh-a: #d9ccaa;
+  --ae-colh-b: #cbbd98;
+  --ae-row-hover: rgba(120, 80, 0, 0.08);
+}
+:root[data-ui="skeuo"][data-theme="dark"] {
+  --ae-bg: #1d1812;
+  --ae-bg-alt: #241e16;
+  --ae-surface: #2b241b;
+  --ae-surface-hover: #362d21;
+  --ae-border: #4a3f2e;
+  --ae-border-soft: #3a3124;
+  --ae-surface-glass: #2b241b;
+  --ae-header-glass: #3a3022;
+  --ae-col-a: #2b241b;
+  --ae-col-b: #221c14;
+  --ae-colh-a: #3a3022;
+  --ae-colh-b: #2e261a;
+  --ae-sk-paper: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 16px -6px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="skeuo"] .app-shell {
+  background:
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.018) 0 2px, transparent 2px 5px),
+    radial-gradient(1000px 700px at 50% 0%, rgba(255, 255, 255, 0.4), transparent 70%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.05;
+}
+:root[data-ui="skeuo"][data-theme="dark"] .app-shell {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 5px),
+    radial-gradient(1000px 700px at 50% 0%, rgba(245, 192, 0, 0.07), transparent 70%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.4;
+}
+:root[data-ui="skeuo"] .ae-page-header {
+  --ae-glass-text: #f6ead0;
+  --ae-glass-text-muted: #d8c7a2;
+  --ae-glass-accent: #fdd023;
+  --ae-glass-divider: rgba(246, 234, 208, 0.25);
+  --ae-tb-bg: rgba(0, 0, 0, 0.18);
+  --ae-tb-border: rgba(0, 0, 0, 0.35);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.08);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.16);
+  --ae-tb-field-bg-active: rgba(253, 208, 35, 0.3);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.16);
+  --ae-tb-text: #fdd023;
+  --ae-tb-text-muted: rgba(253, 208, 35, 0.75);
+  background: linear-gradient(180deg, #4a3826 0%, #33261a 100%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #f6ead0;
+  border: 1px solid #1f160c;
+  border-radius: 10px;
+  box-shadow:
+    0 6px 14px rgba(40, 25, 5, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+  /* The stitching. */
+  outline: 1.5px dashed rgba(253, 208, 35, 0.55);
+  outline-offset: -6px;
+}
+:root[data-ui="skeuo"] .ae-page-header h2,
+:root[data-ui="skeuo"] .ae-page-header p {
+  color: inherit;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+:root[data-ui="skeuo"] .ae-page-header.ae-page-header--offline {
+  outline-color: var(--ae-danger-text);
+}
+:root[data-ui="skeuo"] .ae-sticky-head > .ae-header-tabs {
+  background: linear-gradient(180deg, #e6d9b8, #d3c49c);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 1px solid #a89668;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-sticky-head > .ae-header-tabs {
+  background: linear-gradient(180deg, #3a3022, #2a2218);
+  border-bottom-color: #14100a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="skeuo"] .ae-header-tabs-bar,
+:root[data-ui="skeuo"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="skeuo"] .ae-header-tab {
+  border-radius: 6px 6px 0 0;
+  font-weight: 600;
+}
+:root[data-ui="skeuo"] .ae-header-tab[aria-current="page"] {
+  background: linear-gradient(180deg, #fff7dc, #f0e1b0);
+  color: #2b1f00;
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 -1px 3px rgba(0, 0, 0, 0.25);
+}
+:root[data-ui="skeuo"] .ae-panel,
+:root[data-ui="skeuo"] .ae-dash-stat,
+:root[data-ui="skeuo"] .ae-table-scroll,
+:root[data-ui="skeuo"] .ae-table-wrap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  box-shadow: var(--ae-sk-paper);
+}
+:root[data-ui="skeuo"] .ae-panel,
+:root[data-ui="skeuo"] .ae-dash-stat {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-panel,
+:root[data-ui="skeuo"][data-theme="dark"] .ae-dash-stat {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%);
+}
+:root[data-ui="skeuo"] .ae-table thead th {
+  background-image: linear-gradient(180deg, #f5ecd0, #d6c8a2);
+  color: #3b2d14;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    inset 0 -1px 0 #a89668,
+    inset -1px 0 0 rgba(0, 0, 0, 0.1);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-table thead th {
+  background-image: linear-gradient(180deg, #4a3d2b, #352b1d);
+  color: #f1e3c2;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 #14100a,
+    inset -1px 0 0 rgba(0, 0, 0, 0.3);
+}
+:root[data-ui="skeuo"] .ae-btn {
+  border-radius: 7px;
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    filter var(--ae-dur-micro) ease-out;
+}
+:root[data-ui="skeuo"] .ae-btn-primary {
+  background: linear-gradient(180deg, #e0454b 0%, #c1272d 50%, #9e1f24 51%, #b3242a 100%);
+  border-color: #7d171c;
+  color: #ffffff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 2px 3px rgba(0, 0, 0, 0.35);
+}
+:root[data-ui="skeuo"] .ae-btn-secondary {
+  background: linear-gradient(180deg, #ffe36b 0%, #f5c000 50%, #dba500 51%, #eab400 100%);
+  border-color: #a37800;
+  color: #2b1f00;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 2px 3px rgba(0, 0, 0, 0.3);
+}
+:root[data-ui="skeuo"] .ae-btn-primary:hover:not(:disabled),
+:root[data-ui="skeuo"] .ae-btn-secondary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+:root[data-ui="skeuo"] .ae-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+:root[data-ui="skeuo"] .ae-input:not(.ae-input-cell),
+:root[data-ui="skeuo"] .ae-select {
+  border: 1px solid #a89668;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 2px 4px rgba(60, 40, 0, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.7);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-input:not(.ae-input-cell),
+:root[data-ui="skeuo"][data-theme="dark"] .ae-select {
+  border-color: #14100a;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="skeuo"] .ae-modal-panel {
+  border: 1px solid var(--ae-border);
+  border-radius: 10px;
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root[data-ui="skeuo"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="skeuo"] .ae-modal-header {
+  background: linear-gradient(180deg, #4a3826 0%, #33261a 100%);
+  color: #f6ead0;
+  border-bottom: 2px solid #fdd023 !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+:root[data-ui="skeuo"] .ae-modal-header h3,
+:root[data-ui="skeuo"] .ae-modal-header button {
+  color: #f6ead0 !important;
+}
+
+/* =========================================================================
+   Carbon Design System theme (Settings > Appearance > Theme). IBM's Carbon,
+   the "Gray 10" (light) and "Gray 100" (dark) themes: a flat grid of
+   rectangles, IBM Plex Sans, a black global header, 1px grey rules, square
+   controls, bottom-bordered text fields, blue (#0f62fe) for the primary action
+   and the focus ring, and a 2px blue underline on the active tab. Carbon's own
+   palette is used on purpose - this is the system, not a gold remix of it.
+   Scoped to :root[data-ui="carbon"].
+   ========================================================================= */
+:root[data-ui="carbon"] body,
+:root[data-ui="carbon"] button,
+:root[data-ui="carbon"] input,
+:root[data-ui="carbon"] select,
+:root[data-ui="carbon"] textarea {
+  font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-ui="carbon"] {
+  --ae-glass-blur: none;
+  --ae-cb-blue: #0f62fe;
+  --ae-cb-blue-hover: #0353e9;
+}
+:root[data-ui="carbon"]:not([data-theme="dark"]) {
+  --ae-bg: #f4f4f4;
+  --ae-bg-alt: #e8e8e8;
+  --ae-surface: #ffffff;
+  --ae-surface-hover: #e8e8e8;
+  --ae-text: #161616;
+  --ae-text-muted: #525252;
+  --ae-border: #c6c6c6;
+  --ae-border-soft: #e0e0e0;
+  --ae-header-bg: #e0e0e0;
+  --ae-header-glass: #e0e0e0;
+  --ae-surface-glass: #ffffff;
+  --ae-row-hover: rgba(141, 141, 141, 0.12);
+  --ae-col-a: #ffffff;
+  --ae-col-b: #f4f4f4;
+  --ae-colh-a: #e0e0e0;
+  --ae-colh-b: #d0d0d0;
+  --ae-focus-ring: #0f62fe;
+  --ae-cb-secondary: #393939;
+  --ae-cb-secondary-hover: #4c4c4c;
+}
+:root[data-ui="carbon"][data-theme="dark"] {
+  --ae-bg: #161616;
+  --ae-bg-alt: #1c1c1c;
+  --ae-surface: #262626;
+  --ae-surface-hover: #333333;
+  --ae-text: #f4f4f4;
+  --ae-text-muted: #c6c6c6;
+  --ae-border: #525252;
+  --ae-border-soft: #393939;
+  --ae-header-bg: #393939;
+  --ae-header-glass: #393939;
+  --ae-surface-glass: #262626;
+  --ae-row-hover: rgba(141, 141, 141, 0.16);
+  --ae-col-a: #262626;
+  --ae-col-b: #1c1c1c;
+  --ae-colh-a: #393939;
+  --ae-colh-b: #2c2c2c;
+  --ae-focus-ring: #ffffff;
+  --ae-cb-secondary: #6f6f6f;
+  --ae-cb-secondary-hover: #606060;
+}
+:root[data-ui="carbon"] .app-shell::before {
+  display: none;
+}
+/* Global header: black in both modes, like Carbon's UI shell. */
+:root[data-ui="carbon"] .ae-page-header {
+  --ae-glass-text: #f4f4f4;
+  --ae-glass-text-muted: #c6c6c6;
+  --ae-glass-accent: #78a9ff;
+  --ae-glass-divider: rgba(244, 244, 244, 0.25);
+  --ae-tb-bg: rgba(255, 255, 255, 0.05);
+  --ae-tb-border: #393939;
+  --ae-tb-field-bg: #262626;
+  --ae-tb-field-bg-hover: #333333;
+  --ae-tb-field-bg-active: #393939;
+  --ae-tb-hairline: #525252;
+  --ae-tb-text: #f4f4f4;
+  --ae-tb-text-muted: #c6c6c6;
+  background: #161616;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #f4f4f4;
+  border: 0;
+  border-bottom: 1px solid #393939;
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-ui="carbon"] .ae-page-header.ae-page-header--offline {
+  border-bottom: 3px solid var(--ae-danger-text);
+  box-shadow: none;
+}
+:root[data-ui="carbon"] .ae-page-header h2,
+:root[data-ui="carbon"] .ae-page-header p {
+  color: inherit;
+}
+:root[data-ui="carbon"] .ae-sticky-head > .ae-header-tabs {
+  background: var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--ae-border-soft);
+}
+:root[data-ui="carbon"] .ae-header-tab {
+  border-radius: 0;
+  font-weight: 400;
+  color: var(--ae-text-muted);
+}
+:root[data-ui="carbon"] .ae-header-tab:hover {
+  background: var(--ae-surface-hover);
+  color: var(--ae-text);
+}
+:root[data-ui="carbon"] .ae-header-tab[aria-current="page"] {
+  color: var(--ae-text);
+  font-weight: 600;
+}
+:root[data-ui="carbon"] .ae-header-tabs-bar {
+  background: var(--ae-cb-blue);
+  box-shadow: none;
+  border-radius: 0;
+  height: 2px;
+}
+:root[data-ui="carbon"] .ae-header-tab::after {
+  background: var(--ae-border);
+  border-radius: 0;
+}
+:root[data-ui="carbon"] .ae-panel,
+:root[data-ui="carbon"] .ae-dash-stat,
+:root[data-ui="carbon"] .ae-table-scroll,
+:root[data-ui="carbon"] .ae-table-wrap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: var(--ae-border-soft);
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-ui="carbon"] .ae-table thead th {
+  background-image: none;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border),
+    inset -1px 0 0 var(--ae-border-soft);
+}
+:root[data-ui="carbon"] .ae-table td {
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border-soft),
+    inset -1px 0 0 var(--ae-border-soft);
+}
+:root[data-ui="carbon"] .ae-btn {
+  border-radius: 0;
+  border-color: transparent;
+  box-shadow: none;
+  font-weight: 400;
+}
+:root[data-ui="carbon"] .ae-btn:hover:not(:disabled) {
+  filter: none;
+}
+:root[data-ui="carbon"] .ae-btn-primary {
+  background: var(--ae-cb-blue);
+  color: #ffffff;
+}
+:root[data-ui="carbon"] .ae-btn-primary:hover:not(:disabled) {
+  background: var(--ae-cb-blue-hover);
+}
+:root[data-ui="carbon"] .ae-btn-secondary {
+  background: var(--ae-cb-secondary);
+  color: #ffffff;
+}
+:root[data-ui="carbon"] .ae-btn-secondary:hover:not(:disabled) {
+  background: var(--ae-cb-secondary-hover);
+}
+/* Text fields: a filled well with only a bottom border, as in Carbon. */
+:root[data-ui="carbon"] .ae-input:not(.ae-input-cell),
+:root[data-ui="carbon"] .ae-select {
+  background: var(--ae-bg);
+  border-color: transparent;
+  border-bottom: 1px solid #8d8d8d;
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-ui="carbon"] .ae-input-cell {
+  border-radius: 0;
+}
+:root[data-ui="carbon"] .ae-modal-panel {
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+:root[data-ui="carbon"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="carbon"] .ae-modal-header {
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  border-bottom: 1px solid var(--ae-border-soft) !important;
+}
+:root[data-ui="carbon"] .ae-modal-header h3,
+:root[data-ui="carbon"] .ae-modal-header button {
+  color: var(--ae-text) !important;
+}
+
 /* ---- Settings > Appearance choice cards (both layouts) ------------------- */
 .ae-choice-card {
   position: relative;
