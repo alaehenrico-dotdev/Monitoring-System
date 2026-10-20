@@ -7,7 +7,17 @@ export type Theme = "light" | "dark";
 /// the SAME layout - ink header bar with a gold rule, flat ruled tables, square
 /// controls. Independent of the light/dark color mode, a per-browser preference,
 /// and it changes only how things are drawn, never the pages or the data.
-export type UiStyle = "classic" | "enterprise";
+export type UiStyle =
+  | "classic"
+  | "enterprise"
+  | "brutal"
+  | "flat"
+  | "glass"
+  | "card"
+  | "skeuo"
+  | "carbon";
+
+const UI_STYLES: readonly UiStyle[] = ["classic", "enterprise", "brutal", "flat", "glass", "card", "skeuo", "carbon"];
 
 const STORAGE_KEY = "ae-theme";
 const UI_STORAGE_KEY = "ae-ui";
@@ -30,7 +40,8 @@ function getInitialTheme(): Theme {
 
 function getInitialUiStyle(): UiStyle {
   try {
-    return localStorage.getItem(UI_STORAGE_KEY) === "enterprise" ? "enterprise" : "classic";
+    const stored = localStorage.getItem(UI_STORAGE_KEY);
+    return UI_STYLES.find((u) => u === stored) ?? "classic";
   } catch {
     return "classic";
   }

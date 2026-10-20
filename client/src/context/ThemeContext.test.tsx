@@ -52,4 +52,32 @@ describe("layout style", () => {
     expect(root.dataset.theme).toBe("light");
     expect(root.dataset.ui).toBe("enterprise");
   });
+
+
+
+
+
+
+
+
+
+  it.each(["brutal", "flat", "glass", "card", "skeuo", "carbon"] as const)("switches to %s, applies it at once and remembers it", (style) => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => result.current.setUiStyle(style));
+    expect(result.current.uiStyle).toBe(style);
+    expect(root.dataset.ui).toBe(style);
+    expect(localStorage.getItem("ae-ui")).toBe(style);
+  });
+
+  it.each(["brutal", "flat", "glass", "card", "skeuo", "carbon"] as const)("restores a remembered %s theme", (style) => {
+    localStorage.setItem("ae-ui", style);
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.uiStyle).toBe(style);
+  });
+
+  it.each(["gradient", "ledger", "slate"])("falls back to classic for the retired %s theme", (old) => {
+    localStorage.setItem("ae-ui", old);
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.uiStyle).toBe("classic");
+  });
 });

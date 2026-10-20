@@ -43,6 +43,25 @@ describe("SettingsPage appearance", () => {
     expect((screen.getByRole("radio", { name: /Enterprise/ }) as HTMLInputElement).checked).toBe(true);
   });
 
+  it.each([
+    [/Neobrutalism/, "brutal"],
+    [/Flat Design/, "flat"],
+    [/Glassmorphism/, "glass"],
+    [/Card-Based/, "card"],
+    [/Skeuomorphism/, "skeuo"],
+    [/Carbon/, "carbon"],
+  ] as const)("switching to the %s theme applies at once and is remembered", (name, value) => {
+    open();
+    fireEvent.click(screen.getByRole("radio", { name }));
+    expect(root.dataset.ui).toBe(value);
+    expect(localStorage.getItem("ae-ui")).toBe(value);
+  });
+
+  it("no longer offers the retired themes", () => {
+    open();
+    expect(screen.queryByRole("radio", { name: /Gradient|Ledger|Slate/ })).toBeNull();
+  });
+
   it("switching the color mode applies at once", () => {
     open();
     fireEvent.click(screen.getByRole("radio", { name: /Dark/ }));
