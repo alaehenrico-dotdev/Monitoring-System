@@ -4,17 +4,21 @@ import {
   getSheetPublishes,
   getSheetVersion,
   getSheetVersions,
+  restoreSheetVersion,
   type PublishEvent,
   type SheetKind,
   type SheetVersion,
   type SheetVersionRows,
 } from "../api/changeLog";
 import { useRealtimeVersion } from "../context/RealtimeContext";
+import { parseExtraColumnKey } from "../hooks/useExtraColumns";
 import type { Shift } from "../types";
 import { colors } from "../theme";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { SHIFT_SHORT_LABELS } from "../utils/shift";
 import { Spinner } from "./Spinner";
+import { ConfirmDialog } from "./ConfirmDialog";
+import { useBusyAction } from "../hooks/useBusyAction";
 
 type Tab = "versions" | "publishes";
 
@@ -22,6 +26,8 @@ const SHEET_LABEL: Record<SheetKind, string> = { online: "Online", offline: "Off
 
 /// "stocksIn" -> "Stocks in": the sheet's own field names, made readable.
 function humanize(key: string): string {
+  const extra = parseExtraColumnKey(key);
+  if (extra) return `${humanize(extra.mainKey)} +${extra.slot}`;
   const words = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -63,6 +69,9 @@ export function VersionHistoryPanel({
   // new selection never shows the previous version's rows.
   const [loaded, setLoaded] = useState<{ key: string; data: SheetVersionRows } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingRestore, setConfirmingRestore] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const restore = useBusyAction();
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -74,8 +83,14 @@ export function VersionHistoryPanel({
 
   useEffect(() => {
     let live = true;
+    // A failed load must not outlive the next successful one (a realtime
+    // refetch) - it would hide the data it failed to get.
     getSheetVersions(sheet, date, shift)
-      .then((r) => live && setVersions(r.versions))
+      .then((r) => {
+        if (!live) return;
+        setVersions(r.versions);
+        setError(null);
+      })
       .catch((e) => live && setError(e instanceof Error ? e.message : "Could not load version history"));
     if (sheet === "manual") {
       getSheetPublishes(date, shift)
@@ -97,7 +112,11 @@ export function VersionHistoryPanel({
     if (!selected || !selectedKey) return;
     let live = true;
     getSheetVersion(sheet, date, shift, selected.upTo, selected.after)
-      .then((r) => live && setLoaded({ key: selectedKey, data: r }))
+      .then((r) => {
+        if (!live) return;
+        setLoaded({ key: selectedKey, data: r });
+        setError(null);
+      })
       .catch((e) => live && setError(e instanceof Error ? e.message : "Could not load that version"));
     return () => {
       live = false;
@@ -109,10 +128,43 @@ export function VersionHistoryPanel({
   const columns = useMemo(() => {
     const seen: string[] = [];
     for (const row of view?.rows ?? []) for (const k of Object.keys(row.values)) if (!seen.includes(k)) seen.push(k);
-    return seen;
+    // Added columns sit right after the column they break down, the way the
+    // entry grid draws them, rather than trailing the whole sheet.
+    const base = seen.filter((k) => !parseExtraColumnKey(k));
+    return base.flatMap((k) => [
+      k,
+      ...seen
+        .filter((x) => parseExtraColumnKey(x)?.mainKey === k)
+        .sort((a, b) => parseExtraColumnKey(a)!.slot - parseExtraColumnKey(b)!.slot),
+    ]);
   }, [view]);
 
   const loading = tab === "versions" ? versions === null : publishes === null;
+
+  // Only a version of the Online/Offline sheet can be applied: a Manual Count
+  // carries a publish state, and a publish is a snapshot to read, not to redo.
+  // The newest version already is the sheet as it stands.
+  const canRestore = sheet !== "manual" && !!selected && selected.key.startsWith("v") && !!view && selected.upTo !== newest?.upTo;
+
+  async function applyVersion() {
+    if (!selected || sheet === "manual") return;
+    const upTo = selected.upTo;
+    await restore.run(async () => {
+      try {
+        const r = await restoreSheetVersion(sheet, date, shift, upTo);
+        setConfirmingRestore(false);
+        setError(null);
+        setNotice(
+          `Restored: ${r.restored} product${r.restored === 1 ? "" : "s"} written back${r.held ? `. ${r.held} product${r.held === 1 ? "'s" : "s'"} transfer change${r.held === 1 ? " was" : "s were"} NOT applied: the other page is finished, so it went to an admin for approval (everything else was restored)` : ""}${r.skipped ? `. ${r.skipped} deactivated product${r.skipped === 1 ? " was" : "s were"} left as they are` : ""}. The restore is listed above as a new version.`,
+        );
+        setSelected(null);
+      } catch (e) {
+        setConfirmingRestore(false);
+        setNotice(null);
+        setError(e instanceof Error ? e.message : "Could not restore that version");
+      }
+    });
+  }
 
   return createPortal(
     <div
@@ -141,9 +193,29 @@ export function VersionHistoryPanel({
 
         <div style={{ display: "flex", flex: 1, minHeight: 0, flexWrap: "wrap-reverse" }}>
           {/* The sheet as it stood in the selected version. */}
-          <div style={{ flex: "1 1 480px", overflow: "auto", padding: 16, minWidth: 0 }}>
+          <div className="ae-vh-scroll" style={{ flex: "1 1 480px", overflow: "auto", padding: 16, minWidth: 0 }}>
             {error && <p style={{ color: colors.danger }}>{error}</p>}
-            {selected && <h3 style={{ margin: "0 0 8px" }}>{selected.title}</h3>}
+            {notice && (
+              <p role="status" style={{ color: colors.ink, margin: "0 0 8px" }}>
+                {notice}
+              </p>
+            )}
+            {selected && (
+              <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 8px" }}>
+                <h3 style={{ margin: 0, flex: 1, minWidth: 0 }}>{selected.title}</h3>
+                {sheet !== "manual" && selected.key.startsWith("v") && (
+                  <button
+                    type="button"
+                    className="ae-btn ae-btn-primary"
+                    disabled={!canRestore}
+                    title={canRestore ? "Write this version's figures back onto the sheet" : selected.upTo === newest?.upTo ? "This is already the latest version" : "Loading this version…"}
+                    onClick={() => setConfirmingRestore(true)}
+                  >
+                    Restore this version
+                  </button>
+                )}
+              </div>
+            )}
             {selected && !view && !error && <Spinner />}
             {view && view.rows.length === 0 && <p style={{ color: colors.subtleInk }}>The sheet was empty at this point.</p>}
             {view && view.rows.length > 0 && (
@@ -182,7 +254,7 @@ export function VersionHistoryPanel({
           </div>
 
           {/* The list: versions, and publishes on the Manual Count sheet. */}
-          <aside style={{ flex: "0 0 320px", maxWidth: "100%", borderLeft: `1px solid ${colors.border}`, overflow: "auto", background: colors.surface }}>
+          <aside className="ae-vh-scroll" style={{ flex: "0 0 320px", maxWidth: "100%", borderLeft: `1px solid ${colors.border}`, overflow: "auto", background: colors.surface }}>
             {sheet === "manual" && (
               <div role="tablist" style={{ display: "flex", borderBottom: `1px solid ${colors.border}` }}>
                 {(["versions", "publishes"] as const).map((t) => (
@@ -231,6 +303,25 @@ export function VersionHistoryPanel({
           </aside>
         </div>
       </div>
+      {confirmingRestore && selected && (
+        <ConfirmDialog
+          title="Restore this version?"
+          confirmLabel="Restore"
+          busy={restore.busy}
+          onConfirm={() => void applyVersion()}
+          onCancel={() => setConfirmingRestore(false)}
+        >
+          <p style={{ margin: "0 0 8px" }}>
+            The {SHEET_LABEL[sheet]} sheet for {formatDateDisplay(date)} ({SHIFT_SHORT_LABELS[shift]} Shift) will be put back the way it was in {selected.title.toLowerCase()}.
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            <li>Every product&apos;s figures and added columns are replaced; products added since are set to zero.</li>
+            <li>It is saved as new edits under your name. Nothing is erased: the current figures stay in this history and can be restored again.</li>
+            <li>A finished (locked) page cannot be restored until an admin unlocks it.</li>
+            <li>Transfers between Online and Offline are mirrored onto the other page, as with any save; if that page is finished, the change waits for an admin.</li>
+          </ul>
+        </ConfirmDialog>
+      )}
     </div>,
     document.body,
   );

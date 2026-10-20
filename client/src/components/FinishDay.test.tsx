@@ -148,6 +148,23 @@ describe("FinishDayButton confirmation lists what is wrong", () => {
     expect(screen.queryByRole("alert")).toBeNull();
     expect((screen.getByRole("button", { name: /Finish & lock/ }) as HTMLButtonElement).disabled).toBe(false);
   });
+
+  it("names the products with no entry and notes the missing manual counts, without blocking", async () => {
+    api.getFinishSummary.mockResolvedValue({
+      ...summary(58, 60),
+      missing: [{ productId: 1, name: "APPLE" }, { productId: 2, name: "BANANA" }],
+      missingCount: 12,
+      uncounted: 3,
+    });
+    const { button } = setup();
+    await waitFor(() => expect(api.getFinishSummary).toHaveBeenCalled());
+    fireEvent.click(button());
+    expect(await screen.findByText("APPLE")).toBeTruthy();
+    expect(screen.getByText("BANANA")).toBeTruthy();
+    expect(screen.getByText("and 10 more")).toBeTruthy();
+    expect(screen.getByText(/3 saved products have no manual count/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: /Finish & lock/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
 });
 
 describe("FinishEarlierDayBanner", () => {

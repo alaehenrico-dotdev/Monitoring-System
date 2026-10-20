@@ -4,10 +4,10 @@ vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActive: vi.fn() },
 }));
 vi.mock("../repositories/dailyOnlineStockRepository", () => ({
-  dailyOnlineStockRepository: { findAllForDate: vi.fn() },
+  dailyOnlineStockRepository: { findAllForDate: vi.fn(), getOpeningStocksForProducts: vi.fn() },
 }));
 vi.mock("../repositories/dailyOfflineStockRepository", () => ({
-  dailyOfflineStockRepository: { findAllForDate: vi.fn() },
+  dailyOfflineStockRepository: { findAllForDate: vi.fn(), getOpeningStocksForProducts: vi.fn() },
 }));
 vi.mock("../repositories/manualCountRepository", () => ({
   manualCountRepository: { findForTotals: vi.fn() },
@@ -109,5 +109,21 @@ describe("getTotalStocksGrid - an opening balance is not a variance", () => {
     vi.mocked(manualCountRepository.findForTotals).mockResolvedValue(count(false));
     const [row] = await getTotalStocksGrid(DATE);
     expect(row.totalVariance).toBe(-120);
+  });
+});
+
+describe("getTotalStocksGrid - products nothing was saved for", () => {
+  it("shows their carried-forward stock, looked up from the start of the date so an applied count is included", async () => {
+    vi.mocked(dailyOnlineStockRepository.findAllForDate).mockResolvedValue([]);
+    vi.mocked(dailyOfflineStockRepository.findAllForDate).mockResolvedValue([]);
+    vi.mocked(dailyOnlineStockRepository.getOpeningStocksForProducts).mockResolvedValue(new Map([[PRODUCT_ID, 186]]));
+    vi.mocked(dailyOfflineStockRepository.getOpeningStocksForProducts).mockResolvedValue(new Map([[PRODUCT_ID, 40]]));
+
+    const [row] = await getTotalStocksGrid(DATE);
+    expect(row).toMatchObject({ onlineRemainingStock: 186, offlineRemainingStock: 40, totalRemainingStock: 226 });
+    // An applied count only feeds a MORNING shift (never Night), so the lookup
+    // must be the morning one - a Night lookup silently skips every counted product.
+    expect(dailyOnlineStockRepository.getOpeningStocksForProducts).toHaveBeenCalledWith([PRODUCT_ID], DATE, "MORNING");
+    expect(dailyOfflineStockRepository.getOpeningStocksForProducts).toHaveBeenCalledWith([PRODUCT_ID], DATE, "MORNING");
   });
 });

@@ -763,7 +763,8 @@ table input[type="number"] {
 .ae-table-wrap,
 .table-scroll,
 .ae-main,
-.ae-modal-body {
+.ae-modal-body,
+.ae-vh-scroll {
   scrollbar-width: thin;
   scrollbar-color: #f5c000 var(--ae-bg-alt);
 }
@@ -771,7 +772,8 @@ table input[type="number"] {
 .ae-table-wrap::-webkit-scrollbar,
 .table-scroll::-webkit-scrollbar,
 .ae-main::-webkit-scrollbar,
-.ae-modal-body::-webkit-scrollbar {
+.ae-modal-body::-webkit-scrollbar,
+.ae-vh-scroll::-webkit-scrollbar {
   /* Divided by the page zoom (see zoomStyle in ZoomControl.tsx) so the bar
      stays a constant, grabbable 10px on screen at 50%-200%. */
   width: calc(10px / var(--ae-zoom, 1));
@@ -781,14 +783,16 @@ table input[type="number"] {
 .ae-table-wrap::-webkit-scrollbar-track,
 .table-scroll::-webkit-scrollbar-track,
 .ae-main::-webkit-scrollbar-track,
-.ae-modal-body::-webkit-scrollbar-track {
+.ae-modal-body::-webkit-scrollbar-track,
+.ae-vh-scroll::-webkit-scrollbar-track {
   background: var(--ae-bg-alt);
 }
 .ae-table-scroll::-webkit-scrollbar-thumb,
 .ae-table-wrap::-webkit-scrollbar-thumb,
 .table-scroll::-webkit-scrollbar-thumb,
 .ae-main::-webkit-scrollbar-thumb,
-.ae-modal-body::-webkit-scrollbar-thumb {
+.ae-modal-body::-webkit-scrollbar-thumb,
+.ae-vh-scroll::-webkit-scrollbar-thumb {
   background-color: #f5c000;
   border-radius: 6px;
   border: 2px solid var(--ae-bg-alt);
@@ -797,14 +801,32 @@ table input[type="number"] {
 .ae-table-wrap::-webkit-scrollbar-thumb:hover,
 .table-scroll::-webkit-scrollbar-thumb:hover,
 .ae-main::-webkit-scrollbar-thumb:hover,
-.ae-modal-body::-webkit-scrollbar-thumb:hover {
+.ae-modal-body::-webkit-scrollbar-thumb:hover,
+.ae-vh-scroll::-webkit-scrollbar-thumb:hover {
   background-color: #d4a000;
 }
 .ae-table-scroll::-webkit-scrollbar-corner,
 .table-scroll::-webkit-scrollbar-corner,
-.ae-modal-body::-webkit-scrollbar-corner {
+.ae-modal-body::-webkit-scrollbar-corner,
+.ae-vh-scroll::-webkit-scrollbar-corner {
   background: var(--ae-bg-alt);
 }
+/* Version history panel: its two scroll areas sit on the panel's own paper/
+   surface colours, not --ae-bg-alt, so the track is transparent and the thumb's
+   inset is a transparent border (clipped to the padding box) rather than a
+   border painted in a background colour that would not match. */
+.ae-vh-scroll {
+  scrollbar-color: #f5c000 transparent;
+}
+.ae-vh-scroll::-webkit-scrollbar-track,
+.ae-vh-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.ae-vh-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
 /* Main table container: it has rounded corners now, and a full-length
    scrollbar track ran straight over them. Chromium ignores the ::-webkit-
    scrollbar rules whenever the standard scrollbar-width/-color above are
@@ -2702,7 +2724,16 @@ table input[type="number"] {
    wrapper, not the toolbar, because the inner element clips (overflow:
    hidden) and would cut off a toolbar that overhangs it. */
 .ae-page-header-collapsible--toolbar {
-  margin: 0 -8px 0 -5px;
+  /* -7px left: the first menu (Sheet/File) carries 7px of left inset (see the
+     .ae-mb-trigger rule: 6px padding + 1px border), so its box starts 7px left
+     of the h2 and its first LETTER lands exactly under the h2's first letter. The
+     strip's own left padding is dropped below so it stops at the logo's gap
+     instead of running behind the logo. */
+  margin: 0 -8px 0 -7px;
+}
+/* Beats `.ae-page-header .ae-toolbar` (padding: 2px 5px) further down. */
+.ae-page-header .ae-page-header-toolbar-slot .ae-toolbar {
+  padding-left: 0;
 }
 .ae-page-header-toolbar-slot {
   min-width: 0;

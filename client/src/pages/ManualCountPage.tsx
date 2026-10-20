@@ -14,6 +14,7 @@ import {
 } from "../components/CategoryColorMenu";
 import { inkFor, useCategoryColors } from "../hooks/useColumnColors";
 import {
+  getAuditSnapshot,
   getManualCountGrid,
   publishManualCounts,
   saveManualCount,
@@ -68,6 +69,7 @@ import {
 } from "../utils/manualCountDrafts";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
+import { auditSnapshotPdf } from "../utils/auditSnapshot";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
 import { getCurrentShiftAndDate, getDefaultAuditSheet, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
@@ -223,6 +225,18 @@ interface Figures {
   opening: boolean;
 }
 
+/// Published counts are final, so the sheet shows their cells blank, ready for
+/// the next audit - on every load, not just right after the Publish click. They
+/// stay stored (variance reports and the carry-forward read them), and Audit
+/// History reopens them from the frozen copy each publish saved.
+function blankPublished(rows: ManualCountGridRow[]): ManualCountGridRow[] {
+  return rows.map((r) =>
+    r.entry.publishedAt
+      ? { ...r, isSaved: false, isFlagged: false, entry: { ...r.entry, manualCount: null, variance: null } }
+      : r,
+  );
+}
+
 /// Section 4.4 - the supervisor (or encoder on duty) enters the physical
 /// count at each location; Variance = System Remaining Stock - Count is
 /// always system-calculated, never typed directly. The Total column is just
@@ -236,7 +250,12 @@ export function ManualCountPage() {
   // trigger the PDF once the counts have loaded (same as the report pages).
   const [searchParams] = useSearchParams();
   const openedFromHistory = searchParams.get("history") === "1";
-  const printAfterLoad = useRef(openedFromHistory);
+  // An entry made by a Publish carries the id of the frozen copy it opens; an
+  // older entry (made by exporting the sheet) does not, and rebuilds from the
+  // live counts as it always did.
+  const snapshotParam = Number(searchParams.get("snapshot"));
+  const snapshotId = openedFromHistory && Number.isInteger(snapshotParam) && snapshotParam > 0 ? snapshotParam : null;
+  const printAfterLoad = useRef(openedFromHistory && snapshotId === null);
   // Read once: coming back to the page resumes the sheet with unsaved counts.
   const [resumed] = useState(() => (openedFromHistory ? null : loadStoredView()));
   const [{ date, shift }, setDateShift] = useState<{
@@ -398,7 +417,7 @@ export function ManualCountPage() {
       getManualCountGrid(date, shift, "OFFLINE"),
     ])
       .then(([ONLINE, OFFLINE]) => {
-        if (!cancelled) setGridRows({ ONLINE, OFFLINE });
+        if (!cancelled) setGridRows({ ONLINE: blankPublished(ONLINE), OFFLINE: blankPublished(OFFLINE) });
       })
       .catch((e) => {
         if (!cancelled) setError(e.message);
@@ -586,21 +605,7 @@ export function ManualCountPage() {
         getManualCountGrid(date, shift, "ONLINE"),
         getManualCountGrid(date, shift, "OFFLINE"),
       ]);
-      // Published counts are final, so the sheet's count cells are cleared,
-      // ready for the next audit. They stay stored (variance reports still
-      // read them).
-      const cleared = (rows: typeof ONLINE) =>
-        rows.map((r) =>
-          r.entry.publishedAt
-            ? {
-                ...r,
-                isSaved: false,
-                isFlagged: false,
-                entry: { ...r.entry, manualCount: null, variance: null },
-              }
-            : r,
-        );
-      setGridRows({ ONLINE: cleared(ONLINE), OFFLINE: cleared(OFFLINE) });
+      setGridRows({ ONLINE: blankPublished(ONLINE), OFFLINE: blankPublished(OFFLINE) });
     } catch (e) {
       setShowPublishConfirm(false);
       setError(e instanceof Error ? e.message : "Could not publish");
@@ -857,6 +862,9 @@ export function ManualCountPage() {
   const unpublishedCount = savedCounts.filter(
     (r) => !r.entry.publishedAt,
   ).length;
+  // Published counts show blank (see blankPublished), so they are no longer in
+  // savedCounts - but the sheet still says it was published.
+  const publishedCount = COUNT_LOCATIONS.flatMap((loc) => gridRows?.[loc] ?? []).filter((r) => r.entry.publishedAt).length;
   // Done adding/editing: nothing staged, nothing mid-save, and saved counts
   // are waiting for approval - the toolbar's Publish button glows.
   const publishReady =
@@ -1157,6 +1165,22 @@ export function ManualCountPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleRows]);
 
+  // Opened from Audit History on a published audit: download the frozen copy
+  // that Publish saved (both Online and Offline, as released), and put the page
+  // on that sheet. Runs once; nothing is recorded again.
+  const snapshotOpened = useRef(false);
+  useEffect(() => {
+    if (snapshotId === null || snapshotOpened.current) return;
+    snapshotOpened.current = true;
+    getAuditSnapshot(snapshotId)
+      .then(async (snapshot) => {
+        setDateShift({ date: snapshot.entryDate, shift: snapshot.shift });
+        await progress.track(() => downloadTablePdf(auditSnapshotPdf(snapshot)));
+      })
+      .catch((e) => setError(e instanceof Error ? `Could not open that published audit: ${e.message}` : "Could not open that published audit"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshotId]);
+
   const varianceCell = (value: number | null): CSSProperties => ({
     ...manualCountTint.Variance,
     fontWeight: value !== null && value !== 0 ? 700 : 400,
@@ -1368,7 +1392,7 @@ export function ManualCountPage() {
                   {pendingCount} unsaved change{pendingCount === 1 ? "" : "s"}
                 </span>
               )}
-              {savedCounts.length > 0 && (
+              {(savedCounts.length > 0 || publishedCount > 0) && (
                 <span
                   className="ae-unsaved-badge"
                   style={

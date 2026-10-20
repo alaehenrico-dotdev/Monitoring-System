@@ -134,7 +134,7 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
   the physical count supersedes it instead — the correction, not the pre-correction figure, is what
   the next period actually starts from. Only ever the one period being carried forward from, never
   retroactive: correcting a count later doesn't ripple into a later period already saved. A
-  combined Total-location count stays purely informational (Variance Report / Total Stocks) since
+  combined Total-location count stays purely informational (Variance Report / Consolidated) since
   it can't be unambiguously split back between the two pools.
 - Auto-mirrored Online↔Offline transfer figures (Section 4.3), written once and reflected on both
   sides without duplicate typing. A Stock Out (Fulfillment/Delivery, or a transfer to the other
@@ -147,8 +147,8 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
 - Realtime sync: a shared WebSocket connection tells every open page to refresh the moment any
   encoder saves an entry, manual count, or runs a data reset — no manual reload needed to see
   another encoder's work.
-- Live Total Stocks view (Section 4.5). Online and Offline are separate stock pools that aren't
-  expected to tally with each other — every report (Total Stocks, Daily Report, Dashboard, Monthly
+- Live Consolidated view (Section 4.5; the page was called Total Stocks). Online and Offline are separate stock pools that aren't
+  expected to tally with each other — every report (Consolidated, Daily Report, Dashboard, Monthly
   Monitoring) shows both channels separately, with a combined "Total" kept alongside them only as
   an explicitly-labeled figure, never the only number shown.
 - Daily Report, Variance Report, and a Change Log page (Section 4.8) — every create/update/delete
@@ -163,7 +163,7 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
 **Data entry & reporting tools**
 - Excel-style zoom (25%–200%) on every grid page — genuinely re-lays-out text/cells/inputs at the
   new scale (CSS `zoom`, not a visual stretch).
-- CSV export on Online Entry, Offline Entry, Total Stocks, and Manual Count (Section 3.1). Import
+- CSV export on Online Entry, Offline Entry, Consolidated, and Manual Count (Section 3.1). Import
   (Online/Offline Entry only) writes just Opening Stock, read from the file's Remaining Stock/
   ending-balance column (or its own Opening Stock column, for a day with no prior balance to carry
   forward) — every other cell starts at 0 each day and is entered fresh, so import never applies a

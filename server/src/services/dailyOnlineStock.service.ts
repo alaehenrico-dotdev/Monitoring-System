@@ -4,6 +4,7 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
+import { sheetExtraColumnRepository } from "../repositories/sheetExtraColumnRepository";
 import { recordChange } from "./changeLog.service";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { holdLockedTransfers, requestHeldTransfers, type HeldTransfer } from "./heldTransfers.service";
@@ -14,6 +15,8 @@ import { HttpError } from "../utils/HttpError";
 import {
   columnKeysOf,
   flattenExtras,
+  layoutCells,
+  layoutCellsFor,
   totalsFromExtras,
   validateExtras,
   type StockExtraInput,
@@ -91,9 +94,10 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
   // flattened onto each row so the grid reads an added column's cell exactly
   // like any other. The main column already carries their total, so a client
   // that ignores these entirely still shows correct figures.
-  const extraRows = await dailyStockExtraRepository.findAllForDate("ONLINE", entryDate, shift);
+  const [extraRows, layoutRows] = await Promise.all([dailyStockExtraRepository.findAllForDate("ONLINE", entryDate, shift), sheetExtraColumnRepository.findForSheet("ONLINE", entryDate, shift)]);
   const extrasByProduct = new Map<number, typeof extraRows>();
   for (const e of extraRows) extrasByProduct.set(e.productId, [...(extrasByProduct.get(e.productId) ?? []), e]);
+  const layout = layoutCells(layoutRows);
 
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
   const openingStockByProduct = await dailyOnlineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
@@ -101,7 +105,7 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
   return products.map((product) => {
     const extras = extrasByProduct.get(product.id) ?? [];
     const existing = rowByProduct.get(product.id);
-    if (existing) return { product, entry: { ...existing, ...flattenExtras(extras) }, isSaved: true };
+    if (existing) return { product, entry: { ...existing, ...layoutCellsFor(layoutRows, extras, existing as unknown as Record<string, unknown>), ...flattenExtras(extras) }, isSaved: true };
 
     const openingStock = openingStockByProduct.get(product.id) ?? 0;
     const zero: OnlineFigures = {
@@ -114,7 +118,7 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
     const { onlineStock, remainingStock } = calculate(openingStock, zero);
     return {
       product,
-      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, onlineStock, remainingStock, ...flattenExtras(extras) },
+      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, onlineStock, remainingStock, ...layout, ...flattenExtras(extras) },
       isSaved: false,
     };
   });
@@ -216,6 +220,7 @@ export async function saveOnlineEntry(
     ? await dailyStockExtraRepository.findForProduct("ONLINE", productId, entryDate, shift, db)
     : [];
   await dailyStockExtraRepository.replaceColumns("ONLINE", productId, entryDate, shift, touchedColumns, extras, userId, db);
+  await sheetExtraColumnRepository.sync("ONLINE", entryDate, shift, extras, input.clearExtraColumns ?? [], db);
 
   // One change-log entry for the whole save, under this grid's existing table -
   // the extras ride along as extra fields on the same before/after snapshots,

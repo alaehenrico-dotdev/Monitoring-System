@@ -223,7 +223,7 @@ export function totalStocksSection(rows: TotalStockRow[], options: { title?: str
       { header: "Product" },
       { header: "Online Remaining", align: "right" },
       { header: "Offline Remaining", align: "right" },
-      { header: "Total Remaining", align: "right" },
+      { header: "Consolidated Remaining", align: "right" },
       { header: "Manual Count", align: "right" },
       { header: "Variance", align: "right" },
     ],

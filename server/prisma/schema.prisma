@@ -225,6 +225,46 @@ model DailyStockExtra {
   @@map("daily_stock_extra")
 }
 
+/// A frozen copy of the counts that one Publish released, so Audit History can
+/// reopen exactly what was published (system figure, count, variance, remarks)
+/// however the sheet or the days around it change afterwards. One row per
+/// publish (a sheet can be re-counted and published again), whether or not the
+/// counts were applied to the next day's opening stock.
+model AuditSnapshot {
+  id               Int      @id @default(autoincrement())
+  entryDate        DateTime @db.Date
+  shift            Shift
+  /// The publish's own timestamp - the same value stamped on every count it released.
+  publishedAt      DateTime
+  publishedById    Int?
+  appliedToOpening Boolean  @default(false)
+  /// { rows: [{ location, productId, sku, name, category, systemRemainingStock,
+  ///            manualCount, variance, isOpeningBalance, remarks }] }
+  payload          Json
+  createdAt        DateTime @default(now())
+
+  @@index([entryDate, shift])
+  @@map("audit_snapshots")
+}
+
+/// The added ("+1", "+2") columns a sheet was saved with - which columns exist,
+/// independent of whether any product has a non-zero amount in them. Without
+/// this the grid could only infer the columns from non-zero amounts, so an empty
+/// column, or one where every product used a single destination, vanished on
+/// reload. Written by the entry save (utils/stockExtras.ts decides the keys).
+model SheetExtraColumn {
+  id        Int           @id @default(autoincrement())
+  location  StockLocation
+  entryDate DateTime      @db.Date
+  shift     Shift         @default(NIGHT)
+  columnKey String        @db.VarChar(64)
+  slotIndex Int
+  createdAt DateTime      @default(now())
+
+  @@unique([location, entryDate, shift, columnKey, slotIndex], map: "sheet_extra_column_key")
+  @@map("sheet_extra_columns")
+}
+
 /// 5.4 manual_counts - physical count capture; variance is always derived
 model ManualCount {
   id                   Int           @id @default(autoincrement())

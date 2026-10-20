@@ -64,7 +64,7 @@ const QUICK_LINKS: { to: string; label: string; icon: ReactNode }[] = [
   { to: "/online", label: "Online Entry", icon: <BoxIcon /> },
   { to: "/offline", label: "Offline Entry", icon: <BoxIcon /> },
   { to: "/manual-count", label: "Manual Count", icon: <LayersIcon /> },
-  { to: "/total-stocks", label: "Total Stocks", icon: <LayersIcon /> },
+  { to: "/total-stocks", label: "Consolidated", icon: <LayersIcon /> },
   { to: "/daily-report", label: "Daily Report", icon: <ReportIcon /> },
 ];
 
@@ -413,7 +413,7 @@ export function DashboardPage() {
 
       {/* "What needs attention" row: entry progress for the shift, the
           biggest variances, low/negative stock and the lowest days left.
-          The variance and low-stock cards reuse the Total Stocks rows
+          The variance and low-stock cards reuse the Consolidated rows
           already fetched for the stat cards. */}
       <div className="ae-dash-insights">
         <EntryStatusCard date={viewDate} defaultShift={currentShift} />

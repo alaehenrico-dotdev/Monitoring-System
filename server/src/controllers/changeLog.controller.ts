@@ -12,6 +12,7 @@ import { HttpError } from "../utils/HttpError";
 import { env } from "../config/env";
 import { listArchive, runArchive } from "../services/changeLogArchive.service";
 import { getSheetVersion, listPublishHistory, listSheetVersions } from "../services/sheetHistory.service";
+import { restoreSheetVersion } from "../services/sheetRestore.service";
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -142,4 +143,19 @@ export async function getSheetPublishHistory(req: Request, res: Response) {
   const parsed = sheetSchema.omit({ sheet: true }).safeParse(req.query);
   if (!parsed.success) throw HttpError.badRequest("Invalid publish history query", parsed.error.flatten());
   res.json({ publishes: await listPublishHistory(parsed.data.date, parsed.data.shift) });
+}
+
+const restoreSchema = sheetSchema.extend({
+  sheet: z.enum(["online", "offline"]),
+  upTo: z.number().int().positive(),
+});
+
+/// Puts an Online/Offline sheet back the way it stood at one version. The
+/// Manual Count sheet is not restorable here: its counts carry a publish state
+/// (and may already be next period's opening stock) that a replay cannot undo.
+export async function postRestoreSheetVersion(req: Request, res: Response) {
+  const parsed = restoreSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest("Invalid restore request", parsed.error.flatten());
+  const { sheet, date, shift, upTo } = parsed.data;
+  res.json(await restoreSheetVersion(sheet, date, shift, upTo, req.user?.id));
 }

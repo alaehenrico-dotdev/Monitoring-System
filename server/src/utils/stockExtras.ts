@@ -66,14 +66,31 @@ export function splitDeliveryExtras(extras: StockExtraInput[]) {
  * figure both land), and surfacing an added column for it would put a spurious
  * "+1" on every existing sheet. Two or more non-zero slots means someone
  * actually split the figure up.
+ *
+ * A product that delivered to only one destination has a single non-zero
+ * slot, so judged alone it looks flat. `sheetHasBreakdown` (see
+ * sheetHasDeliveryBreakdown) says another row on the same sheet proves the
+ * columns exist, and then every row's non-zero slots are returned - otherwise
+ * those products would show 0 in their column while their total says
+ * otherwise, and saving the sheet would wipe the amount. A lone figure in a
+ * slot past the first is a breakdown in its own right.
  */
-export function deliveryExtrasFromLegacy(row: Record<string, unknown>): { columnKey: string; slotIndex: number; amount: number }[] {
+export function deliveryExtrasFromLegacy(
+  row: Record<string, unknown>,
+  sheetHasBreakdown = false,
+): { columnKey: string; slotIndex: number; amount: number }[] {
   const used: { columnKey: string; slotIndex: number; amount: number }[] = [];
   for (let slot = 1; slot <= DELIVERY_LEGACY_SLOTS; slot++) {
     const amount = Number(row[deliverySlotField(slot)] ?? 0);
     if (amount !== 0) used.push({ columnKey: DELIVERY_COLUMN, slotIndex: slot, amount });
   }
-  return used.length >= 2 ? used : [];
+  const split = used.length >= 2 || (used.length === 1 && (sheetHasBreakdown || used[0].slotIndex > 1));
+  return split ? used : [];
+}
+
+/// True when any row on the sheet carries a real Delivery (Out) breakdown.
+export function sheetHasDeliveryBreakdown(rows: Record<string, unknown>[]): boolean {
+  return rows.some((r) => deliveryExtrasFromLegacy(r).length > 0);
 }
 
 export interface StockExtraInput {
@@ -93,6 +110,38 @@ export function extraCellKey(columnKey: string, slotIndex: number): string {
 export function isExtraColumn(location: StockLocation, columnKey: string): boolean {
   if (location === "TOTAL") return false;
   return EXTRA_COLUMNS[location].includes(columnKey);
+}
+
+/// A stored sheet layout as zero-valued cells, to sit under a row's real extras:
+/// every product row then carries every column the sheet was saved with, so the
+/// grid redraws columns that are empty (or used by one product only).
+export function layoutCells(layout: { columnKey: string; slotIndex: number }[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const c of layout) out[extraCellKey(c.columnKey, c.slotIndex)] = 0;
+  return out;
+}
+
+/// A saved row's layout cells: every column the sheet was saved with, as zeros -
+/// except that a column this product has NO stored amounts for takes its flat
+/// total into the first added column. Such a row was saved before the column was
+/// split (or imported flat), and a zeroed column over a non-zero total would read
+/// as 0, since the grid shows the main column as the sum of its added columns.
+/// This is the same move the entry page makes when the first column is added.
+export function layoutCellsFor(
+  layout: { columnKey: string; slotIndex: number }[],
+  extras: { columnKey: string }[],
+  row: Record<string, unknown>,
+): Record<string, number> {
+  const out = layoutCells(layout);
+  const hasAmounts = new Set(extras.map((e) => e.columnKey));
+  const first = new Map<string, number>();
+  for (const c of layout) first.set(c.columnKey, Math.min(first.get(c.columnKey) ?? c.slotIndex, c.slotIndex));
+  for (const [columnKey, slot] of first) {
+    if (hasAmounts.has(columnKey)) continue;
+    const total = Number(row[columnKey] ?? 0);
+    if (Number.isFinite(total) && total !== 0) out[extraCellKey(columnKey, slot)] = total;
+  }
+  return out;
 }
 
 /// The amounts flattened onto a grid row, so the client reads an added

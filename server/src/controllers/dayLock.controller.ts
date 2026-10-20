@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
-import { finishDay, getFinishSummary } from "../services/dayFinish.service";
+import { finishDay, getFinishChecklist, getFinishSummary } from "../services/dayFinish.service";
 import { finishThrough, previewFinishThrough } from "../services/finishThrough.service";
 import { closeDay, closeReadiness, getClosureStatus, listClosures, unlockDay, type EntryLocation } from "../services/dayLock.service";
 
@@ -50,7 +50,13 @@ export async function postUnlock(req: Request, res: Response) {
 
 /// What finishing this shift would lock - open to every role, like the status.
 export async function getFinishInfo(req: Request, res: Response) {
-  res.json(await getFinishSummary(parseDateOnly(req.query.date), parseShift(req.query.shift), parseLocation(req.query.location)));
+  const date = parseDateOnly(req.query.date);
+  const shift = parseShift(req.query.shift);
+  const location = parseLocation(req.query.location);
+  const summary = await getFinishSummary(date, shift, location);
+  // The names-and-counts checklist is for the page being finished; without a
+  // page (the all-pages status call) there is nothing to list.
+  res.json(location ? { ...summary, ...(await getFinishChecklist(date, shift, location)) } : summary);
 }
 
 /// The encoder's "Finish day": lock ONE entry page (and, once both pages are

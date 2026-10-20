@@ -181,7 +181,22 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
             </div>
           )}
           {thin && (
-            <p style={{ margin: 0, color: colors.warningText }}>Some products have no saved entry yet. Make sure everyone is done before finishing.</p>
+            <div style={{ color: colors.warningText }}>
+              <p style={{ margin: 0 }}>Some products have no saved entry yet{summary.missingCount ? ` (${summary.missingCount})` : ""}. Make sure everyone is done before finishing.</p>
+              {summary.missing && summary.missing.length > 0 && (
+                <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                  {summary.missing.map((m) => (
+                    <li key={m.productId}>{m.name}</li>
+                  ))}
+                  {(summary.missingCount ?? 0) > summary.missing.length && <li>and {(summary.missingCount ?? 0) - summary.missing.length} more</li>}
+                </ul>
+              )}
+            </div>
+          )}
+          {!nothingSaved && (summary.uncounted ?? 0) > 0 && (
+            <p style={{ margin: "8px 0 0", color: colors.warningText }}>
+              {summary.uncounted} saved product{summary.uncounted === 1 ? " has" : "s have"} no manual count for this shift (Audit). You can still finish.
+            </p>
           )}
           {warnings.length > 0 && (
             <ul aria-label="Warnings" style={{ margin: "8px 0 0", paddingLeft: 18, color: colors.warningText }}>

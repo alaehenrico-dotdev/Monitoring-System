@@ -59,6 +59,14 @@ describe("getSheetVersion", () => {
     expect(at1.rows[0].values.stocksIn).toBe("5.00");
   });
 
+  it("hides the delivery1..5 storage columns but keeps the added columns", async () => {
+    repo.findForSheet.mockResolvedValue([
+      row(1, 0, ana, 10, { productId: 7, entryDate: "2026-10-19", shift: "NIGHT", deliveryOut: "9.00", delivery1: "4.00", delivery2: "5.00", deliveryOut__x1: 4, deliveryOut__x2: 5 }, null, "CREATE"),
+    ]);
+    const { rows: out } = await getSheetVersion("offline", "2026-10-19", "NIGHT", 1);
+    expect(Object.keys(out[0].values)).toEqual(["deliveryOut", "deliveryOut__x1", "deliveryOut__x2"]);
+  });
+
   it("drops a record whose last change before the cutoff was a DELETE", async () => {
     repo.findForSheet.mockResolvedValue([...rows, row(3, 50, ben, 10, null, rows[1].newValue, "DELETE")]);
     expect((await getSheetVersion("online", "2026-10-19", "NIGHT", 3)).rows).toEqual([]);

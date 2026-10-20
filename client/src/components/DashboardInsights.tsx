@@ -19,7 +19,7 @@ import { CheckIcon } from "./icons";
  *   - VarianceTopCard  the SKUs with the biggest variance for the date
  *   - LowStockCard     SKUs that are negative, out, or at their low-stock alert
  *
- * The last two are pure views over the Total Stocks rows the dashboard has
+ * The last two are pure views over the Consolidated rows the dashboard has
  * already fetched, so they cost no extra requests.
  */
 
@@ -350,7 +350,7 @@ export function LowStockCard({
       <h3 className="ae-dash-heading">
         Low &amp; negative stock
         <Link to="/total-stocks" className="ae-dash-link">
-          Total stocks →
+          Consolidated →
         </Link>
       </h3>
       <div className="ae-dash-card">

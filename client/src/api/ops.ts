@@ -82,6 +82,12 @@ export interface FinishSummary {
   /// Products below zero on the page asked about. Finishing needs a supervisor's
   /// sign-off while there are any.
   negatives: { productId: number; name: string; remainingStock: number }[];
+  /// Pre-finish checklist, present when a page was asked about: the first few
+  /// active products with no saved entry, how many there are in all, and how
+  /// many saved products have no manual count. None of these block finishing.
+  missing?: { productId: number; name: string }[];
+  missingCount?: number;
+  uncounted?: number;
 }
 
 /// Open to every role - an encoder has to know a sheet is locked before typing.

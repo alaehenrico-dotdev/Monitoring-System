@@ -4,9 +4,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // propagateOpeningStock) in prisma.$transaction - every repository call
 // below is already mocked out regardless of which `db`/`tx` it's given, so
 // the fake transaction client just needs to run the callback.
-vi.mock("../lib/prisma", () => ({
-  prisma: { $transaction: (cb: (tx: unknown) => unknown) => cb({}) },
+// publishing also stores a frozen copy of what it released (tx.auditSnapshot) and
+// reads the products' names for it (tx.product).
+const snapshotTx = vi.hoisted(() => ({
+  product: { findMany: vi.fn() },
+  auditSnapshot: { create: vi.fn(), findUnique: vi.fn() },
 }));
+vi.mock("../lib/prisma", () => ({
+  prisma: { $transaction: (cb: (tx: unknown) => unknown) => cb(snapshotTx), auditSnapshot: snapshotTx.auditSnapshot },
+}));
+const recordReportHistoryIn = vi.hoisted(() => vi.fn());
+vi.mock("./reportHistory.service", () => ({ recordReportHistoryIn }));
 
 vi.mock("../repositories/manualCountRepository", () => ({
   manualCountRepository: {
@@ -63,7 +71,7 @@ import { productRepository } from "../repositories/productRepository";
 import { changeLogRepository } from "../repositories/changeLogRepository";
 import { userRepository } from "../repositories/userRepository";
 import { recordChange } from "./changeLog.service";
-import { getManualCountGrid, getVarianceReport, getVarianceTrace, publishManualCounts, saveManualCount, setCountRemarks } from "./manualCounts.service";
+import { getAuditSnapshot, getManualCountGrid, getVarianceReport, getVarianceTrace, publishManualCounts, saveManualCount, setCountRemarks } from "./manualCounts.service";
 
 const PRODUCT_ID = 1;
 const DATE = new Date("2026-06-15T00:00:00.000Z");
@@ -332,6 +340,14 @@ describe("getVarianceReport - range limit", () => {
 });
 
 describe("publishing counts", () => {
+  beforeEach(() => {
+    snapshotTx.product.findMany.mockResolvedValue([
+      { id: 10, sku: "A1", name: "APPLE", category: "Fruit" },
+      { id: 11, sku: "B1", name: "BANANA", category: "Fruit" },
+    ]);
+    snapshotTx.auditSnapshot.create.mockResolvedValue({ id: 55 });
+  });
+
   const pending = (id: number, productId: number, location: "ONLINE" | "OFFLINE") => ({ id, productId, location, manualCount: 5, publishedAt: null });
 
   it("an edited count goes back to unpublished, so only approved figures count as final", async () => {
@@ -357,6 +373,37 @@ describe("publishing counts", () => {
     expect(calls[0]).toMatchObject({ tableName: "manual_counts", recordId: 1, action: "UPDATE", changedById: 7 });
     expect(dailyOnlineStockRepository.findNext).not.toHaveBeenCalled();
     expect(dailyOfflineStockRepository.findNext).not.toHaveBeenCalled();
+  });
+
+  it("saves a frozen copy of what was released and files it in Audit History, whether or not it is applied to opening", async () => {
+    vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE"), pending(2, 11, "OFFLINE")] as never);
+    vi.mocked(manualCountRepository.markPublished).mockImplementation(((id: number) =>
+      Promise.resolve({
+        id,
+        productId: id === 1 ? 10 : 11,
+        location: id === 1 ? "ONLINE" : "OFFLINE",
+        systemRemainingStock: 20,
+        manualCount: 18,
+        variance: 2,
+        isOpeningBalance: false,
+        remarks: "spoiled",
+        publishedAt: new Date(),
+      })) as never);
+
+    const out = await publishManualCounts(DATE, SHIFT, 7, false);
+
+    expect(out.snapshotId).toBe(55);
+    const data = snapshotTx.auditSnapshot.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ entryDate: DATE, shift: SHIFT, publishedById: 7, appliedToOpening: false });
+    expect(data.payload.rows).toEqual([
+      { location: "ONLINE", productId: 10, sku: "A1", name: "APPLE", category: "Fruit", systemRemainingStock: 20, manualCount: 18, variance: 2, isOpeningBalance: false, remarks: "spoiled" },
+      { location: "OFFLINE", productId: 11, sku: "B1", name: "BANANA", category: "Fruit", systemRemainingStock: 20, manualCount: 18, variance: 2, isOpeningBalance: false, remarks: "spoiled" },
+    ]);
+    expect(recordReportHistoryIn).toHaveBeenCalledWith(
+      snapshotTx,
+      expect.objectContaining({ type: "Audit Report", scope: "2026-06-15", route: "/manual-count?history=1&snapshot=55&date=2026-06-15&shift=NIGHT&source=TOTAL", section: "all" }),
+      7,
+    );
   });
 
   describe("with applyToOpening", () => {
@@ -505,5 +552,31 @@ describe("opening balance - the first count of a product at a location", () => {
     vi.mocked(dailyOnlineStockRepository.findAllForDate).mockResolvedValue([]);
     const rows = await getManualCountGrid(DATE, SHIFT, "ONLINE");
     expect(rows[0].entry).toMatchObject({ isOpeningBalance: false });
+  });
+});
+
+describe("getAuditSnapshot", () => {
+  it("returns a published audit as it was released", async () => {
+    snapshotTx.auditSnapshot.findUnique.mockResolvedValue({
+      id: 5,
+      entryDate: new Date("2026-06-15T00:00:00.000Z"),
+      shift: "NIGHT",
+      publishedAt: new Date("2026-06-16T01:00:00.000Z"),
+      appliedToOpening: true,
+      payload: { rows: [{ location: "ONLINE", productId: 10, name: "APPLE", manualCount: 18 }] },
+    });
+    expect(await getAuditSnapshot(5)).toEqual({
+      id: 5,
+      entryDate: "2026-06-15",
+      shift: "NIGHT",
+      publishedAt: "2026-06-16T01:00:00.000Z",
+      appliedToOpening: true,
+      rows: [{ location: "ONLINE", productId: 10, name: "APPLE", manualCount: 18 }],
+    });
+  });
+
+  it("says so when the published audit no longer exists", async () => {
+    snapshotTx.auditSnapshot.findUnique.mockResolvedValue(null);
+    await expect(getAuditSnapshot(99)).rejects.toThrow(/no longer exists/);
   });
 });

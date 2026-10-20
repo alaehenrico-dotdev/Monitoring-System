@@ -58,11 +58,18 @@ export async function getTotalStocksGrid(entryDate: Date) {
   // period's remaining, or its manual count), so the dashboard/Total Stocks
   // must too. Zero activity means remaining == opening. Skipped entirely
   // when every product has a saved row.
+  //
+  // Looked up as the date's FIRST period (Morning), not its last: a published
+  // count applied to opening stock feeds the next day's Morning shift only
+  // (manualCountRepository.findLatestBefore), so a Night lookup skipped every
+  // counted product and they all read 0 here while the entry pages, which open
+  // on Morning, showed their stock. With no activity that day, the stock a
+  // product starts the date with is also the stock it ends it with.
   const missingOnlineIds = products.filter((p) => !onlineByProduct.has(p.id)).map((p) => p.id);
   const missingOfflineIds = products.filter((p) => !offlineByProduct.has(p.id)).map((p) => p.id);
   const [carriedOnline, carriedOffline] = await Promise.all([
-    missingOnlineIds.length ? dailyOnlineStockRepository.getOpeningStocksForProducts(missingOnlineIds, entryDate, "NIGHT") : new Map<number, number>(),
-    missingOfflineIds.length ? dailyOfflineStockRepository.getOpeningStocksForProducts(missingOfflineIds, entryDate, "NIGHT") : new Map<number, number>(),
+    missingOnlineIds.length ? dailyOnlineStockRepository.getOpeningStocksForProducts(missingOnlineIds, entryDate, "MORNING") : new Map<number, number>(),
+    missingOfflineIds.length ? dailyOfflineStockRepository.getOpeningStocksForProducts(missingOfflineIds, entryDate, "MORNING") : new Map<number, number>(),
   ]);
 
   return products.map((product) => {

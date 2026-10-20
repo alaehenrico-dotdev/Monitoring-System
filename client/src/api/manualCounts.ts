@@ -1,3 +1,4 @@
+import type { AuditSnapshot } from "../utils/auditSnapshot";
 import { http } from "./http";
 import type {
   ManualCountEntry,
@@ -120,8 +121,13 @@ export function setCountRemarks(
 /// where the next day is already finished (`heldLocked`: held for an admin).
 /// Supervisor/Admin only.
 export function publishManualCounts(date: string, shift: Shift, applyToOpening = false) {
-  return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; keptManual?: number; heldLocked?: number }>(
+  return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; keptManual?: number; heldLocked?: number; snapshotId?: number }>(
     `/manual-counts/publish?date=${date}&shift=${shift}`,
     { applyToOpening },
   );
+}
+
+/// A published audit exactly as it was released - what Audit History reopens.
+export function getAuditSnapshot(id: number) {
+  return http.get<AuditSnapshot>(`/manual-counts/snapshots/${id}`);
 }

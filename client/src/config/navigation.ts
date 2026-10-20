@@ -40,7 +40,7 @@ export const navGroups: NavGroup[] = [
       { to: "/online", label: "Online Entry", roles: ALL_ROLES },
       { to: "/offline", label: "Offline Entry", roles: ALL_ROLES },
       { to: "/awaiting-release", label: "Awaiting Release", roles: ALL_ROLES },
-      { to: "/total-stocks", label: "Total Stocks", roles: ALL_ROLES },
+      { to: "/total-stocks", label: "Consolidated", roles: ALL_ROLES },
     ],
   },
   {

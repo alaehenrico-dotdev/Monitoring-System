@@ -4,6 +4,7 @@ import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRe
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { productRepository } from "../repositories/productRepository";
 import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
+import { sheetExtraColumnRepository } from "../repositories/sheetExtraColumnRepository";
 import { recordChange } from "./changeLog.service";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { holdLockedTransfers, requestHeldTransfers, type HeldTransfer } from "./heldTransfers.service";
@@ -16,6 +17,9 @@ import {
   DELIVERY_COLUMN,
   deliveryExtrasFromLegacy,
   flattenExtras,
+  layoutCells,
+  layoutCellsFor,
+  sheetHasDeliveryBreakdown,
   splitDeliveryExtras,
   totalsFromExtras,
   validateExtras,
@@ -98,12 +102,19 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
 
   // Added columns for the whole sheet in one query - see the matching comment
   // in dailyOnlineStock.service.ts's getOnlineGrid.
-  const extraRows = await dailyStockExtraRepository.findAllForDate("OFFLINE", entryDate, shift);
+  const [extraRows, layoutRows] = await Promise.all([dailyStockExtraRepository.findAllForDate("OFFLINE", entryDate, shift), sheetExtraColumnRepository.findForSheet("OFFLINE", entryDate, shift)]);
   const extrasByProduct = new Map<number, typeof extraRows>();
   for (const e of extraRows) extrasByProduct.set(e.productId, [...(extrasByProduct.get(e.productId) ?? []), e]);
+  const layout = layoutCells(layoutRows);
 
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
   const openingStockByProduct = await dailyOfflineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
+  // A saved layout naming Delivery (Out) counts too: once the sheet has added
+  // Delivery columns, every product's figure must be shown in them. Judged on
+  // the row alone, a product with a flat one-slot figure would get a zeroed
+  // column from the layout while its total (the sum of those columns) read 0.
+  const sheetSplit =
+    sheetHasDeliveryBreakdown(rows as unknown as Record<string, unknown>[]) || layoutRows.some((c) => c.columnKey === DELIVERY_COLUMN);
 
   return products.map((product) => {
     const stored = extrasByProduct.get(product.id) ?? [];
@@ -112,8 +123,11 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
       // Delivery (Out)'s first five added columns are the legacy slot columns
       // on this row, not daily_stock_extra rows - so they're read from there
       // and the stored overflow (slots 6+) sits on top.
-      const extras = [...deliveryExtrasFromLegacy(existing), ...stored];
-      return { product, entry: { ...existing, ...resolveDelivery(existing, {}), ...flattenExtras(extras) }, isSaved: true };
+      // Read the slots as resolved (a row saved before the slots existed holds
+      // only its flat total, which resolveDelivery places in slot 1).
+      const delivery = resolveDelivery(existing, {});
+      const extras = [...deliveryExtrasFromLegacy({ ...existing, ...delivery }, sheetSplit), ...stored];
+      return { product, entry: { ...existing, ...delivery, ...layoutCellsFor(layoutRows, extras, { ...existing, ...delivery }), ...flattenExtras(extras) }, isSaved: true };
     }
     const extras = stored;
 
@@ -134,7 +148,7 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
     const { offlineStock, remainingStock } = calculate(openingStock, zero);
     return {
       product,
-      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, offlineStock, remainingStock, ...flattenExtras(extras) },
+      entry: { productId: product.id, entryDate, shift, openingStock, ...zero, offlineStock, remainingStock, ...layout, ...flattenExtras(extras) },
       isSaved: false,
     };
   });
@@ -247,6 +261,7 @@ export async function saveOfflineEntry(
     ...deliveryExtras.overflow,
   ];
   await dailyStockExtraRepository.replaceColumns("OFFLINE", productId, entryDate, shift, touchedColumns, storedExtras, userId, db);
+  await sheetExtraColumnRepository.sync("OFFLINE", entryDate, shift, extras, input.clearExtraColumns ?? [], db);
 
   const changeId = await recordChange(
     {

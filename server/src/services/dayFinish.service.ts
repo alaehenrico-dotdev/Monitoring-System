@@ -40,6 +40,34 @@ export async function getFinishSummary(entryDate: Date, shift: Shift, location?:
   };
 }
 
+/// How many products the checklist names before saying "and N more".
+const CHECKLIST_NAMES = 10;
+
+/// The rest of the pre-finish checklist for one page - what the summary's counts
+/// cannot say: WHICH active products have no saved entry yet, and how many
+/// saved products have no manual count for this shift. Neither blocks finishing
+/// (counts are an audit, and a product can legitimately have no movement); they
+/// are shown so a half-done sheet is noticed before it is locked.
+export async function getFinishChecklist(entryDate: Date, shift: Shift, location: EntryLocation) {
+  const saved = await (location === "ONLINE"
+    ? prisma.dailyOnlineStock.findMany({ where: { entryDate, shift }, select: { productId: true } })
+    : prisma.dailyOfflineStock.findMany({ where: { entryDate, shift }, select: { productId: true } }));
+  const savedIds = new Set(saved.map((r) => r.productId));
+  const [products, counted] = await Promise.all([
+    prisma.product.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.manualCount.findMany({ where: { entryDate, shift, location }, select: { productId: true } }),
+  ]);
+  const countedIds = new Set(counted.map((c) => c.productId));
+  const missing = products.filter((p) => !savedIds.has(p.id));
+  return {
+    missing: missing.slice(0, CHECKLIST_NAMES).map((p) => ({ productId: p.id, name: p.name })),
+    missingCount: missing.length,
+    /// Saved ACTIVE products with no manual count at this location for the shift
+    /// (a deactivated product's row is not something anyone can still count).
+    uncounted: products.filter((p) => savedIds.has(p.id) && !countedIds.has(p.id)).length,
+  };
+}
+
 /**
  * The encoder's "Finish day" for ONE entry page (Online or Offline) of a date +
  * shift: freezes that page's grid only (Manual Counts stay open - see

@@ -19,8 +19,26 @@ function asObject(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }
 
-/// Bookkeeping columns that are not part of what a sheet shows.
-const HIDDEN_FIELDS = new Set(["id", "productId", "entryDate", "shift", "createdAt", "updatedAt", "publishedById", "countedById", "location"]);
+/// Bookkeeping columns that are not part of what a sheet shows. delivery1..5
+/// are the storage behind Delivery (Out)'s first five added columns, which the
+/// snapshot also carries as deliveryOut__x1..5 - showing both would list every
+/// Delivery amount twice under two different names.
+const HIDDEN_FIELDS = new Set([
+  "id",
+  "productId",
+  "entryDate",
+  "shift",
+  "createdAt",
+  "updatedAt",
+  "publishedById",
+  "countedById",
+  "location",
+  "delivery1",
+  "delivery2",
+  "delivery3",
+  "delivery4",
+  "delivery5",
+]);
 
 export interface SheetVersion {
   /// Pass as `upTo` to see the sheet as it stood when this version ended.
@@ -84,6 +102,15 @@ function stateAt(rows: Row[], upTo: number) {
     else state.set(r.recordId, asObject(r.newValue));
   }
   return state;
+}
+
+/// The raw snapshots (one per record) of a sheet as it stood at change `upTo` -
+/// what restoring a version replays. Null when `upTo` is not a change on this
+/// sheet, so a stale or made-up id can never restore an empty sheet.
+export async function getSheetStateAt(kind: SheetKind, entryDate: string, shift: Shift, upTo: number) {
+  const rows = await changeLogRepository.findForSheet(SHEET_TABLES[kind], entryDate, shift);
+  if (!rows.some((r) => r.id === upTo)) return null;
+  return stateAt(rows, upTo);
 }
 
 /// The sheet as it stood at `upTo`, with the cells that differ from `after`
