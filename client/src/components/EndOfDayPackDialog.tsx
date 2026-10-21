@@ -13,6 +13,7 @@ import {
 } from "../utils/endOfDayPack";
 import { findUnsavedWork } from "../utils/unsavedWork";
 import { formatDateDisplay } from "../utils/dateFormat";
+import { copyExportToDrive } from "../utils/driveCopy";
 import { saveBlob } from "../utils/saveBlob";
 import { colors } from "../theme";
 
@@ -113,6 +114,7 @@ export function EndOfDayPackDialog({
       });
       if (packed.zip) {
         saveBlob(packed.zip, packed.zipName);
+        copyExportToDrive(packed.zipName, packed.zip);
         // Only now that the zip has been saved.
         recordPackHistory(packed);
       }

@@ -12,6 +12,8 @@ import { PageHeader } from "../components/PageHeader";
 import { useZoom, zoomStyle, ZoomControl } from "../components/ZoomControl";
 import { CollapseAllIcon, ExpandAllIcon, SyncIcon } from "../components/icons";
 import { zoomSection } from "../utils/zoomMenu";
+import { fitWidthItem } from "../utils/fitWidthMenu";
+import { useFitWidth } from "../hooks/useFitWidth";
 import { Toast } from "../components/Toast";
 import { CategoryFilter } from "../components/CategoryFilter";
 import {
@@ -141,6 +143,7 @@ export function DailyReportPage() {
   const printAfterLoad = useRef(searchParams.get("history") === "1");
   const realtimeVersion = useRealtimeVersion();
   const [zoom, setZoom] = useZoom("daily-report");
+  const [fit, setFit] = useFitWidth("daily-report");
   // View > Expand/Collapse all categories: one command for every table on the
   // page; each table reports whether any of its categories is open.
   const [catCommand, setCatCommand] = useState<{ expanded: boolean; id: number } | null>(null);
@@ -445,6 +448,7 @@ export function DailyReportPage() {
                       disabledReason: report ? undefined : "Generate the report first",
                       onSelect: () => setCatCommand({ expanded: !anyExpanded, id: Date.now() }),
                     },
+                    fitWidthItem(fit, setFit),
                     {
                       id: "refresh",
                       label: "Refresh",
@@ -612,6 +616,7 @@ export function DailyReportPage() {
                 rows={byCategory(report.total)}
                 expandAllCommand={catCommand}
                 onAnyExpandedChange={onTotalExpanded}
+                fit={fit}
               />
             </>
           )}

@@ -1,3 +1,4 @@
+import { copyExportToDrive } from "./driveCopy";
 /**
  * Client-side table PDF generator (jsPDF + jspdf-autotable).
  *
@@ -383,5 +384,7 @@ export async function buildTablePdf(spec: PdfDocumentSpec): Promise<jsPDF> {
 
 /** Builds the PDF and triggers the browser's normal "Save File" download. */
 export async function downloadTablePdf(spec: PdfDocumentSpec): Promise<void> {
-  (await buildTablePdf(spec)).save(spec.filename);
+  const doc = await buildTablePdf(spec);
+  doc.save(spec.filename);
+  copyExportToDrive(spec.filename, doc.output("blob"));
 }

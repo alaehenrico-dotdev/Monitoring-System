@@ -1,3 +1,4 @@
+import { copyExportToDrive } from "./driveCopy";
 /**
  * Minimal CSV helpers for the Online/Offline grid export & bulk-correction
  * import (Section 3.1: "Copy/paste of a block of numbers from an external
@@ -75,4 +76,5 @@ export function downloadCsv(filename: string, content: string) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  copyExportToDrive(filename, blob);
 }

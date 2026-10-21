@@ -209,6 +209,17 @@ export const env = {
   // Folder the backup scripts write to (scripts/backup.*). When set, the
   // Backups page lists the files found there and can verify them in place.
   backupDir: process.env.BACKUP_DIR?.trim() || "",
+  // Google Drive (Settings > Google Drive; see docs/GOOGLE_DRIVE.md). All optional:
+  // with no client id and secret the page says the feature is not set up and
+  // nothing else changes. The redirect URI must be registered with Google
+  // exactly as written; Google only accepts http for localhost, so it points at
+  // the host PC and the admin connects from there.
+  googleClientId: process.env.GOOGLE_CLIENT_ID?.trim() || "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET?.trim() || "",
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI?.trim() || "http://localhost:8080/api/drive/oauth/callback",
+  // Key the stored Drive refresh token is encrypted with. Falls back to a key
+  // derived from JWT_SECRET; set this to rotate one without the other.
+  driveTokenKey: process.env.DRIVE_TOKEN_KEY?.trim() || "",
   databaseUrl: required("DATABASE_URL"),
   // No fallback for either of these two: a default here would mean
   // `required()` never actually throws, so every token this app has ever

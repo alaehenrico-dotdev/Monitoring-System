@@ -1,3 +1,4 @@
+import { copyExportToDrive } from "./driveCopy";
 /**
  * Excel export for Total Stocks and Manual Count (Section 4.4/4.5) - a real
  * .xls file Excel opens directly with proper columns/number formatting,
@@ -52,4 +53,5 @@ export function downloadExcel(filename: string, tablesHtml: string) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+  copyExportToDrive(filename, blob);
 }

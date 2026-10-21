@@ -27,8 +27,12 @@ export function TotalStocksTable({
   source = "TOTAL",
   expandAllCommand,
   onAnyExpandedChange,
+  fit = false,
 }: {
   rows: TotalStockRow[];
+  /// Stretch the columns to fill the pane (View > Fit table to width) instead
+  /// of sizing them to their content.
+  fit?: boolean;
   /// Same contract as StockGrid's: a new `id` expands or collapses every category.
   expandAllCommand?: { expanded: boolean; id: number } | null;
   /// Reports whether any category is open, so the page's menu can say
@@ -132,7 +136,7 @@ export function TotalStocksTable({
       />
     )}
     <RowGlowScroll>
-      <table className="ae-table ae-table--center-head ae-table--compact ae-table--pickable">
+      <table className={`ae-table ae-table--center-head ae-table--compact ae-table--pickable${fit ? " ae-table--fit" : ""}`}>
         <thead>
           <tr>
             {[

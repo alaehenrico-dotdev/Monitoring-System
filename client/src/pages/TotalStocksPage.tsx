@@ -8,6 +8,8 @@ import { isLowStock } from "../utils/lowStock";
 import { PageToolbar } from "../components/PageToolbar";
 import { FilterSlot } from "../components/FilterSlot";
 import { zoomSection } from "../utils/zoomMenu";
+import { fitWidthItem } from "../utils/fitWidthMenu";
+import { useFitWidth } from "../hooks/useFitWidth";
 import { Dropdown } from "../components/Dropdown";
 import { CollapseAllIcon, ExpandAllIcon, SyncIcon } from "../components/icons";
 import { DateStepper } from "../components/DateStepper";
@@ -57,6 +59,7 @@ export function TotalStocksPage() {
   const [rows, setRows] = useState<TotalStockRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useZoom("total-stocks");
+  const [fit, setFit] = useFitWidth("total-stocks");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [source, setSource] = useState<StockLocation>("TOTAL");
@@ -142,6 +145,7 @@ export function TotalStocksPage() {
                       disabledReason: rows ? undefined : "The sheet is still loading",
                       onSelect: () => setCatCommand({ expanded: !anyExpanded, id: Date.now() }),
                     },
+                    fitWidthItem(fit, setFit),
                     { id: "refresh", label: "Refresh", icon: <SyncIcon />, onSelect: () => setRefreshTick((t) => t + 1) },
                   ],
                 },
@@ -234,6 +238,7 @@ export function TotalStocksPage() {
             source={source}
             expandAllCommand={catCommand}
             onAnyExpandedChange={setAnyExpanded}
+            fit={fit}
           />
         </div>
       )}

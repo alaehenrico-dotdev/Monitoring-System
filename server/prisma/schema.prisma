@@ -746,3 +746,63 @@ model MonthClosure {
 
   @@map("month_closures")
 }
+
+/// The one Google account the system backs up to and saves exports into
+/// (Settings > Google Drive). A single row, id 1: connecting again replaces it.
+/// `refreshTokenEnc` is the OAuth refresh token, AES-256-GCM encrypted (see
+/// utils/secretBox.ts) - the plain token is never stored or returned. The
+/// scope is drive.file, so the app can only ever see files and folders it
+/// created itself, never the rest of the account's Drive.
+model DriveConnection {
+  id             Int       @id @default(1)
+  accountEmail   String?   @db.VarChar(200)
+  refreshTokenEnc String   @db.Text
+  backupFolderId String    @db.VarChar(100)
+  exportFolderId String    @db.VarChar(100)
+  /// Take a database backup to Drive once a day.
+  autoBackup     Boolean   @default(true)
+  /// The UTC hour (0-23) the daily backup becomes due.
+  backupHourUtc  Int       @default(18)
+  /// How many backups to keep in the Drive folder; older ones are trashed.
+  keepBackups    Int       @default(14)
+  /// Save a copy of every Excel/CSV/PDF export to the exports folder.
+  saveExports    Boolean   @default(true)
+  lastBackupAt   DateTime?
+  /// The last thing that went wrong talking to Google (e.g. access revoked).
+  lastError      String?   @db.VarChar(500)
+  connectedById  Int?
+  connectedAt    DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@map("drive_connection")
+}
+
+/// One row per file sent to Drive, successful or not, for the Settings list.
+model DriveUpload {
+  id          Int      @id @default(autoincrement())
+  /// "backup" | "export"
+  kind        String   @db.VarChar(10)
+  fileName    String   @db.VarChar(200)
+  driveFileId String?  @db.VarChar(100)
+  sizeBytes   BigInt?
+  /// "OK" | "FAILED"
+  status      String   @db.VarChar(10)
+  error       String?  @db.VarChar(500)
+  createdById Int?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("drive_uploads")
+}
+
+/// Small system-wide switches an admin can change in Settings, one row each
+/// (key -> text value). A missing row means the built-in default, so adding a
+/// switch never needs a data migration. Not touched by Data Reset.
+model AppSetting {
+  key         String   @id @db.VarChar(80)
+  value       String   @db.VarChar(200)
+  updatedById Int?
+  updatedAt   DateTime @updatedAt
+
+  @@map("app_settings")
+}

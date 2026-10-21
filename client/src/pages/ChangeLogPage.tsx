@@ -31,6 +31,7 @@ import {
   startOfDayIso,
 } from "../utils/changeLogLabel";
 import { localDateStamp } from "../utils/dateFormat";
+import { copyExportToDrive } from "../utils/driveCopy";
 import { saveBlob } from "../utils/saveBlob";
 import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
 import { colors } from "../theme";
@@ -175,13 +176,13 @@ export function ChangeLogPage() {
   function exportCsv() {
     setExporting(true);
     exportChangeLogCsv(filters)
-      .then((blob) =>
+      .then((blob) => {
         // BOM so Excel reads the "→" in "What changed" as UTF-8.
-        saveBlob(
-          new Blob(["﻿", blob], { type: "text/csv;charset=utf-8" }),
-          `change-log-${localDateStamp()}.csv`,
-        ),
-      )
+        const file = new Blob(["﻿", blob], { type: "text/csv;charset=utf-8" });
+        const name = `change-log-${localDateStamp()}.csv`;
+        saveBlob(file, name);
+        copyExportToDrive(name, file);
+      })
       .catch((reason: unknown) => {
         setError(reason instanceof Error ? reason.message : "Export failed");
       })

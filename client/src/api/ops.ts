@@ -68,8 +68,13 @@ export interface DayStatus {
   offlineLocked: boolean;
   closure: DayClosure | null;
   /// An earlier day with saved entries that is not finished yet: it has to be
-  /// finished before this one can be entered. Null when nothing blocks.
+  /// finished before THIS day can be finished (locks stay in order). Null when
+  /// nothing blocks.
   blockedBy: { entryDate: string; shift: Shift } | null;
+  /// The same, for ENTERING figures: equal to `blockedBy` unless an admin has
+  /// turned off Settings > Entry Rules > "Finish days in order", when it is null
+  /// and the sheet stays editable.
+  entryBlockedBy?: { entryDate: string; shift: Shift } | null;
 }
 
 export interface FinishSummary {

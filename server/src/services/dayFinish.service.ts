@@ -93,7 +93,7 @@ export async function finishDay(
   const summary = await getFinishSummary(entryDate, shift, location);
   if (summary.alreadyFinished) return { ...summary, finished: false };
   // Days are finished in order, per page.
-  await assertEarlierDaysFinished(entryDate, prisma, location);
+  await assertEarlierDaysFinished(entryDate, prisma, location, "finish");
   const mine = location === "ONLINE" ? summary.online : summary.offline;
   if (mine.saved === 0) {
     const page = location === "ONLINE" ? "Online" : "Offline";

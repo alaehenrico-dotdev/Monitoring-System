@@ -3,6 +3,11 @@ import { broadcastRealtimeEvent } from "../lib/realtime";
 import { spawn } from "child_process";
 import type { Request, Response } from "express";
 import { createHash } from "crypto";
+import { createWriteStream } from "fs";
+import { rm } from "fs/promises";
+import { Transform } from "stream";
+import { pipeline } from "stream/promises";
+import { createGzip } from "zlib";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
 import { isMysqldumpHeader } from "../utils/dumpHeader";
@@ -18,6 +23,17 @@ function parseDatabaseUrl(databaseUrl: string) {
     password: decodeURIComponent(url.password),
     database: url.pathname.replace(/^\//, ""),
   };
+}
+
+function mysqldumpArgs(c: { host: string; port: string; user: string; database: string }): string[] {
+  return [
+    "--host", c.host, "--port", c.port, "--user", c.user,
+    "--single-transaction", "--routines", "--triggers",
+    // MySQL 8 otherwise demands the server-wide PROCESS privilege just to
+    // dump tablespace metadata, which an app-level DB user rarely has.
+    "--no-tablespaces",
+    c.database,
+  ];
 }
 
 /// Section Admin - Database Backup. Streams a full `mysqldump` of the app's
@@ -43,18 +59,7 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<B
     const hash = createHash("sha256");
     let sizeBytes = 0;
     let tail = "";
-    const dump = spawn(
-      env.mysqldumpPath,
-      [
-        "--host", host, "--port", port, "--user", user,
-        "--single-transaction", "--routines", "--triggers",
-        // MySQL 8 otherwise demands the server-wide PROCESS privilege just to
-        // dump tablespace metadata, which an app-level DB user rarely has.
-        "--no-tablespaces",
-        database,
-      ],
-      { env: { ...process.env, MYSQL_PWD: password } },
-    );
+    const dump = spawn(env.mysqldumpPath, mysqldumpArgs({ host, port, user, database }), { env: { ...process.env, MYSQL_PWD: password } });
 
     let stderr = "";
     dump.stderr.on("data", (chunk) => {
@@ -198,4 +203,74 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
       else reject(new HttpError(500, `Restore failed (mysql exited with code ${code})${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
     });
   });
+}
+
+export interface DumpFileSummary {
+  /// Size and SHA-256 of the .gz file as written - what is uploaded.
+  sizeBytes: number;
+  sha256: string;
+  /// mysqldump's closing "-- Dump completed" line was seen in the dump itself.
+  complete: boolean;
+}
+
+/// The same dump as `streamDatabaseBackup`, written gzipped to `filePath`
+/// instead of an HTTP response - for the scheduled and "back up now" copies
+/// that go to Google Drive. Nothing is buffered whole: dump output flows
+/// through gzip to the file. A dump that fails leaves no file behind.
+export async function dumpDatabaseToGzipFile(filePath: string): Promise<DumpFileSummary> {
+  const { host, port, user, password, database } = parseDatabaseUrl(env.databaseUrl);
+  const dump = spawn(env.mysqldumpPath, mysqldumpArgs({ host, port, user, database }), {
+    env: { ...process.env, MYSQL_PWD: password },
+  });
+
+  let stderr = "";
+  dump.stderr.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
+  const exited = new Promise<number | null>((resolve, reject) => {
+    dump.on("error", (err) =>
+      reject(
+        (err as NodeJS.ErrnoException).code === "ENOENT"
+          ? new HttpError(500, "mysqldump isn't installed on this server (or MYSQLDUMP_PATH is wrong) - install the MySQL client tools to enable database backups.")
+          : err,
+      ),
+    );
+    dump.on("close", resolve);
+  });
+
+  let tail = "";
+  const watchDump = new Transform({
+    transform(chunk, _enc, done) {
+      tail = (tail + chunk.toString("latin1")).slice(-4096);
+      done(null, chunk);
+    },
+  });
+  const hash = createHash("sha256");
+  let sizeBytes = 0;
+  const measureOutput = new Transform({
+    transform(chunk, _enc, done) {
+      hash.update(chunk);
+      sizeBytes += chunk.length;
+      done(null, chunk);
+    },
+  });
+
+  try {
+    // Both are awaited to the end (allSettled): a missing mysqldump rejects
+    // BOTH of them, and a rejection nobody awaits would be an unhandled
+    // rejection - which takes this server down. The spawn error is the useful
+    // one to report, so it wins over the stream error it causes.
+    const [exit, written] = await Promise.allSettled([
+      exited,
+      pipeline(dump.stdout, watchDump, createGzip(), measureOutput, createWriteStream(filePath)),
+    ]);
+    if (exit.status === "rejected") throw exit.reason;
+    if (written.status === "rejected") throw written.reason;
+    const code = exit.value;
+    if (code !== 0) throw new HttpError(500, `mysqldump exited with code ${code}${stderr.trim() ? `: ${stderr.trim()}` : ""}`);
+    return { sizeBytes, sha256: hash.digest("hex"), complete: tail.includes("-- Dump completed") };
+  } catch (err) {
+    await rm(filePath, { force: true });
+    throw err;
+  }
 }

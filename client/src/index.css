@@ -616,6 +616,11 @@ table input[type="number"] {
 .ae-table--compact {
   width: auto;
 }
+/* View > Fit table to width: the compact table stretches to the pane, and the
+   browser shares the extra width out in proportion to each column's content. */
+.ae-table--compact.ae-table--fit {
+  width: 100%;
+}
 .ae-table--compact th,
 .ae-table--compact td {
   padding-left: 4px;
@@ -2705,6 +2710,24 @@ table input[type="number"] {
   box-shadow:
     var(--ae-glass-shadow),
     0 0 0 1px var(--ae-danger-text);
+}
+/* Classic only: a faint gold wash that fades across the header, strongest at
+   the logo end. It is one extra layer on top of the glass fill and sheen, so
+   the blur, glow and text colors are untouched, and every other UI style
+   (which sets its own header background) never matches. The strength is a
+   token because the same alpha reads far stronger on the cream header than on
+   the charcoal one. */
+:root[data-ui="classic"] {
+  --ae-header-wash: rgba(212, 160, 0, 0.14);
+}
+:root[data-ui="classic"][data-theme="dark"] {
+  --ae-header-wash: rgba(245, 192, 0, 0.1);
+}
+:root[data-ui="classic"] .ae-page-header {
+  background:
+    linear-gradient(105deg, var(--ae-header-wash), transparent 62%),
+    var(--ae-glass-sheen),
+    var(--ae-glass-bg);
 }
 /* Nothing sits below the title once collapsed - drop its own bottom
    margin, since the toolbar row (still present for the collapse button
@@ -7122,12 +7145,53 @@ table input[type="number"] {
 .ae-mm-tablewrap .ae-table {
   width: 100%;
 }
+.ae-mm-datecell {
+  white-space: nowrap;
+}
 .ae-mm-tablewrap {
   flex: 1;
   min-height: 240px;
   max-height: 360px;
   margin-top: 14px;
   overflow: auto;
+}
+/* Touch screens: the Chart/Table toggle is a real tap target, not a 24px sliver. */
+@media (pointer: coarse) {
+  .ae-mm-view-btn {
+    min-height: 36px;
+    padding: 6px 14px;
+  }
+}
+/* Phones: fit the whole range on screen instead of scrolling it sideways. The
+   card's side padding, the axis gutter and the air between columns all give up
+   a few pixels so twelve months get ~24px each. (A range with many points -
+   Daily Out over 16+ days - keeps its own inline minimum width and scrolls.) */
+@media (max-width: 520px) {
+  .ae-mm-heading {
+    padding: 12px 12px 0;
+  }
+  .ae-mm-body {
+    padding: 8px 12px 10px;
+  }
+  .ae-mm-chart:not(.ae-mm-chart--dense) {
+    min-width: 0;
+    grid-template-columns: 30px 1fr;
+    column-gap: 6px;
+  }
+  .ae-mm-chart:not(.ae-mm-chart--dense) .ae-mm-col {
+    padding: 0 2px;
+  }
+  .ae-mm-xlabel {
+    font-size: 10px;
+  }
+  .ae-mm-tablewrap .ae-table th,
+  .ae-mm-tablewrap .ae-table td {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .ae-mm-tip {
+    min-width: 168px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .ae-mm-tip {

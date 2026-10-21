@@ -21,6 +21,7 @@ export function useDayLock(date: string, shift: Shift, refreshKey: unknown, loca
     closure: DayClosure | null;
     locked: boolean;
     blockedBy: DayStatus["blockedBy"];
+    entryBlockedBy: DayStatus["blockedBy"];
   } | null>(null);
   const key = `${date}:${shift}:${location}`;
 
@@ -28,10 +29,15 @@ export function useDayLock(date: string, shift: Shift, refreshKey: unknown, loca
     let cancelled = false;
     getDayStatus(date, shift, location)
       .then((s) => {
-        if (!cancelled) setState({ key, closure: s.closure, locked: s.locked, blockedBy: s.blockedBy ?? null });
+        if (!cancelled) {
+          const blockedBy = s.blockedBy ?? null;
+          // A server without entry rules sends no entryBlockedBy: entering is
+          // then blocked by the same day as finishing, as it always was.
+          setState({ key, closure: s.closure, locked: s.locked, blockedBy, entryBlockedBy: s.entryBlockedBy === undefined ? blockedBy : s.entryBlockedBy });
+        }
       })
       .catch(() => {
-        if (!cancelled) setState({ key, closure: null, locked: false, blockedBy: null });
+        if (!cancelled) setState({ key, closure: null, locked: false, blockedBy: null, entryBlockedBy: null });
       });
     return () => {
       cancelled = true;
@@ -46,8 +52,12 @@ export function useDayLock(date: string, shift: Shift, refreshKey: unknown, loca
     loaded: current !== null,
     locked: current?.locked ?? false,
     closure: current?.closure ?? null,
-    /// The earlier day to finish first (days are finished in order), if any.
+    /// The earlier day to finish first before THIS day can be finished (locks
+    /// stay in order), if any.
     blockedBy: current?.blockedBy ?? null,
+    /// The earlier day to finish first before this sheet can be ENTERED - null
+    /// when the entry rules let people enter ahead of it.
+    entryBlockedBy: current?.entryBlockedBy ?? null,
     /// Re-reads the status now - after this page's own Finish day.
     refresh: load,
   };

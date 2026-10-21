@@ -3,14 +3,18 @@ import { DatabaseBackupPage } from "./DatabaseBackupPage";
 import { DataResetPage } from "./DataResetPage";
 import { UserPasswordsPage } from "./UserPasswordsPage";
 import { AppearanceSettings } from "./AppearanceSettings";
+import { GoogleDriveSettings } from "./GoogleDriveSettings";
+import { EntryRulesSettings } from "./EntryRulesSettings";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../context/AuthContext";
 
-type Tab = "appearance" | "backup" | "reset" | "passwords";
+type Tab = "appearance" | "entry" | "backup" | "drive" | "reset" | "passwords";
 
 const TABS: { key: Tab; label: string; adminOnly: boolean }[] = [
   { key: "appearance", label: "Appearance", adminOnly: false },
+  { key: "entry", label: "Entry Rules", adminOnly: true },
   { key: "backup", label: "Backup & Restore", adminOnly: true },
+  { key: "drive", label: "Google Drive", adminOnly: true },
   { key: "reset", label: "Data Reset", adminOnly: true },
   { key: "passwords", label: "User Passwords", adminOnly: true },
 ];
@@ -28,7 +32,11 @@ export function SettingsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "SUPERVISOR_ADMIN";
   const tabs = TABS.filter((t) => isAdmin || !t.adminOnly);
-  const [tab, setTab] = useState<Tab>("appearance");
+  // Google sends the browser back here with ?drive=... after the consent screen,
+  // so that is the tab to land on.
+  const [tab, setTab] = useState<Tab>(() =>
+    isAdmin && new URLSearchParams(window.location.search).has("drive") ? "drive" : "appearance",
+  );
 
   return (
     <div>
@@ -53,7 +61,9 @@ export function SettingsPage() {
       </div>
 
       {tab === "appearance" && <AppearanceSettings />}
+      {isAdmin && tab === "entry" && <EntryRulesSettings />}
       {isAdmin && tab === "backup" && <DatabaseBackupPage />}
+      {isAdmin && tab === "drive" && <GoogleDriveSettings />}
       {isAdmin && tab === "reset" && <DataResetPage />}
       {isAdmin && tab === "passwords" && <UserPasswordsPage />}
     </div>
