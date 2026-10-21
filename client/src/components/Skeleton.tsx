@@ -224,14 +224,16 @@ export function RowsSkeleton({
 export function BarsSkeleton({
   count = 12,
   chartHeight = 130,
+  label = "Loading monthly monitoring…",
 }: {
   count?: number;
   chartHeight?: number;
+  label?: string;
 }) {
   const heightCycle = [40, 65, 50, 80, 55, 70, 45, 90, 60, 75, 50, 68];
   return (
     <SkeletonRegion
-      label="Loading monthly monitoring…"
+      label={label}
       style={{ padding: "20px 20px 8px" }}
     >
       <div

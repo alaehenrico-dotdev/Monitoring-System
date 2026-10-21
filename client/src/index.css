@@ -33,6 +33,21 @@
    stay fixed on the sidebar, dashboard, login screen, and table headers,
    which are permanently dark by design in both modes. */
 :root {
+  /* Native controls (date/number spinners, selects, scrollbars, autofill) follow
+     the app theme instead of the OS, so they never render light on a dark page. */
+  color-scheme: light;
+  /* The 0.3px outline every card, field and table shares - one value, both themes. */
+  --ae-hairline: #525252;
+  /* Corner radius of every data table container, whatever the UI style. */
+  --ae-table-radius: 4px;
+  /* Monthly Monitoring series, validated against the card surface (scripts/validate_palette.js):
+     gold + blue clear every CVD and normal-vision check; the dark steps sit in the dark lightness band. */
+  --ae-viz-online: #b8860b;
+  --ae-viz-offline: #2a78d6;
+  --ae-viz-now: #d4a000;
+  --ae-viz-bar: color-mix(in srgb, var(--ae-text) 16%, transparent);
+  --ae-viz-bar-active: color-mix(in srgb, var(--ae-text) 26%, transparent);
+  --ae-viz-bar-key: #8f8a7c;
   /* Viewport height that follows mobile browser bars. 100vh is the tallest the
      viewport gets (bars hidden), so full-height shells overflowed and their
      bottoms were cut off on phones; dvh tracks the bars. Falls back to vh. */
@@ -172,6 +187,10 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
+  --ae-viz-online: #c98500;
+  --ae-viz-offline: #3987e5;
+  --ae-viz-bar-key: #8f8f8f;
   --ae-focus-ring: #f5c000;
   /* Charcoal black instead of near-pure black (#070707) - easier on the
      eyes for long sessions. Steps go lightest-on-top: page < tinted rows <
@@ -666,7 +685,7 @@ table input[type="number"] {
      pane reads as floating rather than boxed in. Side/bottom margins still
      match .ae-page-header's -18px (a 6px gap to the viewport edge) instead
      of bleeding off-screen, so the glow has room to be visible. */
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.45),
     0 0 16px rgba(255, 255, 255, 0.22),
@@ -739,7 +758,7 @@ table input[type="number"] {
 .ae-panel {
   position: relative;
   overflow: hidden;
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   border-radius: 6px;
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
@@ -857,7 +876,7 @@ table input[type="number"] {
   font-family: inherit;
   font-size: 13px;
   padding: 7px 10px;
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   border-radius: 6px;
   background: var(--ae-surface);
   color: var(--ae-text);
@@ -1009,7 +1028,7 @@ table input[type="number"] {
 }
 .ae-date-trigger.ae-input:hover:not(:disabled):not(:focus):not([aria-expanded="true"]) {
   /* No hover border on a date picker: keep the resting one. */
-  border-color: #525252;
+  border-color: var(--ae-hairline);
 }
 .ae-date-trigger[aria-expanded="true"] {
   border-color: rgba(212, 160, 0, 0.5);
@@ -1057,7 +1076,7 @@ table input[type="number"] {
   background: var(--ae-surface);
   color: var(--ae-text);
   /* Thin edge, matching the dialogs' 0.5px border (Modal.tsx). */
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   /* Same 8px radius as .ae-page-header/.ae-modal-panel - every floating
      panel in the app reads as the same family of rounded brand chrome. */
   border-radius: 6px;
@@ -1210,7 +1229,7 @@ table input[type="number"] {
   justify-content: space-between;
   gap: 8px;
   padding: 8px 12px 12px;
-  border-top: 0.3px solid #525252;
+  border-top: 0.3px solid var(--ae-hairline);
 }
 .ae-datepicker-foot-text {
   min-width: 0;
@@ -1509,8 +1528,8 @@ table input[type="number"] {
 }
 .ae-btn-danger {
   background: transparent;
-  border-color: #c1272d;
-  color: #c1272d;
+  border-color: var(--ae-danger-text);
+  color: var(--ae-danger-text);
 }
 
 /* The "..." button at the end of a table row (opens that row's action menu). */
@@ -2501,7 +2520,7 @@ table input[type="number"] {
   display: flex;
   align-items: stretch;
   height: 32px;
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   border-radius: 6px;
   background: var(--ae-surface);
   overflow: hidden;
@@ -3300,7 +3319,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   /* Same 8px radius as .ae-page-header - every card on this page reads as
      the same family of "rounded brand chrome" instead of the old sharp-
      cornered boxes. */
@@ -3319,7 +3338,7 @@ table input[type="number"] {
   transform: translateY(-1px);
 }
 .ae-dash-stat--alert {
-  border-color: #c1272d;
+  border-color: var(--ae-danger-text);
 }
 /* Icon badge - the small rounded chip each stat card leads with, CRM-tile
    style, tinted brand gold (or danger red for the alert variant). */
@@ -3334,8 +3353,8 @@ table input[type="number"] {
   color: #d4a000;
 }
 .ae-dash-stat--alert .ae-dash-stat-icon {
-  background: color-mix(in srgb, #c1272d 14%, transparent);
-  color: #c1272d;
+  background: color-mix(in srgb, var(--ae-danger-text) 14%, transparent);
+  color: var(--ae-danger-text);
 }
 .ae-dash-stat-value {
   position: relative;
@@ -3354,11 +3373,7 @@ table input[type="number"] {
 }
 .ae-dash-stat--alert .ae-dash-stat-value,
 .ae-dash-stat--alert .ae-dash-stat-label {
-  color: #c1272d;
-}
-:root[data-theme="dark"] .ae-dash-stat--alert .ae-dash-stat-value,
-:root[data-theme="dark"] .ae-dash-stat--alert .ae-dash-stat-label {
-  color: #ef5a5f;
+  color: var(--ae-danger-text);
 }
 /* Dashboard "Quick Access" - one-click shortcuts to the app's major
    Data Entry pages, so a supervisor lands here and can jump straight to
@@ -3457,7 +3472,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   border-radius: 6px;
   box-shadow:
     0 1px 2px rgba(12, 12, 12, 0.04),
@@ -3735,7 +3750,7 @@ table input[type="number"] {
 .ae-dash-seg {
   display: inline-flex;
   overflow: hidden;
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
   border-radius: 4px;
 }
 .ae-dash-seg button {
@@ -4052,7 +4067,7 @@ table input[type="number"] {
   font-size: 11px;
   font-weight: 600;
   color: var(--ae-text);
-  border: 0.3px solid #525252;
+  border: 0.3px solid var(--ae-hairline);
 }
 .ae-hist-chip--accent {
   color: var(--ae-glass-accent);
@@ -4373,13 +4388,14 @@ table input[type="number"] {
    right-click menu reads as the same family of chrome as every other popover.
    --------------------------------------------------------------------------- */
 .ae-col-menu {
+  color-scheme: dark;
   position: fixed;
   z-index: 310; /* above .ae-datepicker (300), which is above Modal (200) */
   min-width: 204px;
   padding: 5px;
   background: #232323;
   color: #e5e5e5;
-  border: 0.5px solid #525252;
+  border: 0.5px solid var(--ae-hairline);
   border-radius: 8px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.45);
   font-size: 12.5px;
@@ -4438,7 +4454,7 @@ table input[type="number"] {
 .ae-col-menu-colors {
   margin-top: 4px;
   padding: 8px 9px 6px;
-  border-top: 0.5px solid #525252;
+  border-top: 0.5px solid var(--ae-hairline);
 }
 .ae-col-menu-colors-label {
   margin-bottom: 7px;
@@ -4694,6 +4710,7 @@ table input[type="number"] {
   padding-top: 12vh;
 }
 .ae-quickjump {
+  color-scheme: dark;
   display: flex;
   flex-direction: column;
   width: 520px;
@@ -4702,7 +4719,7 @@ table input[type="number"] {
   overflow: hidden;
   background: #232323;
   color: #e5e5e5;
-  border: 0.5px solid #525252;
+  border: 0.5px solid var(--ae-hairline);
   border-radius: 8px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.45);
   animation: ae-quickjump-in var(--ae-dur-enter) var(--ae-ease-out);
@@ -6770,6 +6787,354 @@ table input[type="number"] {
   }
 }
 
+/* ---- Dashboard > Monthly Monitoring --------------------------------------
+   Grouped columns on one shared scale. Series colors are the --ae-viz-*
+   tokens (validated per theme); everything else is a text or hairline token,
+   so text never wears a series color and the grid stays recessive. */
+.ae-mm-heading {
+  margin: 0;
+  padding: 14px 20px 0;
+}
+.ae-mm-controls {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ae-mm-year {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ae-mm-year-label {
+  min-width: 44px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+.ae-mm-view {
+  display: inline-flex;
+  overflow: hidden;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 4px;
+}
+.ae-mm-view-btn {
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ae-text-muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--ae-dur-micro) var(--ae-ease-out),
+    color var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-mm-view-btn + .ae-mm-view-btn {
+  border-left: 0.3px solid var(--ae-hairline);
+}
+.ae-mm-view-btn:hover {
+  background: var(--ae-row-hover);
+  color: var(--ae-text);
+}
+.ae-mm-view-btn[aria-pressed="true"] {
+  background: var(--ae-text);
+  color: var(--ae-surface);
+}
+.ae-mm-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 20px 12px;
+}
+.ae-mm-error {
+  margin: 0;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--ae-danger-text);
+}
+.ae-mm-note {
+  margin: 14px 0 0;
+  font-size: 11.5px;
+  color: var(--ae-text-muted);
+}
+.ae-mm-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 11.5px;
+  color: var(--ae-text-muted);
+}
+.ae-mm-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Legend mirrors the mark: a block for the bars, a stroke for each line. */
+.ae-mm-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--ae-viz-bar);
+}
+.ae-mm-key {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+.ae-mm-key--online,
+.ae-mm-dot--online {
+  background: var(--ae-viz-online);
+}
+.ae-mm-key--offline,
+.ae-mm-dot--offline {
+  background: var(--ae-viz-offline);
+}
+/* Scrolls sideways (rather than squeezing the months) below ~560px. */
+.ae-mm-scroll {
+  display: flex;
+  flex: 1;
+  min-height: 240px;
+  margin-top: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.ae-mm-chart {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 34px 1fr;
+  grid-template-rows: 1fr auto;
+  column-gap: 8px;
+  min-width: 560px;
+  /* Room for the top tick label, which is centred on its gridline. */
+  padding-top: 8px;
+}
+.ae-mm-yaxis {
+  position: relative;
+}
+.ae-mm-yaxis span {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  font-size: 10.5px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ae-text-muted);
+}
+.ae-mm-plot {
+  position: relative;
+  min-height: 200px;
+}
+.ae-mm-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ae-text) 9%, transparent);
+  pointer-events: none;
+}
+.ae-mm-grid--base {
+  border-top-color: color-mix(in srgb, var(--ae-text) 28%, transparent);
+}
+/* No gap between months: a month's centre is exactly (i + 0.5) / 12 of the
+   width, which is where its line points and crosshair are drawn. */
+.ae-mm-cols,
+.ae-mm-xaxis {
+  display: flex;
+}
+.ae-mm-cols {
+  position: absolute;
+  inset: 0;
+}
+.ae-mm-col {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  height: 100%;
+  padding: 0 5px;
+  border-radius: 4px;
+  transition: background-color var(--ae-dur-micro) var(--ae-ease-out);
+}
+/* Many narrow points (a month or more of days): slimmer air between bars. */
+.ae-mm-chart--dense .ae-mm-col {
+  padding: 0 2px;
+}
+.ae-mm-col:focus-visible {
+  outline: 2px solid var(--ae-focus-ring);
+  outline-offset: -2px;
+}
+.ae-mm-col--active {
+  background: color-mix(in srgb, var(--ae-text) 6%, transparent);
+}
+/* The combined total, kept quiet so the two lines carry the story. */
+.ae-mm-bar {
+  flex: 1 1 0;
+  /* Capped so a wide desktop chart is air around slim columns, not slabs. */
+  max-width: 24px;
+  /* Rounded at the data end, square on the baseline. */
+  border-radius: 4px 4px 0 0;
+  background: var(--ae-viz-bar);
+  transition:
+    height 0.3s var(--ae-ease-out),
+    background-color var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-mm-col--active .ae-mm-bar {
+  background: var(--ae-viz-bar-active);
+}
+.ae-mm-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.ae-mm-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.ae-mm-line--online {
+  stroke: var(--ae-viz-online);
+}
+.ae-mm-line--offline {
+  stroke: var(--ae-viz-offline);
+}
+/* Snaps to the month under the pointer, like the dots on it. */
+.ae-mm-cross {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--ae-text) 45%, transparent);
+  pointer-events: none;
+}
+.ae-mm-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, 50%);
+  border-radius: 50%;
+  /* The 2px surface ring that keeps it legible over a line or bar. */
+  box-shadow: 0 0 0 2px var(--ae-surface);
+  pointer-events: none;
+}
+.ae-mm-xaxis {
+  grid-column: 2;
+  margin-top: 6px;
+}
+.ae-mm-xlabel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--ae-text-muted);
+}
+.ae-mm-xlabel-text {
+  padding-bottom: 1px;
+  /* A thinned-out label may be wider than its own column; let it overhang. */
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.ae-mm-xlabel--current {
+  font-weight: 800;
+  color: var(--ae-text);
+}
+.ae-mm-xlabel--current .ae-mm-xlabel-text {
+  border-bottom-color: var(--ae-viz-now);
+}
+.ae-mm-flag {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ae-danger-text);
+}
+.ae-mm-tip {
+  position: absolute;
+  top: 4px;
+  z-index: 3;
+  min-width: 190px;
+  padding: 8px 10px;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 6px;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  pointer-events: none;
+  animation: ae-mm-tip-in var(--ae-dur-micro) var(--ae-ease-out);
+}
+@keyframes ae-mm-tip-in {
+  from {
+    opacity: 0;
+  }
+}
+.ae-mm-tip-title {
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+/* One row per series: its color, its name, its value at the right edge. */
+.ae-mm-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.7;
+}
+.ae-mm-tip-label {
+  flex: 1;
+  color: var(--ae-text-muted);
+}
+.ae-mm-tip-row strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ae-mm-dotkey {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ae-viz-bar-key);
+}
+.ae-mm-dotkey--online {
+  background: var(--ae-viz-online);
+}
+.ae-mm-dotkey--offline {
+  background: var(--ae-viz-offline);
+}
+.ae-mm-tip-flags,
+.ae-mm-tip-empty {
+  margin-top: 4px;
+  color: var(--ae-text-muted);
+}
+.ae-mm-tip-empty {
+  margin-top: 0;
+}
+.ae-mm-tip-flags--alert {
+  font-weight: 600;
+  color: var(--ae-danger-text);
+}
+.ae-mm-tablewrap .ae-table {
+  width: 100%;
+}
+.ae-mm-tablewrap {
+  flex: 1;
+  min-height: 240px;
+  max-height: 360px;
+  margin-top: 14px;
+  overflow: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-mm-tip {
+    animation: none;
+  }
+}
+
 /* ---- Interaction baseline ------------------------------------------------
    Three rules every control inherits, so a new one is correct by default
    instead of by remembering to copy them. All use :where(), which has no
@@ -7376,4 +7741,16 @@ table input[type="number"] {
 .ae-mb .ae-search--open input[type="search"] {
   border: calc(var(--ae-mb-line-w) * 0.5) solid var(--ae-mb-line);
   border-radius: var(--ae-mb-radius);
+}
+
+/* Data tables: one corner radius in every UI style. The style blocks above round
+   panels, stat cards and tables together, so this sits last and matches their
+   specificity (:root[data-ui="x"] .cls) to take the tables back out of that. */
+.ae-table-scroll,
+.ae-table-wrap,
+.table-scroll,
+:root[data-ui] .ae-table-scroll,
+:root[data-ui] .ae-table-wrap,
+:root[data-ui] .table-scroll {
+  border-radius: var(--ae-table-radius);
 }

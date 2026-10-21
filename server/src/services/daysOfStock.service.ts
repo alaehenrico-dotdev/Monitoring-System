@@ -1,6 +1,6 @@
 import { prisma } from "../lib/prisma";
 import { getTotalStocksGrid } from "./totalStocks.service";
-import { toNum } from "../utils/stockMath";
+import { offlineNetOutflow, toNum } from "../utils/stockMath";
 
 /**
  * Dashboard > "Needs restock" / "Lowest days left": how long each product's
@@ -126,10 +126,11 @@ async function tallyOutflow(start: Date, end: Date): Promise<Tally> {
   }
   for (const row of offline) {
     // Backloads come back INTO stock, so they offset the day's outflow.
-    const out =
-      toNum(row._sum.deliveryOut) +
-      toNum(row._sum.upsellOut) -
-      toNum(row._sum.backloads);
+    const out = offlineNetOutflow(
+      toNum(row._sum.deliveryOut),
+      toNum(row._sum.upsellOut),
+      toNum(row._sum.backloads),
+    );
     add(tally, row.productId, row.entryDate, out);
   }
   return tally;
