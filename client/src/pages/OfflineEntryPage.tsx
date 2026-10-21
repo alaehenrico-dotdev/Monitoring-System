@@ -166,8 +166,9 @@ export function OfflineEntryPage() {
   // A finished day is frozen: the sheet opens read-only with its saved state
   // (the server refuses writes to it too - see assertPeriodOpen).
   const dayLock = useDayLock(date, shift, `${realtimeVersion}:${reconnects}`, "OFFLINE");
-  // Read-only while an earlier day still has to be finished (days go in order).
-  const canEdit = roleCanEdit && !dayLock.locked && !dayLock.blockedBy;
+  // Read-only while an earlier day still has to be finished (days go in order) -
+  // unless an admin has turned that rule off in Settings > Entry Rules.
+  const canEdit = roleCanEdit && !dayLock.locked && !dayLock.entryBlockedBy;
 
   // Cell edits are staged here instead of hitting the save endpoint
   // immediately - Save (below) flushes them all at once, and Preview shows
@@ -677,9 +678,9 @@ export function OfflineEntryPage() {
         variant="warning"
         duration={null}
       />
-      {dayLock.blockedBy && !dayLock.locked && (
+      {dayLock.entryBlockedBy && !dayLock.locked && (
         <FinishEarlierDayBanner
-          blockedBy={dayLock.blockedBy}
+          blockedBy={dayLock.entryBlockedBy}
           onGo={(d, s) => setDateShift({ date: d, shift: s })}
         />
       )}

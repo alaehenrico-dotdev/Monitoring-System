@@ -85,7 +85,7 @@ describe("finishDay", () => {
     summary(58, 60);
     const result = await finishDay(DATE, "NIGHT", "ONLINE", 7);
     expect(closePeriod).toHaveBeenCalledWith(DATE, "NIGHT", { entriesOnly: true, userId: 7, location: "ONLINE" }, prismaMock);
-    expect(assertEarlierDaysFinished).toHaveBeenCalledWith(DATE, expect.anything(), "ONLINE");
+    expect(assertEarlierDaysFinished).toHaveBeenCalledWith(DATE, expect.anything(), "ONLINE", "finish");
     expect(saveSnapshot).not.toHaveBeenCalled();
     expect(result).toMatchObject({ finished: true, reportSaved: false });
   });

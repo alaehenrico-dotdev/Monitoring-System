@@ -37,6 +37,8 @@ import { DateStepper } from "../components/DateStepper";
 import { SplitButton } from "../components/SplitButton";
 import type { MenuDef } from "../components/MenuBar";
 import { zoomSection } from "../utils/zoomMenu";
+import { fitWidthItem } from "../utils/fitWidthMenu";
+import { useFitWidth } from "../hooks/useFitWidth";
 import { PageHeader } from "../components/PageHeader";
 import { Toast } from "../components/Toast";
 import { SearchInput } from "../components/SearchInput";
@@ -353,6 +355,7 @@ export function ManualCountPage() {
     useCategoryColors("audit");
   const [catMenu, setCatMenu] = useState<CategoryMenuTarget | null>(null);
   const [zoom, setZoom] = useZoom("manual-count");
+  const [fit, setFit] = useFitWidth("manual-count");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   // Which rows the grid shows: everything, only counts with a non-zero
@@ -1246,6 +1249,7 @@ export function ManualCountPage() {
               disabledReason: auditRows ? undefined : "The sheet is still loading",
               onSelect: () => setAllExpanded(!anyExpanded),
             },
+            fitWidthItem(fit, setFit),
             {
               id: "reorder",
               label: "Reorder products…",
@@ -1545,7 +1549,7 @@ export function ManualCountPage() {
             focusStorageKey={`ala-eh-focus:manual-count:${date}:${shift}`}
           >
             <table
-              className="ae-table ae-table--center-head ae-table--compact ae-table--pickable"
+              className={`ae-table ae-table--center-head ae-table--compact ae-table--pickable${fit ? " ae-table--fit" : ""}`}
               onPaste={handlePaste}
             >
               <thead>

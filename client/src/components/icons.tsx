@@ -10,6 +10,7 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  FoldHorizontal,
   Clock,
   Download,
   Ellipsis,
@@ -30,6 +31,7 @@ import {
   Tag,
   TriangleAlert,
   Undo2,
+  UnfoldHorizontal,
   Upload,
   X,
   ZoomIn,
@@ -178,6 +180,16 @@ export function CollapseAllIcon() {
 /// Expand every category: chevrons pointing out, away from each other.
 export function ExpandAllIcon() {
   return <ChevronsUpDown {...look(15, 1.7)} />;
+}
+
+/// Stretch a table's columns to fill the width: arrows pointing out to both sides.
+export function FitWidthIcon() {
+  return <UnfoldHorizontal {...look(15, 1.7)} />;
+}
+
+/// Put a stretched table back to content-sized columns: arrows pointing in.
+export function CompactWidthIcon() {
+  return <FoldHorizontal {...look(15, 1.7)} />;
 }
 
 /// Arrange product order: an up arrow beside a down arrow.

@@ -73,7 +73,7 @@ describe("SettingsPage appearance", () => {
 describe("SettingsPage tabs by role", () => {
   it("gives an admin the admin tools as well", () => {
     open();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Appearance", "Backup & Restore", "Data Reset", "User Passwords"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Appearance", "Entry Rules", "Backup & Restore", "Google Drive", "Data Reset", "User Passwords"]);
     fireEvent.click(screen.getByRole("tab", { name: "Data Reset" }));
     expect(screen.getByText("reset tool")).toBeTruthy();
   });

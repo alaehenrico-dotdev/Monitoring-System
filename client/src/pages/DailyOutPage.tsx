@@ -30,6 +30,13 @@ function daysBefore(date: string, n: number): string {
   return `${out.getFullYear()}-${String(out.getMonth() + 1).padStart(2, "0")}-${String(out.getDate()).padStart(2, "0")}`;
 }
 
+/// "2026-10-08" -> "Oct 8, 2026": short enough to stay on one line in a phone-width
+/// table column (the page title already carries the long form).
+function tableDate(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 const cell = (v: number | null) => (v === null ? "—" : fullNumber.format(v));
 
 /**
@@ -81,8 +88,8 @@ export function DailyOutPage() {
   return (
     <div>
       <PageHeader
-        title={`Daily Out - last ${days} days to ${formatDateDisplay(to)}`}
-        subtitle="Stock leaving the company each day: Online fulfilled, Offline delivered, and both combined."
+        title={`Daily Out - ${formatDateDisplay(to)}`}
+        subtitle={`The last ${days} days to this date: stock leaving the company each day - Online fulfilled, Offline delivered, and both combined.`}
       >
         <PageToolbar
           label="Daily Out"
@@ -186,7 +193,8 @@ function DailyOutTable({
       <table className="ae-table ae-table--compact">
         <thead>
           <tr>
-            {["Date", "Online out", "Offline out", "Combined out"].map((h) => (
+            {/* The card is titled "Out per day", so the columns need not repeat "out". */}
+            {["Date", "Online", "Offline", "Combined"].map((h) => (
               <th key={h}>{h}</th>
             ))}
           </tr>
@@ -194,7 +202,7 @@ function DailyOutTable({
         <tbody>
           {rows.map((e) => (
             <tr key={e.date}>
-              <td>{formatDateDisplay(e.date)}</td>
+              <td className="ae-mm-datecell">{tableDate(e.date)}</td>
               <td>{cell(e.onlineOut)}</td>
               <td>{cell(e.offlineOut)}</td>
               <td>{cell(e.totalOut)}</td>

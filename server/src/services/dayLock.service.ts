@@ -5,6 +5,7 @@ import { HttpError } from "../utils/HttpError";
 import { toDateOnlyString } from "../utils/date";
 import { recordChange } from "./changeLog.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
+import { getEntryRules } from "./appSettings.service";
 
 export const DAY_CLOSURES_TABLE = "day_closures";
 
@@ -136,13 +137,21 @@ export interface UnfinishedPeriod {
  * onwards count: everything entered before Finish day existed was never
  * finished, and must not suddenly block all new entries. Skipped inside an
  * approved correction (runAsAdjustment), like the closed-day lock.
+ *
+ * `purpose` is what the answer is used for. "entry" (saving figures) is waived
+ * when an admin has turned off Settings > Entry Rules > "Finish days in order",
+ * so the present day can be filled in while earlier days are still open.
+ * "finish" (locking a day) is never waived: the locks stay in sequence, so a day
+ * is never locked while an earlier one can still change under it.
  */
 export async function findUnfinishedEarlierPeriod(
   entryDate: Date,
   db: Db = prisma,
   location?: EntryLocation,
+  purpose: "entry" | "finish" = "entry",
 ): Promise<UnfinishedPeriod | null> {
   if (adjustment.getStore()) return null;
+  if (purpose === "entry" && !(await getEntryRules()).requireEarlierDaysFinished) return null;
   const first = await db.dayClosure.findFirst({ orderBy: { entryDate: "asc" }, select: { entryDate: true } });
   if (!first || first.entryDate >= entryDate) return null;
 
@@ -166,8 +175,13 @@ export async function findUnfinishedEarlierPeriod(
 }
 
 /// Refuses an entry write (or a Finish day) while an earlier day is unfinished.
-export async function assertEarlierDaysFinished(entryDate: Date, db: Db = prisma, location?: EntryLocation): Promise<void> {
-  const blocker = await findUnfinishedEarlierPeriod(entryDate, db, location);
+export async function assertEarlierDaysFinished(
+  entryDate: Date,
+  db: Db = prisma,
+  location?: EntryLocation,
+  purpose: "entry" | "finish" = "entry",
+): Promise<void> {
+  const blocker = await findUnfinishedEarlierPeriod(entryDate, db, location, purpose);
   if (blocker) {
     throw HttpError.conflict(
       `Finish ${blocker.entryDate} (${SHIFT_LABELS[blocker.shift]} shift) before entering ${toDateOnlyString(entryDate)}: days are finished in order.`,
@@ -195,6 +209,10 @@ export function listClosures(filters: { from?: Date; to?: Date; closedOnly?: boo
 /// it, `locked` is true only when both pages are.
 export async function getClosureStatus(entryDate: Date, shift: Shift, location?: EntryLocation) {
   const row = await prisma.dayClosure.findUnique({ where: { entryDate_shift: { entryDate, shift } } });
+  // Asked for finishing, which is never waived; the entry answer is derived from
+  // it so the two cannot disagree (and the day-by-day scan runs only once).
+  const blockedBy = await findUnfinishedEarlierPeriod(entryDate, prisma, location, "finish");
+  const rules = await getEntryRules();
   return {
     entryDate: toDateOnlyString(entryDate),
     shift,
@@ -203,8 +221,11 @@ export async function getClosureStatus(entryDate: Date, shift: Shift, location?:
     offlineLocked: row?.offlineLocked ?? false,
     locked: location ? isSideLocked(row, location) : (row?.isClosed ?? false),
     closure: row,
-    /// The earlier day that must be finished before this one can be entered.
-    blockedBy: await findUnfinishedEarlierPeriod(entryDate, prisma, location),
+    /// The earlier day that must be finished before THIS day can be finished.
+    blockedBy,
+    /// The earlier day that must be finished before this one can be ENTERED:
+    /// the same day, unless the entry rules let people enter ahead of it.
+    entryBlockedBy: rules.requireEarlierDaysFinished ? blockedBy : null,
   };
 }
 

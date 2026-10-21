@@ -41,6 +41,12 @@ services:
       # nginx reaches the API over the compose network, so trust that subnet
       # for X-Forwarded-For (per-visitor rate limiting).
       TRUST_PROXY: 172.28.0.0/16
+      # Settings > Google Drive (docs/GOOGLE_DRIVE.md). Optional: with no client
+      # id/secret the page just says the feature is not set up.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-http://localhost:${WEB_PORT:-8080}/api/drive/oauth/callback}
+      DRIVE_TOKEN_KEY: ${DRIVE_TOKEN_KEY:-}
     # Snapshots taken before pending migrations are applied (server/docker/start.sh).
     volumes:
       - api_backups:/backups

@@ -4,12 +4,14 @@ import { env } from "./config/env";
 import { prisma } from "./lib/prisma";
 import { attachRealtime, closeRealtime } from "./lib/realtime";
 import { startMaintenance } from "./services/maintenance.service";
+import { startDriveScheduler } from "./services/drive.service";
 
 const app = createApp();
 const server = createServer(app);
 attachRealtime(server);
 
 startMaintenance();
+startDriveScheduler();
 
 server.listen(env.port, env.host, () => {
   // eslint-disable-next-line no-console
