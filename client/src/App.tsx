@@ -35,6 +35,11 @@ const TotalStocksPage = lazy(() =>
     default: m.TotalStocksPage,
   })),
 );
+const DailyOutPage = lazy(() =>
+  import("./pages/DailyOutPage").then((m) => ({
+    default: m.DailyOutPage,
+  })),
+);
 const ManualCountPage = lazy(() =>
   import("./pages/ManualCountPage").then((m) => ({
     default: m.ManualCountPage,
@@ -114,6 +119,7 @@ export default function App() {
                     <Route path="/online" element={<OnlineEntryPage />} />
                     <Route path="/offline" element={<OfflineEntryPage />} />
                     <Route path="/total-stocks" element={<TotalStocksPage />} />
+                    <Route path="/daily-out" element={<DailyOutPage />} />
                     <Route path="/manual-count" element={<ManualCountPage />} />
                     <Route
                       path="/audit-history"

@@ -85,7 +85,7 @@ describe("rankQuickJump - role filtering", () => {
 
   it("offers an online encoder only the pages their role can open", () => {
     const labels = rankQuickJump("", pagesForRole("ONLINE_ENCODER"), [], groupOf).map((r) => r.label);
-    expect(labels).toEqual(["Audit", "Online Entry", "Offline Entry", "Awaiting Release", "Consolidated", "Corrections", "Settings"]);
+    expect(labels).toEqual(["Audit", "Online Entry", "Offline Entry", "Awaiting Release", "Consolidated", "Daily Out", "Corrections", "Settings"]);
     expect(labels).not.toContain("Dashboard");
     expect(labels).not.toContain("Change Log");
   });

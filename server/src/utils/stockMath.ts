@@ -56,6 +56,14 @@ export function calculateOfflineStock(opening: number, stockIn: number, stockOut
 /// backload is a delivery route returning undelivered stock, so it's a
 /// return back into inventory, not an outflow like Delivery (Out)/Upsell
 /// (Out).
+/// Offline stock leaving the company in a period: deliveries and upsells,
+/// less backloads (undelivered stock a route brings back, which the Remaining
+/// formula adds back in). Transfers to Online are NOT outflow - they only move
+/// stock between the two pools. One definition for days-of-stock and Daily Out.
+export function offlineNetOutflow(deliveryOut: number, upsellOut: number, backloads: number): number {
+  return round2(deliveryOut + upsellOut - backloads);
+}
+
 export function calculateOfflineRemaining(
   offlineStock: number,
   productionIn: number,
