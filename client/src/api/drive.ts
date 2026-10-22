@@ -44,6 +44,16 @@ export const disconnectDrive = () => http.post<DriveStatus>("/drive/disconnect")
 export const updateDriveSettings = (patch: Partial<DriveSettings>) => http.patch<DriveStatus>("/drive/settings", patch);
 export const backupToDriveNow = () => http.post<{ fileName: string; sizeBytes: number; status: DriveStatus }>("/drive/backup-now");
 
+/// What came of saving a date's Daily Report to Drive: "saved" (new or changed
+/// file), "unchanged" (Drive already had exactly this one), "empty" (nothing saved
+/// that day) or "not-connected".
+export type GeneratedReportStatus = "saved" | "unchanged" | "empty" | "not-connected";
+
+/// Saves the Daily Report of `date` to Google Drive - one file per date, replaced
+/// when the report changed, left alone when it did not.
+export const saveDailyReportToDrive = (date: string) =>
+  http.post<{ status: GeneratedReportStatus }>("/drive/daily-report", { date });
+
 /// Whether this browser should send a copy of each export (any signed-in role).
 export const getDriveExportConfig = () => http.get<{ saveExports: boolean }>("/drive/export-config");
 

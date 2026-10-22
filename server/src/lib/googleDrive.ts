@@ -131,6 +131,47 @@ export async function createFolder(accessToken: string, name: string, parentId?:
   return ((await res.json()) as { id: string }).id;
 }
 
+const FOLDER_MIME = "application/vnd.google-apps.folder";
+
+export interface DriveFolder {
+  id: string;
+  name: string;
+  trashed: boolean;
+}
+
+/// One folder by id, or null when Google no longer knows it (deleted, or it
+/// belongs to another account).
+export async function getFolder(accessToken: string, folderId: string): Promise<DriveFolder | null> {
+  const res = await fetch(`${FILES_URL}/${encodeURIComponent(folderId)}?fields=id,name,trashed`, { headers: auth(accessToken) });
+  if (res.status === 404) return null;
+  if (!res.ok) return failure(res, "Reading the Drive folder");
+  return (await res.json()) as DriveFolder;
+}
+
+/// Folders with exactly this name that are not in the trash, oldest first - the
+/// system only ever sees folders it made itself (drive.file). Inside `parentId`
+/// when given, anywhere it can see otherwise.
+export async function findFolders(accessToken: string, name: string, parentId?: string): Promise<DriveFolder[]> {
+  // Single quotes and backslashes are the only characters Drive's query syntax
+  // treats specially inside a quoted name.
+  const quoted = name.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const clauses = [`name = '${quoted}'`, `mimeType = '${FOLDER_MIME}'`, "trashed = false", ...(parentId ? [`'${parentId}' in parents`] : [])];
+  const params = new URLSearchParams({ q: clauses.join(" and "), orderBy: "createdTime", fields: "files(id, name, trashed)", pageSize: "50" });
+  const res = await fetch(`${FILES_URL}?${params}`, { headers: auth(accessToken) });
+  if (!res.ok) return failure(res, "Looking for the Drive folder");
+  return ((await res.json()) as { files: DriveFolder[] }).files;
+}
+
+/// Renames a folder in place - its contents and id are untouched.
+export async function renameFolder(accessToken: string, folderId: string, name: string): Promise<void> {
+  const res = await fetch(`${FILES_URL}/${encodeURIComponent(folderId)}`, {
+    method: "PATCH",
+    headers: { ...auth(accessToken), "Content-Type": "application/json" },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) await failure(res, "Renaming the Drive folder");
+}
+
 export interface UploadInput {
   name: string;
   parentId: string;
@@ -173,6 +214,9 @@ export interface DriveFile {
   id: string;
   name: string;
   createdTime: string;
+  /// Drive's MD5 of the file's bytes (absent for folders), so a file can be
+  /// recognised as identical to one about to be uploaded.
+  md5Checksum?: string;
 }
 
 /// Newest first. Only files this app created are ever visible (drive.file).
@@ -183,7 +227,7 @@ export async function listFolder(accessToken: string, folderId: string): Promise
     const params = new URLSearchParams({
       q: `'${folderId}' in parents and trashed = false`,
       orderBy: "createdTime desc",
-      fields: "nextPageToken, files(id, name, createdTime)",
+      fields: "nextPageToken, files(id, name, createdTime, md5Checksum)",
       pageSize: "200",
       ...(pageToken ? { pageToken } : {}),
     });

@@ -45,7 +45,12 @@ function dosDateTime(d: Date): { time: number; date: number } {
   };
 }
 
-export function zip(files: { name: string; data: Buffer }[], now = new Date()): Buffer {
+/// The timestamp every entry carries. Fixed on purpose: the same sheets always
+/// produce the same bytes, so a file already in Drive can be recognised as
+/// identical by its checksum instead of being uploaded again.
+const FIXED_TIME = new Date(Date.UTC(2000, 0, 1));
+
+export function zip(files: { name: string; data: Buffer }[], now = FIXED_TIME): Buffer {
   const { time, date } = dosDateTime(now);
   const parts: Buffer[] = [];
   const central: Buffer[] = [];
@@ -190,7 +195,7 @@ const STYLES_XML =
 
 /// The whole workbook as bytes. At least one sheet is required (a workbook with
 /// none does not open in Excel).
-export function buildXlsx(sheets: Sheet[], now = new Date()): Buffer {
+export function buildXlsx(sheets: Sheet[], now?: Date): Buffer {
   if (sheets.length === 0) throw new Error("A workbook needs at least one sheet.");
   const taken = new Set<string>();
   const named = sheets.map((s) => ({ ...s, name: sheetName(s.name, taken) }));

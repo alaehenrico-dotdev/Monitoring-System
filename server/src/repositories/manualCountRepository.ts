@@ -130,6 +130,16 @@ export const manualCountRepository = {
     });
   },
 
+  /// Every audit count saved for a date - all shifts and locations, with the
+  /// product - for the Daily Report's Audit section.
+  findAllForDateWithProduct(entryDate: Date) {
+    return prisma.manualCount.findMany({
+      where: { entryDate },
+      include: { product: { select: { category: true, sku: true, name: true, sortOrder: true } } },
+      orderBy: [{ shift: "asc" }, { location: "asc" }, { product: { sortOrder: "asc" } }, { product: { name: "asc" } }],
+    });
+  },
+
   /// Used by the Total Stocks view (Section 4.5), which is a per-date (not
   /// per-shift) snapshot - both shifts saved so far for the date are
   /// returned and totalStocks.service collapses each product/location down

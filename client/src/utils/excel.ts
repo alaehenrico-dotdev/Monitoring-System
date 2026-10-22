@@ -40,7 +40,11 @@ export function toExcelTable(headers: string[], rows: (string | number)[][], tit
 /// pass multiple `toExcelTable` outputs concatenated for more than one sheet
 /// worth of tables stacked on a single page (Excel opens them as one sheet,
 /// same as pasting several tables into one worksheet).
-export function downloadExcel(filename: string, tablesHtml: string) {
+///
+/// `driveCopy: false` keeps this download out of the Exports folder in Google
+/// Drive - for a file that is already saved there another way (the Daily Report
+/// has its own place in Drive), so the same report is not kept twice.
+export function downloadExcel(filename: string, tablesHtml: string, opts: { driveCopy?: boolean } = {}) {
   const html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8" /></head><body>${tablesHtml}</body></html>`;
   // Same UTF-8 BOM as downloadCsv, for the same reason - correct encoding
   // detection for non-ASCII product/customer names.
@@ -53,5 +57,5 @@ export function downloadExcel(filename: string, tablesHtml: string) {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-  copyExportToDrive(filename, blob);
+  if (opts.driveCopy !== false) copyExportToDrive(filename, blob);
 }

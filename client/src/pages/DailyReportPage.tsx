@@ -1,8 +1,11 @@
 import { useBusyAction } from "../hooks/useBusyAction";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getDailyReport, type DailyReport } from "../api/reports";
+import { getDailyReport, type AuditReportRow, type DailyReport } from "../api/reports";
 import { getDayExtraNames, type DayExtraNames } from "../api/extraLabels";
 import { getDailyOut, type DailyOutEntry } from "../api/dailyOut";
+import { saveDailyReportToDrive } from "../api/drive";
+import { notify } from "../utils/notify";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Dropdown } from "../components/Dropdown";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
@@ -63,14 +66,15 @@ function today(): string {
   return getCurrentShiftAndDate().date;
 }
 
-type ReportSection = "all" | "online" | "offline" | "total" | "out";
+type ReportSection = "all" | "online" | "offline" | "total" | "out" | "audit";
 
 const SECTION_LABELS: Record<ReportSection, string> = {
-  all: "Full Report (Online + Offline + Consolidated + Daily Out)",
+  all: "Full Report (Online + Offline + Consolidated + Daily Out + Audit)",
   online: "Online Only",
   offline: "Offline Only",
   total: "Consolidated Only",
   out: "Daily Out Only",
+  audit: "Audit Only",
 };
 
 // Not every row the report returns is real data: a date nobody has entered
@@ -162,6 +166,8 @@ export function DailyReportPage() {
   const onTotalExpanded = useCallback((v: boolean) => setExpandedBySection((p) => ({ ...p, total: v })), []);
   const { user } = useAuth();
   const [generating, setGenerating] = useState(false);
+  // Generate asks first: it also saves the date's report to Google Drive.
+  const [confirmGenerate, setConfirmGenerate] = useState(false);
   // Only the newest request may update the page - a slow earlier response
   // (older date, or a realtime refresh) must never overwrite a newer report.
   const requestId = useRef(0);
@@ -214,14 +220,30 @@ export function DailyReportPage() {
   /// `notify` is for a refresh the person asked for (View > Refresh): it keeps
   /// the report and its collapsed categories like a silent one, but still says so
   /// when it cannot run (unsaved edits) or fails, rather than doing nothing.
-  function load({ silent = false, notify = false }: { silent?: boolean; notify?: boolean } = {}) {
+  /// Saves the generated date to Drive and tells the person how it went: new or
+  /// changed file, already up to date, or the reason it failed. Not connected is
+  /// silent - the report still generated, there is just no Drive to save it to.
+  async function saveToDriveAndTell(day: string) {
+    try {
+      const { status } = await saveDailyReportToDrive(day);
+      if (status === "saved") notify({ level: "success", message: `Daily Report for ${day} saved to Google Drive.` });
+      else if (status === "unchanged") notify({ level: "info", message: `Daily Report for ${day} is already up to date in Google Drive.` });
+    } catch (e) {
+      notify({ level: "error", message: `Could not save the ${day} Daily Report to Google Drive: ${e instanceof Error ? e.message : "unknown error"}` });
+    }
+  }
+
+  /// `saveToDrive` is only for a confirmed Generate: it saves the date's report to
+  /// Google Drive once the report has actually loaded. Reopening from history, the
+  /// live refresh and View > Refresh never upload.
+  function load({ silent = false, notify: notifyFailure = false, saveToDrive = false }: { silent?: boolean; notify?: boolean; saveToDrive?: boolean } = {}) {
     if (!silent) setError(null);
 
     // A report only reads saved data - staged edits for this date would be
     // silently left out of it.
     const unsaved = findUnsavedWork({ from: date, to: date });
     if (unsaved.length > 0) {
-      if (!silent || notify) setUnsavedWork(unsaved);
+      if (!silent || notifyFailure) setUnsavedWork(unsaved);
       return;
     }
 
@@ -251,6 +273,7 @@ export function DailyReportPage() {
           return;
         }
         setReport(nextReport);
+        if (saveToDrive) void saveToDriveAndTell(requestedDate);
         void getDayExtraNames(requestedDate).then((names) => {
           if (id === requestId.current) setExtraNames(names);
         });
@@ -266,7 +289,7 @@ export function DailyReportPage() {
         if (!silent) setReportVersion((v) => v + 1);
       })
       .catch((e) => {
-        if (id !== requestId.current || (silent && !notify)) return;
+        if (id !== requestId.current || (silent && !notifyFailure)) return;
         setError(e instanceof Error ? e.message : "Failed to build report");
       })
       .finally(() => {
@@ -357,6 +380,7 @@ export function DailyReportPage() {
     );
     const total = totalSection(report.date, byCategory(report.total));
     const out = dailyOutExcel(report.date, dailyOut);
+    const audit = auditExcel(report.date, report.audit ?? []);
 
     // "Full Report" still combines every section into one file (previous,
     // only behavior) - a Daily Report is meaningless split across three
@@ -368,7 +392,7 @@ export function DailyReportPage() {
     // thing.
     if (reportSection === "all") {
       const allName = `daily-report-${report.date}.xls`;
-      downloadExcel(allName, [online, offline, total, out].join(""));
+      downloadExcel(allName, [online, offline, total, out, audit].join(""), { driveCopy: false });
       logExported();
       return;
     }
@@ -377,9 +401,10 @@ export function DailyReportPage() {
       offline,
       total,
       out,
+      audit,
     };
     const sectionName = `daily-report-${reportSection}-${report.date}.xls`;
-    downloadExcel(sectionName, bySection[reportSection]);
+    downloadExcel(sectionName, bySection[reportSection], { driveCopy: false });
     logExported();
   }
 
@@ -428,6 +453,15 @@ export function DailyReportPage() {
         ),
       );
     }
+    if (reportSection === "all" || reportSection === "audit") {
+      sections.push(
+        flatSection(
+          AUDIT_COLUMNS.map((header, i) => ({ header, align: i >= 5 && i <= 7 ? ("right" as const) : ("left" as const) })),
+          (report.audit ?? []).map((a) => auditCells(a).map((v) => (typeof v === "number" ? formatCount(v) : v))),
+          { title: `AUDIT - ${report.date}`, emptyMessage: "No audit counts were saved for this date." },
+        ),
+      );
+    }
     const pdfName = pdfFileName(
       "daily-report",
       reportSection === "all" ? undefined : reportSection,
@@ -444,6 +478,8 @@ export function DailyReportPage() {
             ...filterNotes({ category: categoryFilter }),
           ],
           sections,
+          // The report's own place in Google Drive is the Reports folder.
+          driveCopy: false,
         }),
       );
       logExported();
@@ -456,7 +492,7 @@ export function DailyReportPage() {
     <div>
       <PageHeader
         title={`Daily Report - ${formatDateDisplay(date)}`}
-        subtitle="Print a stock snapshot for any date."
+        subtitle="Every entry, the audit and Daily Out for any date - saved to Google Drive when generated."
       >
         <PageToolbar
           activeFilters={categoryFilter !== "" ? 1 : 0}
@@ -563,8 +599,8 @@ export function DailyReportPage() {
               type="button"
               className="ae-mb-btn ae-mb-btn--primary"
               aria-disabled={generating || undefined}
-              title={generating ? "Generating…" : "Generate the report for this date"}
-              onClick={() => !generating && load()}
+              title={generating ? "Generating…" : "Generate the report for this date and save it to Google Drive"}
+              onClick={() => !generating && setConfirmGenerate(true)}
             >
               <PlayIcon /> <span>{generating ? "Generating…" : "Generate"}</span>
             </button>
@@ -682,6 +718,38 @@ export function DailyReportPage() {
               )}
             </>
           )}
+
+          {(reportSection === "all" || reportSection === "audit") && (
+            <>
+              <h3 style={{ marginBottom: 8, marginTop: reportSection === "all" ? 32 : 0 }}>Audit — {report.date}</h3>
+              {(report.audit ?? []).length > 0 ? (
+                <div className="ae-table-scroll">
+                  <table className="ae-table ae-table--center-head ae-table--compact">
+                    <thead>
+                      <tr>
+                        {AUDIT_COLUMNS.map((h) => (
+                          <th key={h}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(report.audit ?? []).map((a, i) => (
+                        <tr key={`${a.product.name}-${a.shift}-${a.location}-${i}`}>
+                          {auditCells(a).map((v, c) => (
+                            <td key={AUDIT_COLUMNS[c]} style={c <= 2 || c === 8 ? { textAlign: "left" } : undefined}>
+                              {typeof v === "number" ? formatCount(v) : v}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={{ fontSize: 13, color: colors.subtleInk }}>No audit counts were saved for this date.</p>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -691,6 +759,21 @@ export function DailyReportPage() {
         </p>
       )}
 
+      {confirmGenerate && (
+        <ConfirmDialog
+          title="Generate Daily Report"
+          confirmLabel="Generate"
+          onCancel={() => setConfirmGenerate(false)}
+          onConfirm={() => {
+            setConfirmGenerate(false);
+            load({ saveToDrive: true });
+          }}
+        >
+          Generate the Daily Report for <strong>{formatDateDisplay(date)}</strong>? It covers every entry and the audit
+          for that date, and is saved to Google Drive as one file for the date. Generating the same date again replaces
+          that file, or leaves it alone if nothing has changed.
+        </ConfirmDialog>
+      )}
       {unsavedWork && (
         <UnsavedWorkDialog
           items={unsavedWork}
@@ -771,4 +854,28 @@ function totalSection(date: string, rows: DailyReport["total"]): string {
     r.totalVariance ?? "",
   ]);
   return toExcelTable(headers, excelRows, `CONSOLIDATED STOCKS - ${date}`);
+}
+
+const AUDIT_COLUMNS = ["Category", "SKU", "Product", "Shift", "Location", "System Remaining", "Counted", "Variance", "Remarks", "Status"];
+
+const SHIFT_NAME: Record<string, string> = { MORNING: "Morning", NIGHT: "Night" };
+const LOCATION_NAME: Record<string, string> = { ONLINE: "Online", OFFLINE: "Offline", TOTAL: "Total" };
+
+function auditCells(a: AuditReportRow): (string | number)[] {
+  return [
+    a.product.category,
+    a.product.sku ?? "",
+    a.product.name,
+    SHIFT_NAME[a.shift] ?? a.shift,
+    LOCATION_NAME[a.location] ?? a.location,
+    a.systemRemainingStock,
+    a.manualCount,
+    a.variance,
+    a.remarks ?? "",
+    a.isOpeningBalance ? "Opening balance" : a.published ? "Published" : "Not published",
+  ];
+}
+
+function auditExcel(date: string, rows: AuditReportRow[]): string {
+  return toExcelTable(AUDIT_COLUMNS, rows.map(auditCells), `AUDIT - ${date}`);
 }

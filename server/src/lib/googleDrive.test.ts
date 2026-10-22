@@ -5,7 +5,10 @@ import {
   DriveApiError,
   DriveAuthError,
   exchangeCode,
+  findFolders,
+  getFolder,
   listFolder,
+  renameFolder,
   refreshAccessToken,
   trashFile,
   uploadFile,
@@ -129,5 +132,57 @@ describe("listFolder and trashFile", () => {
     expect(String(url)).toContain("/files/file-1");
     expect(init.method).toBe("PATCH");
     expect(JSON.parse(init.body)).toEqual({ trashed: true });
+  });
+});
+
+describe("folder lookup and rename", () => {
+  it("looks for a folder by exact name, not in the trash, oldest first", async () => {
+    fetchMock.mockResolvedValue(json({ files: [{ id: "a", name: "Ala Eh Stock Monitoring - Reports", trashed: false }] }));
+    const found = await findFolders("tok", "Ala Eh Stock Monitoring - Reports");
+    expect(found).toEqual([{ id: "a", name: "Ala Eh Stock Monitoring - Reports", trashed: false }]);
+    const url = new URL(fetchMock.mock.calls[0][0]);
+    expect(url.searchParams.get("q")).toBe(
+      "name = 'Ala Eh Stock Monitoring - Reports' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
+    );
+    expect(url.searchParams.get("orderBy")).toBe("createdTime");
+  });
+
+  it("can be limited to one parent folder", async () => {
+    fetchMock.mockResolvedValue(json({ files: [] }));
+    await findFolders("tok", "2026", "parent-1");
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get("q")).toContain("'parent-1' in parents");
+  });
+
+  it("escapes quotes and backslashes so a name can never change the query", async () => {
+    fetchMock.mockResolvedValue(json({ files: [] }));
+    const BS = String.fromCharCode(92);
+    const Q = "'";
+    // O'Brien\ ' or name != 'y   ->   each quote and backslash gets a backslash in front
+    await findFolders("tok", `O${Q}Brien${BS} ${Q} or name != ${Q}y`);
+    const q = new URL(fetchMock.mock.calls[0][0]).searchParams.get("q")!;
+    expect(q).toContain(`name = ${Q}O${BS}${Q}Brien${BS}${BS} ${BS}${Q} or name != ${BS}${Q}y${Q}`);
+  });
+
+  it("reads a folder, and says null - not an error - when Google no longer knows it", async () => {
+    fetchMock.mockResolvedValueOnce(json({ id: "f", name: "X", trashed: false }));
+    expect(await getFolder("tok", "f")).toEqual({ id: "f", name: "X", trashed: false });
+    fetchMock.mockResolvedValueOnce(json({ error: { message: "File not found" } }, 404));
+    expect(await getFolder("tok", "gone")).toBeNull();
+    fetchMock.mockResolvedValueOnce(json({ error: { message: "boom" } }, 500));
+    await expect(getFolder("tok", "f")).rejects.toBeInstanceOf(DriveApiError);
+  });
+
+  it("renames in place with a PATCH of just the name", async () => {
+    fetchMock.mockResolvedValue(json({ id: "f" }));
+    await renameFolder("tok", "f", "Ala Eh Stock Monitoring - Backups");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/files/f");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body)).toEqual({ name: "Ala Eh Stock Monitoring - Backups" });
+  });
+
+  it("reports a failed rename", async () => {
+    fetchMock.mockResolvedValue(json({ error: { message: "Insufficient permissions" } }, 403));
+    await expect(renameFolder("tok", "f", "X")).rejects.toThrow(/Renaming the Drive folder failed \(403\)/);
   });
 });

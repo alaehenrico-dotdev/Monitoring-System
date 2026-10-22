@@ -386,5 +386,5 @@ export async function buildTablePdf(spec: PdfDocumentSpec): Promise<jsPDF> {
 export async function downloadTablePdf(spec: PdfDocumentSpec): Promise<void> {
   const doc = await buildTablePdf(spec);
   doc.save(spec.filename);
-  copyExportToDrive(spec.filename, doc.output("blob"));
+  if (spec.driveCopy !== false) copyExportToDrive(spec.filename, doc.output("blob"));
 }

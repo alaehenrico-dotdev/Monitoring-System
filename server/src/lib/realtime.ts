@@ -120,7 +120,13 @@ export function broadcastNotice(notice: Notice, roles?: readonly string[]): void
   for (const ws of authenticatedClients) {
     if (ws.readyState !== WebSocket.OPEN) continue;
     if (roles && !roles.includes(roleOf.get(ws) ?? "")) continue;
-    ws.send(message);
+    // A socket that dies between the check and the send must not stop the others
+    // being told - or fail the backup or report save that is announcing itself.
+    try {
+      ws.send(message);
+    } catch {
+      ws.terminate();
+    }
   }
 }
 

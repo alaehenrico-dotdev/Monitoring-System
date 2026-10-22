@@ -11,6 +11,7 @@ vi.mock("../services/drive.service", () => ({
   getStatus: vi.fn().mockResolvedValue({ connected: true }),
   runBackup: vi.fn(),
   saveExport: vi.fn(),
+  saveGeneratedReport: vi.fn(),
   startConnect: vi.fn(),
   updateSettings: vi.fn(),
 }));
@@ -23,6 +24,7 @@ import {
   postDriveBackupNow,
   postDriveConnect,
   postDriveExportCopy,
+  postDriveGeneratedReport,
 } from "./drive.controller";
 
 const user = { id: 7, role: "SUPERVISOR_ADMIN" };
@@ -155,5 +157,33 @@ describe("postDriveExportCopy", () => {
 
   it("rejects a file name that is not valid percent-encoding", async () => {
     await expect(call(postDriveExportCopy, { ...withHeader("%E0%A4%A"), body: Buffer.from("x") }).done).rejects.toThrow(/not valid/);
+  });
+});
+
+describe("postDriveGeneratedReport", () => {
+  it("saves the report of the date asked for, as the signed-in person, and answers with what came of it", async () => {
+    vi.mocked(drive.saveGeneratedReport).mockResolvedValue("unchanged");
+    const { res, done } = call(postDriveGeneratedReport, { body: { date: "2026-10-22" } });
+    await done;
+    expect(drive.saveGeneratedReport).toHaveBeenCalledWith(new Date("2026-10-22T00:00:00.000Z"), 7);
+    expect(res.json).toHaveBeenCalledWith({ status: "unchanged" });
+  });
+
+  it.each([
+    ["no date", {}],
+    ["a date that is not a date", { date: "tomorrow" }],
+    ["an impossible date", { date: "2026-02-31" }],
+    ["a number", { date: 20261022 }],
+  ])("refuses %s before touching Drive", async (_label, body) => {
+    const { done } = call(postDriveGeneratedReport, { body });
+    await expect(done).rejects.toMatchObject({ status: 400 });
+    expect(drive.saveGeneratedReport).not.toHaveBeenCalled();
+  });
+
+  it("turns Google's own failures into readable errors, not a bare 500", async () => {
+    vi.mocked(drive.saveGeneratedReport).mockRejectedValue(new DriveAuthError("reconnect Google Drive"));
+    await expect(call(postDriveGeneratedReport, { body: { date: "2026-10-22" } }).done).rejects.toMatchObject({ status: 400 });
+    vi.mocked(drive.saveGeneratedReport).mockRejectedValue(new DriveApiError("Uploading to Drive failed (403)", 403));
+    await expect(call(postDriveGeneratedReport, { body: { date: "2026-10-22" } }).done).rejects.toMatchObject({ status: 502 });
   });
 });

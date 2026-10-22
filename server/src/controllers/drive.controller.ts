@@ -3,6 +3,7 @@ import { z } from "zod";
 import { env } from "../config/env";
 import { DriveApiError, DriveAuthError } from "../lib/googleDrive";
 import { HttpError } from "../utils/HttpError";
+import { parseDateOnly } from "../utils/date";
 import {
   completeConnect,
   disconnect,
@@ -10,6 +11,7 @@ import {
   getStatus,
   runBackup,
   saveExport,
+  saveGeneratedReport,
   startConnect,
   updateSettings,
 } from "../services/drive.service";
@@ -103,4 +105,16 @@ export async function postDriveExportCopy(req: Request, res: Response) {
   if (!name) throw HttpError.badRequest("Send the file name in the X-Filename header");
   if (!Buffer.isBuffer(req.body) || req.body.length === 0) throw HttpError.badRequest("The file was empty");
   res.json(await guarded(() => saveExport(name, req.body as Buffer, req.user!.id)));
+}
+
+const generatedReportSchema = z.object({ date: z.string() });
+
+/// "Generate" was confirmed on the Daily Report page: save that date's report to
+/// Drive. Every role can generate the report, so every role can ask; the file it
+/// writes is the report itself, never anything the caller sends.
+export async function postDriveGeneratedReport(req: Request, res: Response) {
+  const parsed = generatedReportSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest("Expected a report `date`", parsed.error.flatten());
+  const date = parseDateOnly(parsed.data.date);
+  res.json({ status: await guarded(() => saveGeneratedReport(date, req.user!.id)) });
 }

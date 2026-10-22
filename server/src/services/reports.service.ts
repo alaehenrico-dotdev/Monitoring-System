@@ -2,6 +2,8 @@ import { getOnlineGrid } from "./dailyOnlineStock.service";
 import { getOfflineGrid } from "./dailyOfflineStock.service";
 import { getTotalStocksGrid } from "./totalStocks.service";
 import { toDateOnlyString } from "../utils/date";
+import { manualCountRepository } from "../repositories/manualCountRepository";
+import { toNum } from "../utils/stockMath";
 import { findFrozenSnapshot, snapshotMeta } from "./dailyReportSnapshot.service";
 
 /// Merges a date's Morning and Night grids down to one row per product for
@@ -18,6 +20,40 @@ function mergeShiftGrids<T extends { product: { id: number }; isSaved?: boolean 
   });
 }
 
+/// One audit (manual count) line of the report: what the system said, what was
+/// counted, and the gap - the same figures as the Audit page.
+export interface AuditReportRow {
+  product: { category: string; sku: string | null; name: string };
+  shift: "MORNING" | "NIGHT";
+  location: "ONLINE" | "OFFLINE" | "TOTAL";
+  systemRemainingStock: number;
+  manualCount: number;
+  variance: number;
+  remarks: string | null;
+  /// Approved by a supervisor (the Audit page's Publish).
+  published: boolean;
+  /// The first count of a product at a location seeds the system rather than
+  /// auditing it, so it carries no variance.
+  isOpeningBalance: boolean;
+}
+
+/// Every audit count saved for the date. Plain numbers and strings only, so it
+/// survives being frozen into a snapshot as JSON.
+export async function buildAudit(entryDate: Date): Promise<AuditReportRow[]> {
+  const counts = await manualCountRepository.findAllForDateWithProduct(entryDate);
+  return counts.map((c) => ({
+    product: { category: c.product.category, sku: c.product.sku, name: c.product.name },
+    shift: c.shift,
+    location: c.location,
+    systemRemainingStock: toNum(c.systemRemainingStock),
+    manualCount: toNum(c.manualCount),
+    variance: toNum(c.variance),
+    remarks: c.remarks ?? null,
+    published: c.publishedAt !== null,
+    isOpeningBalance: c.isOpeningBalance,
+  }));
+}
+
 /**
  * Section 4.8 - Daily Report: a printable/exportable view of a given date's
  * Online, Offline, and Total grids, laid out the same way as the current
@@ -25,7 +61,7 @@ function mergeShiftGrids<T extends { product: { id: number }; isSaved?: boolean 
  * holds no stock-calculation logic of its own.
  */
 export async function buildDailyReport(entryDate: Date) {
-  const [onlineMorning, onlineNight, offlineMorning, offlineNight, total] = await Promise.all([
+  const [onlineMorning, onlineNight, offlineMorning, offlineNight, total, audit] = await Promise.all([
     // The sheets as entered, whatever the shift setting: a report (and the
     // snapshot frozen from it) must not change when shifts are switched off.
     getOnlineGrid(entryDate, "MORNING", { combineSplitDay: false }),
@@ -33,6 +69,7 @@ export async function buildDailyReport(entryDate: Date) {
     getOfflineGrid(entryDate, "MORNING", { combineSplitDay: false }),
     getOfflineGrid(entryDate, "NIGHT", { combineSplitDay: false }),
     getTotalStocksGrid(entryDate),
+    buildAudit(entryDate),
   ]);
 
   return {
@@ -40,6 +77,7 @@ export async function buildDailyReport(entryDate: Date) {
     online: mergeShiftGrids(onlineMorning, onlineNight),
     offline: mergeShiftGrids(offlineMorning, offlineNight),
     total,
+    audit,
   };
 }
 
@@ -49,7 +87,10 @@ export async function buildDailyReport(entryDate: Date) {
 export async function getDailyReport(entryDate: Date) {
   const frozen = await findFrozenSnapshot(entryDate);
   if (frozen) {
-    return { ...(frozen.payload as unknown as Awaited<ReturnType<typeof buildDailyReport>>), snapshot: snapshotMeta(frozen) };
+    const payload = frozen.payload as unknown as Awaited<ReturnType<typeof buildDailyReport>>;
+    // A report frozen before the Audit section existed has none stored; read the
+    // day's counts as they stand so the section is never silently empty.
+    return { ...payload, audit: payload.audit ?? (await buildAudit(entryDate)), snapshot: snapshotMeta(frozen) };
   }
   return { ...(await buildDailyReport(entryDate)), snapshot: null };
 }

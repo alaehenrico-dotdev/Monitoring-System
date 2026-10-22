@@ -11,6 +11,7 @@ import {
   postDriveConnect,
   postDriveDisconnect,
   postDriveExportCopy,
+  postDriveGeneratedReport,
 } from "../controllers/drive.controller";
 
 const router = Router();
@@ -39,5 +40,9 @@ router.post(
   express.raw({ type: () => true, limit: MAX_EXPORT_BYTES }),
   asyncHandler(postDriveExportCopy),
 );
+
+// Confirming "Generate" on the Daily Report saves that date's report to Drive.
+// Any role that can generate the report; the body is only the date.
+router.post("/daily-report", authenticate, asyncHandler(postDriveGeneratedReport));
 
 export default router;

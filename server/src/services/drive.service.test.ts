@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { writeFileSync } from "fs";
 import jwt from "jsonwebtoken";
+import { createHash } from "node:crypto";
 
 const JWT_SECRET = "jwt-secret-for-tests-0123456789abcdef0123456789";
 vi.mock("../config/env", () => ({
@@ -38,6 +39,9 @@ vi.mock("../lib/googleDrive", async (orig) => ({
   refreshAccessToken: vi.fn(),
   fetchAccountEmail: vi.fn(),
   createFolder: vi.fn(),
+  findFolders: vi.fn(),
+  getFolder: vi.fn(),
+  renameFolder: vi.fn(),
   uploadFile: vi.fn(),
   listFolder: vi.fn(),
   trashFile: vi.fn(),
@@ -59,6 +63,7 @@ import {
   completeConnect,
   disconnect,
   exportFileInfo,
+  FOLDER_NAMES,
   isBackupDue,
   nextBackupAt,
   resetScheduleState,
@@ -66,6 +71,9 @@ import {
   queueDailyReportUpload,
   runScheduledBackupIfDue,
   saveDailyReports,
+  syncFolderNames,
+  syncFolderNamesIfDue,
+  saveGeneratedReport,
   saveExport,
   startConnect,
 } from "./drive.service";
@@ -77,7 +85,7 @@ const stateFor = (payload: object, secret = stateKey, opts: jwt.SignOptions = { 
 /// vi.clearAllMocks keeps queued one-shot results, so one test's leftover
 /// "reject once" would fire in the next. These are re-armed below.
 const resettable = [
-  google.refreshAccessToken, google.uploadFile, google.listFolder, google.trashFile, google.createFolder,
+  google.refreshAccessToken, google.uploadFile, google.listFolder, google.trashFile, google.createFolder, google.findFolders, google.getFolder, google.renameFolder,
   google.exchangeCode, google.fetchAccountEmail, google.revokeToken, dumpDatabaseToGzipFile, recordBackup,
 ];
 
@@ -91,6 +99,14 @@ beforeEach(async () => {
   reports.buildDailyReportWorkbook.mockReset().mockResolvedValue(null);
   resetScheduleState();
   vi.mocked(google.refreshAccessToken).mockResolvedValue({ accessToken: "access-1", expiresIn: 3600 });
+  vi.mocked(google.findFolders).mockResolvedValue([]);
+  // By default every remembered folder exists and is already named right, so the
+  // name check that runs after connecting has nothing to change.
+  vi.mocked(google.getFolder).mockImplementation(async (_t, id) => ({
+    id,
+    name: id === "backups-folder" ? FOLDER_NAMES.backups : id === "exports-folder" ? FOLDER_NAMES.exports : FOLDER_NAMES.reports,
+    trashed: false,
+  }));
   vi.mocked(google.uploadFile).mockImplementation(async (_t, input) => {
     (input.body as { destroy?: () => void }).destroy?.();
     return "drive-file-1";
@@ -338,7 +354,7 @@ describe("Daily Report files (saved with the backup)", () => {
     // (The mocked listing never remembers what was made, so the second day
     // would make year and month again here; against real Drive it finds them.)
     expect(folders().slice(0, 3)).toEqual([
-      ["Ala Eh Stocks Monitoring - Reports", undefined],
+      ["Ala Eh Stock Monitoring - Reports", undefined],
       ["2026", "folder-1"],
       ["10", "folder-2"],
     ]);
@@ -355,14 +371,14 @@ describe("Daily Report files (saved with the backup)", () => {
     await saveDailyReports(conn());
     vi.mocked(google.createFolder).mockClear();
     await saveDailyReports(conn());
-    expect(folders().filter(([name]) => name === "Ala Eh Stocks Monitoring - Reports")).toHaveLength(0);
+    expect(folders().filter(([name]) => name === "Ala Eh Stock Monitoring - Reports")).toHaveLength(0);
   });
 
   it("makes the Reports folder again when Google no longer knows the remembered one", async () => {
     db.setting = { value: "gone" };
     vi.mocked(google.listFolder).mockRejectedValueOnce(new google.DriveApiError("not found", 404));
     await saveDailyReports(conn());
-    expect(folders()[0]).toEqual(["Ala Eh Stocks Monitoring - Reports", undefined]);
+    expect(folders()[0]).toEqual(["Ala Eh Stock Monitoring - Reports", undefined]);
     expect(db.setting).toEqual({ value: "folder-1" });
   });
 
@@ -480,6 +496,313 @@ describe("a saved report goes to Drive straight away", () => {
   it("lets different days upload independently", async () => {
     await Promise.all([queueDailyReportUpload(D("2026-10-21")), queueDailyReportUpload(D("2026-10-22"))]);
     expect(google.uploadFile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("Drive folders: exact names, and never a second folder of a name", () => {
+  const D = (iso: string) => new Date(`${iso}T00:00:00Z`);
+  const folder = (id: string, name: string, trashed = false) => ({ id, name, trashed });
+
+  it("uses exactly these three names", () => {
+    expect(FOLDER_NAMES).toEqual({
+      backups: "Ala Eh Stock Monitoring - Backups",
+      exports: "Ala Eh Stock Monitoring - Exports",
+      reports: "Ala Eh Stock Monitoring - Reports",
+    });
+  });
+
+  describe("when Drive is connected for the first time", () => {
+    const connect = () => completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
+
+    // The suite's own setup already connected once; these are first connections.
+    beforeEach(() => {
+      db.conn = null;
+      vi.mocked(google.createFolder).mockReset();
+      vi.mocked(google.renameFolder).mockClear();
+      vi.mocked(google.findFolders).mockResolvedValue([]);
+      // Whichever of these ids the connection ends up with is, by then, named right.
+      const rightName: Record<string, string> = {
+        b: FOLDER_NAMES.backups, "old-b": FOLDER_NAMES.backups, oldest: FOLDER_NAMES.backups, "legacy-b": FOLDER_NAMES.backups,
+        e: FOLDER_NAMES.exports, "old-e": FOLDER_NAMES.exports, "legacy-e": FOLDER_NAMES.exports,
+      };
+      vi.mocked(google.getFolder).mockImplementation(async (_t, id) => ({ id, name: rightName[id] ?? "", trashed: false }));
+    });
+
+    it("creates the Backups and Exports folders under the exact names when none exist", async () => {
+      vi.mocked(google.createFolder).mockResolvedValueOnce("b").mockResolvedValueOnce("e");
+      await connect();
+      expect(vi.mocked(google.createFolder).mock.calls.map((c) => c[1])).toEqual([FOLDER_NAMES.backups, FOLDER_NAMES.exports]);
+    });
+
+    it("reuses a folder that already has the name instead of making another", async () => {
+      vi.mocked(google.findFolders).mockImplementation(async (_t, name) =>
+        name === FOLDER_NAMES.backups ? [folder("old-b", name)] : name === FOLDER_NAMES.exports ? [folder("old-e", name)] : [],
+      );
+      await connect();
+      expect(google.createFolder).not.toHaveBeenCalled();
+      expect(db.conn).toMatchObject({ backupFolderId: "old-b", exportFolderId: "old-e" });
+    });
+
+    it("takes the oldest when strays share the name, and does not make a new one", async () => {
+      vi.mocked(google.findFolders).mockImplementation(async (_t, name) =>
+        name === FOLDER_NAMES.backups ? [folder("oldest", name), folder("newer", name)] : [folder("e", name)],
+      );
+      await connect();
+      expect(db.conn).toMatchObject({ backupFolderId: "oldest" });
+      expect(google.createFolder).not.toHaveBeenCalled();
+    });
+
+    it("renames a folder made under an older name rather than creating a new one beside it", async () => {
+      vi.mocked(google.findFolders).mockImplementation(async (_t, name) =>
+        name === "Ala Eh Monitoring - Backups" ? [folder("legacy-b", name)] : name === "Ala Eh Monitoring - Exports" ? [folder("legacy-e", name)] : [],
+      );
+      await connect();
+      expect(google.createFolder).not.toHaveBeenCalled();
+      expect(vi.mocked(google.renameFolder).mock.calls.map((c) => [c[1], c[2]])).toEqual([
+        ["legacy-b", FOLDER_NAMES.backups],
+        ["legacy-e", FOLDER_NAMES.exports],
+      ]);
+      expect(db.conn).toMatchObject({ backupFolderId: "legacy-b", exportFolderId: "legacy-e" });
+    });
+  });
+
+  describe("syncFolderNames (existing folders)", () => {
+    beforeEach(async () => {
+      vi.mocked(google.createFolder).mockResolvedValueOnce("backups-folder").mockResolvedValueOnce("exports-folder");
+      await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
+      vi.mocked(google.createFolder).mockReset();
+      vi.mocked(google.createFolder).mockResolvedValue("created");
+      vi.mocked(google.renameFolder).mockClear();
+    });
+
+    it("changes nothing when every folder already has its exact name", async () => {
+      expect(await syncFolderNames()).toEqual({ renamed: [], adopted: [], recreated: [] });
+      expect(google.renameFolder).not.toHaveBeenCalled();
+      expect(google.createFolder).not.toHaveBeenCalled();
+    });
+
+    it("renames old-named folders in place - same id, so every file already in them stays where it is", async () => {
+      vi.mocked(google.getFolder).mockImplementation(async (_t, id) =>
+        folder(id, id === "backups-folder" ? "Ala Eh Monitoring - Backups" : "Ala Eh Monitoring - Exports"),
+      );
+      const result = await syncFolderNames();
+      expect(result?.renamed).toEqual(["Ala Eh Monitoring - Backups -> " + FOLDER_NAMES.backups, "Ala Eh Monitoring - Exports -> " + FOLDER_NAMES.exports]);
+      expect(vi.mocked(google.renameFolder).mock.calls.map((c) => [c[1], c[2]])).toEqual([
+        ["backups-folder", FOLDER_NAMES.backups],
+        ["exports-folder", FOLDER_NAMES.exports],
+      ]);
+      expect(google.createFolder).not.toHaveBeenCalled();
+      expect(db.conn).toMatchObject({ backupFolderId: "backups-folder", exportFolderId: "exports-folder" });
+    });
+
+    it("renames the Reports folder too, whichever old name it had", async () => {
+      db.setting = { value: "reports-folder" };
+      vi.mocked(google.getFolder).mockImplementation(async (_t, id) =>
+        folder(id, id === "reports-folder" ? "Ala Eh Stocks Monitoring - Reports" : id === "backups-folder" ? FOLDER_NAMES.backups : FOLDER_NAMES.exports),
+      );
+      const result = await syncFolderNames();
+      expect(result?.renamed).toEqual(["Ala Eh Stocks Monitoring - Reports -> " + FOLDER_NAMES.reports]);
+      expect(google.renameFolder).toHaveBeenCalledWith("access-1", "reports-folder", FOLDER_NAMES.reports);
+      expect(db.setting).toEqual({ value: "reports-folder" });
+    });
+
+    it("never renames into a name another folder already has - it uses that folder and leaves the old one alone", async () => {
+      vi.mocked(google.getFolder).mockImplementation(async (_t, id) =>
+        folder(id, id === "backups-folder" ? "Ala Eh Monitoring - Backups" : FOLDER_NAMES.exports),
+      );
+      vi.mocked(google.findFolders).mockImplementation(async (_t, name) => (name === FOLDER_NAMES.backups ? [folder("already-named", name)] : []));
+      const result = await syncFolderNames();
+      expect(result?.adopted).toEqual([FOLDER_NAMES.backups]);
+      expect(google.renameFolder).not.toHaveBeenCalled();
+      expect(db.conn).toMatchObject({ backupFolderId: "already-named" });
+    });
+
+    it("finds a folder that has gone by name, and makes one only if none exists", async () => {
+      vi.mocked(google.getFolder).mockImplementation(async (_t, id) => (id === "backups-folder" ? null : folder(id, FOLDER_NAMES.exports)));
+      vi.mocked(google.findFolders).mockImplementation(async (_t, name) => (name === FOLDER_NAMES.backups ? [folder("found", name)] : []));
+      expect((await syncFolderNames())?.recreated).toEqual([FOLDER_NAMES.backups]);
+      expect(db.conn).toMatchObject({ backupFolderId: "found" });
+      expect(google.createFolder).not.toHaveBeenCalled();
+
+      vi.mocked(google.getFolder).mockImplementation(async (_t, id) => (id === "found" ? folder("found", FOLDER_NAMES.backups, true) : folder(id, FOLDER_NAMES.exports)));
+      vi.mocked(google.findFolders).mockResolvedValue([]);
+      await syncFolderNames();
+      expect(vi.mocked(google.createFolder).mock.calls.map((c) => c[1])).toEqual([FOLDER_NAMES.backups]); // a trashed folder counts as gone
+    });
+
+    it("does not make a Reports folder for a system that has never saved a report", async () => {
+      db.setting = null;
+      await syncFolderNames();
+      expect(google.createFolder).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when Drive is not connected, and never throws when Google fails", async () => {
+      const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(google.getFolder).mockRejectedValue(new Error("Drive is down"));
+      await expect(syncFolderNames()).resolves.toBeNull();
+      db.conn = null;
+      await expect(syncFolderNames()).resolves.toBeNull();
+      warn.mockRestore();
+    });
+
+    it("is checked at most once an hour by the scheduler", async () => {
+      const start = new Date("2026-10-22T10:00:00Z");
+      expect(await syncFolderNamesIfDue(start)).toBe(true);
+      expect(await syncFolderNamesIfDue(new Date(start.getTime() + 30 * 60_000))).toBe(false);
+      expect(await syncFolderNamesIfDue(new Date(start.getTime() + 61 * 60_000))).toBe(true);
+    });
+  });
+
+  describe("reports for different dates saved at the same moment", () => {
+    it("share one year folder and one month folder - never two of the same name", async () => {
+      // Drive as a real folder tree: what createFolder makes, listFolder then sees.
+      const tree = new Map<string, { id: string; name: string }[]>([["root", [{ id: "y-old", name: "2025" }]]]);
+      let n = 0;
+      db.setting = { value: "root" };
+      vi.mocked(google.listFolder).mockImplementation(async (_t, parent) => (tree.get(parent) ?? []).map((f) => ({ ...f, createdTime: "" })));
+      vi.mocked(google.createFolder).mockImplementation(async (_t, name, parent) => {
+        await new Promise((r) => setTimeout(r, 5)); // a slow create, so a racing second one would overlap it
+        const id = `new-${++n}`;
+        tree.set(parent ?? "root", [...(tree.get(parent ?? "root") ?? []), { id, name }]);
+        return id;
+      });
+      reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => ({ fileName: `daily-report-${d.toISOString().slice(0, 10)}.xlsx`, data: Buffer.from(d.toISOString()) }));
+      vi.mocked(google.createFolder).mockClear();
+
+      await Promise.all([saveGeneratedReport(D("2026-10-21"), 7), saveGeneratedReport(D("2026-10-22"), 7), saveGeneratedReport(D("2026-10-23"), 7)]);
+
+      const made = vi.mocked(google.createFolder).mock.calls.map((c) => c[1]);
+      expect(made.filter((name) => name === "2026")).toHaveLength(1);
+      expect(made.filter((name) => name === "10")).toHaveLength(1);
+      expect(google.uploadFile).toHaveBeenCalledTimes(3);
+    });
+  });
+});
+
+describe("one file per day in Drive: Generate saves it, and never twice", () => {
+  const D = (iso: string) => new Date(`${iso}T00:00:00Z`);
+  const bytes = Buffer.from("xlsx-bytes-v1");
+  const md5 = (b: Buffer) => createHash("md5").update(b).digest("hex");
+  const FILE = "daily-report-2026-10-22.xlsx";
+
+  /// Drive as it stands: root > 2026 > 10, and what is in the month folder.
+  const driveHolds = (files: { id: string; name: string; md5Checksum?: string }[]) => {
+    db.setting = { value: "root" };
+    vi.mocked(google.listFolder).mockImplementation(async (_t, parent) =>
+      parent === "root"
+        ? [{ id: "y", name: "2026", createdTime: "" }]
+        : parent === "y"
+          ? [{ id: "m", name: "10", createdTime: "" }]
+          : parent === "m"
+            ? files.map((f) => ({ createdTime: "", ...f }))
+            : [],
+    );
+  };
+
+  beforeEach(async () => {
+    vi.mocked(google.createFolder).mockResolvedValueOnce("backups-folder").mockResolvedValueOnce("exports-folder");
+    await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
+    vi.mocked(google.createFolder).mockReset();
+    vi.mocked(google.createFolder).mockResolvedValue("folder");
+    reports.buildDailyReportWorkbook.mockResolvedValue({ fileName: FILE, data: bytes });
+    realtime.broadcastNotice.mockClear();
+  });
+
+  it("uploads the first time a date is generated", async () => {
+    driveHolds([]);
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("saved");
+    expect(vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name)).toEqual([FILE]);
+    expect(vi.mocked(google.uploadFile).mock.calls[0][1]).toMatchObject({ parentId: "m" });
+  });
+
+  it("does not upload again when Drive already holds exactly this file", async () => {
+    driveHolds([{ id: "f1", name: FILE, md5Checksum: md5(bytes) }]);
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("unchanged");
+    expect(google.uploadFile).not.toHaveBeenCalled();
+    expect(google.trashFile).not.toHaveBeenCalled();
+    expect(db.uploads.filter((u) => u.kind === "report")).toEqual([]); // nothing was sent, so nothing is logged as sent
+  });
+
+  it("replaces the file when the report has changed, trashing the old one", async () => {
+    driveHolds([{ id: "f1", name: FILE, md5Checksum: md5(Buffer.from("an older report")) }]);
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("saved");
+    expect(vi.mocked(google.trashFile).mock.calls.map((c) => c[1])).toEqual(["f1"]);
+    expect(google.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("tidies stray extra copies, keeping the identical one", async () => {
+    driveHolds([
+      { id: "dup-1", name: FILE, md5Checksum: md5(Buffer.from("old")) },
+      { id: "keep", name: FILE, md5Checksum: md5(bytes) },
+      { id: "dup-2", name: FILE, md5Checksum: md5(Buffer.from("older")) },
+      { id: "other-day", name: "daily-report-2026-10-21.xlsx", md5Checksum: "x" },
+    ]);
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("unchanged");
+    expect(vi.mocked(google.trashFile).mock.calls.map((c) => c[1]).sort()).toEqual(["dup-1", "dup-2"]);
+    expect(google.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("collapses several stray copies into one when none is identical", async () => {
+    driveHolds([
+      { id: "a", name: FILE, md5Checksum: "1" },
+      { id: "b", name: FILE, md5Checksum: "2" },
+    ]);
+    await saveGeneratedReport(D("2026-10-22"), 7);
+    expect(vi.mocked(google.trashFile).mock.calls.map((c) => c[1]).sort()).toEqual(["a", "b"]);
+    expect(google.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("generating the same date twice in a row uploads once, however quickly", async () => {
+    let held: { id: string; name: string; md5Checksum?: string }[] = [];
+    driveHolds([]);
+    vi.mocked(google.listFolder).mockImplementation(async (_t, parent) =>
+      parent === "root"
+        ? [{ id: "y", name: "2026", createdTime: "" }]
+        : parent === "y"
+          ? [{ id: "m", name: "10", createdTime: "" }]
+          : held.map((f) => ({ createdTime: "", ...f })),
+    );
+    vi.mocked(google.uploadFile).mockImplementation(async (_t, input) => {
+      held = [{ id: "new", name: input.name, md5Checksum: md5(bytes) }];
+      return "new";
+    });
+    const results = await Promise.all([saveGeneratedReport(D("2026-10-22"), 7), saveGeneratedReport(D("2026-10-22"), 7)]);
+    expect(results).toEqual(["saved", "unchanged"]);
+    expect(google.uploadFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("says there is nothing to keep for a date with no saved entries, and for Drive not connected", async () => {
+    driveHolds([]);
+    reports.buildDailyReportWorkbook.mockResolvedValue(null);
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("empty");
+    expect(google.uploadFile).not.toHaveBeenCalled();
+    db.conn = null;
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("not-connected");
+  });
+
+  it("lets a Drive failure reach the person who asked, and tells nobody else", async () => {
+    driveHolds([]);
+    vi.mocked(google.uploadFile).mockRejectedValue(new Error("Drive is full"));
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).rejects.toThrow("Drive is full");
+    expect(db.uploads.find((u) => u.kind === "report")).toMatchObject({ status: "FAILED" });
+    expect(realtime.broadcastNotice).not.toHaveBeenCalled();
+  });
+
+  it("a failed generate does not block the next one for that date", async () => {
+    driveHolds([]);
+    vi.mocked(google.uploadFile).mockRejectedValueOnce(new Error("blip"));
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).rejects.toThrow("blip");
+    vi.mocked(google.uploadFile).mockResolvedValue("ok");
+    await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("saved");
+  });
+
+  it("does not toast admins for a file Drive already had, but does for a new one (finish-day path)", async () => {
+    driveHolds([{ id: "f1", name: FILE, md5Checksum: md5(bytes) }]);
+    await queueDailyReportUpload(D("2026-10-22"));
+    expect(realtime.broadcastNotice).not.toHaveBeenCalled();
+    driveHolds([]);
+    await queueDailyReportUpload(D("2026-10-22"));
+    expect(realtime.broadcastNotice).toHaveBeenCalledTimes(1);
   });
 });
 

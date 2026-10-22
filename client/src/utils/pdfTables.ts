@@ -69,6 +69,8 @@ export interface PdfDocumentSpec {
   sections: PdfSection[];
   /** Portrait by default ("auto" is the same); pass "landscape" for a wide report. */
   orientation?: "auto" | "portrait" | "landscape";
+  /** `false` keeps the download out of the Exports folder in Google Drive (see downloadExcel). */
+  driveCopy?: boolean;
 }
 
 // ---------------------------------------------------------------------------
