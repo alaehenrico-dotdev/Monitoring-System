@@ -28,6 +28,8 @@ const saveSnapshot = vi.hoisted(() => vi.fn());
 vi.mock("./dailyReportSnapshot.service", () => ({ saveSnapshot }));
 const recordReportHistoryIn = vi.hoisted(() => vi.fn());
 vi.mock("./reportHistory.service", () => ({ recordReportHistoryIn }));
+const notifyDailyReportSaved = vi.hoisted(() => vi.fn());
+vi.mock("../lib/reportSaved", () => ({ notifyDailyReportSaved }));
 const logSystemEvent = vi.hoisted(() => vi.fn());
 vi.mock("./changeLog.service", () => ({ logSystemEvent }));
 
@@ -79,6 +81,21 @@ describe("finishDay", () => {
       { type: "Daily Report", scope: "2026-10-14", route: "/daily-report?history=1&date=2026-10-14", section: "all" },
       7,
     );
+  });
+
+  it("tells Drive about the saved report only once the report is saved", async () => {
+    summary(58, 60, { offline: true });
+    buildDailyReport.mockResolvedValue({ date: "2026-10-14" });
+    await finishDay(DATE, "NIGHT", "ONLINE", 7);
+    expect(notifyDailyReportSaved).toHaveBeenCalledWith(DATE);
+    // It runs after the transaction, not inside it.
+    expect(notifyDailyReportSaved.mock.invocationCallOrder[0]).toBeGreaterThan(prismaMock.$transaction.mock.invocationCallOrder[0]);
+  });
+
+  it("does not tell Drive anything while the report is still live", async () => {
+    summary(58, 60);
+    await finishDay(DATE, "NIGHT", "ONLINE", 7);
+    expect(notifyDailyReportSaved).not.toHaveBeenCalled();
   });
 
   it("locks only its own page and leaves the report live while the other page is still being entered", async () => {

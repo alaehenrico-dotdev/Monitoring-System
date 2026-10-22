@@ -6,6 +6,7 @@ import { broadcastRealtimeEvent } from "../lib/realtime";
 import { closePeriod, type EntryLocation } from "./dayLock.service";
 import { buildDailyReport } from "./reports.service";
 import { saveSnapshot } from "./dailyReportSnapshot.service";
+import { notifyDailyReportSaved } from "../lib/reportSaved";
 import { recordReportHistoryIn } from "./reportHistory.service";
 
 /**
@@ -180,6 +181,7 @@ export async function finishThrough(
     { timeout: 120_000, maxWait: 10_000 },
   );
   broadcastRealtimeEvent();
+  for (const day of snapshotDates) notifyDailyReportSaved(new Date(`${day}T00:00:00.000Z`));
 
   return {
     finished: plan.periods.length,

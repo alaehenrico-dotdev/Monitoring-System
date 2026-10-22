@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { ShiftModeGate } from "./components/ShiftModeGate";
 import { TopProgressBar } from "./components/TopProgressBar";
+import { NoticeHost } from "./components/NoticeHost";
 import { TopProgressProvider } from "./hooks/useTopProgress";
 import { LoadingBlock } from "./components/Spinner";
 import { LoginPage } from "./pages/LoginPage";
@@ -111,6 +112,7 @@ export default function App() {
         <RealtimeProvider>
           <TopProgressProvider>
             <TopProgressBar />
+            <NoticeHost />
             <Suspense
               fallback={
                 <LoadingBlock label="" minHeight="var(--ae-vh)" size="xxl" />

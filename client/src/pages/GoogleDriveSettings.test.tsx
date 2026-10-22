@@ -22,6 +22,8 @@ const base: DriveStatus = {
   accountEmail: null,
   connectedAt: null,
   lastBackupAt: null,
+  lastReportAt: null,
+  nextBackupAt: null,
   lastError: null,
   settings: null,
   recent: [],
@@ -112,7 +114,7 @@ describe("once connected", () => {
   it("shows the account and its settings", async () => {
     await show(connected());
     expect(screen.getByText("owner@gmail.com")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /every day/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /end of every month/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /copy of every Excel/ })).toBeChecked();
     expect(screen.getByLabelText("Number of backups to keep")).toHaveValue(14);
   });
@@ -143,7 +145,7 @@ describe("once connected", () => {
   it("applies each switch the moment it is changed", async () => {
     api.updateDriveSettings.mockResolvedValue(connected());
     await show(connected());
-    fireEvent.click(screen.getByRole("checkbox", { name: /every day/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /end of every month/ }));
     await waitFor(() => expect(api.updateDriveSettings).toHaveBeenLastCalledWith({ autoBackup: false }));
     fireEvent.click(screen.getByRole("checkbox", { name: /copy of every Excel/ }));
     await waitFor(() => expect(api.updateDriveSettings).toHaveBeenLastCalledWith({ saveExports: false }));
@@ -221,5 +223,74 @@ describe("once connected", () => {
     expect(within(rows[1]).getByText("2.0 KB")).toBeInTheDocument();
     expect(within(rows[2]).getByText("Saved")).toBeInTheDocument();
     expect(within(rows[2]).getByText("3.0 MB")).toBeInTheDocument();
+  });
+
+  it("says the backup is monthly, at the end of the month, and when the next one is due", async () => {
+    await show(connected({ nextBackupAt: "2026-10-31T18:00:00Z" }));
+    const card = screen.getByRole("region", { name: "Database backup" });
+    expect(within(card).getByRole("checkbox", { name: /end of every month/ })).toBeChecked();
+    expect(within(card).getByText(/on the last day, at/)).toBeInTheDocument();
+    expect(within(card).getByText(/Next backup/)).toBeInTheDocument();
+  });
+
+  it("shows no next-backup time while the monthly backup is off", async () => {
+    await show(connected({ nextBackupAt: null, settings: { autoBackup: false, backupHourUtc: 18, keepBackups: 14, saveExports: true } }));
+    expect(screen.queryByText(/Next backup/)).toBeNull();
+  });
+
+  it("says the daily reports are saved automatically, and where", async () => {
+    await show(connected({ lastReportAt: "2026-10-22T10:30:00Z" }));
+    const card = screen.getByRole("region", { name: "Daily reports" });
+    expect(within(card).getByText("Automatic")).toBeInTheDocument();
+    expect(within(card).getByText("Ala Eh Stocks Monitoring - Reports / year / month")).toBeInTheDocument();
+    expect(within(card).getByText(/Last saved/)).toBeInTheDocument();
+    // Nothing to switch: it is simply on.
+    expect(within(card).queryByRole("checkbox")).toBeNull();
+  });
+
+  it("says no report has been saved yet before the first one", async () => {
+    await show(connected());
+    expect(within(screen.getByRole("region", { name: "Daily reports" })).getByText(/No report has been saved yet/)).toBeInTheDocument();
+  });
+
+  it("marks the backup and export cards Off when their switches are off", async () => {
+    await show(connected({ settings: { autoBackup: false, backupHourUtc: 18, keepBackups: 14, saveExports: false } }));
+    expect(within(screen.getByRole("region", { name: "Database backup" })).getByText("Off")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Export copies" })).getByText("Off")).toBeInTheDocument();
+  });
+
+  it("labels each upload's type and filters the activity by it", async () => {
+    await show(
+      connected({
+        recent: [
+          { id: 3, kind: "report", fileName: "daily-report-2026-10-22.xlsx", sizeBytes: 9000, status: "OK", error: null, createdAt: "2026-10-22T10:30:00Z" },
+          { id: 2, kind: "export", fileName: "daily-out.csv", sizeBytes: 2048, status: "OK", error: null, createdAt: "2026-10-22T10:00:00Z" },
+          { id: 1, kind: "backup", fileName: "ala-eh-backup.sql.gz", sizeBytes: 3_145_728, status: "OK", error: null, createdAt: "2026-10-22T02:00:00Z" },
+        ],
+      }),
+    );
+    expect(screen.getAllByRole("row")).toHaveLength(4); // header + 3
+    fireEvent.click(screen.getByRole("button", { name: "Reports" }));
+    const rows = screen.getAllByRole("row");
+    expect(rows).toHaveLength(2);
+    expect(within(rows[1]).getByText("Report")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("daily-report-2026-10-22.xlsx")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Backups" }));
+    expect(screen.getByText("ala-eh-backup.sql.gz")).toBeInTheDocument();
+    expect(screen.queryByText("daily-out.csv")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "All" }));
+    expect(screen.getAllByRole("row")).toHaveLength(4);
+  });
+
+  it("says so when a filter has nothing, and counts failed uploads up top with the reason in the row", async () => {
+    await show(
+      connected({
+        recent: [{ id: 1, kind: "report", fileName: "daily-report-2026-10-22.xlsx", sizeBytes: 9000, status: "FAILED", error: "Drive is full", createdAt: "2026-10-22T10:30:00Z" }],
+      }),
+    );
+    expect(screen.getByText("1 failed")).toBeInTheDocument();
+    expect(screen.getAllByText("Drive is full").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("button", { name: "Backups" }));
+    expect(screen.getByText("Nothing of this kind in the recent activity.")).toBeInTheDocument();
   });
 });

@@ -21,6 +21,8 @@ const AUTH_TIMEOUT_MS = 5000;
 const HEARTBEAT_INTERVAL_MS = 30000;
 
 const authenticatedClients = new Set<WebSocket>();
+/// Who each authenticated socket belongs to, so a notice can go to admins only.
+const roleOf = new WeakMap<WebSocket, string>();
 
 export function attachRealtime(server: HttpServer): void {
   const wss = // maxPayload: the only thing a client ever sends is a tiny auth message,
@@ -54,7 +56,8 @@ export function attachRealtime(server: HttpServer): void {
         if (msg?.type !== "auth" || typeof msg.token !== "string") {
           throw new Error("Expected an auth message");
         }
-        verifyToken(msg.token);
+        const user = verifyToken(msg.token);
+        roleOf.set(ws, user.role);
         authenticatedClients.add(ws);
       } catch {
         ws.close(4001, "Unauthorized");
@@ -100,6 +103,24 @@ export function broadcastRealtimeEvent(): void {
   const message = JSON.stringify({ type: "data-changed", at: new Date().toISOString() });
   for (const ws of authenticatedClients) {
     if (ws.readyState === WebSocket.OPEN) ws.send(message);
+  }
+}
+
+export interface Notice {
+  level: "success" | "error" | "info";
+  message: string;
+}
+
+/// A short message every connected person of the given roles sees as a toast
+/// (e.g. "Backup saved to Google Drive") - for things the server did on its own,
+/// which nobody is waiting on a response for. Everyone signed in when `roles` is
+/// left out. Best effort: it only reaches sockets that are open right now.
+export function broadcastNotice(notice: Notice, roles?: readonly string[]): void {
+  const message = JSON.stringify({ type: "notice", ...notice, at: new Date().toISOString() });
+  for (const ws of authenticatedClients) {
+    if (ws.readyState !== WebSocket.OPEN) continue;
+    if (roles && !roles.includes(roleOf.get(ws) ?? "")) continue;
+    ws.send(message);
   }
 }
 

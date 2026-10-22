@@ -90,3 +90,16 @@ db_data/
 /*.xlsx
 /*.xls
 /*.csv
+
+# --- Leftovers from merges, patches and package managers ------------------------
+*.orig
+*.rej
+*.bak
+*.swo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.nyc_output/
+# Per-machine overrides of the committed config (a local client/.env.local is already covered by .env.*).
+*.local
+!*.example

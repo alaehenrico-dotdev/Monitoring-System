@@ -780,7 +780,7 @@ model DriveConnection {
 /// One row per file sent to Drive, successful or not, for the Settings list.
 model DriveUpload {
   id          Int      @id @default(autoincrement())
-  /// "backup" | "export"
+  /// "backup" | "export" | "report"
   kind        String   @db.VarChar(10)
   fileName    String   @db.VarChar(200)
   driveFileId String?  @db.VarChar(100)
