@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { getCurrentShiftAndDate, getDefaultAuditSheet, otherShift } from "./shift";
+import { afterEach, describe, expect, it } from "vitest";
+import { getCurrentShiftAndDate, getDefaultAuditSheet, otherShift, SHIFT_LABELS, SHIFT_SHORT_LABELS, setWholeDayMode, shiftWithWord } from "./shift";
 
 describe("getCurrentShiftAndDate", () => {
   it("is Morning, same date, from 7:00am up to (not including) 4:00pm", () => {
@@ -65,5 +65,41 @@ describe("getDefaultAuditSheet", () => {
 
   it("crosses a month boundary", () => {
     expect(getDefaultAuditSheet(new Date(2026, 6, 1, 10, 0))).toEqual({ shift: "NIGHT", date: "2026-06-30" });
+  });
+});
+
+describe("whole-day mode (shifts switched off)", () => {
+  afterEach(() => setWholeDayMode(false));
+
+  it("is the one whole-day sheet at any hour - 4pm does not cut the entry", () => {
+    setWholeDayMode(true);
+    for (const hour of [7, 12, 15, 16, 22]) {
+      expect(getCurrentShiftAndDate(new Date(2026, 5, 15, hour, 0))).toEqual({ shift: "NIGHT", date: "2026-06-15" });
+    }
+  });
+
+  it("rolls the date over at midnight, with no carry-back to yesterday", () => {
+    setWholeDayMode(true);
+    expect(getCurrentShiftAndDate(new Date(2026, 5, 15, 0, 30))).toEqual({ shift: "NIGHT", date: "2026-06-15" });
+    expect(getCurrentShiftAndDate(new Date(2026, 5, 15, 3, 0))).toEqual({ shift: "NIGHT", date: "2026-06-15" });
+  });
+
+  it("audits today's whole-day sheet", () => {
+    setWholeDayMode(true);
+    expect(getDefaultAuditSheet(new Date(2026, 5, 15, 9, 0))).toEqual({ shift: "NIGHT", date: "2026-06-15" });
+  });
+
+  it("calls the sheet 'Whole day' and leaves the Morning label alone", () => {
+    setWholeDayMode(true);
+    expect(SHIFT_LABELS.NIGHT).toBe("Whole day");
+    expect(SHIFT_SHORT_LABELS.NIGHT).toBe("Whole day");
+    expect(shiftWithWord("NIGHT")).toBe("Whole day");
+    expect(shiftWithWord("MORNING")).toBe("Morning Shift");
+  });
+
+  it("changes nothing when shifts are on", () => {
+    expect(SHIFT_SHORT_LABELS.NIGHT).toBe("Night");
+    expect(shiftWithWord("NIGHT")).toBe("Night Shift");
+    expect(getCurrentShiftAndDate(new Date(2026, 5, 15, 12, 0))).toEqual({ shift: "MORNING", date: "2026-06-15" });
   });
 });

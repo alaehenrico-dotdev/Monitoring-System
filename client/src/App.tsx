@@ -5,6 +5,7 @@ import { RealtimeProvider } from "./context/RealtimeContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { Layout } from "./components/Layout";
+import { ShiftModeGate } from "./components/ShiftModeGate";
 import { TopProgressBar } from "./components/TopProgressBar";
 import { TopProgressProvider } from "./hooks/useTopProgress";
 import { LoadingBlock } from "./components/Spinner";
@@ -71,6 +72,11 @@ const DailyReportHistoryPage = lazy(() =>
     default: m.DailyReportHistoryPage,
   })),
 );
+const DailyOutHistoryPage = lazy(() =>
+  import("./pages/DailyOutHistoryPage").then((m) => ({
+    default: m.DailyOutHistoryPage,
+  })),
+);
 const VarianceReportHistoryPage = lazy(() =>
   import("./pages/VarianceReportHistoryPage").then((m) => ({
     default: m.VarianceReportHistoryPage,
@@ -114,6 +120,7 @@ export default function App() {
                 <Route path="/login" element={<LoginPage />} />
 
                 <Route element={<ProtectedRoute />}>
+                  <Route element={<ShiftModeGate />}>
                   <Route element={<Layout />}>
                     <Route index element={<Navigate to="/online" replace />} />
                     <Route path="/online" element={<OnlineEntryPage />} />
@@ -141,6 +148,10 @@ export default function App() {
                         element={<DailyReportHistoryPage />}
                       />
                       <Route
+                        path="/daily-out-history"
+                        element={<DailyOutHistoryPage />}
+                      />
+                      <Route
                         path="/variance-report-history"
                         element={<VarianceReportHistoryPage />}
                       />
@@ -156,6 +167,7 @@ export default function App() {
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
                     </Route>
+                  </Route>
                   </Route>
                 </Route>
 

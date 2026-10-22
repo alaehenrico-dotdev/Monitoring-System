@@ -1,5 +1,6 @@
 import type { Shift } from "../types";
 import { ENTRY_PREFIX } from "./unsavedWork";
+import { isWholeDayMode } from "./shift";
 
 /**
  * Which sheet (date + shift) an entry page was last on, so coming back to the
@@ -32,6 +33,10 @@ export function resumeSheet(page: EntryPageKind): { date: string; shift: Shift }
     const v = JSON.parse(raw) as { date?: unknown; shift?: unknown };
     if (typeof v.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v.date)) return null;
     if (v.shift !== "MORNING" && v.shift !== "NIGHT") return null;
+    // Shifts are off: there is no Morning sheet to go back to, so open the
+    // whole-day sheet. Edits staged on a Morning sheet stay in storage, still
+    // counted by the unsaved-work check, and come back if shifts are switched on.
+    if (isWholeDayMode() && v.shift === "MORNING") return null;
     const staged = sessionStorage.getItem(`${ENTRY_PREFIX}${page}:${v.date}:${v.shift}`);
     if (!staged || Object.keys(JSON.parse(staged) as object).length === 0) return null;
     return { date: v.date, shift: v.shift };

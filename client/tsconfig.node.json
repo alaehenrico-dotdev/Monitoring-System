@@ -1,6 +1,10 @@
 {
   "compilerOptions": {
     "composite": true,
+    // Emitted files (the compiled vite.config.js and its .d.ts) go here, not beside
+    // vite.config.ts: Vite prefers a .js config over the .ts one, so a stale compiled
+    // copy in the client folder silently shadowed every edit to the real config.
+    "outDir": "./node_modules/.cache/tsconfig-node",
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",

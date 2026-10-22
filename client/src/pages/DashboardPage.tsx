@@ -7,7 +7,8 @@ import type { ChangeLogEntry, Product, TotalStockRow } from "../types";
 import { ACTION_COLOR, TABLE_LABELS } from "../config/changeLog";
 import { formatRelativeTime } from "../utils/dateFormat";
 import { StatCardsSkeleton, TableSkeleton } from "../components/Skeleton";
-import { MonthlyMonitoring } from "../components/MonthlyMonitoring";
+import { StockFlowChart } from "../components/StockFlowChart";
+import { PeriodMonitoringCard } from "../components/PeriodMonitoringCard";
 import {
   EntryStatusCard,
   LowStockCard,
@@ -476,9 +477,11 @@ export function DashboardPage() {
         </div>
 
         <div className="ae-dash-hero-chart">
-          <MonthlyMonitoring />
+          <StockFlowChart />
         </div>
       </div>
+
+      <PeriodMonitoringCard />
     </div>
   );
 }

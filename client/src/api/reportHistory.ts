@@ -4,7 +4,8 @@ import { http } from "./http";
 export type ReportHistoryType =
   | "Daily Report"
   | "Variance Report"
-  | "Audit Report";
+  | "Audit Report"
+  | "Daily Out";
 
 export interface ReportHistoryEntry {
   id: number;

@@ -2,6 +2,7 @@ import { useBusyAction } from "../hooks/useBusyAction";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getDailyReport, type DailyReport } from "../api/reports";
 import { getDayExtraNames, type DayExtraNames } from "../api/extraLabels";
+import { getDailyOut, type DailyOutEntry } from "../api/dailyOut";
 import { Dropdown } from "../components/Dropdown";
 import { StockGrid, type GridRow } from "../components/StockGrid";
 import { TotalStocksTable } from "../components/TotalStocksTable";
@@ -29,6 +30,8 @@ import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import {
   filterNotes,
+  flatSection,
+  formatCount,
   pdfFileName,
   stockGridSection,
   totalStocksSection,
@@ -60,13 +63,14 @@ function today(): string {
   return getCurrentShiftAndDate().date;
 }
 
-type ReportSection = "all" | "online" | "offline" | "total";
+type ReportSection = "all" | "online" | "offline" | "total" | "out";
 
 const SECTION_LABELS: Record<ReportSection, string> = {
-  all: "Full Report (Online + Offline + Consolidated)",
+  all: "Full Report (Online + Offline + Consolidated + Daily Out)",
   online: "Online Only",
   offline: "Offline Only",
   total: "Consolidated Only",
+  out: "Daily Out Only",
 };
 
 // Not every row the report returns is real data: a date nobody has entered
@@ -119,6 +123,10 @@ export function DailyReportPage() {
   const [searchParams] = useSearchParams();
   const [date, setDate] = useState(searchParams.get("date") ?? today());
   const [report, setReport] = useState<DailyReport | null>(null);
+  // The shown date's Daily Out figures (stock that left the company). Fetched
+  // beside the report; a failure leaves it null and the section says so rather
+  // than blocking the rest of the report.
+  const [dailyOut, setDailyOut] = useState<DailyOutEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Names typed into added-column headers on the shown date's sheets.
   const [extraNames, setExtraNames] = useState<DayExtraNames>({
@@ -170,6 +178,7 @@ export function DailyReportPage() {
     requestId.current++;
     setGenerating(false);
     setReport(null);
+    setDailyOut(null);
     setError(null);
     setEmptyMessage(null);
     setDate(nextDate);
@@ -245,6 +254,13 @@ export function DailyReportPage() {
         void getDayExtraNames(requestedDate).then((names) => {
           if (id === requestId.current) setExtraNames(names);
         });
+        void getDailyOut(requestedDate, requestedDate)
+          .then((rows) => {
+            if (id === requestId.current) setDailyOut(rows[0] ?? null);
+          })
+          .catch(() => {
+            if (id === requestId.current) setDailyOut(null);
+          });
         // Only a fresh Generate remounts the grids (every category expanded
         // again); a silent refresh keeps whatever the person had collapsed.
         if (!silent) setReportVersion((v) => v + 1);
@@ -340,6 +356,7 @@ export function DailyReportPage() {
       offlineColumns,
     );
     const total = totalSection(report.date, byCategory(report.total));
+    const out = dailyOutExcel(report.date, dailyOut);
 
     // "Full Report" still combines every section into one file (previous,
     // only behavior) - a Daily Report is meaningless split across three
@@ -351,7 +368,7 @@ export function DailyReportPage() {
     // thing.
     if (reportSection === "all") {
       const allName = `daily-report-${report.date}.xls`;
-      downloadExcel(allName, [online, offline, total].join(""));
+      downloadExcel(allName, [online, offline, total, out].join(""));
       logExported();
       return;
     }
@@ -359,6 +376,7 @@ export function DailyReportPage() {
       online,
       offline,
       total,
+      out,
     };
     const sectionName = `daily-report-${reportSection}-${report.date}.xls`;
     downloadExcel(sectionName, bySection[reportSection]);
@@ -396,6 +414,18 @@ export function DailyReportPage() {
         totalStocksSection(byCategory(report.total), {
           title: `CONSOLIDATED STOCKS - ${report.date}`,
         }),
+      );
+    }
+    if (reportSection === "all" || reportSection === "out") {
+      sections.push(
+        flatSection(
+          DAILY_OUT_COLUMNS.map((header) => ({ header, align: "right" as const })),
+          dailyOut ? [dailyOutCells(dailyOut).map(formatCount)] : [],
+          {
+            title: `DAILY OUT - ${report.date}`,
+            emptyMessage: "No Daily Out figures for this date.",
+          },
+        ),
       );
     }
     const pdfName = pdfFileName(
@@ -620,6 +650,38 @@ export function DailyReportPage() {
               />
             </>
           )}
+
+          {(reportSection === "all" || reportSection === "out") && (
+            <>
+              <h3 style={{ marginBottom: 8, marginTop: reportSection === "all" ? 32 : 0 }}>
+                Daily Out — {report.date}
+              </h3>
+              {dailyOut ? (
+                <div className="ae-table-scroll" style={{ maxWidth: 560 }}>
+                  <table className="ae-table ae-table--center-head ae-table--compact">
+                    <thead>
+                      <tr>
+                        {DAILY_OUT_COLUMNS.map((h) => (
+                          <th key={h}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        {dailyOutCells(dailyOut).map((v, i) => (
+                          <td key={DAILY_OUT_COLUMNS[i]}>{formatCount(v)}</td>
+                        ))}
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p style={{ fontSize: 13, color: colors.subtleInk }}>
+                  No Daily Out figures for this date.
+                </p>
+              )}
+            </>
+          )}
         </div>
       )}
 
@@ -644,6 +706,20 @@ export function DailyReportPage() {
         </AlertDialog>
       )}
     </div>
+  );
+}
+
+const DAILY_OUT_COLUMNS = ["Online Out", "Offline Out", "Combined Out"];
+
+function dailyOutCells(e: DailyOutEntry): (number | null)[] {
+  return [e.onlineOut, e.offlineOut, e.totalOut];
+}
+
+function dailyOutExcel(date: string, e: DailyOutEntry | null): string {
+  return toExcelTable(
+    DAILY_OUT_COLUMNS,
+    e ? [dailyOutCells(e).map((v) => v ?? "")] : [],
+    `DAILY OUT - ${date}`,
   );
 }
 

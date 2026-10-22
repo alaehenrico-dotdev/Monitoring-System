@@ -1,10 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { getDailyOut, type DailyOutEntry } from "../api/dailyOut";
+import { recordReportHistory } from "../api/reportHistory";
+import { useAuth } from "../context/AuthContext";
 import { ComboChart } from "../components/ComboChart";
 import { hasLines } from "../utils/comboChartData";
 import { DateStepper } from "../components/DateStepper";
 import { Dropdown } from "../components/Dropdown";
-import { DownloadIcon } from "../components/icons";
+import { DownloadIcon, HistoryIcon } from "../components/icons";
 import { FilterSlot } from "../components/FilterSlot";
 import { PageHeader } from "../components/PageHeader";
 import { PageToolbar } from "../components/PageToolbar";
@@ -47,9 +50,19 @@ const cell = (v: number | null) => (v === null ? "—" : fullNumber.format(v));
  */
 export function DailyOutPage() {
   const today = getCurrentShiftAndDate().date;
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  // Opened from Daily Out History: restore that export's window and download it
+  // again as soon as the figures have loaded.
+  const downloadAfterLoad = useRef(searchParams.get("history") === "1");
+  const fromHistory = searchParams.get("history") === "1";
+  const historyTo = searchParams.get("to");
+  const historyDays = Number(searchParams.get("days"));
   // The selected date is the last day shown; the window runs back from it.
-  const [to, setTo] = useState(today);
-  const [days, setDays] = useState(DEFAULT_DAYS);
+  const [to, setTo] = useState(fromHistory && historyTo ? historyTo : today);
+  const [days, setDays] = useState(
+    fromHistory && historyDays >= 1 && historyDays <= 366 ? historyDays : DEFAULT_DAYS,
+  );
   const [view, setView] = useState<View>("table");
   const from = daysBefore(to, days - 1);
   const [rows, setRows] = useState<DailyOutEntry[] | null>(null);
@@ -80,6 +93,28 @@ export function DailyOutPage() {
   const points = useMemo(() => (rows ? dailyOutPoints(rows, today) : null), [rows, today]);
   const totals = useMemo(() => (rows ? dailyOutTotals(rows) : null), [rows]);
 
+  // Listed in Daily Out History once actually exported, not merely viewed. An
+  // export that came from the history itself is already listed. Best effort: a
+  // failed history write never surfaces as an export failure.
+  function exportCsv() {
+    if (!rows) return;
+    downloadCsv(`daily-out-${from}-to-${to}.csv`, dailyOutCsv(rows));
+    if (fromHistory) return;
+    recordReportHistory({
+      type: "Daily Out",
+      scope: `${from} to ${to}`,
+      route: `/daily-out?history=1&to=${to}&days=${days}`,
+      section: "all",
+    }).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (!rows || !downloadAfterLoad.current) return;
+    downloadAfterLoad.current = false;
+    downloadCsv(`daily-out-${from}-to-${to}.csv`, dailyOutCsv(rows));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows]);
+
   function changeWindow(apply: () => void) {
     setRows(null);
     apply();
@@ -105,7 +140,7 @@ export function DailyOutPage() {
                       label: "Export CSV",
                       icon: <DownloadIcon />,
                       disabledReason: rows && rows.length > 0 ? undefined : "Nothing to export yet",
-                      onSelect: () => rows && downloadCsv(`daily-out-${from}-to-${to}.csv`, dailyOutCsv(rows)),
+                      onSelect: exportCsv,
                     },
                   ],
                 },
@@ -129,6 +164,17 @@ export function DailyOutPage() {
                 todayValue={today}
               />
             </>
+          }
+          actions={
+            user?.role === "SUPERVISOR_ADMIN" && (
+              <Link
+                to="/daily-out-history"
+                className="ae-mb-btn"
+                style={{ textDecoration: "none" }}
+              >
+                <HistoryIcon /> <span>Daily History</span>
+              </Link>
+            )
           }
         />
       </PageHeader>
@@ -190,7 +236,7 @@ function DailyOutTable({
 }) {
   return (
     <div className="ae-mm-tablewrap">
-      <table className="ae-table ae-table--compact">
+      <table className="ae-table ae-table--center-head ae-table--compact">
         <thead>
           <tr>
             {/* The card is titled "Out per day", so the columns need not repeat "out". */}

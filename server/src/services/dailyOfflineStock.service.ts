@@ -6,6 +6,8 @@ import { productRepository } from "../repositories/productRepository";
 import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
 import { sheetExtraColumnRepository } from "../repositories/sheetExtraColumnRepository";
 import { recordChange } from "./changeLog.service";
+import { getEntryRules } from "./appSettings.service";
+import { combineSplitRows, WHOLE_DAY_COMBINED } from "../utils/wholeDay";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { holdLockedTransfers, requestHeldTransfers, type HeldTransfer } from "./heldTransfers.service";
 import { isNoopSave } from "../utils/noopSave";
@@ -95,7 +97,7 @@ function calculate(opening: number, input: OfflineFigures) {
 
 /// Same N+1 avoidance as getOnlineGrid - opening stocks for every row are
 /// fetched in one batched call instead of one query per product.
-export async function getOfflineGrid(entryDate: Date, shift: Shift) {
+export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { combineSplitDay?: boolean } = {}) {
   const products = await productRepository.findActive();
   const rows = await dailyOfflineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
@@ -107,8 +109,15 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
   for (const e of extraRows) extrasByProduct.set(e.productId, [...(extrasByProduct.get(e.productId) ?? []), e]);
   const layout = layoutCells(layoutRows);
 
-  const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
-  const openingStockByProduct = await dailyOfflineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
+  // Whole-day mode on a day that was entered by shift: see getOnlineGrid.
+  const morningByProduct =
+    opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts
+      ? new Map((await dailyOfflineStockRepository.findAllForDate(entryDate, "MORNING")).map((r) => [r.productId, r]))
+      : new Map<number, DailyOfflineStock>();
+  const splitDay = morningByProduct.size > 0;
+
+  const missingProductIds = products.filter((p) => !rowByProduct.has(p.id) && !morningByProduct.has(p.id)).map((p) => p.id);
+  const openingStockByProduct = await dailyOfflineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, splitDay ? "MORNING" : shift);
   // A saved layout naming Delivery (Out) counts too: once the sheet has added
   // Delivery columns, every product's figure must be shown in them. Judged on
   // the row alone, a product with a flat one-slot figure would get a zeroed
@@ -119,6 +128,24 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift) {
   return products.map((product) => {
     const stored = extrasByProduct.get(product.id) ?? [];
     const existing = rowByProduct.get(product.id);
+    if (splitDay && (existing || morningByProduct.has(product.id))) {
+      const merged = combineSplitRows(morningByProduct.get(product.id), existing, [
+        "stockInOlToOff",
+        "stockOutOffToOl",
+        "productionIn",
+        "deliveryOut",
+        "delivery1",
+        "delivery2",
+        "delivery3",
+        "delivery4",
+        "delivery5",
+        "backloads",
+        "upsellOut",
+      ])!;
+      const figures = merged as unknown as OfflineFigures & { openingStock: number };
+      const { offlineStock, remainingStock } = calculate(figures.openingStock, figures);
+      return { product, entry: { ...merged, shift, offlineStock, remainingStock, [WHOLE_DAY_COMBINED]: true }, isSaved: true };
+    }
     if (existing) {
       // Delivery (Out)'s first five added columns are the legacy slot columns
       // on this row, not daily_stock_extra rows - so they're read from there

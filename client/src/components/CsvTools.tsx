@@ -32,7 +32,7 @@ import type { Product, Shift, StockLocation } from "../types";
 import { DatePicker } from "./DatePicker";
 import { Dropdown } from "./Dropdown";
 import { ShiftFilter } from "./ShiftFilter";
-import { getCurrentShiftAndDate, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { getCurrentShiftAndDate, isWholeDayMode, shiftWithWord } from "../utils/shift";
 import {
   ClearIcon,
   DownloadIcon,
@@ -168,7 +168,7 @@ export interface ImportTarget {
 }
 
 function describeTarget(t: ImportTarget): string {
-  return `${formatDateDisplay(t.date)} · ${SHIFT_SHORT_LABELS[t.shift]} Shift · ${t.location}`;
+  return `${formatDateDisplay(t.date)} · ${shiftWithWord(t.shift)} · ${t.location}`;
 }
 
 interface CsvToolsProps {
@@ -1273,7 +1273,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                   ).map((l) => ({ value: l, label: l }))}
                 />
               </label>
-              <label style={targetFieldStyle}>
+              <label style={{ ...targetFieldStyle, ...(isWholeDayMode() ? { display: "none" } : null) }}>
                 <span>Shift</span>
                 <ShiftFilter
                   value={targetDraft.shift}
@@ -1706,7 +1706,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                         }}
                       >
                         {formatDateDisplay(b.entryDate.slice(0, 10))} ·{" "}
-                        {SHIFT_SHORT_LABELS[b.shift]} Shift · {b.location} ·{" "}
+                        {shiftWithWord(b.shift)} · {b.location} ·{" "}
                         {b.rowCount} row
                         {b.rowCount === 1 ? "" : "s"}
                       </div>

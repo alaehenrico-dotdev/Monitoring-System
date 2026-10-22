@@ -26,11 +26,11 @@ describe("entry rules endpoints", () => {
   });
 
   it("applies a valid change as the signed-in admin and returns the result", async () => {
-    vi.mocked(setEntryRules).mockResolvedValue({ requireEarlierDaysFinished: false });
+    vi.mocked(setEntryRules).mockResolvedValue({ requireEarlierDaysFinished: false, useShifts: true });
     const { res, done } = call(patchEntryRulesHandler, { requireEarlierDaysFinished: false });
     await done;
     expect(setEntryRules).toHaveBeenCalledWith({ requireEarlierDaysFinished: false }, 7);
-    expect(res.json).toHaveBeenCalledWith({ requireEarlierDaysFinished: false });
+    expect(res.json).toHaveBeenCalledWith({ requireEarlierDaysFinished: false, useShifts: true });
   });
 
   it.each([

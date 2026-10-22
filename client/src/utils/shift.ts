@@ -2,9 +2,26 @@ import type { Shift } from "../types";
 
 export const SHIFTS: Shift[] = ["MORNING", "NIGHT"];
 
+/// Whole-day mode (Settings > Entry Rules: shifts switched off): a day is one
+/// sheet, kept as the Night sheet of the calendar date. Module state, set once
+/// by ShiftModeGate before any page renders (and the page reloads if it
+/// changes), so the many places that ask "what is the current shift/date" or
+/// label a shift all follow it without each having to pass it around.
+let wholeDay = false;
+
+export function setWholeDayMode(on: boolean) {
+  wholeDay = on;
+}
+
+export function isWholeDayMode(): boolean {
+  return wholeDay;
+}
+
 export const SHIFT_LABELS: Record<Shift, string> = {
   MORNING: "Morning (7am\u20134pm)",
-  NIGHT: "Night (4pm\u20131am)",
+  get NIGHT() {
+    return wholeDay ? "Whole day" : "Night (4pm\u20131am)";
+  },
 };
 
 /// A toolbar <select> only has room for a handful of characters once it's
@@ -18,8 +35,22 @@ export const SHIFT_LABELS: Record<Shift, string> = {
 /// enough to fit them inline everywhere it's used.
 export const SHIFT_SHORT_LABELS: Record<Shift, string> = {
   MORNING: "Morning",
-  NIGHT: "Night",
+  get NIGHT() {
+    return wholeDay ? "Whole day" : "Night";
+  },
 };
+
+/// "Night Shift" / "Morning Shift" for running text - and just "Whole day" for
+/// the whole-day sheet, which is not a shift.
+export function shiftWithWord(shift: Shift): string {
+  return wholeDay && shift === "NIGHT" ? SHIFT_SHORT_LABELS.NIGHT : `${SHIFT_SHORT_LABELS[shift]} Shift`;
+}
+
+/// A shift taken from storage or a link, as the current mode allows it: with
+/// shifts off there is only the whole-day sheet, so "Morning" becomes it.
+export function coerceShift(shift: Shift): Shift {
+  return wholeDay ? "NIGHT" : shift;
+}
 
 export function otherShift(shift: Shift): Shift {
   return shift === "MORNING" ? "NIGHT" : "MORNING";
@@ -56,6 +87,8 @@ function isoDate(d: Date): string {
 /// recent one that has finished (before 7am that is last night's already, and
 /// during the morning shift it is yesterday's).
 export function getDefaultAuditSheet(now: Date = new Date()): { shift: Shift; date: string } {
+  // A whole day is counted as it stands: today's sheet.
+  if (wholeDay) return { shift: "NIGHT", date: isoDate(now) };
   const current = getCurrentShiftAndDate(now);
   if (current.shift === "NIGHT") return current;
   const [y, m, d] = current.date.split("-").map(Number);
@@ -63,6 +96,9 @@ export function getDefaultAuditSheet(now: Date = new Date()): { shift: Shift; da
 }
 
 export function getCurrentShiftAndDate(now: Date = new Date()): { shift: Shift; date: string } {
+  // Whole-day mode: one sheet per calendar date, whatever the hour - 4pm does
+  // not cut the entry, and the date rolls over at midnight.
+  if (wholeDay) return { shift: "NIGHT", date: isoDate(now) };
   const hour = now.getHours();
 
   if (hour >= 7 && hour < 16) {

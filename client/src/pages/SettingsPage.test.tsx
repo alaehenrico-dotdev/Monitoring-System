@@ -47,7 +47,7 @@ describe("SettingsPage appearance", () => {
     [/Neobrutalism/, "brutal"],
     [/Flat Design/, "flat"],
     [/Glassmorphism/, "glass"],
-    [/Card-Based/, "card"],
+    [/Minimalism/, "minimal"],
     [/Skeuomorphism/, "skeuo"],
     [/Carbon/, "carbon"],
   ] as const)("switching to the %s theme applies at once and is remembered", (name, value) => {

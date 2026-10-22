@@ -13,7 +13,7 @@ export interface ChangeLogFilters {
   shift?: "MORNING" | "NIGHT";
   importOnly?: boolean;
   /// Only for tableName "reports".
-  reportType?: "Daily Report" | "Variance Report" | "Audit Report";
+  reportType?: "Daily Report" | "Variance Report" | "Audit Report" | "Daily Out";
   reportSection?: "online" | "offline" | "all";
 }
 

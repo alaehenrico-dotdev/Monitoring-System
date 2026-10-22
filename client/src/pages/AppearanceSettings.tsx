@@ -56,10 +56,10 @@ const THEMES: Choice<UiStyle>[] = [
     preview: <GlassPreview />,
   },
   {
-    value: "card",
-    label: "Card-Based UI",
-    description: "Every area is its own white card on a neutral page, with soft shadows, rounded corners and tabs that look like small cards.",
-    preview: <CardPreview />,
+    value: "minimal",
+    label: "Minimalism",
+    description: "Only what is information: no fills, shadows, glow or watermark. Plain text on a quiet page, hairline rules, ink buttons and a muted-to-dark text scale. Same pages and shortcuts as Classic.",
+    preview: <MinimalPreview />,
   },
   {
     value: "skeuo",
@@ -77,7 +77,7 @@ const THEMES: Choice<UiStyle>[] = [
 
 /**
  * Settings > Appearance: how the app looks on THIS browser. The color mode
- * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Card, Skeuomorphic, Carbon) are independent, remembered per
+ * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Carbon) are independent, remembered per
  * browser (ThemeContext), apply immediately, and change only how things are
  * drawn - never the pages, the controls or the data - which is why every role can
  * reach them, unlike the other Settings tabs.
@@ -249,16 +249,21 @@ function GlassPreview() {
   );
 }
 
-function CardPreview() {
-  const card = { display: "block", background: "#ffffff", borderRadius: 7, boxShadow: "0 1px 2px rgba(20,18,10,0.1), 0 4px 10px -2px rgba(20,18,10,0.15)" } as const;
+function MinimalPreview() {
+  const rule = "1px solid #e6e6e3";
   return (
-    <span style={{ display: "block", background: "#ecebe6", height: 86, borderRadius: 4, overflow: "hidden", padding: 8 }}>
-      <span style={{ ...card, height: 20, borderTop: "3px solid #f5c000" }} />
-      <span style={{ display: "flex", gap: 6, marginTop: 8 }}>
-        <span style={{ ...card, flex: 1, height: 34 }} />
-        <span style={{ ...card, flex: 1, height: 34 }} />
-        <span style={{ ...card, flex: 1, height: 34 }} />
+    <span style={{ display: "block", background: "#ffffff", height: 86, borderRadius: 4, overflow: "hidden", padding: "10px 10px", border: rule }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <span style={bar(64, 7, "#1a1a1a", { borderRadius: 1 })} />
+        <span style={bar(28, 5, "#c9c9c4", { borderRadius: 1 })} />
+        <span style={bar(28, 5, "#c9c9c4", { borderRadius: 1 })} />
+        <span style={bar(32, 12, "#1a1a1a", { borderRadius: 3, marginLeft: "auto" })} />
       </span>
+      <span style={{ display: "block", borderBottom: rule, marginTop: 8 }} />
+      <span style={{ display: "block", ...bar("100%", 5, "#efefec", { borderRadius: 1, marginTop: 8 }) }} />
+      <span style={{ display: "block", borderBottom: rule, marginTop: 6 }} />
+      <span style={{ display: "block", ...bar("70%", 5, "#efefec", { borderRadius: 1, marginTop: 7 }) }} />
+      <span style={{ display: "block", borderBottom: rule, marginTop: 6 }} />
     </span>
   );
 }
