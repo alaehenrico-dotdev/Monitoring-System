@@ -6,6 +6,8 @@ import { productRepository } from "../repositories/productRepository";
 import { dailyStockExtraRepository } from "../repositories/dailyStockExtraRepository";
 import { sheetExtraColumnRepository } from "../repositories/sheetExtraColumnRepository";
 import { recordChange } from "./changeLog.service";
+import { getEntryRules } from "./appSettings.service";
+import { combineSplitRows, WHOLE_DAY_COMBINED } from "../utils/wholeDay";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { holdLockedTransfers, requestHeldTransfers, type HeldTransfer } from "./heldTransfers.service";
 import { isNoopSave } from "../utils/noopSave";
@@ -81,11 +83,15 @@ function calculate(opening: number, input: OnlineFigures) {
 /// opening stock (Section 3.1: the grid always shows every product in the
 /// master list).
 ///
+/// `combineSplitDay: false` returns the sheet's own rows even in whole-day mode.
+/// The Daily Report and its frozen snapshot pass it: they describe what was
+/// entered, and must come out the same whichever mode is on.
+///
 /// Opening stocks for every missing row are fetched in one batched call
 /// rather than one query per product - on a fresh shift, most/all of the
 /// ~60 products in the master list won't have a row yet, so the naive
 /// per-product await turned every grid load into an N+1 query storm.
-export async function getOnlineGrid(entryDate: Date, shift: Shift) {
+export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combineSplitDay?: boolean } = {}) {
   const products = await productRepository.findActive();
   const rows = await dailyOnlineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
@@ -99,12 +105,26 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift) {
   for (const e of extraRows) extrasByProduct.set(e.productId, [...(extrasByProduct.get(e.productId) ?? []), e]);
   const layout = layoutCells(layoutRows);
 
-  const missingProductIds = products.filter((p) => !rowByProduct.has(p.id)).map((p) => p.id);
-  const openingStockByProduct = await dailyOnlineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, shift);
+  // Whole-day mode on a day that was entered by shift: the Night sheet shows the
+  // two sheets added together, as one read-only row per product.
+  const morningByProduct =
+    opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts
+      ? new Map((await dailyOnlineStockRepository.findAllForDate(entryDate, "MORNING")).map((r) => [r.productId, r]))
+      : new Map<number, DailyOnlineStock>();
+  const splitDay = morningByProduct.size > 0;
+
+  const missingProductIds = products.filter((p) => !rowByProduct.has(p.id) && !morningByProduct.has(p.id)).map((p) => p.id);
+  const openingStockByProduct = await dailyOnlineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, splitDay ? "MORNING" : shift);
 
   return products.map((product) => {
     const extras = extrasByProduct.get(product.id) ?? [];
     const existing = rowByProduct.get(product.id);
+    if (splitDay && (existing || morningByProduct.has(product.id))) {
+      const merged = combineSplitRows(morningByProduct.get(product.id), existing, ["stockInOffToOl", "stockOutOlToOff", "productionIn", "fulfillmentOut", "rts"])!;
+      const figures = merged as unknown as OnlineFigures & { openingStock: number };
+      const { onlineStock, remainingStock } = calculate(figures.openingStock, figures);
+      return { product, entry: { ...merged, shift, onlineStock, remainingStock, [WHOLE_DAY_COMBINED]: true }, isSaved: true };
+    }
     if (existing) return { product, entry: { ...existing, ...layoutCellsFor(layoutRows, extras, existing as unknown as Record<string, unknown>), ...flattenExtras(extras) }, isSaved: true };
 
     const openingStock = openingStockByProduct.get(product.id) ?? 0;

@@ -10,7 +10,7 @@ import {
 import type { Shift } from "../types";
 import { colors } from "../theme";
 import { formatDateDisplay } from "../utils/dateFormat";
-import { SHIFT_SHORT_LABELS } from "../utils/shift";
+import { shiftWithWord } from "../utils/shift";
 
 type Loc = "ONLINE" | "OFFLINE";
 const LOCATION_LABEL: Record<Loc, string> = { ONLINE: "Online", OFFLINE: "Offline" };
@@ -58,7 +58,7 @@ export function VarianceDetails({
       width={720}
     >
       <p style={{ margin: "0 0 12px", fontSize: 12.5, color: colors.subtleInk }}>
-        {formatDateDisplay(date)} · {SHIFT_SHORT_LABELS[shift]} Shift
+        {formatDateDisplay(date)} · {shiftWithWord(shift)}
       </p>
       {locations.map((loc) => (
         <LocationTrace

@@ -336,6 +336,7 @@ export function ChangeLogPage() {
                       { value: "Daily Report", label: "Daily Report" },
                       { value: "Variance Report", label: "Variance Report" },
                       { value: "Audit Report", label: "Audit Report" },
+                      { value: "Daily Out", label: "Daily Out" },
                     ]}
                   />
                   <Dropdown

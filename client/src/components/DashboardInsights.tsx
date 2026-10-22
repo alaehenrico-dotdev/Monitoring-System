@@ -6,7 +6,7 @@ import { getOfflineGrid } from "../api/offlineStock";
 import { getManualCountGrid } from "../api/manualCounts";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
-import { SHIFTS, SHIFT_LABELS, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { SHIFTS, SHIFT_LABELS, SHIFT_SHORT_LABELS, isWholeDayMode } from "../utils/shift";
 import { RowsSkeleton } from "./Skeleton";
 import { CheckIcon } from "./icons";
 
@@ -140,7 +140,7 @@ export function EntryStatusCard({
       <h3 className="ae-dash-heading">
         Entry status
         <span className="ae-dash-seg" role="group" aria-label="Shift">
-          {SHIFTS.map((s) => (
+          {SHIFTS.filter((s) => !isWholeDayMode() || s === "NIGHT").map((s) => (
             <button
               key={s}
               type="button"

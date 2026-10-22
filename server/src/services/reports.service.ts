@@ -26,10 +26,12 @@ function mergeShiftGrids<T extends { product: { id: number }; isSaved?: boolean 
  */
 export async function buildDailyReport(entryDate: Date) {
   const [onlineMorning, onlineNight, offlineMorning, offlineNight, total] = await Promise.all([
-    getOnlineGrid(entryDate, "MORNING"),
-    getOnlineGrid(entryDate, "NIGHT"),
-    getOfflineGrid(entryDate, "MORNING"),
-    getOfflineGrid(entryDate, "NIGHT"),
+    // The sheets as entered, whatever the shift setting: a report (and the
+    // snapshot frozen from it) must not change when shifts are switched off.
+    getOnlineGrid(entryDate, "MORNING", { combineSplitDay: false }),
+    getOnlineGrid(entryDate, "NIGHT", { combineSplitDay: false }),
+    getOfflineGrid(entryDate, "MORNING", { combineSplitDay: false }),
+    getOfflineGrid(entryDate, "NIGHT", { combineSplitDay: false }),
     getTotalStocksGrid(entryDate),
   ]);
 

@@ -60,6 +60,28 @@ export async function assertMonthOpen(entryDate: Date, db: Db = prisma): Promise
   }
 }
 
+/// Whole-day mode (Settings > Entry Rules > shifts off): a day is one sheet,
+/// saved as the Night sheet of the calendar date. So nothing may be written to a
+/// Morning sheet, and a day that was already entered by shift stays as it was -
+/// it shows combined and read-only rather than being half rewritten. Counts
+/// (the audit) are let onto such a day, since they only compare against it.
+async function assertShiftModeAllows(entryDate: Date, shift: Shift, scope: "entry" | "count", db: Db): Promise<void> {
+  if ((await getEntryRules()).useShifts) return;
+  if (shift === "MORNING") {
+    throw HttpError.badRequest("Shifts are switched off: the whole day is saved as one sheet. Use the whole-day sheet instead of Morning.");
+  }
+  if (scope !== "entry") return;
+  const [online, offline] = await Promise.all([
+    db.dailyOnlineStock.findFirst({ where: { entryDate, shift: "MORNING" }, select: { id: true } }),
+    db.dailyOfflineStock.findFirst({ where: { entryDate, shift: "MORNING" }, select: { id: true } }),
+  ]);
+  if (online || offline) {
+    throw HttpError.conflict(
+      `${toDateOnlyString(entryDate)} was entered by shift (Morning and Night), so it is read-only while shifts are switched off. Switch shifts back on to edit it, or request a correction.`,
+    );
+  }
+}
+
 /// Refuses a write into a closed day. The message names the way out so an
 /// encoder who hits it knows what to ask for.
 ///
@@ -77,6 +99,7 @@ export async function assertPeriodOpen(
   location?: EntryLocation,
 ): Promise<void> {
   if (adjustment.getStore()) return;
+  await assertShiftModeAllows(entryDate, shift, scope, db);
   await assertMonthOpen(entryDate, db);
   const row = await db.dayClosure.findUnique({ where: { entryDate_shift: { entryDate, shift } } });
   if (!row) return;

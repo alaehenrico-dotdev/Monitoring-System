@@ -217,7 +217,7 @@ export function RowsSkeleton({
   );
 }
 
-/// Mirrors MonthlyMonitoring's bar chart - a row of bars at varied
+/// Mirrors the dashboard bar charts - a row of bars at varied
 /// (deterministic, not random-per-render) heights plus a month-label bar
 /// under each, so the loading state occupies the exact footprint the real
 /// chart will fill in at rather than collapsing the section to nothing.

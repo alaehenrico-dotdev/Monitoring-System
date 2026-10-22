@@ -26,6 +26,15 @@ certs/
 *.p12
 *.pfx
 
+# Google credentials (Settings > Google Drive, docs/GOOGLE_DRIVE.md). The console's
+# "Download JSON" button on an OAuth client saves client_secret_<id>.json, which holds
+# the real client secret; service-account keys are the same kind of file. The client id
+# and secret belong in .env, never in a committed file.
+client_secret*.json
+*.apps.googleusercontent.com.json
+service-account*.json
+*-service-account*.json
+
 # --- Data that must never be committed ----------------------------------------
 # Database dumps and backups. The backup scripts write outside the repo by default
 # (C:\ala-eh-backups, /var/backups/ala-eh); this catches one pointed inside it.
@@ -59,3 +68,25 @@ Desktop.ini
 # Office lock/temp files left beside an open spreadsheet (e.g. the encoder order .xlsx).
 ~$*
 *.tmp
+
+# --- Build caches and tool output ------------------------------------------------
+# Vite/ESLint caches and the TypeScript incremental build files (client/tsconfig.tsbuildinfo
+# was being left in the working tree).
+.vite/
+.eslintcache
+*.pid
+# Screenshots and traces from scripts/e2e.mjs or a local Playwright run.
+e2e-output/
+screenshots/
+# Scratch space for one-off scripts and exports - never source.
+scratch/
+tmp/
+
+# --- Local data that belongs to a machine, not the repo ---------------------------
+# A local MySQL data directory, if one is ever created inside the project, and any
+# exported stock/orders spreadsheet or CSV dropped in the root for an import.
+mysql-data/
+db_data/
+/*.xlsx
+/*.xls
+/*.csv

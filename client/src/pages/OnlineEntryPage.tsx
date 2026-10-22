@@ -168,7 +168,10 @@ export function OnlineEntryPage() {
   const dayLock = useDayLock(date, shift, `${realtimeVersion}:${reconnects}`, "ONLINE");
   // Read-only while an earlier day still has to be finished (days go in order) -
   // unless an admin has turned that rule off in Settings > Entry Rules.
-  const canEdit = roleCanEdit && !dayLock.locked && !dayLock.entryBlockedBy;
+  // Whole-day mode on a day that was entered by shift: the sheet shows the two
+  // shifts added together and cannot be edited (the server refuses it too).
+  const splitDayView = rows?.some((r) => (r.entry as Record<string, unknown>).wholeDayCombined === true) ?? false;
+  const canEdit = roleCanEdit && !dayLock.locked && !dayLock.entryBlockedBy && !splitDayView;
 
   // Cell edits are staged here instead of hitting the save endpoint
   // immediately - Save (below) flushes them all at once, and Preview shows
@@ -685,6 +688,12 @@ export function OnlineEntryPage() {
           blockedBy={dayLock.entryBlockedBy}
           onGo={(d, s) => setDateShift({ date: d, shift: s })}
         />
+      )}
+      {splitDayView && (
+        <p role="status" className="ae-mm-note" style={{ margin: "0 0 10px" }}>
+          This day was entered by shift (Morning and Night). With shifts switched off it shows the two added together
+          and is read-only. Switch shifts back on in Settings to edit it, or request a correction.
+        </p>
       )}
       {dayLock.locked && (
         <DayLockBanner

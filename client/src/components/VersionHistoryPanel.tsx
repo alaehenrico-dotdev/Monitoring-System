@@ -15,7 +15,7 @@ import { parseExtraColumnKey } from "../hooks/useExtraColumns";
 import type { Shift } from "../types";
 import { colors } from "../theme";
 import { formatDateDisplay } from "../utils/dateFormat";
-import { SHIFT_SHORT_LABELS } from "../utils/shift";
+import { shiftWithWord } from "../utils/shift";
 import { Spinner } from "./Spinner";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { useBusyAction } from "../hooks/useBusyAction";
@@ -183,7 +183,7 @@ export function VersionHistoryPanel({
           <div style={{ flex: 1, minWidth: 0 }}>
             <strong>Version history</strong>
             <div style={{ color: colors.subtleInk, fontSize: 13 }}>
-              {SHEET_LABEL[sheet]} - {formatDateDisplay(date)} - {SHIFT_SHORT_LABELS[shift]} Shift
+              {SHEET_LABEL[sheet]} - {formatDateDisplay(date)} - {shiftWithWord(shift)}
             </div>
           </div>
           <button type="button" className="ae-btn" onClick={onClose} aria-label="Close version history">
@@ -312,7 +312,7 @@ export function VersionHistoryPanel({
           onCancel={() => setConfirmingRestore(false)}
         >
           <p style={{ margin: "0 0 8px" }}>
-            The {SHEET_LABEL[sheet]} sheet for {formatDateDisplay(date)} ({SHIFT_SHORT_LABELS[shift]} Shift) will be put back the way it was in {selected.title.toLowerCase()}.
+            The {SHEET_LABEL[sheet]} sheet for {formatDateDisplay(date)} ({shiftWithWord(shift)}) will be put back the way it was in {selected.title.toLowerCase()}.
           </p>
           <ul style={{ margin: 0, paddingLeft: 18 }}>
             <li>Every product&apos;s figures and added columns are replaced; products added since are set to zero.</li>

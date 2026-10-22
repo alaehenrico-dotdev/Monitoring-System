@@ -1,7 +1,7 @@
 import { Dropdown } from "./Dropdown";
 import { ClockIcon } from "./icons";
 import type { Shift } from "../types";
-import { SHIFTS, SHIFT_LABELS, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { SHIFTS, SHIFT_LABELS, SHIFT_SHORT_LABELS, isWholeDayMode } from "../utils/shift";
 
 /// A toolbar dropdown for the two operating shifts - same reusable-Dropdown
 /// shape as CategoryFilter. Used both where a shift is required (Online/
@@ -28,6 +28,8 @@ export function ShiftFilter({
   /// "Shift" => the trigger reads "Shift: Night".
   labelPrefix?: string;
 }) {
+  // Whole-day mode: there is one sheet a day, so there is nothing to pick.
+  if (isWholeDayMode()) return null;
   return (
     <Dropdown
       aria-label="Shift"

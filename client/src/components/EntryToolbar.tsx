@@ -5,7 +5,7 @@ import type { Shift } from "../types";
 import { ROW_FILTER_LABELS, type RowFilter } from "../hooks/useGridView";
 import { useFinishDay } from "../hooks/useFinishDay";
 import { addDaysIso } from "../utils/dateMath";
-import { getCurrentShiftAndDate, SHIFTS, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { getCurrentShiftAndDate, isWholeDayMode, SHIFTS, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { CategoryFilter } from "./CategoryFilter";
 import { CopyPreviousButton, type CopyPreviousButtonProps } from "./CopyPreviousButton";
 import { DateStepper } from "./DateStepper";
@@ -273,10 +273,14 @@ export function EntryToolbar(p: EntryToolbarProps) {
       heading: "Rows",
       items: (["all", "changed", "negative"] as const).map((f) => ({ id: `rows:${f}`, label: ROW_FILTER_LABELS[f], checked: p.rowFilter === f, onSelect: () => p.onRowFilterChange(f) })),
     },
-    {
-      heading: "Shift",
-      items: SHIFTS.map((s) => ({ id: `shift:${s}`, label: SHIFT_SHORT_LABELS[s], checked: p.shift === s, onSelect: () => p.onShiftChange(s) })),
-    },
+    ...(isWholeDayMode()
+      ? []
+      : [
+          {
+            heading: "Shift",
+            items: SHIFTS.map((s) => ({ id: `shift:${s}`, label: SHIFT_SHORT_LABELS[s], checked: p.shift === s, onSelect: () => p.onShiftChange(s) })),
+          },
+        ]),
     ...(activeFilters > 0
       ? [{ items: [{ id: "clear-filters", label: `Clear filters (${activeFilters})`, onSelect: clearFilters }] }]
       : []),

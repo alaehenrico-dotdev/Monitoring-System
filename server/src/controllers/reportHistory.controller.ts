@@ -9,7 +9,7 @@ import {
 
 const createSchema = z.object({
   // The three reports the app generates - also what the Change Log filters on.
-  type: z.enum(["Daily Report", "Variance Report", "Audit Report"]),
+  type: z.enum(["Daily Report", "Variance Report", "Audit Report", "Daily Out"]),
   scope: z.string().min(1).max(100),
   route: z.string().min(1).max(500),
   section: z.enum(["online", "offline", "all"]).optional(),

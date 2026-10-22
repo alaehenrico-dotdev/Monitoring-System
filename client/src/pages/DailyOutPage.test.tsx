@@ -11,6 +11,8 @@ vi.mock("../components/PageHeader", () => ({
   PageHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("../context/RealtimeContext", () => ({ useRealtimeVersion: () => 0 }));
+vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "SUPERVISOR_ADMIN" } }) }));
+vi.mock("../api/reportHistory", () => ({ recordReportHistory: vi.fn().mockResolvedValue({}) }));
 
 const day = (date: string, onlineOut: number | null, offlineOut: number | null): DailyOutEntry => ({
   date,

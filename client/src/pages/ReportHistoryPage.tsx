@@ -1,15 +1,17 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   listReportHistory,
   type ReportHistoryEntry,
 } from "../api/reportHistory";
 import { matchesSearch } from "../utils/search";
-import { describe, parseDay } from "../utils/reportHistoryText";
+import { describe } from "../utils/reportHistoryText";
 import { reportHistoryCsv } from "../utils/reportHistoryCsv";
 import { downloadCsv } from "../utils/csv";
 import { localDateStamp } from "../utils/dateFormat";
-import { CalendarIcon, ClockIcon, DownloadIcon, HistoryIcon } from "../components/icons";
+import { DownloadIcon, HistoryIcon } from "../components/icons";
+import { DatePicker } from "../components/DatePicker";
+import { FilterSlot } from "../components/FilterSlot";
 import { PageToolbar } from "../components/PageToolbar";
 import { PageHeader } from "../components/PageHeader";
 import { SearchInput } from "../components/SearchInput";
@@ -29,11 +31,10 @@ interface Props {
 }
 
 /**
- * Shared body of the Daily / Variance Report History pages. Each generated
- * report is a glass card (what it covers, when it was generated, one-click
- * Download) and the cards are grouped under Today / Yesterday / date
- * headings, newest first - instead of the old flat three-column table.
- * Server-backed (api/reportHistory.ts) - the same list for every device and
+ * Shared body of the Daily / Variance / Audit / Daily Out History pages: one
+ * plain table, newest first - what each report covers, when it was generated
+ * (and by whom) and a Download action. Searchable, and narrowable to a range
+ * of generated dates. Server-backed (api/reportHistory.ts) - the same list for every device and
  * tester, not just whichever browser happened to generate a given report.
  */
 export function ReportHistoryPage({
@@ -48,6 +49,9 @@ export function ReportHistoryPage({
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  // Narrow to reports generated within these local days ("" = no limit).
+  const [fromDay, setFromDay] = useState("");
+  const [toDay, setToDay] = useState("");
   const realtimeVersion = useRealtimeVersion();
 
   useEffect(() => {
@@ -88,33 +92,29 @@ export function ReportHistoryPage({
 
   const visible = useMemo(
     () =>
-      (history ?? []).filter((e) =>
-        matchesSearch(
+      (history ?? []).filter((e) => {
+        const day = dayKey(e.generatedAt);
+        if (fromDay && day < fromDay) return false;
+        if (toDay && day > toDay) return false;
+        return matchesSearch(
           [e.scope, describe(e).title, describe(e).category],
           query,
-        ),
-      ),
-    [history, query],
+        );
+      }),
+    [history, query, fromDay, toDay],
   );
-
-  // Group by the local day each report was generated on; input is already
-  // newest-first, and Map preserves insertion order.
-  const groups = useMemo(() => {
-    const map = new Map<string, ReportHistoryEntry[]>();
-    for (const entry of visible) {
-      const key = dayKey(entry.generatedAt);
-      const bucket = map.get(key);
-      if (bucket) bucket.push(entry);
-      else map.set(key, [entry]);
-    }
-    return Array.from(map.entries());
-  }, [visible]);
+  const filtering = query.trim() !== "" || fromDay !== "" || toDay !== "";
 
   return (
     <div>
       <PageHeader title={title} subtitle={subtitle}>
         <PageToolbar
           label="Report history"
+          activeFilters={fromDay !== "" || toDay !== "" ? 1 : 0}
+          onClearFilters={() => {
+            setFromDay("");
+            setToDay("");
+          }}
           menus={[
             {
               id: "export",
@@ -148,6 +148,10 @@ export function ReportHistoryPage({
                 onChange={setQuery}
                 placeholder="Search by date or category…"
               />
+              <FilterSlot active={fromDay !== "" || toDay !== ""} label="Generated">
+                <DatePicker aria-label="Generated from" value={fromDay} onChange={setFromDay} />
+                <DatePicker aria-label="Generated to" value={toDay} onChange={setToDay} />
+              </FilterSlot>
             </>
           }
         />
@@ -188,21 +192,24 @@ export function ReportHistoryPage({
         <div className="ae-hist">
           <p className="ae-hist-count">
             {visible.length} {visible.length === 1 ? "report" : "reports"}
-            {query.trim() && ` matching "${query.trim()}"`}
+            {filtering && " match the filters"}
           </p>
-          {groups.map(([day, entries]) => (
-            <Fragment key={day}>
-              <h3 className="ae-hist-day">
-                {dayHeading(day)}
-                <span>{entries.length}</span>
-              </h3>
-              <div className="ae-hist-grid">
-                {entries.map((entry) => (
-                  <HistoryCard key={entry.id} entry={entry} />
+          <div className="ae-table-scroll">
+            <table className="ae-table ae-table--left">
+              <thead>
+                <tr>
+                  <th>Report</th>
+                  <th>Generated</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((entry) => (
+                  <HistoryRow key={entry.id} entry={entry} />
                 ))}
-              </div>
-            </Fragment>
-          ))}
+              </tbody>
+            </table>
+          </div>
           {nextCursor !== null && (
             <button
               type="button"
@@ -219,86 +226,43 @@ export function ReportHistoryPage({
   );
 }
 
-function HistoryCard({ entry }: { entry: ReportHistoryEntry }) {
+function HistoryRow({ entry }: { entry: ReportHistoryEntry }) {
   const { title, detail, category } = describe(entry);
+  const extra = [detail, category].filter(Boolean).join(" · ");
+  const when = new Date(entry.generatedAt);
   return (
-    <article className="ae-hist-card">
-      <span className="ae-hist-card-icon" aria-hidden>
-        <CalendarIcon />
-      </span>
-      <div className="ae-hist-card-body">
-        <h4 className="ae-hist-card-title">{title}</h4>
-        <p className="ae-hist-card-meta">
-          {detail && <span className="ae-hist-chip">{detail}</span>}
-          {category && (
-            <span className="ae-hist-chip ae-hist-chip--accent">
-              {category}
-            </span>
-          )}
-        </p>
-        <p
-          className="ae-hist-card-time"
-          title={new Date(entry.generatedAt).toLocaleString()}
+    <tr>
+      <td>
+        <strong>{title}</strong>
+        {extra && <div style={{ fontSize: 12, opacity: 0.7 }}>{extra}</div>}
+      </td>
+      <td title={when.toLocaleString()}>
+        {when.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+        {", "}
+        {when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+        {entry.generatedBy && (
+          <div style={{ fontSize: 12, opacity: 0.7 }}>{entry.generatedBy.name}</div>
+        )}
+      </td>
+      <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+        {/* Still a navigation under the hood (the report page re-fetches live
+            data for this exact date/range and auto-downloads - see the
+            `history=1` handling in each report page), but presented as the
+            one-click Download it functionally is. */}
+        <Link
+          to={entry.route}
+          className="ae-btn ae-btn-secondary ae-btn-sm"
+          style={{ textDecoration: "none" }}
         >
-          <ClockIcon />
-          Generated {timeOfDay(entry.generatedAt)} ·{" "}
-          {relativeTime(entry.generatedAt)}
-          {entry.generatedBy && <> · {entry.generatedBy.name}</>}
-        </p>
-      </div>
-      {/* Still a navigation under the hood (the report page re-fetches live
-          data for this exact date/range and auto-triggers the PDF - see
-          DailyReportPage.tsx/VarianceReportPage.tsx's `printAfterLoad`), but
-          presented as the one-click Download it functionally already is,
-          rather than "open this page". */}
-      <Link
-        to={entry.route}
-        className="ae-btn ae-btn-secondary ae-btn-sm ae-hist-open"
-        style={{ textDecoration: "none" }}
-      >
-        <DownloadIcon />
-        Download
-      </Link>
-    </article>
+          <DownloadIcon />
+          Download
+        </Link>
+      </td>
+    </tr>
   );
 }
 
 function dayKey(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function dayHeading(key: string): string {
-  const d = parseDay(key);
-  if (!d) return key;
-  const today = new Date();
-  const startOfToday = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
-  const diff = Math.round((startOfToday.getTime() - d.getTime()) / 86_400_000);
-  if (diff === 0) return "Today";
-  if (diff === 1) return "Yesterday";
-  return d.toLocaleDateString(undefined, {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-const timeOfDay = (iso: string) =>
-  new Date(iso).toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-
-function relativeTime(iso: string): string {
-  const seconds = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  if (seconds < 60) return "just now";
-  if (seconds < 3600) return rtf.format(-Math.floor(seconds / 60), "minute");
-  if (seconds < 86_400) return rtf.format(-Math.floor(seconds / 3600), "hour");
-  return rtf.format(-Math.floor(seconds / 86_400), "day");
 }

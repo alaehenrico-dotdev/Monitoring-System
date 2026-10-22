@@ -38,7 +38,7 @@ const filterSchema = z.object({
   action: z.enum(["CREATE", "UPDATE", "DELETE"]).optional(),
   productId: z.coerce.number().int().positive().optional(),
   shift: z.enum(["MORNING", "NIGHT"]).optional(),
-  reportType: z.enum(["Daily Report", "Variance Report", "Audit Report"]).optional(),
+  reportType: z.enum(["Daily Report", "Variance Report", "Audit Report", "Daily Out"]).optional(),
   reportSection: z.enum(["online", "offline", "all"]).optional(),
   importOnly: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
 });

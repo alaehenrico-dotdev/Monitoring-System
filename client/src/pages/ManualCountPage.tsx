@@ -73,7 +73,7 @@ import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { auditSnapshotPdf } from "../utils/auditSnapshot";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
-import { getCurrentShiftAndDate, getDefaultAuditSheet, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { coerceShift, getCurrentShiftAndDate, getDefaultAuditSheet, isWholeDayMode, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { GridSelectionBar } from "../components/GridSelectionBar";
@@ -199,6 +199,8 @@ function loadStoredView(): StoredView | null {
       return null;
     const staged = loadDrafts(v.date, v.shift);
     if (Object.keys(staged.ONLINE).length + Object.keys(staged.OFFLINE).length === 0) return null;
+    // Shifts off: a remembered Morning sheet cannot be reopened.
+    if (isWholeDayMode() && v.shift === "MORNING") return null;
     return { date: v.date, shift: v.shift, source: v.source };
   } catch {
     return null;
@@ -269,7 +271,7 @@ export function ManualCountPage() {
     const d = searchParams.get("date") ?? "";
     const s = searchParams.get("shift");
     if (!openedFromHistory || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return resumed ?? now;
-    return { date: d, shift: s === "MORNING" || s === "NIGHT" ? s : now.shift };
+    return { date: d, shift: s === "MORNING" || s === "NIGHT" ? coerceShift(s) : now.shift };
   });
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
   const setShift = (s: Shift) =>

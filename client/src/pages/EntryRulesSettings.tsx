@@ -40,6 +40,29 @@ export function EntryRulesSettings() {
     }
   }
 
+  async function setUseShifts(useShifts: boolean) {
+    const message = useShifts
+      ? [
+          "Switch Morning and Night shifts back on?",
+          "Entry pages will show the shift picker again, and the 4pm cutoff applies. Days already entered as a whole day stay as the Night sheet.",
+        ].join("\n\n")
+      : [
+          "Switch off Morning and Night shifts?",
+          "A day becomes one whole sheet, saved under the calendar date, so 4pm no longer cuts the entry and the date changes at midnight. Days that were already entered by shift stay as they are and show combined, read-only. Everyone's page will reload.",
+        ].join("\n\n");
+    if (!window.confirm(message)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateEntryRules({ useShifts });
+      // The whole app changes shape with this, so start every page afresh.
+      window.location.reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save the entry rule.");
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="ae-panel" style={{ maxWidth: 640, padding: "14px 18px" }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>Entry rules</div>
@@ -68,6 +91,26 @@ export function EntryRulesSettings() {
                 shows "Finish that day first".
                 <br />
                 Off: people can fill in the present day even if earlier days have not been finished yet.
+              </span>
+            </span>
+          </label>
+
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: colors.ink, marginTop: 16 }}>
+            <input
+              type="checkbox"
+              style={{ marginTop: 3 }}
+              checked={rules.useShifts}
+              disabled={saving}
+              onChange={(e) => void setUseShifts(e.target.checked)}
+            />
+            <span>
+              <strong>Use Morning and Night shifts</strong>
+              <span style={{ display: "block", fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+                On: each day has a Morning (7am–4pm) and a Night (4pm–1am) sheet, and the entry pages open on the one
+                the clock says.
+                <br />
+                Off: each day is one whole sheet, however late it is. Entries are saved under the calendar date, which
+                changes at midnight. Days already entered by shift stay as they are and show combined, read-only.
               </span>
             </span>
           </label>

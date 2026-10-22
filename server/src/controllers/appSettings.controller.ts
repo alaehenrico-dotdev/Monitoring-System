@@ -7,8 +7,14 @@ export async function getEntryRulesHandler(_req: Request, res: Response) {
   res.json(await getEntryRules());
 }
 
+/// The one rule every role needs (the entry pages change shape with it), so it
+/// has its own read; the full rules stay Supervisor/Admin only.
+export async function getShiftModeHandler(_req: Request, res: Response) {
+  res.json({ useShifts: (await getEntryRules()).useShifts });
+}
+
 const entryRulesSchema = z
-  .object({ requireEarlierDaysFinished: z.boolean() })
+  .object({ requireEarlierDaysFinished: z.boolean(), useShifts: z.boolean() })
   .partial()
   .strict()
   .refine((v) => Object.keys(v).length > 0, "Nothing to change");
