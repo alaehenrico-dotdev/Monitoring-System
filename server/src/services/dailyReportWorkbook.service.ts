@@ -8,8 +8,13 @@ import { getDailyReport } from "./reports.service";
  * The Daily Report as an Excel workbook, built on the server so it can be saved
  * to Google Drive with the nightly backup without anyone opening a browser.
  * Same content as the report page's own Excel export: Online, Offline and
- * Consolidated, plus Daily Out. The figures come from getDailyReport, so a
+ * Consolidated, Daily Out and the day's Audit counts, behind a Summary sheet that
+ * says whether the day is finished. The figures come from getDailyReport, so a
  * finished day is its frozen snapshot, exactly as the page shows it.
+ *
+ * Nothing in the workbook depends on when it was built (no "generated at"), so
+ * the same report always produces the same bytes - which is how an upload can
+ * tell that Drive already holds exactly this file.
  */
 
 interface ProductRef {
@@ -61,6 +66,21 @@ function stockSheet(name: string, rows: GridRow[], columns: [string, string][]):
   };
 }
 
+interface AuditRow {
+  product: ProductRef;
+  shift: string;
+  location: string;
+  systemRemainingStock: number;
+  manualCount: number;
+  variance: number;
+  remarks: string | null;
+  published: boolean;
+  isOpeningBalance: boolean;
+}
+
+const SHIFT_LABEL: Record<string, string> = { MORNING: "Morning", NIGHT: "Night" };
+const LOCATION_LABEL: Record<string, string> = { ONLINE: "Online", OFFLINE: "Offline", TOTAL: "Total" };
+
 interface TotalRow {
   product: ProductRef;
   onlineRemainingStock: number;
@@ -70,13 +90,31 @@ interface TotalRow {
   totalVariance?: number | null;
 }
 
+interface ReportInput {
+  date?: string;
+  online: unknown[];
+  offline: unknown[];
+  total: unknown[];
+  audit?: unknown[];
+  /// Set when this is the frozen copy saved at Finish day rather than live figures.
+  snapshot?: { savedAt: string; savedBy: { name: string } | null } | null;
+}
+
 /// Pure: the sheets for one report and its Daily Out figures.
 export function dailyReportSheets(
-  report: { online: unknown[]; offline: unknown[]; total: unknown[] },
+  report: ReportInput,
   out: { onlineOut: number | null; offlineOut: number | null; totalOut: number | null } | null,
 ): Sheet[] {
   const total = report.total as TotalRow[];
+  const audit = (report.audit ?? []) as AuditRow[];
+  const summary: Cell[][] = [
+    ["Report date", report.date ?? ""],
+    ["Status", report.snapshot ? "Finished - this is the report saved when the day was finished" : "Live - the day is not finished yet, so these figures can still change"],
+    ...(report.snapshot ? ([["Saved at", report.snapshot.savedAt], ["Saved by", report.snapshot.savedBy?.name ?? ""]] as Cell[][]) : []),
+    ["Audit counts", audit.length],
+  ];
   return [
+    { name: "Summary", columns: ["Item", "Value"], rows: summary },
     stockSheet("Online", report.online as GridRow[], ONLINE_COLUMNS),
     stockSheet("Offline", report.offline as GridRow[], OFFLINE_COLUMNS),
     {
@@ -95,6 +133,20 @@ export function dailyReportSheets(
       name: "Daily Out",
       columns: ["Online Out", "Offline Out", "Combined Out"],
       rows: out ? [[out.onlineOut, out.offlineOut, out.totalOut]] : [],
+    },
+    {
+      name: "Audit",
+      columns: ["Category", "SKU", "Product", "Shift", "Location", "System Remaining", "Counted", "Variance", "Remarks", "Status"],
+      rows: audit.map((a) => [
+        ...productCells(a.product),
+        SHIFT_LABEL[a.shift] ?? a.shift,
+        LOCATION_LABEL[a.location] ?? a.location,
+        num(a.systemRemainingStock),
+        num(a.manualCount),
+        num(a.variance),
+        a.remarks ?? "",
+        a.isOpeningBalance ? "Opening balance" : a.published ? "Published" : "Not published",
+      ]),
     },
   ];
 }

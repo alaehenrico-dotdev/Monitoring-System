@@ -4,18 +4,22 @@ Settings > **Google Drive** connects the system to one Google account. Once conn
 
 - **Database backups** are taken automatically at the **end of every month** (the last day, at the hour you
   set; and on demand with *Back up now*), gzipped, and uploaded to a
-  Drive folder called **Ala Eh Monitoring - Backups**. The newest *N* are kept (default 14); older ones go to
+  Drive folder called **Ala Eh Stock Monitoring - Backups**. The newest *N* are kept (default 14); older ones go to
   the Drive trash. Each one also appears in the existing Backup history, and a failed one raises the same
   "backup failed / overdue" warnings as any other.
+- **Generating the Daily Report** (the Generate button, after a confirmation) saves that date's report to Drive
+  straight away - see the next point for what the file is. Generating a date again replaces the file, and does
+  nothing when Drive already holds exactly the same report, so there is never more than one file per date.
 - **Daily Report workbooks** are saved automatically: the moment a day's report is saved (an encoder
   finishes the day, "Finish through" runs, or a correction re-saves a frozen report), and again with each
   backup (monthly, and on *Back up now*) for the latest day and the day before it, as a catch-up. Each is an
-  Excel file (`daily-report-YYYY-MM-DD.xlsx`, with Online, Offline, Consolidated and Daily Out sheets) in
-  **Ala Eh Stocks Monitoring - Reports / year / month**. A day's
+  Excel file (`daily-report-YYYY-MM-DD.xlsx`, with Summary, Online, Offline, Consolidated, Daily Out and Audit
+  sheets) in
+  **Ala Eh Stock Monitoring - Reports / year / month**. A day's
   file is replaced with the current one each time, so Drive holds one file per day; earlier days stay, so the
   folder is a running archive. A finished day's file is its frozen report. If saving a report fails the
   backup still stands, and the failure shows in the recent uploads list.
-- **Excel, CSV, PDF and end-of-day pack exports** are copied to **Ala Eh Monitoring - Exports** at the moment
+- **Excel, CSV, PDF and end-of-day pack exports** are copied to **Ala Eh Stock Monitoring - Exports** at the moment
   someone downloads them. The person still gets their normal download; the copy is sent in the background and
   never blocks or fails it.
 
@@ -61,10 +65,11 @@ on Settings showing the account.
 > **Why from that PC:** Google only accepts plain `http` redirect addresses for `localhost`. Everything after
 > connecting (backups, exports from any PC on the network) works from any address.
 
-> **Backup-overdue warning:** the Admin Queue flags "Backup overdue" when the newest backup of any kind is
-> older than `BACKUP_OVERDUE_HOURS` (36 by default, which suits a daily backup). If the monthly Drive backup is
-> your only backup, set `BACKUP_OVERDUE_HOURS=768` (32 days) in `.env` and restart, or the warning will show most
-> of the month. A separate daily backup (the scheduled task in `scripts/`) keeps the 36-hour default meaningful.
+> **Backup-overdue warning:** the Admin Queue flags "Backup overdue" when the newest backup is older than
+> `BACKUP_OVERDUE_HOURS` (36 by default, which suits a daily backup). When the monthly Drive backup is your only
+> scheduled backup (no `BACKUP_DIR` with daily scripts), the limit widens by itself to 33 days, so the warning
+> does not show most of the month. If you do run daily backup scripts and set `BACKUP_DIR`, the 36-hour
+> default stays in force.
 
 ## What is stored, and where
 
@@ -86,6 +91,22 @@ on Settings showing the account.
 - If you remove the app at <https://myaccount.google.com/permissions>, or Google expires the grant, the page
   shows *"reconnect Google Drive"*; click **Connect** again. Reconnecting the same account keeps its folders
   and settings.
+
+## Folder names
+
+The system keeps exactly three folders in Drive, named:
+
+- **Ala Eh Stock Monitoring - Backups**
+- **Ala Eh Stock Monitoring - Reports** (with `year/month` inside)
+- **Ala Eh Stock Monitoring - Exports**
+
+It never makes a second folder of a name that already exists: it reuses the one there (the oldest, if there
+are strays), and creates one only when none exists. Folders made under an older name ("Ala Eh Monitoring - …"
+or "Ala Eh Stocks Monitoring - Reports") are **renamed in place** - same folder, same files - when the
+server starts, then at most once an hour, and when you connect. If a folder with the exact name already
+exists, the system uses that one and leaves the old one alone rather than create a duplicate name. Folders
+you delete or trash are found by name again or made once. Year and month folders inside Reports are
+created one at a time, so reports saved at the same moment never make two.
 
 ## Toasts
 

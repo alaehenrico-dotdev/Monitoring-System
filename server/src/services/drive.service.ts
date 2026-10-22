@@ -8,6 +8,9 @@ import { prisma } from "../lib/prisma";
 import {
   createFolder,
   DriveApiError,
+  findFolders,
+  getFolder,
+  renameFolder,
   DriveAuthError,
   exchangeCode,
   fetchAccountEmail,
@@ -26,6 +29,7 @@ import { recordBackup } from "./backupVerify.service";
 import { logSystemEvent } from "./changeLog.service";
 import { buildDailyReportWorkbook, latestEntryDate } from "./dailyReportWorkbook.service";
 import { XLSX_MIME } from "../utils/xlsx";
+import { createHash } from "node:crypto";
 import { toDateOnlyString } from "../utils/date";
 import { setReportSavedHandler } from "../lib/reportSaved";
 import { broadcastNotice } from "../lib/realtime";
@@ -44,9 +48,19 @@ const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
  */
 
 const CONNECTION_ID = 1;
-const BACKUP_FOLDER_NAME = "Ala Eh Monitoring - Backups";
-const EXPORT_FOLDER_NAME = "Ala Eh Monitoring - Exports";
-const REPORTS_FOLDER_NAME = "Ala Eh Stocks Monitoring - Reports";
+/// The three folders the system keeps in Drive, named exactly like this and no
+/// other way. Anything it finds under an older name is renamed to these, never
+/// copied, so there is only ever one folder of each name.
+export const FOLDER_NAMES = {
+  backups: "Ala Eh Stock Monitoring - Backups",
+  exports: "Ala Eh Stock Monitoring - Exports",
+  reports: "Ala Eh Stock Monitoring - Reports",
+} as const;
+const LEGACY_FOLDER_NAMES = {
+  backups: ["Ala Eh Monitoring - Backups"],
+  exports: ["Ala Eh Monitoring - Exports"],
+  reports: ["Ala Eh Monitoring - Reports", "Ala Eh Stocks Monitoring - Reports"],
+} as const;
 /// Where the Reports folder's id is kept (app_settings, a plain key/value table),
 /// so adding it needed no schema change.
 const REPORTS_FOLDER_KEY = "drive.reportsFolderId";
@@ -115,8 +129,12 @@ export async function completeConnect(code: string, state: string): Promise<void
   // folders and settings, so the backup history stays in one place.
   const existing = await prisma.driveConnection.findUnique({ where: { id: CONNECTION_ID } });
   const sameAccount = Boolean(existing && accountEmail && existing.accountEmail === accountEmail);
-  const backupFolderId = sameAccount ? existing!.backupFolderId : await createFolder(tokens.accessToken, BACKUP_FOLDER_NAME);
-  const exportFolderId = sameAccount ? existing!.exportFolderId : await createFolder(tokens.accessToken, EXPORT_FOLDER_NAME);
+  const backupFolderId = sameAccount
+    ? existing!.backupFolderId
+    : await findOrCreateFolder(tokens.accessToken, FOLDER_NAMES.backups, { legacyNames: LEGACY_FOLDER_NAMES.backups });
+  const exportFolderId = sameAccount
+    ? existing!.exportFolderId
+    : await findOrCreateFolder(tokens.accessToken, FOLDER_NAMES.exports, { legacyNames: LEGACY_FOLDER_NAMES.exports });
 
   const data = {
     accountEmail,
@@ -130,6 +148,8 @@ export async function completeConnect(code: string, state: string): Promise<void
   await prisma.driveConnection.upsert({ where: { id: CONNECTION_ID }, create: { id: CONNECTION_ID, ...data }, update: data });
   clearAccessToken();
   await logSystemEvent("drive_connected", { accountEmail }, userId);
+  // Folders kept from an earlier connection may carry an older name.
+  await syncFolderNames();
 }
 
 export async function disconnect(userId: number): Promise<void> {
@@ -369,13 +389,62 @@ async function trimOldBackups(conn: Connection): Promise<void> {
 
 // --- Daily Report files ---------------------------------------------------------
 
+/// Folder creation is serialised per (parent, name): without it two reports for
+/// different dates, generated at once, would each find "2026" missing and each
+/// make one - the very duplicate this is here to prevent.
+const folderLocks = new Map<string, Promise<unknown>>();
+
+function withFolderLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const previous = folderLocks.get(key) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(work);
+  const tail = run.catch(() => undefined);
+  folderLocks.set(key, tail);
+  void tail.finally(() => {
+    if (folderLocks.get(key) === tail) folderLocks.delete(key);
+  });
+  return run;
+}
+
+/// A folder with exactly this name, made only when none exists:
+///  1. one already carrying the name is reused (the oldest, if there are strays);
+///  2. else one under an older name is renamed to it and reused;
+///  3. else a new one is created.
+/// Never makes a second folder of a name that is already there.
+async function findOrCreateFolder(token: string, name: string, opts: { parentId?: string; legacyNames?: readonly string[] } = {}): Promise<string> {
+  return withFolderLock(`${opts.parentId ?? "root"}/${name}`, async () => {
+    const same = await findFolders(token, name, opts.parentId);
+    if (same.length) return same[0].id;
+    for (const legacy of opts.legacyNames ?? []) {
+      const old = await findFolders(token, legacy, opts.parentId);
+      if (old.length) {
+        await renameFolder(token, old[0].id, name);
+        return old[0].id;
+      }
+    }
+    return createFolder(token, name, opts.parentId);
+  });
+}
+
+/// A year or month folder inside the Reports folder: the existing one, or one
+/// new one.
 async function findOrCreateChild(token: string, parentId: string, name: string): Promise<string> {
-  const existing = (await listFolder(token, parentId)).find((f) => f.name === name);
-  return existing ? existing.id : createFolder(token, name, parentId);
+  return withFolderLock(`${parentId}/${name}`, async () => {
+    const existing = (await listFolder(token, parentId)).find((f) => f.name === name);
+    return existing ? existing.id : createFolder(token, name, parentId);
+  });
+}
+
+async function storeReportsFolderId(id: string): Promise<void> {
+  await prisma.appSetting.upsert({
+    where: { key: REPORTS_FOLDER_KEY },
+    create: { key: REPORTS_FOLDER_KEY, value: id },
+    update: { value: id },
+  });
 }
 
 /// The Reports folder, created on first use. A remembered folder that Google no
-/// longer knows (deleted, or the account was changed) is simply made again.
+/// longer knows (deleted, or the account was changed) is found again by name -
+/// and only made if no folder of that name exists.
 async function reportsRootFolder(token: string): Promise<string> {
   const row = await prisma.appSetting.findUnique({ where: { key: REPORTS_FOLDER_KEY } });
   if (row) {
@@ -386,13 +455,81 @@ async function reportsRootFolder(token: string): Promise<string> {
       if (!(err instanceof DriveApiError && err.status === 404)) throw err;
     }
   }
-  const id = await createFolder(token, REPORTS_FOLDER_NAME);
-  await prisma.appSetting.upsert({
-    where: { key: REPORTS_FOLDER_KEY },
-    create: { key: REPORTS_FOLDER_KEY, value: id },
-    update: { value: id },
-  });
+  const id = await findOrCreateFolder(token, FOLDER_NAMES.reports, { legacyNames: LEGACY_FOLDER_NAMES.reports });
+  await storeReportsFolderId(id);
   return id;
+}
+
+export interface FolderSyncResult {
+  renamed: string[];
+  adopted: string[];
+  recreated: string[];
+}
+
+/// What folder to use for `name`, given the one remembered for it.
+///  - remembered and named right: kept;
+///  - remembered but named otherwise: renamed in place (contents and id untouched);
+///  - ... unless another folder already has the right name: that one is used and
+///    the old one is left under its old name, because renaming would make two
+///    folders with the same name;
+///  - remembered but gone or in the trash: found by name or made, once.
+async function reconcileFolder(
+  token: string,
+  trackedId: string | null,
+  name: string,
+  legacyNames: readonly string[],
+  result: FolderSyncResult,
+): Promise<string> {
+  if (trackedId) {
+    const folder = await getFolder(token, trackedId);
+    if (folder && !folder.trashed) {
+      if (folder.name === name) return trackedId;
+      const others = (await findFolders(token, name)).filter((f) => f.id !== trackedId);
+      if (others.length) {
+        result.adopted.push(name);
+        return others[0].id;
+      }
+      await renameFolder(token, trackedId, name);
+      result.renamed.push(`${folder.name} -> ${name}`);
+      return trackedId;
+    }
+    result.recreated.push(name);
+  }
+  return findOrCreateFolder(token, name, { legacyNames });
+}
+
+/**
+ * Makes the three Drive folders carry exactly the names in FOLDER_NAMES: a folder
+ * made under an older name is renamed in place, a folder that has gone is found
+ * or made again once, and nothing is ever made twice. Safe to run any time and as
+ * often as wanted; when everything is already right it only reads.
+ */
+export async function syncFolderNames(): Promise<FolderSyncResult | null> {
+  const conn = await prisma.driveConnection.findUnique({ where: { id: CONNECTION_ID } });
+  if (!conn) return null;
+  const result: FolderSyncResult = { renamed: [], adopted: [], recreated: [] };
+  try {
+    const token = await accessTokenFor(conn);
+    const backupFolderId = await reconcileFolder(token, conn.backupFolderId, FOLDER_NAMES.backups, LEGACY_FOLDER_NAMES.backups, result);
+    const exportFolderId = await reconcileFolder(token, conn.exportFolderId, FOLDER_NAMES.exports, LEGACY_FOLDER_NAMES.exports, result);
+    if (backupFolderId !== conn.backupFolderId || exportFolderId !== conn.exportFolderId) {
+      await prisma.driveConnection.update({ where: { id: CONNECTION_ID }, data: { backupFolderId, exportFolderId } });
+    }
+    const stored = await prisma.appSetting.findUnique({ where: { key: REPORTS_FOLDER_KEY } });
+    // A system that has never saved a report has no Reports folder yet; it is
+    // made by the first report, not here.
+    if (stored) {
+      const reportsId = await reconcileFolder(token, stored.value, FOLDER_NAMES.reports, LEGACY_FOLDER_NAMES.reports, result);
+      if (reportsId !== stored.value) await storeReportsFolderId(reportsId);
+    }
+    if (result.renamed.length || result.adopted.length || result.recreated.length) {
+      console.warn(JSON.stringify({ level: "info", event: "drive-folders-synced", ...result }));
+    }
+  } catch (err) {
+    console.error(JSON.stringify({ level: "warn", event: "drive-folder-sync-failed", message: messageOf(err) }));
+    return null;
+  }
+  return result;
 }
 
 /// "2026-10-22" -> the day before, as a date-only value.
@@ -400,22 +537,41 @@ function dayBefore(date: Date): Date {
   return new Date(date.getTime() - 24 * 60 * 60 * 1000);
 }
 
-/// Uploads one day's Daily Report workbook into Reports / year / month, replacing
-/// that day's earlier file. False when the day has nothing saved to report.
-async function uploadDailyReport(token: string, root: string, date: Date, userId?: number): Promise<boolean> {
+/// What an upload of a day's report came to.
+export type ReportUploadResult =
+  /// A new or changed file is now in Drive.
+  | "saved"
+  /// Drive already held exactly this file, so nothing was uploaded.
+  | "unchanged"
+  /// The day has nothing saved, so there is no report to keep.
+  | "empty";
+
+/// Puts one day's Daily Report workbook in Reports / year / month, so that Drive
+/// ends up with exactly one file for the day:
+///  - the same file already there (same checksum) is left alone;
+///  - a changed report replaces the old one (which goes to the Drive trash);
+///  - stray extra copies of the same name are trashed too.
+async function uploadDailyReport(token: string, root: string, date: Date, userId?: number): Promise<ReportUploadResult> {
   const built = await buildDailyReportWorkbook(date);
-  if (!built) return false;
+  if (!built) return "empty";
   const [year, month] = toDateOnlyString(date).split("-");
   const folder = await findOrCreateChild(token, await findOrCreateChild(token, root, year), month);
   try {
-    for (const old of (await listFolder(token, folder)).filter((f) => f.name === built.fileName)) await trashFile(token, old.id);
+    const existing = (await listFolder(token, folder)).filter((f) => f.name === built.fileName);
+    const md5 = createHash("md5").update(built.data).digest("hex");
+    const identical = existing.find((f) => f.md5Checksum === md5);
+    if (identical) {
+      for (const extra of existing.filter((f) => f !== identical)) await trashFile(token, extra.id);
+      return "unchanged";
+    }
+    for (const old of existing) await trashFile(token, old.id);
     const id = await uploadFile(token, { name: built.fileName, parentId: folder, mimeType: XLSX_MIME, size: built.data.length, body: built.data });
     await logUpload({ kind: "report", fileName: built.fileName, driveFileId: id, sizeBytes: built.data.length, status: "OK", createdById: userId });
   } catch (err) {
     await logUpload({ kind: "report", fileName: built.fileName, sizeBytes: built.data.length, status: "FAILED", error: messageOf(err), createdById: userId });
     throw err;
   }
-  return true;
+  return "saved";
 }
 
 /**
@@ -441,24 +597,38 @@ export async function saveDailyReports(conn: Connection, userId?: number): Promi
 }
 
 /// One upload at a time per day, in the order they were asked for: a correction
-/// that lands while the finish-day upload is still running waits for it, so the
-/// older report can never overwrite the newer one in Drive.
-const reportUploads = new Map<string, Promise<void>>();
+/// that lands while the finish-day upload is still running waits for it, and a
+/// second "Generate" of the same date waits for the first, so the older report
+/// can never overwrite the newer one in Drive and two uploads never race to
+/// create the same file.
+const reportUploads = new Map<string, Promise<unknown>>();
+
+function inDayOrder<T>(key: string, work: () => Promise<T>): Promise<T> {
+  const previous = reportUploads.get(key) ?? Promise.resolve();
+  const run = previous.catch(() => undefined).then(work);
+  const tail = run.catch(() => undefined);
+  reportUploads.set(key, tail);
+  void tail.finally(() => {
+    if (reportUploads.get(key) === tail) reportUploads.delete(key);
+  });
+  return run;
+}
 
 /**
  * A day's report was just saved (finished, or re-saved by a correction): put its
  * workbook in Drive now, if Drive is connected, without making the save wait for
  * it. Never throws; a failure is logged and listed on Settings > Google Drive,
- * and the nightly backup tries the recent days again.
+ * and the nightly backup tries the recent days again. Admins get a toast when a
+ * file was actually saved (not when Drive already had it).
  */
 export function queueDailyReportUpload(date: Date, userId?: number): Promise<void> {
   const key = toDateOnlyString(date);
-  const run = (reportUploads.get(key) ?? Promise.resolve()).then(async () => {
+  return inDayOrder(key, async () => {
     try {
       const conn = await prisma.driveConnection.findUnique({ where: { id: CONNECTION_ID } });
       if (!conn) return;
       const token = await accessTokenFor(conn);
-      if (await uploadDailyReport(token, await reportsRootFolder(token), date, userId)) {
+      if ((await uploadDailyReport(token, await reportsRootFolder(token), date, userId)) === "saved") {
         broadcastNotice({ level: "success", message: `Daily Report for ${key} saved to Google Drive.` }, NOTICE_ROLES);
       }
     } catch (err) {
@@ -466,11 +636,25 @@ export function queueDailyReportUpload(date: Date, userId?: number): Promise<voi
       broadcastNotice({ level: "error", message: `Could not save the ${key} Daily Report to Google Drive: ${messageOf(err)}` }, NOTICE_ROLES);
     }
   });
-  reportUploads.set(key, run);
-  void run.finally(() => {
-    if (reportUploads.get(key) === run) reportUploads.delete(key);
+}
+
+/// What the Generate button gets back: what happened to the file, or that Drive
+/// is not connected (in which case there is nothing to say - the report still generates).
+export type GeneratedReportResult = ReportUploadResult | "not-connected";
+
+/**
+ * Someone confirmed "Generate" for a date: save that date's report to Drive and
+ * say what came of it. Unlike the event-driven upload this answers the person
+ * who asked (so no broadcast) and lets a Drive failure reach them. Generating
+ * the same date again replaces the file or, if nothing changed, does nothing.
+ */
+export function saveGeneratedReport(date: Date, userId: number): Promise<GeneratedReportResult> {
+  return inDayOrder(toDateOnlyString(date), async () => {
+    const conn = await prisma.driveConnection.findUnique({ where: { id: CONNECTION_ID } });
+    if (!conn) return "not-connected" as const;
+    const token = await accessTokenFor(conn);
+    return uploadDailyReport(token, await reportsRootFolder(token), date, userId);
   });
-  return run;
 }
 
 setReportSavedHandler((date) => void queueDailyReportUpload(date));
@@ -533,13 +717,31 @@ export async function runScheduledBackupIfDue(now = new Date()): Promise<boolean
 /// Test hook: forget the retry delay between attempts.
 export function resetScheduleState(): void {
   lastAttemptAt = 0;
+  lastFolderSyncAt = 0;
 }
 
 const TICK_MS = 10 * 60 * 1000;
 
+/// Names are re-checked at most this often: it is three small reads, but there
+/// is no reason to ask Google every ten minutes.
+const FOLDER_SYNC_EVERY_MS = HOUR_MS;
+let lastFolderSyncAt = 0;
+
+/// Runs the folder-name check if it has not run in the last hour.
+export async function syncFolderNamesIfDue(now = new Date()): Promise<boolean> {
+  if (now.getTime() - lastFolderSyncAt < FOLDER_SYNC_EVERY_MS) return false;
+  lastFolderSyncAt = now.getTime();
+  await syncFolderNames();
+  return true;
+}
+
 export function startDriveScheduler(): () => void {
-  const first = setTimeout(() => void runScheduledBackupIfDue(), 2 * 60 * 1000);
-  const tick = setInterval(() => void runScheduledBackupIfDue(), TICK_MS);
+  const run = () => {
+    void syncFolderNamesIfDue();
+    void runScheduledBackupIfDue();
+  };
+  const first = setTimeout(run, 2 * 60 * 1000);
+  const tick = setInterval(run, TICK_MS);
   first.unref();
   tick.unref();
   return () => {

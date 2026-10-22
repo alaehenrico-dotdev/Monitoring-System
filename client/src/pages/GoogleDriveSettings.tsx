@@ -249,7 +249,7 @@ export function GoogleDriveSettings() {
               <AutoCard
                 title="Daily reports"
                 badge="Automatic"
-                folder="Ala Eh Stocks Monitoring - Reports / year / month"
+                folder="Ala Eh Stock Monitoring - Reports / year / month"
                 last={status.lastReportAt ? `Last saved ${when(status.lastReportAt)}` : "No report has been saved yet"}
               >
                 <div style={{ fontSize: 12.5, color: colors.ink }}>
@@ -261,7 +261,7 @@ export function GoogleDriveSettings() {
               <AutoCard
                 title="Database backup"
                 badge={settings.autoBackup ? "Automatic" : "Off"}
-                folder="Ala Eh Monitoring - Backups"
+                folder="Ala Eh Stock Monitoring - Backups"
                 last={
                   <>
                     {status.lastBackupAt ? `Last backup ${when(status.lastBackupAt)}` : "No backup has been sent yet"}
@@ -345,7 +345,7 @@ export function GoogleDriveSettings() {
               <AutoCard
                 title="Export copies"
                 badge={settings.saveExports ? "Automatic" : "Off"}
-                folder="Ala Eh Monitoring - Exports"
+                folder="Ala Eh Stock Monitoring - Exports"
                 last="Whenever someone downloads a file"
               >
                 <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: colors.ink }}>

@@ -242,7 +242,7 @@ describe("once connected", () => {
     await show(connected({ lastReportAt: "2026-10-22T10:30:00Z" }));
     const card = screen.getByRole("region", { name: "Daily reports" });
     expect(within(card).getByText("Automatic")).toBeInTheDocument();
-    expect(within(card).getByText("Ala Eh Stocks Monitoring - Reports / year / month")).toBeInTheDocument();
+    expect(within(card).getByText("Ala Eh Stock Monitoring - Reports / year / month")).toBeInTheDocument();
     expect(within(card).getByText(/Last saved/)).toBeInTheDocument();
     // Nothing to switch: it is simply on.
     expect(within(card).queryByRole("checkbox")).toBeNull();
