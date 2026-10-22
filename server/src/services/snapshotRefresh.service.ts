@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma";
 import { buildDailyReport } from "./reports.service";
 import { findFrozenSnapshot, saveSnapshot } from "./dailyReportSnapshot.service";
+import { notifyDailyReportSaved } from "../lib/reportSaved";
 
 /// Key-order-independent string form: MySQL's JSON column does not preserve the
 /// order keys were written in, so two equal payloads can stringify differently.
@@ -42,6 +43,8 @@ export async function refreshFrozenSnapshots(fromDate: Date, opts: { cascade?: b
     if (canonical(JSON.parse(JSON.stringify(report))) === canonical(frozen.payload)) continue;
     await prisma.$transaction((tx) => saveSnapshot(entryDate, report, opts.userId, tx));
     refreshed.push(entryDate);
+    // A corrected day's file in Drive follows its corrected report.
+    notifyDailyReportSaved(entryDate);
   }
   return refreshed;
 }

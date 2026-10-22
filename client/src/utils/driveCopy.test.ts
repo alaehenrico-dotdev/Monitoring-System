@@ -12,20 +12,29 @@ vi.mock("../api/drive", () => ({
 }));
 
 import { copyExportToDrive, MAX_COPY_BYTES, resetDriveCopyConfig } from "./driveCopy";
+import { subscribeNotices, type AppNotice } from "./notify";
 
 const file = (text = "a,b\n1,2\n") => new Blob([text]);
 /// copyExportToDrive returns at once and works in the background; this lets that
 /// background work (a few resolved promises) finish before asserting nothing happened.
 const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
 
+let notices: AppNotice[] = [];
+let stopListening = () => {};
+
 beforeEach(() => {
   vi.clearAllMocks();
   resetDriveCopyConfig();
+  notices = [];
+  stopListening = subscribeNotices((n) => notices.push(n));
   api.getToken.mockReturnValue("jwt");
   api.getDriveExportConfig.mockResolvedValue({ saveExports: true });
   api.uploadExportCopy.mockResolvedValue(undefined);
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  stopListening();
+  vi.useRealTimers();
+});
 
 describe("copyExportToDrive", () => {
   it("sends the file when Drive is connected and copies are on", async () => {
@@ -97,5 +106,29 @@ describe("copyExportToDrive", () => {
     await vi.waitFor(() => expect(warn).toHaveBeenCalled());
     expect(String(warn.mock.calls[0][1])).toMatch(/Quota exceeded/);
     warn.mockRestore();
+  });
+
+  it("tells the person with a toast when the copy reached Drive", async () => {
+    copyExportToDrive("daily-report-2026-10-22.xlsx", file());
+    await vi.waitFor(() => expect(notices).toHaveLength(1));
+    expect(notices[0]).toEqual({ level: "success", message: "Saved a copy of daily-report-2026-10-22.xlsx to Google Drive." });
+  });
+
+  it("tells them with an error toast when it did not", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    api.uploadExportCopy.mockRejectedValue(new Error("Quota exceeded"));
+    copyExportToDrive("a.csv", file());
+    await vi.waitFor(() => expect(notices).toHaveLength(1));
+    expect(notices[0]).toEqual({ level: "error", message: "Could not save a copy of a.csv to Google Drive." });
+    warn.mockRestore();
+  });
+
+  it("shows no toast when nothing is sent (copies off, not connected, or no one signed in)", async () => {
+    api.getDriveExportConfig.mockResolvedValue({ saveExports: false });
+    copyExportToDrive("a.csv", file());
+    api.getToken.mockReturnValue(null);
+    copyExportToDrive("b.csv", file());
+    await settle();
+    expect(notices).toEqual([]);
   });
 });

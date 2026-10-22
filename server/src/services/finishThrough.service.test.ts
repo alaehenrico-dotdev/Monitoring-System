@@ -22,6 +22,8 @@ const saveSnapshot = vi.hoisted(() => vi.fn());
 vi.mock("./dailyReportSnapshot.service", () => ({ saveSnapshot }));
 const recordReportHistoryIn = vi.hoisted(() => vi.fn());
 vi.mock("./reportHistory.service", () => ({ recordReportHistoryIn }));
+const notifyDailyReportSaved = vi.hoisted(() => vi.fn());
+vi.mock("../lib/reportSaved", () => ({ notifyDailyReportSaved }));
 
 import { finishThrough, MAX_FINISH_SPAN_DAYS, planFinishThrough } from "./finishThrough.service";
 
@@ -139,6 +141,17 @@ describe("finishThrough", () => {
     expect(closePeriod.mock.calls[0][2]).toEqual({ entriesOnly: true, userId: 9, location: "ONLINE" });
     expect(saveSnapshot.mock.calls.map((c) => c[0].toISOString().slice(0, 10))).toEqual(["2026-10-12", "2026-10-13"]);
     expect(result).toMatchObject({ finished: 3, snapshots: ["2026-10-12", "2026-10-13"] });
+  });
+
+  it("tells Drive about each saved day's report after the transaction commits", async () => {
+    await finishThrough(D("2026-10-14"), "ONLINE", 9);
+    expect(notifyDailyReportSaved.mock.calls.map((c) => c[0].toISOString().slice(0, 10))).toEqual(["2026-10-12", "2026-10-13"]);
+  });
+
+  it("tells Drive nothing when the finish rolls back", async () => {
+    closePeriod.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("db hiccup"));
+    await expect(finishThrough(D("2026-10-14"), "ONLINE", 9)).rejects.toThrow("db hiccup");
+    expect(notifyDailyReportSaved).not.toHaveBeenCalled();
   });
 
   it("changes nothing when a blocker is present", async () => {

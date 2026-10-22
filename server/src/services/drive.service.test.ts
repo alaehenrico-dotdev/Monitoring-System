@@ -13,7 +13,7 @@ vi.mock("../config/env", () => ({
   },
 }));
 
-const db = vi.hoisted(() => ({ conn: null as Record<string, unknown> | null, uploads: [] as Record<string, unknown>[] }));
+const db = vi.hoisted(() => ({ conn: null as Record<string, unknown> | null, uploads: [] as Record<string, unknown>[], setting: null as { value: string } | null }));
 vi.mock("../lib/prisma", () => ({
   prisma: {
     driveConnection: {
@@ -21,6 +21,10 @@ vi.mock("../lib/prisma", () => ({
       upsert: vi.fn(async ({ create, update }: { create: object; update: object }) => (db.conn = { ...(db.conn ?? {}), ...(db.conn ? update : create) })),
       update: vi.fn(async ({ data }: { data: object }) => (db.conn = { ...db.conn, ...data })),
       delete: vi.fn(async () => (db.conn = null)),
+    },
+    appSetting: {
+      findUnique: vi.fn(async () => db.setting),
+      upsert: vi.fn(async ({ create }: { create: { value: string } }) => (db.setting = { value: create.value })),
     },
     driveUpload: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => void db.uploads.push(data)),
@@ -42,6 +46,10 @@ vi.mock("../lib/googleDrive", async (orig) => ({
 vi.mock("./backup.service", () => ({ dumpDatabaseToGzipFile: vi.fn() }));
 vi.mock("./backupVerify.service", () => ({ recordBackup: vi.fn() }));
 vi.mock("./changeLog.service", () => ({ logSystemEvent: vi.fn() }));
+const realtime = vi.hoisted(() => ({ broadcastNotice: vi.fn() }));
+vi.mock("../lib/realtime", () => realtime);
+const reports = vi.hoisted(() => ({ latestEntryDate: vi.fn(), buildDailyReportWorkbook: vi.fn() }));
+vi.mock("./dailyReportWorkbook.service", () => reports);
 
 import * as google from "../lib/googleDrive";
 import { dumpDatabaseToGzipFile } from "./backup.service";
@@ -52,9 +60,12 @@ import {
   disconnect,
   exportFileInfo,
   isBackupDue,
+  nextBackupAt,
   resetScheduleState,
   runBackup,
+  queueDailyReportUpload,
   runScheduledBackupIfDue,
+  saveDailyReports,
   saveExport,
   startConnect,
 } from "./drive.service";
@@ -75,6 +86,9 @@ beforeEach(async () => {
   resettable.forEach((m) => vi.mocked(m).mockReset());
   db.conn = null;
   db.uploads = [];
+  db.setting = null;
+  reports.latestEntryDate.mockReset().mockResolvedValue(null);
+  reports.buildDailyReportWorkbook.mockReset().mockResolvedValue(null);
   resetScheduleState();
   vi.mocked(google.refreshAccessToken).mockResolvedValue({ accessToken: "access-1", expiresIn: 3600 });
   vi.mocked(google.uploadFile).mockImplementation(async (_t, input) => {
@@ -134,6 +148,19 @@ describe("connecting", () => {
   it("explains how to recover when Google withholds the refresh token", async () => {
     vi.mocked(google.exchangeCode).mockResolvedValue({ accessToken: "a", expiresIn: 3600 });
     await expect(completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }))).rejects.toThrow(/myaccount\.google\.com\/permissions/);
+  });
+
+  it("refuses a connection where the Drive permission was left unticked, before creating any folder", async () => {
+    vi.mocked(google.createFolder).mockClear();
+    vi.mocked(google.exchangeCode).mockResolvedValue({ accessToken: "a", refreshToken: "1//r", expiresIn: 3600, scope: "openid https://www.googleapis.com/auth/userinfo.email" });
+    await expect(completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }))).rejects.toThrow(/permission to create files and folders was left unticked/);
+    expect(google.createFolder).not.toHaveBeenCalled();
+  });
+
+  it("accepts a connection where Drive was granted", async () => {
+    vi.mocked(google.exchangeCode).mockResolvedValue({ accessToken: "a", refreshToken: "1//r", expiresIn: 3600, scope: "openid email https://www.googleapis.com/auth/drive.file" });
+    vi.mocked(google.createFolder).mockResolvedValue("folder");
+    await expect(completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }))).resolves.toBeUndefined();
   });
 
   it("keeps the folders and settings when the same account reconnects, but starts fresh for a different one", async () => {
@@ -288,7 +315,242 @@ describe("runBackup", () => {
   });
 });
 
-describe("isBackupDue", () => {
+describe("Daily Report files (saved with the backup)", () => {
+  const built = (date: string) => ({ fileName: `daily-report-${date}.xlsx`, data: Buffer.from("xlsx-bytes") });
+  const folders = () => vi.mocked(google.createFolder).mock.calls.map((c) => [c[1], c[2]]);
+
+  beforeEach(async () => {
+    // Connected, and the backup itself already works (see the runBackup tests).
+    vi.mocked(google.createFolder).mockResolvedValueOnce("backups-folder").mockResolvedValueOnce("exports-folder");
+    await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
+    vi.mocked(google.createFolder).mockReset();
+    let n = 0;
+    vi.mocked(google.createFolder).mockImplementation(async () => `folder-${++n}`);
+    vi.mocked(google.listFolder).mockResolvedValue([]);
+    reports.latestEntryDate.mockResolvedValue(new Date("2026-10-22T00:00:00Z"));
+    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => built(d.toISOString().slice(0, 10)));
+  });
+
+  const conn = () => db.conn as never;
+
+  it("saves the latest day and the day before under Reports / year / month", async () => {
+    await saveDailyReports(conn(), 7);
+    // (The mocked listing never remembers what was made, so the second day
+    // would make year and month again here; against real Drive it finds them.)
+    expect(folders().slice(0, 3)).toEqual([
+      ["Ala Eh Stocks Monitoring - Reports", undefined],
+      ["2026", "folder-1"],
+      ["10", "folder-2"],
+    ]);
+    const names = vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name);
+    expect(names).toEqual(["daily-report-2026-10-22.xlsx", "daily-report-2026-10-21.xlsx"]);
+    expect(vi.mocked(google.uploadFile).mock.calls[0][1]).toMatchObject({
+      parentId: "folder-3",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    expect(db.uploads.filter((u) => u.kind === "report").map((u) => u.status)).toEqual(["OK", "OK"]);
+  });
+
+  it("remembers the Reports folder instead of creating another one next time", async () => {
+    await saveDailyReports(conn());
+    vi.mocked(google.createFolder).mockClear();
+    await saveDailyReports(conn());
+    expect(folders().filter(([name]) => name === "Ala Eh Stocks Monitoring - Reports")).toHaveLength(0);
+  });
+
+  it("makes the Reports folder again when Google no longer knows the remembered one", async () => {
+    db.setting = { value: "gone" };
+    vi.mocked(google.listFolder).mockRejectedValueOnce(new google.DriveApiError("not found", 404));
+    await saveDailyReports(conn());
+    expect(folders()[0]).toEqual(["Ala Eh Stocks Monitoring - Reports", undefined]);
+    expect(db.setting).toEqual({ value: "folder-1" });
+  });
+
+  it("replaces that day's earlier file rather than leaving a second copy", async () => {
+    vi.mocked(google.listFolder).mockImplementation(async (_t, parent) =>
+      parent === "month-folder" ? [{ id: "old-1", name: "daily-report-2026-10-22.xlsx", createdTime: "" }] : [],
+    );
+    db.setting = { value: "root" };
+    vi.mocked(google.listFolder).mockImplementation(async (_t, parent) =>
+      parent === "root"
+        ? [{ id: "y", name: "2026", createdTime: "" }]
+        : parent === "y"
+          ? [{ id: "month-folder", name: "10", createdTime: "" }]
+          : parent === "month-folder"
+            ? [{ id: "old-1", name: "daily-report-2026-10-22.xlsx", createdTime: "" }, { id: "other", name: "notes.txt", createdTime: "" }]
+            : [],
+    );
+    await saveDailyReports(conn());
+    expect(google.createFolder).not.toHaveBeenCalled(); // year and month were found, not remade
+    expect(vi.mocked(google.trashFile).mock.calls.map((c) => c[1])).toContain("old-1");
+    expect(vi.mocked(google.trashFile).mock.calls.map((c) => c[1])).not.toContain("other");
+  });
+
+  it("skips a day with nothing saved, and does nothing at all before any entry exists", async () => {
+    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => (d.toISOString().startsWith("2026-10-22") ? built("2026-10-22") : null));
+    await saveDailyReports(conn());
+    expect(vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name)).toEqual(["daily-report-2026-10-22.xlsx"]);
+
+    vi.mocked(google.uploadFile).mockClear();
+    reports.latestEntryDate.mockResolvedValue(null);
+    await saveDailyReports(conn());
+    expect(google.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("never throws: a failed upload is recorded and the backup that called it stands", async () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(google.uploadFile).mockRejectedValue(new Error("Drive is full"));
+    await expect(saveDailyReports(conn())).resolves.toBeUndefined();
+    expect(db.uploads.find((u) => u.kind === "report")).toMatchObject({ status: "FAILED", error: "Drive is full" });
+    warn.mockRestore();
+  });
+
+  it("runs after a successful backup, and a failure there does not fail the backup", async () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(dumpDatabaseToGzipFile).mockImplementation(async (path) => {
+      writeFileSync(path, "gzipped-bytes");
+      return { sizeBytes: 13, sha256: "abc", complete: true };
+    });
+    reports.latestEntryDate.mockRejectedValue(new Error("db hiccup"));
+    await expect(runBackup("manual")).resolves.toMatchObject({ sizeBytes: 13 });
+    expect(reports.latestEntryDate).toHaveBeenCalled();
+    warn.mockRestore();
+  });
+});
+
+describe("a saved report goes to Drive straight away", () => {
+  const built = (date: string) => ({ fileName: `daily-report-${date}.xlsx`, data: Buffer.from("xlsx-bytes") });
+  const D = (iso: string) => new Date(`${iso}T00:00:00Z`);
+
+  beforeEach(async () => {
+    vi.mocked(google.createFolder).mockResolvedValueOnce("backups-folder").mockResolvedValueOnce("exports-folder");
+    await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
+    vi.mocked(google.createFolder).mockReset();
+    let n = 0;
+    vi.mocked(google.createFolder).mockImplementation(async () => `folder-${++n}`);
+    vi.mocked(google.listFolder).mockResolvedValue([]);
+    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => built(d.toISOString().slice(0, 10)));
+  });
+
+  it("uploads just that day's workbook into Reports / year / month", async () => {
+    await queueDailyReportUpload(D("2026-10-22"), 7);
+    expect(vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name)).toEqual(["daily-report-2026-10-22.xlsx"]);
+    expect(reports.buildDailyReportWorkbook).toHaveBeenCalledTimes(1);
+    expect(db.uploads.find((u) => u.kind === "report")).toMatchObject({ status: "OK", createdById: 7 });
+  });
+
+  it("does nothing when Drive is not connected", async () => {
+    db.conn = null;
+    await queueDailyReportUpload(D("2026-10-22"));
+    expect(google.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("never throws, and records the failure", async () => {
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(google.uploadFile).mockRejectedValue(new Error("Drive is full"));
+    await expect(queueDailyReportUpload(D("2026-10-22"))).resolves.toBeUndefined();
+    expect(db.uploads.find((u) => u.kind === "report")).toMatchObject({ status: "FAILED" });
+    warn.mockRestore();
+  });
+
+  it("keeps two saves of the same day in order, so the older report cannot overwrite the newer one", async () => {
+    const order: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    reports.buildDailyReportWorkbook
+      .mockImplementationOnce(async () => {
+        order.push("first-start");
+        await gate;
+        order.push("first-end");
+        return built("2026-10-22");
+      })
+      .mockImplementationOnce(async () => {
+        order.push("second-start");
+        return built("2026-10-22");
+      });
+    const first = queueDailyReportUpload(D("2026-10-22"));
+    const second = queueDailyReportUpload(D("2026-10-22"));
+    await vi.waitFor(() => expect(order).toContain("first-start"));
+    expect(order).not.toContain("second-start"); // still waiting its turn
+    release();
+    await Promise.all([first, second]);
+    expect(order).toEqual(["first-start", "first-end", "second-start"]);
+  });
+
+  it("lets different days upload independently", async () => {
+    await Promise.all([queueDailyReportUpload(D("2026-10-21")), queueDailyReportUpload(D("2026-10-22"))]);
+    expect(google.uploadFile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("toasts for what the server saves to Drive on its own", () => {
+  const D = (iso: string) => new Date(`${iso}T00:00:00Z`);
+  const connect = async () => {
+    vi.mocked(google.createFolder).mockResolvedValueOnce("backups-folder").mockResolvedValueOnce("exports-folder");
+    await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
+    vi.mocked(google.createFolder).mockReset();
+    vi.mocked(google.createFolder).mockResolvedValue("folder");
+    vi.mocked(google.listFolder).mockResolvedValue([]);
+    vi.mocked(dumpDatabaseToGzipFile).mockImplementation(async (path) => {
+      writeFileSync(path, "gzipped-bytes");
+      return { sizeBytes: 3_145_728, sha256: "abc", complete: true };
+    });
+    realtime.broadcastNotice.mockClear();
+  };
+
+  it("announces a scheduled backup to the admins, and only that one", async () => {
+    await connect();
+    await runBackup("scheduled");
+    expect(realtime.broadcastNotice).toHaveBeenCalledTimes(1);
+    expect(realtime.broadcastNotice).toHaveBeenCalledWith(
+      { level: "success", message: expect.stringMatching(/Google Drive backup saved: ala-eh-backup-.*\.sql\.gz \(3\.0 MB\)/) },
+      ["SUPERVISOR_ADMIN"],
+    );
+  });
+
+  it("does not announce a backup someone asked for - they get the answer directly", async () => {
+    await connect();
+    await runBackup("manual", 7);
+    expect(realtime.broadcastNotice).not.toHaveBeenCalled();
+  });
+
+  it("announces a failed scheduled backup as an error", async () => {
+    await connect();
+    vi.mocked(google.uploadFile).mockRejectedValue(new Error("Quota exceeded"));
+    await expect(runBackup("scheduled")).rejects.toThrow("Quota exceeded");
+    expect(realtime.broadcastNotice).toHaveBeenCalledWith({ level: "error", message: expect.stringContaining("Quota exceeded") }, ["SUPERVISOR_ADMIN"]);
+  });
+
+  it("announces a saved Daily Report, and a failed one", async () => {
+    await connect();
+    reports.buildDailyReportWorkbook.mockResolvedValue({ fileName: "daily-report-2026-10-22.xlsx", data: Buffer.from("x") });
+    await queueDailyReportUpload(D("2026-10-22"));
+    expect(realtime.broadcastNotice).toHaveBeenLastCalledWith({ level: "success", message: "Daily Report for 2026-10-22 saved to Google Drive." }, ["SUPERVISOR_ADMIN"]);
+
+    const warn = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(google.uploadFile).mockRejectedValue(new Error("Drive is full"));
+    await queueDailyReportUpload(D("2026-10-22"));
+    expect(realtime.broadcastNotice).toHaveBeenLastCalledWith({ level: "error", message: expect.stringContaining("Drive is full") }, ["SUPERVISOR_ADMIN"]);
+    warn.mockRestore();
+  });
+
+  it("says nothing for a day with no report to save", async () => {
+    await connect();
+    reports.buildDailyReportWorkbook.mockResolvedValue(null);
+    await queueDailyReportUpload(D("2026-10-22"));
+    expect(realtime.broadcastNotice).not.toHaveBeenCalled();
+  });
+
+  it("does not toast once per catch-up report inside a backup", async () => {
+    await connect();
+    reports.latestEntryDate.mockResolvedValue(D("2026-10-22"));
+    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => ({ fileName: `daily-report-${d.toISOString().slice(0, 10)}.xlsx`, data: Buffer.from("x") }));
+    await runBackup("scheduled");
+    expect(realtime.broadcastNotice).toHaveBeenCalledTimes(1); // the backup, not its two reports
+  });
+});
+
+describe("isBackupDue (monthly, at the end of the month)", () => {
   const at = (iso: string) => new Date(iso);
   const conn = (lastBackupAt: string | null, backupHourUtc = 18, autoBackup = true) => ({
     autoBackup,
@@ -296,28 +558,54 @@ describe("isBackupDue", () => {
     lastBackupAt: lastBackupAt ? at(lastBackupAt) : null,
   });
 
-  it("is due once the scheduled time has passed with no backup since", () => {
-    expect(isBackupDue(conn("2026-10-21T18:05:00Z"), at("2026-10-22T18:00:00Z"))).toBe(true);
-    expect(isBackupDue(conn(null), at("2026-10-22T03:00:00Z"))).toBe(true);
+  it("is due once the last day of the month has reached the set hour with no backup since the month before", () => {
+    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-10-31T18:00:00Z"))).toBe(true);
+    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-11-01T03:00:00Z"))).toBe(true);
   });
 
-  it("is not due before the time, or after a backup that already covered this slot", () => {
-    expect(isBackupDue(conn("2026-10-21T18:05:00Z"), at("2026-10-22T17:59:00Z"))).toBe(false);
-    expect(isBackupDue(conn("2026-10-22T18:05:00Z"), at("2026-10-22T23:00:00Z"))).toBe(false);
+  it("is not due mid-month, or before the hour on the last day", () => {
+    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-10-22T20:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-10-31T17:59:00Z"))).toBe(false);
   });
 
-  it("does not fire a second time the same day after the hour is changed", () => {
-    // Backed up at 02:10; at 22:10 that is 20h ago, but today's 02:00 slot is already covered.
-    expect(isBackupDue(conn("2026-10-22T02:10:00Z", 2), at("2026-10-22T22:10:00Z"))).toBe(false);
-    expect(isBackupDue(conn("2026-10-22T02:10:00Z", 2), at("2026-10-23T02:00:00Z"))).toBe(true);
+  it("is not due again after the backup that covered this month's slot", () => {
+    expect(isBackupDue(conn("2026-10-31T18:05:00Z"), at("2026-11-02T09:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-31T18:05:00Z"), at("2026-11-30T17:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-31T18:05:00Z"), at("2026-11-30T18:00:00Z"))).toBe(true);
   });
 
-  it("catches up after downtime: a missed slot is due as soon as the server is back", () => {
-    expect(isBackupDue(conn("2026-10-19T18:05:00Z"), at("2026-10-22T09:00:00Z"))).toBe(true);
+  it("finds the last day of every month, including February and leap years", () => {
+    expect(isBackupDue(conn("2027-01-31T18:05:00Z"), at("2027-02-27T23:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2027-01-31T18:05:00Z"), at("2027-02-28T18:00:00Z"))).toBe(true); // Feb 2027 has 28 days
+    expect(isBackupDue(conn("2028-01-31T18:05:00Z"), at("2028-02-28T18:00:00Z"))).toBe(false); // ...2028 has 29
+    expect(isBackupDue(conn("2028-01-31T18:05:00Z"), at("2028-02-29T18:00:00Z"))).toBe(true);
+    expect(isBackupDue(conn("2026-11-30T18:05:00Z"), at("2026-12-31T18:00:00Z"))).toBe(true); // across the year
+  });
+
+  it("a manual backup mid-month does not bring the scheduled one forward", () => {
+    expect(isBackupDue(conn("2026-10-15T10:00:00Z"), at("2026-10-30T20:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-15T10:00:00Z"), at("2026-10-31T18:00:00Z"))).toBe(true);
+  });
+
+  it("catches up after downtime: a missed month-end is due as soon as the server is back", () => {
+    expect(isBackupDue(conn("2026-08-31T18:05:00Z"), at("2026-10-04T09:00:00Z"))).toBe(true);
+  });
+
+  it("is due straight away for a connection that has never been backed up", () => {
+    expect(isBackupDue(conn(null), at("2026-10-05T03:00:00Z"))).toBe(true);
   });
 
   it("is never due when automatic backups are off", () => {
-    expect(isBackupDue(conn(null, 18, false), at("2026-10-22T20:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn(null, 18, false), at("2026-10-31T20:00:00Z"))).toBe(false);
+  });
+});
+
+describe("nextBackupAt", () => {
+  it("is the last day of this month at the hour, or next month's once that has passed", () => {
+    expect(nextBackupAt(18, new Date("2026-10-22T09:00:00Z")).toISOString()).toBe("2026-10-31T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-10-31T18:00:00Z")).toISOString()).toBe("2026-11-30T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-12-31T19:00:00Z")).toISOString()).toBe("2027-01-31T18:00:00.000Z");
+    expect(nextBackupAt(2, new Date("2028-02-10T00:00:00Z")).toISOString()).toBe("2028-02-29T02:00:00.000Z");
   });
 });
 

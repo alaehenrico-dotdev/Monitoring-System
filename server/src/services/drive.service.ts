@@ -7,6 +7,7 @@ import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import {
   createFolder,
+  DriveApiError,
   DriveAuthError,
   exchangeCode,
   fetchAccountEmail,
@@ -23,6 +24,14 @@ import { open, seal } from "../utils/secretBox";
 import { dumpDatabaseToGzipFile } from "./backup.service";
 import { recordBackup } from "./backupVerify.service";
 import { logSystemEvent } from "./changeLog.service";
+import { buildDailyReportWorkbook, latestEntryDate } from "./dailyReportWorkbook.service";
+import { XLSX_MIME } from "../utils/xlsx";
+import { toDateOnlyString } from "../utils/date";
+import { setReportSavedHandler } from "../lib/reportSaved";
+import { broadcastNotice } from "../lib/realtime";
+
+/// The one Drive permission the app needs (see DRIVE_SCOPES in lib/googleDrive.ts).
+const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 /**
  * Settings > Google Drive: one connected Google account that receives the
@@ -37,6 +46,12 @@ import { logSystemEvent } from "./changeLog.service";
 const CONNECTION_ID = 1;
 const BACKUP_FOLDER_NAME = "Ala Eh Monitoring - Backups";
 const EXPORT_FOLDER_NAME = "Ala Eh Monitoring - Exports";
+const REPORTS_FOLDER_NAME = "Ala Eh Stocks Monitoring - Reports";
+/// Where the Reports folder's id is kept (app_settings, a plain key/value table),
+/// so adding it needed no schema change.
+const REPORTS_FOLDER_KEY = "drive.reportsFolderId";
+/// Who is told, as a toast, about what the server saves to Drive on its own.
+const NOTICE_ROLES = ["SUPERVISOR_ADMIN"] as const;
 const STATE_TTL = "10m";
 const HOUR_MS = 60 * 60 * 1000;
 
@@ -84,6 +99,14 @@ export async function completeConnect(code: string, state: string): Promise<void
   if (!tokens.refreshToken) {
     throw HttpError.badRequest(
       "Google did not return a long-lived access token. Remove this app at myaccount.google.com/permissions, then connect again.",
+    );
+  }
+  // Google's consent screen lets the person untick a permission, and the sign-in
+  // still "succeeds". Without the Drive permission every upload later fails with
+  // a bare 403, so say what is wrong now, while they are still at the screen.
+  if (tokens.scope !== undefined && !tokens.scope.split(" ").includes(DRIVE_FILE_SCOPE)) {
+    throw HttpError.badRequest(
+      "Google Drive access was not granted: the permission to create files and folders was left unticked. Connect again and tick every box on Google's permission screen.",
     );
   }
   const accountEmail = await fetchAccountEmail(tokens.accessToken);
@@ -173,6 +196,10 @@ export async function getStatus() {
   const recent = conn
     ? await prisma.driveUpload.findMany({ orderBy: { createdAt: "desc" }, take: 20 })
     : [];
+  // Reports are saved on their own schedule (whenever a day is finished), so the
+  // page shows when the last one landed - which the 20 newest uploads may not
+  // include on a day with many exports.
+  const lastReport = conn ? await prisma.driveUpload.findFirst({ where: { kind: "report", status: "OK" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }) : null;
   return {
     configured: isConfigured(),
     redirectUri: env.googleRedirectUri,
@@ -180,6 +207,8 @@ export async function getStatus() {
     accountEmail: conn?.accountEmail ?? null,
     connectedAt: conn?.connectedAt ?? null,
     lastBackupAt: conn?.lastBackupAt ?? null,
+    lastReportAt: lastReport?.createdAt ?? null,
+    nextBackupAt: conn && conn.autoBackup ? nextBackupAt(conn.backupHourUtc, new Date()) : null,
     lastError: conn?.lastError ?? null,
     settings: conn
       ? ({ autoBackup: conn.autoBackup, backupHourUtc: conn.backupHourUtc, keepBackups: conn.keepBackups, saveExports: conn.saveExports } satisfies DriveSettings)
@@ -257,6 +286,10 @@ export async function saveExport(rawName: string, data: Buffer, userId: number):
   }
 }
 
+function formatSize(bytes: number): string {
+  return bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 // --- Backups --------------------------------------------------------------------
 
 function backupFileName(now = new Date()): string {
@@ -300,6 +333,12 @@ async function doBackup(trigger: "manual" | "scheduled", userId?: number) {
     await prisma.driveConnection.update({ where: { id: CONNECTION_ID }, data: { lastBackupAt: new Date(), lastError: null } });
     await logSystemEvent("drive_backup", { fileName, trigger }, userId);
     await trimOldBackups(conn);
+    await saveDailyReports(conn, userId);
+    // A backup someone asked for answers them directly; only the ones the
+    // schedule runs on its own need announcing.
+    if (trigger === "scheduled") {
+      broadcastNotice({ level: "success", message: `Google Drive backup saved: ${fileName} (${formatSize(summary.sizeBytes)}).` }, NOTICE_ROLES);
+    }
     return { fileName, sizeBytes: summary.sizeBytes };
   } catch (err) {
     // Recorded as a failed backup too, so the existing "last backup failed /
@@ -307,6 +346,9 @@ async function doBackup(trigger: "manual" | "scheduled", userId?: number) {
     await recordBackup({ fileName, trigger, status: "FAILED", error: messageOf(err), createdById: userId });
     await logUpload({ kind: "backup", fileName, status: "FAILED", error: messageOf(err), createdById: userId });
     if (!(err instanceof DriveAuthError)) await noteError(messageOf(err));
+    if (trigger === "scheduled") {
+      broadcastNotice({ level: "error", message: `The scheduled Google Drive backup failed: ${messageOf(err)}` }, NOTICE_ROLES);
+    }
     throw err;
   } finally {
     await rm(tmp, { force: true });
@@ -325,20 +367,148 @@ async function trimOldBackups(conn: Connection): Promise<void> {
   }
 }
 
+// --- Daily Report files ---------------------------------------------------------
+
+async function findOrCreateChild(token: string, parentId: string, name: string): Promise<string> {
+  const existing = (await listFolder(token, parentId)).find((f) => f.name === name);
+  return existing ? existing.id : createFolder(token, name, parentId);
+}
+
+/// The Reports folder, created on first use. A remembered folder that Google no
+/// longer knows (deleted, or the account was changed) is simply made again.
+async function reportsRootFolder(token: string): Promise<string> {
+  const row = await prisma.appSetting.findUnique({ where: { key: REPORTS_FOLDER_KEY } });
+  if (row) {
+    try {
+      await listFolder(token, row.value);
+      return row.value;
+    } catch (err) {
+      if (!(err instanceof DriveApiError && err.status === 404)) throw err;
+    }
+  }
+  const id = await createFolder(token, REPORTS_FOLDER_NAME);
+  await prisma.appSetting.upsert({
+    where: { key: REPORTS_FOLDER_KEY },
+    create: { key: REPORTS_FOLDER_KEY, value: id },
+    update: { value: id },
+  });
+  return id;
+}
+
+/// "2026-10-22" -> the day before, as a date-only value.
+function dayBefore(date: Date): Date {
+  return new Date(date.getTime() - 24 * 60 * 60 * 1000);
+}
+
+/// Uploads one day's Daily Report workbook into Reports / year / month, replacing
+/// that day's earlier file. False when the day has nothing saved to report.
+async function uploadDailyReport(token: string, root: string, date: Date, userId?: number): Promise<boolean> {
+  const built = await buildDailyReportWorkbook(date);
+  if (!built) return false;
+  const [year, month] = toDateOnlyString(date).split("-");
+  const folder = await findOrCreateChild(token, await findOrCreateChild(token, root, year), month);
+  try {
+    for (const old of (await listFolder(token, folder)).filter((f) => f.name === built.fileName)) await trashFile(token, old.id);
+    const id = await uploadFile(token, { name: built.fileName, parentId: folder, mimeType: XLSX_MIME, size: built.data.length, body: built.data });
+    await logUpload({ kind: "report", fileName: built.fileName, driveFileId: id, sizeBytes: built.data.length, status: "OK", createdById: userId });
+  } catch (err) {
+    await logUpload({ kind: "report", fileName: built.fileName, sizeBytes: built.data.length, status: "FAILED", error: messageOf(err), createdById: userId });
+    throw err;
+  }
+  return true;
+}
+
+/**
+ * Saves the Daily Report workbook of the latest day with entries, and of the day
+ * before it (which is often still being finished), under
+ * "Ala Eh Stocks Monitoring - Reports" / year / month. A day's file is replaced with the
+ * current one each time, so Drive holds one file per day, never a pile of copies;
+ * files for earlier days are left alone, so the folder becomes the archive.
+ *
+ * Runs after a backup that has already succeeded, so it never throws: a failure
+ * here is logged and shown in the upload list, and the backup stands.
+ */
+export async function saveDailyReports(conn: Connection, userId?: number): Promise<void> {
+  try {
+    const latest = await latestEntryDate();
+    if (!latest) return;
+    const token = await accessTokenFor(conn);
+    const root = await reportsRootFolder(token);
+    for (const date of [latest, dayBefore(latest)]) await uploadDailyReport(token, root, date, userId);
+  } catch (err) {
+    console.error(JSON.stringify({ level: "warn", event: "drive-reports-failed", message: messageOf(err) }));
+  }
+}
+
+/// One upload at a time per day, in the order they were asked for: a correction
+/// that lands while the finish-day upload is still running waits for it, so the
+/// older report can never overwrite the newer one in Drive.
+const reportUploads = new Map<string, Promise<void>>();
+
+/**
+ * A day's report was just saved (finished, or re-saved by a correction): put its
+ * workbook in Drive now, if Drive is connected, without making the save wait for
+ * it. Never throws; a failure is logged and listed on Settings > Google Drive,
+ * and the nightly backup tries the recent days again.
+ */
+export function queueDailyReportUpload(date: Date, userId?: number): Promise<void> {
+  const key = toDateOnlyString(date);
+  const run = (reportUploads.get(key) ?? Promise.resolve()).then(async () => {
+    try {
+      const conn = await prisma.driveConnection.findUnique({ where: { id: CONNECTION_ID } });
+      if (!conn) return;
+      const token = await accessTokenFor(conn);
+      if (await uploadDailyReport(token, await reportsRootFolder(token), date, userId)) {
+        broadcastNotice({ level: "success", message: `Daily Report for ${key} saved to Google Drive.` }, NOTICE_ROLES);
+      }
+    } catch (err) {
+      console.error(JSON.stringify({ level: "warn", event: "drive-report-upload-failed", date: key, message: messageOf(err) }));
+      broadcastNotice({ level: "error", message: `Could not save the ${key} Daily Report to Google Drive: ${messageOf(err)}` }, NOTICE_ROLES);
+    }
+  });
+  reportUploads.set(key, run);
+  void run.finally(() => {
+    if (reportUploads.get(key) === run) reportUploads.delete(key);
+  });
+  return run;
+}
+
+setReportSavedHandler((date) => void queueDailyReportUpload(date));
+
 // --- Schedule -----------------------------------------------------------------
 
-/// A backup is due when the most recent scheduled time (today's `hourUtc`, or
-/// yesterday's if that hasn't happened yet) has passed with no backup since.
-/// "Hours since the last one" would instead fire again a few hours early
-/// whenever the hour is changed.
+/// The scheduled backup is monthly: the last day of each month (by the UTC
+/// calendar, which is what the server runs on) at `hourUtc`. `Date.UTC` rolls a
+/// month of -1 or 12 over into the neighbouring year, and day 0 is the last day
+/// of the month before - so no month length is spelled out anywhere.
+function monthEndSlot(year: number, month: number, hourUtc: number): number {
+  return Date.UTC(year, month + 1, 0, hourUtc);
+}
+
+/// The most recent scheduled time that is not in the future.
+function latestBackupSlot(hourUtc: number, now: Date): number {
+  const thisMonth = monthEndSlot(now.getUTCFullYear(), now.getUTCMonth(), hourUtc);
+  return now.getTime() >= thisMonth ? thisMonth : monthEndSlot(now.getUTCFullYear(), now.getUTCMonth() - 1, hourUtc);
+}
+
+/// The next scheduled time after `now`.
+export function nextBackupAt(hourUtc: number, now: Date): Date {
+  const thisMonth = monthEndSlot(now.getUTCFullYear(), now.getUTCMonth(), hourUtc);
+  return new Date(now.getTime() < thisMonth ? thisMonth : monthEndSlot(now.getUTCFullYear(), now.getUTCMonth() + 1, hourUtc));
+}
+
+/// A backup is due when the most recent end-of-month slot has passed with no
+/// backup since. "A month since the last one" would instead drift (and fire
+/// early whenever the hour is changed); a slot also catches up by itself after
+/// downtime, and a manual "Back up now" mid-month does not bring it forward.
+/// A connection that has never been backed up is due straight away, so there is
+/// a first copy without waiting for the month to end.
 export function isBackupDue(
   conn: { autoBackup: boolean; backupHourUtc: number; lastBackupAt: Date | null },
   now: Date,
 ): boolean {
   if (!conn.autoBackup) return false;
-  let slot = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), conn.backupHourUtc);
-  if (now.getTime() < slot) slot -= 24 * HOUR_MS;
-  return !conn.lastBackupAt || conn.lastBackupAt.getTime() < slot;
+  return !conn.lastBackupAt || conn.lastBackupAt.getTime() < latestBackupSlot(conn.backupHourUtc, now);
 }
 
 /// After a failed attempt, wait this long before trying again, so a Drive
@@ -385,7 +555,7 @@ function messageOf(err: unknown): string {
 }
 
 async function logUpload(input: {
-  kind: "backup" | "export";
+  kind: "backup" | "export" | "report";
   fileName: string;
   driveFileId?: string;
   sizeBytes?: number;

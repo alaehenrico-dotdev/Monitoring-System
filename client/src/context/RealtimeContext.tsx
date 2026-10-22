@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { getToken, getWsUrl } from "../api/http";
 import { useAuth } from "./AuthContext";
+import { notify } from "../utils/notify";
 
 const BASE_RECONNECT_MS = 1000;
 const MAX_RECONNECT_MS = 30000;
@@ -51,6 +52,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       socket.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
+          // Something the server did on its own (e.g. a scheduled Drive backup).
+          if (msg?.type === "notice" && typeof msg.message === "string") {
+            notify({ level: msg.level === "error" || msg.level === "info" ? msg.level : "success", message: msg.message });
+            return;
+          }
           if (msg?.type !== "data-changed") return;
         } catch {
           return;

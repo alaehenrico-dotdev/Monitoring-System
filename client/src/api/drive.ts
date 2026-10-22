@@ -10,7 +10,7 @@ export interface DriveSettings {
 
 export interface DriveUpload {
   id: number;
-  kind: "backup" | "export";
+  kind: "backup" | "export" | "report";
   fileName: string;
   sizeBytes: number | null;
   status: "OK" | "FAILED";
@@ -27,6 +27,10 @@ export interface DriveStatus {
   accountEmail: string | null;
   connectedAt: string | null;
   lastBackupAt: string | null;
+  /// When the last Daily Report file was saved to Drive.
+  lastReportAt: string | null;
+  /// When the next scheduled (end-of-month) backup is due; null while that is switched off.
+  nextBackupAt: string | null;
   /// The last thing that went wrong talking to Google (e.g. access revoked).
   lastError: string | null;
   settings: DriveSettings | null;

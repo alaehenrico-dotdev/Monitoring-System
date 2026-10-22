@@ -1,5 +1,6 @@
 import { getToken } from "../api/http";
 import { getDriveExportConfig, uploadExportCopy } from "../api/drive";
+import { notify } from "./notify";
 
 /// The server refuses bigger bodies, so do not send them at all.
 export const MAX_COPY_BYTES = 30 * 1024 * 1024;
@@ -37,18 +38,20 @@ export function resetDriveCopyConfig(): void {
  * admin has connected Drive and left "save export copies" on.
  *
  * Fire-and-forget by design: the download has already happened, and a slow or
- * failed upload must never delay it, throw into the export that called this,
- * or show the person an error about something they did not ask for. Failures
- * that reach the server are recorded on Settings > Google Drive; a request that
- * never got there is only logged to the console.
+ * failed upload must never delay it or throw into the export that called this.
+ * The person is told how it went with a toast (saved, or not), and failures that
+ * reach the server are also recorded on Settings > Google Drive.
  */
 export function copyExportToDrive(filename: string, blob: Blob): void {
   if (!getToken() || blob.size === 0 || blob.size > MAX_COPY_BYTES) return;
   void (async () => {
     try {
-      if (await shouldCopy()) await uploadExportCopy(filename, blob);
+      if (!(await shouldCopy())) return;
+      await uploadExportCopy(filename, blob);
+      notify({ level: "success", message: `Saved a copy of ${filename} to Google Drive.` });
     } catch (err) {
       console.warn("Could not save a copy to Google Drive:", err);
+      notify({ level: "error", message: `Could not save a copy of ${filename} to Google Drive.` });
     }
   })();
 }

@@ -76,6 +76,9 @@ export interface TokenSet {
   refreshToken?: string;
   /// Seconds the access token stays valid.
   expiresIn: number;
+  /// What Google says was actually granted (space separated). The consent screen
+  /// lets a person untick individual permissions, so this can be less than asked.
+  scope?: string;
 }
 
 async function tokenRequest(client: OAuthClient, form: Record<string, string>, what: string): Promise<TokenSet> {
@@ -85,8 +88,8 @@ async function tokenRequest(client: OAuthClient, form: Record<string, string>, w
     body: new URLSearchParams({ client_id: client.clientId, client_secret: client.clientSecret, ...form }),
   });
   if (!res.ok) return failure(res, what);
-  const body = (await res.json()) as { access_token: string; refresh_token?: string; expires_in: number };
-  return { accessToken: body.access_token, refreshToken: body.refresh_token, expiresIn: body.expires_in };
+  const body = (await res.json()) as { access_token: string; refresh_token?: string; expires_in: number; scope?: string };
+  return { accessToken: body.access_token, refreshToken: body.refresh_token, expiresIn: body.expires_in, scope: body.scope };
 }
 
 export function exchangeCode(client: OAuthClient, code: string): Promise<TokenSet> {
@@ -118,11 +121,11 @@ export async function revokeToken(token: string): Promise<void> {
 
 const auth = (accessToken: string) => ({ Authorization: `Bearer ${accessToken}` });
 
-export async function createFolder(accessToken: string, name: string): Promise<string> {
+export async function createFolder(accessToken: string, name: string, parentId?: string): Promise<string> {
   const res = await fetch(`${FILES_URL}?fields=id`, {
     method: "POST",
     headers: { ...auth(accessToken), "Content-Type": "application/json" },
-    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder" }),
+    body: JSON.stringify({ name, mimeType: "application/vnd.google-apps.folder", ...(parentId ? { parents: [parentId] } : {}) }),
   });
   if (!res.ok) return failure(res, "Creating the Drive folder");
   return ((await res.json()) as { id: string }).id;

@@ -5,6 +5,7 @@ import { broadcastRealtimeEvent } from "../lib/realtime";
 import { assertEarlierDaysFinished, closePeriod, isSideLocked, otherLocation, type EntryLocation } from "./dayLock.service";
 import { buildDailyReport } from "./reports.service";
 import { saveSnapshot } from "./dailyReportSnapshot.service";
+import { notifyDailyReportSaved } from "../lib/reportSaved";
 import { recordReportHistoryIn } from "./reportHistory.service";
 import { toDateOnlyString } from "../utils/date";
 import { describeNegatives, findNegativeRows } from "./negativeStock.service";
@@ -139,6 +140,9 @@ export async function finishDay(
     );
   });
   broadcastRealtimeEvent();
+  // The saved report goes to Google Drive too, if connected - after the commit,
+  // so what is uploaded is exactly what was saved.
+  if (report) notifyDailyReportSaved(entryDate);
   return {
     ...summary,
     onlineLocked: location === "ONLINE" ? true : summary.onlineLocked,
