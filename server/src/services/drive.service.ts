@@ -27,8 +27,7 @@ import { open, seal } from "../utils/secretBox";
 import { dumpDatabaseToGzipFile } from "./backup.service";
 import { recordBackup } from "./backupVerify.service";
 import { logSystemEvent } from "./changeLog.service";
-import { buildDailyReportWorkbook, latestEntryDate } from "./dailyReportWorkbook.service";
-import { XLSX_MIME } from "../utils/xlsx";
+import { buildDailyReportPdf, latestEntryDate } from "./dailyReportPdf.service";
 import { createHash } from "node:crypto";
 import { toDateOnlyString } from "../utils/date";
 import { setReportSavedHandler } from "../lib/reportSaved";
@@ -546,13 +545,13 @@ export type ReportUploadResult =
   /// The day has nothing saved, so there is no report to keep.
   | "empty";
 
-/// Puts one day's Daily Report workbook in Reports / year / month, so that Drive
+/// Puts one day's Daily Report PDF in Reports / year / month, so that Drive
 /// ends up with exactly one file for the day:
 ///  - the same file already there (same checksum) is left alone;
 ///  - a changed report replaces the old one (which goes to the Drive trash);
 ///  - stray extra copies of the same name are trashed too.
 async function uploadDailyReport(token: string, root: string, date: Date, userId?: number): Promise<ReportUploadResult> {
-  const built = await buildDailyReportWorkbook(date);
+  const built = await buildDailyReportPdf(date);
   if (!built) return "empty";
   const [year, month] = toDateOnlyString(date).split("-");
   const folder = await findOrCreateChild(token, await findOrCreateChild(token, root, year), month);
@@ -565,7 +564,7 @@ async function uploadDailyReport(token: string, root: string, date: Date, userId
       return "unchanged";
     }
     for (const old of existing) await trashFile(token, old.id);
-    const id = await uploadFile(token, { name: built.fileName, parentId: folder, mimeType: XLSX_MIME, size: built.data.length, body: built.data });
+    const id = await uploadFile(token, { name: built.fileName, parentId: folder, mimeType: "application/pdf", size: built.data.length, body: built.data });
     await logUpload({ kind: "report", fileName: built.fileName, driveFileId: id, sizeBytes: built.data.length, status: "OK", createdById: userId });
   } catch (err) {
     await logUpload({ kind: "report", fileName: built.fileName, sizeBytes: built.data.length, status: "FAILED", error: messageOf(err), createdById: userId });
@@ -575,7 +574,7 @@ async function uploadDailyReport(token: string, root: string, date: Date, userId
 }
 
 /**
- * Saves the Daily Report workbook of the latest day with entries, and of the day
+ * Saves the Daily Report PDF of the latest day with entries, and of the day
  * before it (which is often still being finished), under
  * "Ala Eh Stocks Monitoring - Reports" / year / month. A day's file is replaced with the
  * current one each time, so Drive holds one file per day, never a pile of copies;

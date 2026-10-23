@@ -10,11 +10,11 @@ Settings > **Google Drive** connects the system to one Google account. Once conn
 - **Generating the Daily Report** (the Generate button, after a confirmation) saves that date's report to Drive
   straight away - see the next point for what the file is. Generating a date again replaces the file, and does
   nothing when Drive already holds exactly the same report, so there is never more than one file per date.
-- **Daily Report workbooks** are saved automatically: the moment a day's report is saved (an encoder
+- **Daily Report PDFs** are saved automatically: the moment a day's report is saved (an encoder
   finishes the day, "Finish through" runs, or a correction re-saves a frozen report), and again with each
   backup (monthly, and on *Back up now*) for the latest day and the day before it, as a catch-up. Each is an
-  Excel file (`daily-report-YYYY-MM-DD.xlsx`, with Summary, Online, Offline, Consolidated, Daily Out and Audit
-  sheets) in
+  PDF (`daily-report-YYYY-MM-DD.pdf`, with a Summary, then the Online, Offline, Consolidated, Daily Out and Audit
+  tables) in
   **Ala Eh Stock Monitoring - Reports / year / month**. A day's
   file is replaced with the current one each time, so Drive holds one file per day; earlier days stay, so the
   folder is a running archive. A finished day's file is its frozen report. If saving a report fails the

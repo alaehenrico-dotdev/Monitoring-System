@@ -6,11 +6,13 @@ import {
   getFinishInfo,
   getFinishThroughPreview,
   getReadiness,
+  getUnlockRequest,
   getStatus,
   postClose,
   postFinish,
   postFinishThrough,
   postUnlock,
+  postUnlockRequest,
 } from "../controllers/dayLock.controller";
 
 const router = Router();
@@ -34,6 +36,13 @@ router.post(
   authenticate,
   authorize(ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER, ROLES.SUPERVISOR_ADMIN),
   asyncHandler(postFinishThrough),
+);
+router.get("/unlock-request", authenticate, asyncHandler(getUnlockRequest));
+router.post(
+  "/unlock-request",
+  authenticate,
+  authorize(ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER, ROLES.SUPERVISOR_ADMIN),
+  asyncHandler(postUnlockRequest),
 );
 router.get("/", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getClosures));
 router.get("/readiness", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getReadiness));

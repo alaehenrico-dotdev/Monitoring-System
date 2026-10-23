@@ -9,7 +9,7 @@ import type { AddressInfo } from "net";
  * real client:
  *
  *  1. `trust proxy` - which peers are allowed to tell us the client's IP.
- *     server.ts listens directly as well as behind Nginx, so a forged
+ *     server.ts listens directly as well as behind Caddy, so a forged
  *     X-Forwarded-For from a direct connection must not be able to change
  *     `req.ip` (and so must not be able to hand its sender a fresh rate
  *     limit bucket per request).

@@ -19,6 +19,8 @@ import {
   flattenExtras,
   layoutCells,
   layoutCellsFor,
+  sumExtras,
+  unionLayouts,
   totalsFromExtras,
   validateExtras,
   type StockExtraInput,
@@ -107,10 +109,14 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combi
 
   // Whole-day mode on a day that was entered by shift: the Night sheet shows the
   // two sheets added together, as one read-only row per product.
-  const morningByProduct =
-    opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts
-      ? new Map((await dailyOnlineStockRepository.findAllForDate(entryDate, "MORNING")).map((r) => [r.productId, r]))
-      : new Map<number, DailyOnlineStock>();
+  const wholeDayView = opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts;
+  const morningRows = wholeDayView ? await dailyOnlineStockRepository.findAllForDate(entryDate, "MORNING") : [];
+  const morningByProduct = new Map<number, DailyOnlineStock>(morningRows.map((r) => [r.productId, r]));
+  // The Morning sheet's added columns, so the combined view keeps them.
+  const [morningExtraRows, morningLayout] =
+    morningRows.length > 0
+      ? await Promise.all([dailyStockExtraRepository.findAllForDate("ONLINE", entryDate, "MORNING"), sheetExtraColumnRepository.findForSheet("ONLINE", entryDate, "MORNING")])
+      : [[], []];
   const splitDay = morningByProduct.size > 0;
 
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id) && !morningByProduct.has(p.id)).map((p) => p.id);
@@ -123,7 +129,13 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combi
       const merged = combineSplitRows(morningByProduct.get(product.id), existing, ["stockInOffToOl", "stockOutOlToOff", "productionIn", "fulfillmentOut", "rts"])!;
       const figures = merged as unknown as OnlineFigures & { openingStock: number };
       const { onlineStock, remainingStock } = calculate(figures.openingStock, figures);
-      return { product, entry: { ...merged, shift, onlineStock, remainingStock, [WHOLE_DAY_COMBINED]: true }, isSaved: true };
+      const combinedExtras = sumExtras(morningExtraRows.filter((e) => e.productId === product.id), extras);
+      const combinedLayout = unionLayouts(morningLayout, layoutRows);
+      return {
+        product,
+        entry: { ...merged, shift, onlineStock, remainingStock, ...layoutCellsFor(combinedLayout, combinedExtras, merged as unknown as Record<string, unknown>), ...flattenExtras(combinedExtras), [WHOLE_DAY_COMBINED]: true },
+        isSaved: true,
+      };
     }
     if (existing) return { product, entry: { ...existing, ...layoutCellsFor(layoutRows, extras, existing as unknown as Record<string, unknown>), ...flattenExtras(extras) }, isSaved: true };
 

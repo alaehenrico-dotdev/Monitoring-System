@@ -19,6 +19,8 @@ import {
   DELIVERY_COLUMN,
   deliveryExtrasFromLegacy,
   flattenExtras,
+  sumExtras,
+  unionLayouts,
   layoutCells,
   layoutCellsFor,
   sheetHasDeliveryBreakdown,
@@ -110,10 +112,14 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { comb
   const layout = layoutCells(layoutRows);
 
   // Whole-day mode on a day that was entered by shift: see getOnlineGrid.
-  const morningByProduct =
-    opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts
-      ? new Map((await dailyOfflineStockRepository.findAllForDate(entryDate, "MORNING")).map((r) => [r.productId, r]))
-      : new Map<number, DailyOfflineStock>();
+  const wholeDayView = opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts;
+  const morningRows = wholeDayView ? await dailyOfflineStockRepository.findAllForDate(entryDate, "MORNING") : [];
+  const morningByProduct = new Map<number, DailyOfflineStock>(morningRows.map((r) => [r.productId, r]));
+  // The Morning sheet's added columns, so the combined view keeps them.
+  const [morningExtraRows, morningLayout] =
+    morningRows.length > 0
+      ? await Promise.all([dailyStockExtraRepository.findAllForDate("OFFLINE", entryDate, "MORNING"), sheetExtraColumnRepository.findForSheet("OFFLINE", entryDate, "MORNING")])
+      : [[], []];
   const splitDay = morningByProduct.size > 0;
 
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id) && !morningByProduct.has(p.id)).map((p) => p.id);
@@ -144,7 +150,22 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { comb
       ])!;
       const figures = merged as unknown as OfflineFigures & { openingStock: number };
       const { offlineStock, remainingStock } = calculate(figures.openingStock, figures);
-      return { product, entry: { ...merged, shift, offlineStock, remainingStock, [WHOLE_DAY_COMBINED]: true }, isSaved: true };
+      // Each added column shows Morning + Night, so the breakdown is not lost
+      // to the total when a day entered by shift is viewed as one sheet.
+      const morningRow = morningByProduct.get(product.id);
+      const morningSplit = sheetHasDeliveryBreakdown(morningRows as unknown as Record<string, unknown>[]) || morningLayout.some((c) => c.columnKey === DELIVERY_COLUMN);
+      const morningExtras = [
+        ...(morningRow ? deliveryExtrasFromLegacy({ ...morningRow, ...resolveDelivery(morningRow, {}) }, morningSplit) : []),
+        ...morningExtraRows.filter((e) => e.productId === product.id),
+      ];
+      const nightExtras = existing ? [...deliveryExtrasFromLegacy({ ...existing, ...resolveDelivery(existing, {}) }, sheetSplit), ...stored] : [];
+      const combinedExtras = sumExtras(morningExtras, nightExtras);
+      const combinedLayout = unionLayouts(morningLayout, layoutRows);
+      return {
+        product,
+        entry: { ...merged, shift, offlineStock, remainingStock, ...layoutCellsFor(combinedLayout, combinedExtras, merged as unknown as Record<string, unknown>), ...flattenExtras(combinedExtras), [WHOLE_DAY_COMBINED]: true },
+        isSaved: true,
+      };
     }
     if (existing) {
       // Delivery (Out)'s first five added columns are the legacy slot columns

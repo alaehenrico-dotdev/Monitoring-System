@@ -8,6 +8,9 @@ const api = vi.hoisted(() => ({
   finishDay: vi.fn(),
   previewFinishThrough: vi.fn(),
   finishThrough: vi.fn(),
+  getUnlockRequest: vi.fn(),
+  unlockDay: vi.fn(),
+  requestUnlock: vi.fn(),
 }));
 vi.mock("../api/ops", () => api);
 vi.mock("../context/RealtimeContext", () => ({ useRealtimeVersion: () => 0 }));
@@ -94,6 +97,7 @@ const item = (name: RegExp | string) => screen.getByRole("menuitem", { name });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  api.getUnlockRequest.mockResolvedValue(null);
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
   api.getFinishSummary.mockResolvedValue({
@@ -359,6 +363,50 @@ describe("Finish", () => {
     show({ dayLock: { loaded: true, locked: true, blockedBy: null } });
     expect(screen.queryByRole("group", { name: /Finish/ })).toBeNull();
     expect(api.getFinishSummary).not.toHaveBeenCalled();
+  });
+
+  it("on a finished sheet an encoder gets a Request unlock button beside where Finish was, and it sends the reason", async () => {
+    api.requestUnlock.mockResolvedValue({ id: 1, reason: "Wrong row", requestedAt: "", alreadyRequested: false });
+    show({ dayLock: { loaded: true, locked: true, blockedBy: null } });
+    fireEvent.click(await screen.findByRole("button", { name: /Request unlock/ }));
+    fireEvent.change(screen.getByLabelText("Reason for the unlock request"), { target: { value: "Wrong row" } });
+    fireEvent.click(screen.getByRole("button", { name: "Send request" }));
+    await waitFor(() => expect(api.requestUnlock).toHaveBeenCalledWith(expect.any(String), expect.any(String), "ONLINE", "Wrong row"));
+    expect(await screen.findByText("Unlock requested")).toBeTruthy();
+  });
+
+  it("an admin unlocks a finished page directly - no request, no approval", async () => {
+    api.unlockDay.mockResolvedValue({});
+    const onFinished = vi.fn();
+    show({ isAdmin: true, onFinished, dayLock: { loaded: true, locked: true, blockedBy: null } });
+    fireEvent.click(await screen.findByRole("button", { name: "Unlock" }));
+    fireEvent.change(screen.getByLabelText("Reason for unlocking"), { target: { value: "Fix a delivery figure" } });
+    fireEvent.click(screen.getByRole("button", { name: "Unlock now" }));
+    await waitFor(() => expect(api.unlockDay).toHaveBeenCalledWith(expect.any(String), expect.any(String), "Fix a delivery figure", "ONLINE"));
+    expect(api.requestUnlock).not.toHaveBeenCalled();
+    expect(api.getUnlockRequest).not.toHaveBeenCalled();
+    await waitFor(() => expect(onFinished).toHaveBeenCalled());
+  });
+
+  it("an admin is not offered it where unlocking is not the fix (earlier day pending, split day)", () => {
+    show({ isAdmin: true, dayLock: { loaded: true, locked: false, blockedBy: { entryDate: "2026-10-16", shift: "NIGHT" } } });
+    expect(screen.queryByRole("button", { name: /unlock/i })).toBeNull();
+  });
+
+  it("it also shows on a sheet held up by an earlier unfinished day, beside Finish pending days", async () => {
+    show({ dayLock: { loaded: true, locked: false, blockedBy: { entryDate: "2026-10-16", shift: "NIGHT" } } });
+    expect(await screen.findByRole("button", { name: /Request unlock/ })).toBeTruthy();
+    expect(screen.getByRole("group", { name: /Finish pending days/ })).toBeTruthy();
+  });
+
+  it("it shows on a day entered by shift that is read-only because shifts are off", async () => {
+    show({ splitDay: true, dayLock: { loaded: true, locked: false, blockedBy: null } });
+    expect(await screen.findByRole("button", { name: /Request unlock/ })).toBeTruthy();
+  });
+
+  it("it is not offered while the sheet is open for entry", () => {
+    show({ dayLock: { loaded: true, locked: false, blockedBy: null } });
+    expect(screen.queryByRole("button", { name: /Request unlock/ })).toBeNull();
   });
 });
 

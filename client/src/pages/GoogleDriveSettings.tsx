@@ -253,7 +253,7 @@ export function GoogleDriveSettings() {
                 last={status.lastReportAt ? `Last saved ${when(status.lastReportAt)}` : "No report has been saved yet"}
               >
                 <div style={{ fontSize: 12.5, color: colors.ink }}>
-                  Each day's report is saved as an Excel file the moment the day is finished, and again if a
+                  Each day's report is saved as a PDF the moment the day is finished, and again if a
                   correction changes it. There is one file per day; earlier days stay as an archive.
                 </div>
               </AutoCard>

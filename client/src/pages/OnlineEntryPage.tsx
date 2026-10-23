@@ -37,6 +37,7 @@ import { onlineStockColumns as columns } from "../config/stockColumns";
 import {
   columnsWithExtras,
   extraColumnList,
+  extraColumnsFromRows,
   flattenExtraPayload,
   extraColumnKey,
   MAX_EXTRAS_PER_COLUMN,
@@ -58,7 +59,7 @@ import {
   getCurrentShiftAndDate,
   otherShift,
   SHIFT_LABELS,
-  SHIFT_SHORT_LABELS,
+  shiftWithWord,
 } from "../utils/shift";
 import {
   calculateOnlineRemaining,
@@ -257,6 +258,14 @@ export function OnlineEntryPage() {
     columns,
   });
 
+  // A finished (or otherwise read-only) sheet shows exactly the columns that
+  // were saved with it: unsaved columns left in this browser's draft storage
+  // never appear on it, and its columns cannot be added to or removed.
+  const shownExtras = useMemo(
+    () => (canEdit ? extras : extraColumnsFromRows(rows, columns)),
+    [canEdit, extras, rows],
+  );
+
   const extraLabels = useExtraLabels("ONLINE", date, shift, setError);
 
   function handleAddExtraColumns(mainKey: string, count: number) {
@@ -418,6 +427,8 @@ export function OnlineEntryPage() {
   async function handleSaveAll(): Promise<boolean> {
     setError(null);
     setSaveFailed(false);
+    // Column names still being typed are saved with the sheet.
+    await extraLabels.flush();
     if (!online) {
       setError("Server unreachable. Reconnect before saving changes.");
       setSaveFailed(true);
@@ -580,13 +591,13 @@ export function OnlineEntryPage() {
         downloadTablePdf({
           filename: pdfName,
           title: "Daily Online Stock Monitoring",
-          subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`,
+          subtitle: `${formatDateDisplay(date)} - ${shiftWithWord(shift)}`,
           notes: filterNotes({ category: categoryFilter, query }),
           // Added columns print beside the column they add up to; with
           // none, this is the same column list - and the same PDF - as
           // before.
           sections: [
-            stockGridSection(visibleRows, columnsWithExtras(columns, extras, extraLabels.names)),
+            stockGridSection(visibleRows, columnsWithExtras(columns, shownExtras, extraLabels.names)),
           ],
         }),
       );
@@ -603,7 +614,7 @@ export function OnlineEntryPage() {
   return (
     <div>
       <PageHeader
-        title={`Daily Online Stock Monitoring - ${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift`}
+        title={`Daily Online Stock Monitoring - ${formatDateDisplay(date)} - ${shiftWithWord(shift)}`}
         subtitle="Stocks In/Out transfers also update the Offline table."
       >
         <EntryToolbar
@@ -656,6 +667,7 @@ export function OnlineEntryPage() {
           pdfBusy={pdfAction.busy}
           onPdf={() => void pdfAction.run(handlePdf)}
           dayLock={dayLock}
+          splitDay={splitDayView}
           onFinished={dayLock.refresh}
           onError={setError}
           finishWarnings={belowZeroWarnings(rows)}
@@ -692,7 +704,7 @@ export function OnlineEntryPage() {
       {splitDayView && (
         <p role="status" className="ae-mm-note" style={{ margin: "0 0 10px" }}>
           This day was entered by shift (Morning and Night). With shifts switched off it shows the two added together
-          and is read-only. Switch shifts back on in Settings to edit it, or request a correction.
+          and is read-only. Use Request unlock in the toolbar to ask an admin to open it, switch shifts back on in Settings to edit it, or request a correction.
         </p>
       )}
       {dayLock.locked && (
@@ -734,7 +746,7 @@ export function OnlineEntryPage() {
             getSavedValue={getSavedValue}
             expandAllCommand={catCommand}
             onAnyExpandedChange={setAnyCatExpanded}
-            extraColumns={extras}
+            extraColumns={shownExtras}
             onAddExtraColumns={canEdit ? handleAddExtraColumns : undefined}
             onRemoveExtraColumns={
               canEdit

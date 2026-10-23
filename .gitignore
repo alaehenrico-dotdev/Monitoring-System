@@ -19,9 +19,10 @@ client/vite.config.d.ts
 !.env.example
 !.env.*.example
 
-# TLS certificates / keys for docker-compose.tls.yml
-certs/
+# Private keys and certificates. (Caddy keeps its own certificates in a Docker
+# volume, not in the repo; this catches any that get copied in by hand.)
 *.pem
+*.crt
 *.key
 *.p12
 *.pfx
@@ -42,9 +43,21 @@ service-account*.json
 # and are source.
 *.sql.gz
 *.sql.gz.*
+# Dumps by name, in case one is left unzipped in the project (a plain "*.sql" is
+# not ignored on purpose - the migrations are SQL).
+db_backup_*.sql
+docker_db_backup_*
+premigrate_*
 *.dump
 backups/
 snapshots/
+
+# --- Docker -----------------------------------------------------------------
+# A personal compose override (ports, volumes) and anything Caddy writes if its data
+# folders are ever bind-mounted into the project instead of the named volumes.
+docker-compose.override.yml
+caddy_data/
+caddy_config/
 
 # --- Local tooling and test output --------------------------------------------
 # Personal Claude Code settings (the shared agents/skills under .claude/ stay tracked).

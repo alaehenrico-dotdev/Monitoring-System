@@ -352,6 +352,11 @@ export async function unlockDay(entryDate: Date, shift: Shift, reason: string, u
       },
       tx,
     );
+    // The encoder's ask (if any) for this page has been answered.
+    await tx.unlockRequest.updateMany({
+      where: { entryDate, shift, status: "PENDING", ...(location ? { location } : {}) },
+      data: { status: "RESOLVED", resolvedAt: new Date() },
+    });
     return saved;
   });
   broadcastRealtimeEvent();

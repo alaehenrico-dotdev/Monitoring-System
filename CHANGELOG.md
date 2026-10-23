@@ -2,14 +2,21 @@
 
 ## Unreleased
 
+## 2.4.0 - 2026-10-23
+
 ### Added
-- **The Daily Report is now the main report.** It covers every entry (Online, Offline, Consolidated, Daily Out) **and the Audit** - every manual count for the date with the system figure, the count, the variance, remarks and published status. The Audit shows on the page, in Export Excel, in the PDF and as a sheet in the Drive workbook, which also has a Summary sheet saying whether the day is live or finished.
-- **Generate asks first, then saves to Google Drive.** Clicking Generate opens a confirmation; on OK the picked date's report is generated and saved to Drive as one Excel file for that date. Generating the same date again replaces that file, or - when nothing has changed - leaves Drive alone and says it is already up to date.
+- **Request unlock.** On a finished page, an encoder can send an unlock request with a reason from the banner. It waits in the Admin Queue (with its own counter) and is resolved when an admin unlocks the page. One open request per page.
+- Added columns now keep their saved header names, and show on days entered by shift when shifts are switched off (each column as Morning + Night). A name still being typed is saved with Save. A finished sheet shows only the columns saved with it.
+- **The Daily Report is now the main report.** It covers every entry (Online, Offline, Consolidated, Daily Out) **and the Audit** - every manual count for the date with the system figure, the count, the variance, remarks and published status. The Audit shows on the page, in Export Excel, in the PDF and as a table in the Drive PDF, which also opens with a Summary saying whether the day is live or finished.
+- **Generate asks first, then saves to Google Drive.** Clicking Generate opens a confirmation; on OK the picked date's report is generated and saved to Drive as one PDF for that date. Generating the same date again replaces that file, or - when nothing has changed - leaves Drive alone and says it is already up to date.
 
 ### Changed
+- **The web server is now Caddy instead of Nginx** (`deploy/caddy/Caddyfile`). It serves the client, proxies the API and WebSocket, and gets and renews the HTTPS certificate by itself: set `SITE_ADDRESS` to a domain in `.env` and nothing else is needed. The Nginx configs and `docker-compose.tls.yml` are removed.
+- **Shifts are off by default** (one whole-day sheet, labelled "Daily Sheet"); an admin can switch them on in Settings. PDF header now reads "ALA EH! PRODUCT VENTURES".
+- **The Daily Report goes to Google Drive as a PDF, not an Excel file** (`daily-report-YYYY-MM-DD.pdf`). It is built on the server with the same tables as the report page and is byte-for-byte the same for the same figures, so the checksum check that avoids re-uploading and duplicates works as before. Excel exports from the report page are unchanged. A day already saved as `.xlsx` in Drive is left alone; its new file is the `.pdf`.
 - **Drive folders have exact names and are never duplicated.** They are now "Ala Eh Stock Monitoring - Backups", "- Reports" and "- Exports". Folders made under an older name are renamed in place (same folder, same files) at server start, hourly after that, and on connect; a folder is only created when none of that name exists, and year/month folders are created one at a time, so reports saved together cannot make two.
 - The Daily Report's own Export Excel and Download PDF no longer also copy themselves to the Exports folder in Drive, so the same report is not kept twice (other exports still do).
-- The report workbook is built so that the same report always produces the same file; Drive's checksum is compared before uploading, and stray duplicate copies of a day's file are tidied.
+- The report PDF is built so that the same report always produces the same file; Drive's checksum is compared before uploading, and stray duplicate copies of a day's file are tidied.
 
 ## 2.3.0
 

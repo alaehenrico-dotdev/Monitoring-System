@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   columnKeysOf,
+  sumExtras,
+  unionLayouts,
   DELIVERY_LEGACY_SLOTS,
   deliveryExtrasFromLegacy,
   layoutCells,
@@ -194,5 +196,21 @@ describe("layoutCellsFor", () => {
 
   it("seeds into the lowest slot even when it is not slot 1", () => {
     expect(layoutCellsFor([{ columnKey: "rts", slotIndex: 3 }, { columnKey: "rts", slotIndex: 2 }], [], { rts: 4 })).toEqual({ rts__x3: 0, rts__x2: 4 });
+  });
+});
+
+describe("sumExtras / unionLayouts (a day entered by shift, viewed as one sheet)", () => {
+  it("adds the Morning and Night amount of each added column", () => {
+    const morning = [{ columnKey: "deliveryOut", slotIndex: 1, amount: 4 }, { columnKey: "deliveryOut", slotIndex: 2, amount: 1 }];
+    const night = [{ columnKey: "deliveryOut", slotIndex: 1, amount: 6 }];
+    expect(sumExtras(morning, night)).toEqual([
+      { columnKey: "deliveryOut", slotIndex: 1, amount: 10 },
+      { columnKey: "deliveryOut", slotIndex: 2, amount: 1 },
+    ]);
+  });
+
+  it("keeps a column that only one of the sheets was saved with", () => {
+    const merged = unionLayouts([{ columnKey: "deliveryOut", slotIndex: 1 }], [{ columnKey: "deliveryOut", slotIndex: 1 }, { columnKey: "deliveryOut", slotIndex: 2 }]);
+    expect(merged).toHaveLength(2);
   });
 });

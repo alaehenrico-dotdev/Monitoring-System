@@ -9,7 +9,7 @@ vi.mock("./reports.service", () => ({ getDailyReport: mocks.getDailyReport }));
 vi.mock("./dailyOutflow.service", () => ({ getDailyOutflow: mocks.getDailyOutflow }));
 vi.mock("../lib/prisma", () => ({ prisma: mocks.prisma }));
 
-import { buildDailyReportWorkbook, dailyReportFileName, dailyReportSheets, latestEntryDate } from "./dailyReportWorkbook.service";
+import { buildDailyReportPdf, dailyReportFileName, dailyReportSheets, latestEntryDate } from "./dailyReportPdf.service";
 
 const product = { category: "Class A", sku: "A1", name: "Alpha" };
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -75,25 +75,25 @@ describe("Summary and Audit sheets", () => {
   it("builds the same bytes every time for the same report - nothing in it depends on when it was made", async () => {
     mocks.getDailyReport.mockResolvedValue({ ...report, date: "2026-10-22", audit, snapshot: null });
     mocks.getDailyOutflow.mockResolvedValue([{ date: "2026-10-22", onlineOut: 3, offlineOut: 2.5, totalOut: 5.5 }]);
-    const a = await buildDailyReportWorkbook(d("2026-10-22"));
+    const a = await buildDailyReportPdf(d("2026-10-22"));
     await new Promise((r) => setTimeout(r, 1100)); // past a whole second, which the old zip time would have noticed
-    const b = await buildDailyReportWorkbook(d("2026-10-22"));
+    const b = await buildDailyReportPdf(d("2026-10-22"));
     expect(a!.data.equals(b!.data)).toBe(true);
   });
 });
 
-describe("buildDailyReportWorkbook", () => {
-  it("builds a named .xlsx for a day with saved entries", async () => {
+describe("buildDailyReportPdf", () => {
+  it("builds a named PDF for a day with saved entries", async () => {
     mocks.getDailyReport.mockResolvedValue(report);
     mocks.getDailyOutflow.mockResolvedValue([{ date: "2026-10-22", onlineOut: 3, offlineOut: 2.5, totalOut: 5.5 }]);
-    const out = await buildDailyReportWorkbook(d("2026-10-22"));
-    expect(out?.fileName).toBe("daily-report-2026-10-22.xlsx");
-    expect(out?.data.subarray(0, 2).toString()).toBe("PK"); // a zip container
+    const out = await buildDailyReportPdf(d("2026-10-22"));
+    expect(out?.fileName).toBe("daily-report-2026-10-22.pdf");
+    expect(out?.data.subarray(0, 5).toString()).toBe("%PDF-");
   });
 
   it("builds nothing for a day with no saved entry", async () => {
     mocks.getDailyReport.mockResolvedValue({ ...report, online: [{ ...report.online[0], isSaved: false }], offline: [] });
-    expect(await buildDailyReportWorkbook(d("2026-10-22"))).toBeNull();
+    expect(await buildDailyReportPdf(d("2026-10-22"))).toBeNull();
     expect(mocks.getDailyOutflow).not.toHaveBeenCalled();
   });
 });
@@ -109,6 +109,6 @@ describe("latestEntryDate / dailyReportFileName", () => {
   });
 
   it("names the file by date", () => {
-    expect(dailyReportFileName("2026-10-22")).toBe("daily-report-2026-10-22.xlsx");
+    expect(dailyReportFileName("2026-10-22")).toBe("daily-report-2026-10-22.pdf");
   });
 });

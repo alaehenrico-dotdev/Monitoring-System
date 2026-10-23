@@ -57,6 +57,7 @@ const KIND_LABEL: Record<QueueItem["kind"], string> = {
   "missing-entry": "Missing entry",
   backup: "Backup",
   correction: "Correction",
+  "unlock-request": "Unlock request",
 };
 
 const SHIFTS: Shift[] = ["MORNING", "NIGHT"];
@@ -146,11 +147,12 @@ function QueueTab() {
     ["Missing entries", c.missingEntries],
     ["Backup issues", c.backup],
     ["Corrections to review", c.corrections],
+    ["Unlock requests", c.unlockRequests ?? 0],
   ];
 
   return (
     <>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 12 }}>
+      <div className="ae-queue-summary" style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center", marginBottom: 12 }}>
         {summary.map(([label, n]) => (
           <span key={label} className={`ae-dash-chip ae-dash-chip--${n === 0 ? "done" : "bad"}`}>
             {label}: {n}

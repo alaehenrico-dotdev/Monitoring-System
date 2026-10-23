@@ -144,6 +144,28 @@ export function layoutCellsFor(
   return out;
 }
 
+/// Added-column amounts of several sheets of one product added together, per
+/// (column, slot) - the combined view of a day that was entered by shift keeps
+/// its added columns (each one the Morning + Night amount) instead of showing
+/// only the total.
+export function sumExtras(...lists: { columnKey: string; slotIndex: number; amount: unknown }[][]): { columnKey: string; slotIndex: number; amount: number }[] {
+  const sums = new Map<string, { columnKey: string; slotIndex: number; amount: number }>();
+  for (const e of lists.flat()) {
+    const key = extraCellKey(e.columnKey, e.slotIndex);
+    const prev = sums.get(key);
+    const amount = Math.round(((prev?.amount ?? 0) + Number(e.amount)) * 100) / 100;
+    sums.set(key, { columnKey: e.columnKey, slotIndex: e.slotIndex, amount });
+  }
+  return [...sums.values()];
+}
+
+/// Layouts of several sheets as one, without repeats.
+export function unionLayouts(...layouts: { columnKey: string; slotIndex: number }[][]): { columnKey: string; slotIndex: number }[] {
+  const seen = new Map<string, { columnKey: string; slotIndex: number }>();
+  for (const c of layouts.flat()) seen.set(extraCellKey(c.columnKey, c.slotIndex), { columnKey: c.columnKey, slotIndex: c.slotIndex });
+  return [...seen.values()];
+}
+
 /// The amounts flattened onto a grid row, so the client reads an added
 /// column's cell exactly like any other (`row.entry[key]`).
 export function flattenExtras(extras: { columnKey: string; slotIndex: number; amount: unknown }[]): Record<string, number> {

@@ -18,7 +18,7 @@ export function createApp() {
   const app = express();
 
   // Which peers may set `X-Forwarded-For`, as an address allowlist (default
-  // loopback for the local Nginx reverse proxy in PRODUCTION.md).
+  // loopback for the local Caddy reverse proxy, see the README).
   // Behind that proxy `req.ip` is the real client, so the IP-keyed limiters
   // below bucket per visitor instead of lumping the whole tunnel together.
   //

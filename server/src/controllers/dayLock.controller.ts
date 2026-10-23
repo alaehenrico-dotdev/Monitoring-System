@@ -5,6 +5,8 @@ import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
 import { finishDay, getFinishChecklist, getFinishSummary } from "../services/dayFinish.service";
 import { finishThrough, previewFinishThrough } from "../services/finishThrough.service";
+import { currentUnlockRequest, requestUnlock } from "../services/unlockRequest.service";
+import { Role } from "@prisma/client";
 import { closeDay, closeReadiness, getClosureStatus, listClosures, unlockDay, type EntryLocation } from "../services/dayLock.service";
 
 const unlockSchema = z.object({
@@ -46,6 +48,31 @@ export async function postUnlock(req: Request, res: Response) {
   const parsed = unlockSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest(parsed.error.issues[0]?.message ?? "Invalid request", parsed.error.flatten());
   res.json(await unlockDay(parseDateOnly(req.body?.date), parseShift(req.body?.shift), parsed.data.reason, req.user?.id, parsed.data.location));
+}
+
+const unlockRequestSchema = z.object({
+  location: z.enum(["ONLINE", "OFFLINE"]),
+  reason: z.string().trim().min(5, "Give a reason (at least 5 characters)").max(500),
+});
+
+/// An encoder may ask for their own page only; an admin may ask for either.
+function assertOwnPage(role: Role | undefined, location: EntryLocation) {
+  const ok = role === Role.SUPERVISOR_ADMIN || (location === "ONLINE" ? role === Role.ONLINE_ENCODER : role === Role.OFFLINE_ENCODER);
+  if (!ok) throw HttpError.forbidden("You cannot request an unlock on this page");
+}
+
+export async function postUnlockRequest(req: Request, res: Response) {
+  const parsed = unlockRequestSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest(parsed.error.issues[0]?.message ?? "Invalid request", parsed.error.flatten());
+  assertOwnPage(req.user?.role, parsed.data.location);
+  res.json(await requestUnlock({ ...parsed.data, entryDate: parseDateOnly(req.body?.date), shift: parseShift(req.body?.shift) }, req.user?.id));
+}
+
+/// The request still waiting for this page, or null - so the banner can say so.
+export async function getUnlockRequest(req: Request, res: Response) {
+  const location = parseLocation(req.query.location);
+  if (!location) throw HttpError.badRequest("location must be ONLINE or OFFLINE");
+  res.json((await currentUnlockRequest(location, parseDateOnly(req.query.date), parseShift(req.query.shift))) ?? null);
 }
 
 /// What finishing this shift would lock - open to every role, like the status.

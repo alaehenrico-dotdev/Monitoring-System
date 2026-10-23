@@ -4,6 +4,7 @@ import type { EntryLocation } from "../api/ops";
 import type { Shift } from "../types";
 import { ROW_FILTER_LABELS, type RowFilter } from "../hooks/useGridView";
 import { useFinishDay } from "../hooks/useFinishDay";
+import { useRequestUnlock } from "../hooks/useRequestUnlock";
 import { addDaysIso } from "../utils/dateMath";
 import { getCurrentShiftAndDate, isWholeDayMode, SHIFTS, SHIFT_SHORT_LABELS } from "../utils/shift";
 import { CategoryFilter } from "./CategoryFilter";
@@ -11,7 +12,7 @@ import { CopyPreviousButton, type CopyPreviousButtonProps } from "./CopyPrevious
 import { DateStepper } from "./DateStepper";
 import { FinishThroughDialog } from "./FinishThrough";
 import { ClearFilters, FilterSlot } from "./FilterSlot";
-import { ClockIcon, CollapseAllIcon, EllipsisIcon, ExpandAllIcon, HistoryIcon, LockCheckIcon, PrinterIcon, ReorderIcon, ReportIcon, SaveIcon, SyncIcon, UndoIcon } from "./icons";
+import { ClockIcon, CollapseAllIcon, EllipsisIcon, ExpandAllIcon, HistoryIcon, LockCheckIcon, LockIcon, PrinterIcon, ReorderIcon, ReportIcon, SaveIcon, SyncIcon, UndoIcon } from "./icons";
 import { MenuBar, type MenuDef, type MenuItemDef, type MenuSection } from "./MenuBar";
 import { ReorderProductsDialog } from "./ReorderProductsButton";
 import { RowFilterSelect } from "./RowFilterSelect";
@@ -80,7 +81,9 @@ export interface EntryToolbarProps {
   pdfBusy: boolean;
   onPdf: () => void;
   /* finishing */
-  dayLock: { loaded: boolean; locked: boolean; blockedBy: { entryDate: string; shift: Shift } | null };
+  /// A day entered by shift, shown combined and read-only because shifts are off.
+  splitDay?: boolean;
+  dayLock: { loaded: boolean; locked: boolean; blockedBy: { entryDate: string; shift: Shift } | null; entryBlockedBy?: { entryDate: string; shift: Shift } | null };
   onFinished: () => void;
   onError: (message: string) => void;
   /// Worth a look before locking (products below zero...). Shown in Finish's confirmation.
@@ -118,6 +121,15 @@ export function EntryToolbar(p: EntryToolbarProps) {
   const blocked = p.dayLock.loaded && p.dayLock.blockedBy !== null;
   const finishable = p.dayLock.loaded && !p.dayLock.locked && !p.dayLock.blockedBy;
   const finishReason = unsaved ? LOCKED_OUT : undefined;
+  // A locked page - finished, waiting on an earlier unfinished day, or a day
+  // entered by shift and shown read-only with shifts off - can be
+  // asked to be opened up; the ask goes to the Admin Queue.
+  const entryBlocked = p.dayLock.entryBlockedBy !== undefined ? p.dayLock.entryBlockedBy !== null : p.dayLock.blockedBy !== null;
+  // An admin unlocks a finished page directly (nothing to approve). The other two
+  // states are not unlocks for them: an earlier day is finished with "Finish
+  // pending days", and a split day is opened by switching shifts on in Settings.
+  const canRequestUnlock = p.dayLock.loaded && (p.isAdmin ? p.dayLock.locked : p.dayLock.locked || entryBlocked || !!p.splitDay);
+  const unlockRequest = useRequestUnlock({ date: p.date, shift: p.shift, location: p.location, enabled: canRequestUnlock, direct: p.isAdmin, onUnlocked: p.onFinished });
   const finish = useFinishDay({
     date: p.date,
     shift: p.shift,
@@ -252,14 +264,24 @@ export function EntryToolbar(p: EntryToolbarProps) {
      narrow bar has no room for. Built from the same items, so it can never
      disagree with the menus about what is available or why not. */
   const flat = (sections: MenuSection[]) => sections.flatMap((s) => s.items);
-  const finishItems: MenuItemDef[] = blocked
-    ? [{ id: "finish-pending", label: "Finish pending days…", icon: <LockCheckIcon />, disabledReason: finishReason, onSelect: () => setThroughOpen(true) }]
-    : finishable
-      ? [
-          { id: "finish-day", label: "Finish day…", icon: <LockCheckIcon />, disabledReason: finishReason, onSelect: () => void finish.open() },
-          { id: "finish-through", label: "Finish through a date…", disabledReason: finishReason, onSelect: () => setThroughOpen(true) },
-        ]
-      : [];
+  const requestUnlockItem: MenuItemDef = {
+    id: "request-unlock",
+    label: unlockRequest.direct ? "Unlock…" : unlockRequest.pending ? "Unlock requested - waiting for an admin" : "Request unlock…",
+    icon: <LockIcon />,
+    disabledReason: unlockRequest.pending ? "An admin has been asked to unlock this page" : undefined,
+    onSelect: unlockRequest.openDialog,
+  };
+  const finishItems: MenuItemDef[] = [
+    ...(blocked
+      ? [{ id: "finish-pending", label: "Finish pending days…", icon: <LockCheckIcon />, disabledReason: finishReason, onSelect: () => setThroughOpen(true) }]
+      : finishable
+        ? [
+            { id: "finish-day", label: "Finish day…", icon: <LockCheckIcon />, disabledReason: finishReason, onSelect: () => void finish.open() },
+            { id: "finish-through", label: "Finish through a date…", disabledReason: finishReason, onSelect: () => setThroughOpen(true) },
+          ]
+        : []),
+    ...(canRequestUnlock ? [requestUnlockItem] : []),
+  ];
   const overflowSections: MenuSection[] = [
     { heading: "Sheet", items: sheetItems },
     { heading: "Edit", items: flat(editSections) },
@@ -360,6 +382,24 @@ export function EntryToolbar(p: EntryToolbarProps) {
               items={[{ id: "through", label: "Finish through a date…", disabledReason: finishReason, onSelect: () => setThroughOpen(true) }]}
             />
           )}
+          {canRequestUnlock && (
+            <button
+              type="button"
+              className="ae-mb-btn ae-mb-btn--warn"
+              disabled={!!unlockRequest.pending}
+              onClick={unlockRequest.openDialog}
+              title={
+                unlockRequest.direct
+                  ? `Unlock the ${PAGE_LABEL[p.location]} page for changes`
+                  : unlockRequest.pending
+                    ? `Waiting for an admin: ${unlockRequest.pending.reason}`
+                    : `Ask an admin to open the ${PAGE_LABEL[p.location]} page for changes`
+              }
+            >
+              <LockIcon />
+              <span>{unlockRequest.direct ? "Unlock" : unlockRequest.pending ? "Unlock requested" : "Request unlock"}</span>
+            </button>
+          )}
           {blocked && (
             <SplitButton
               label="Finish pending days"
@@ -383,6 +423,7 @@ export function EntryToolbar(p: EntryToolbarProps) {
       </div>
 
       {finish.dialogs}
+      {unlockRequest.dialog}
       {throughOpen && (
         <FinishThroughDialog
           defaultDate={blocked ? addDaysIso(p.date, -1) : p.date}

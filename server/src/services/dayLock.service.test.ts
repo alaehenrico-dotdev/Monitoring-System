@@ -9,6 +9,8 @@ const prismaMock = vi.hoisted(() => ({
 vi.mock("../lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 vi.mock("../lib/realtime", () => ({ broadcastRealtimeEvent: vi.fn() }));
+// These tests are about two shifts a day; whole-day mode has its own file (dayLock.shiftMode.test.ts).
+vi.mock("./appSettings.service", () => ({ getEntryRules: vi.fn(async () => ({ requireEarlierDaysFinished: true, useShifts: true })) }));
 
 import {
   assertEarlierDaysFinished,

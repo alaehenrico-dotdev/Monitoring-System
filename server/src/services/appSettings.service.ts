@@ -21,7 +21,7 @@ export interface EntryRules {
   useShifts: boolean;
 }
 
-export const ENTRY_RULE_DEFAULTS: EntryRules = { requireEarlierDaysFinished: true, useShifts: true };
+export const ENTRY_RULE_DEFAULTS: EntryRules = { requireEarlierDaysFinished: true, useShifts: false };
 
 const KEYS = { requireEarlierDaysFinished: "entry.requireEarlierDaysFinished", useShifts: "entry.useShifts" } as const;
 const CACHE_KEY = "app-settings:entry-rules";
@@ -34,7 +34,7 @@ async function load(): Promise<EntryRules> {
   const value = (key: string) => rows.find((r) => r.key === key)?.value;
   return {
     requireEarlierDaysFinished: value(KEYS.requireEarlierDaysFinished) !== "false",
-    useShifts: value(KEYS.useShifts) !== "false",
+    useShifts: value(KEYS.useShifts) === "true",
   };
 }
 
