@@ -528,6 +528,26 @@ model ExtraColumnLabel {
   @@map("extra_column_labels")
 }
 
+/// An encoder's ask for a finished entry page to be unlocked. Open until the
+/// page is unlocked (unlockDay resolves it), so the Admin Queue lists exactly
+/// the asks still waiting.
+model UnlockRequest {
+  id            Int           @id @default(autoincrement())
+  location      StockLocation
+  entryDate     DateTime      @db.Date
+  shift         Shift         @default(NIGHT)
+  reason        String        @db.VarChar(500)
+  /// "PENDING" until the page is unlocked, then "RESOLVED".
+  status        String        @default("PENDING") @db.VarChar(12)
+  requestedById Int?
+  requestedAt   DateTime      @default(now())
+  resolvedAt    DateTime?
+
+  @@index([status, requestedAt])
+  @@index([entryDate, shift, location])
+  @@map("unlock_requests")
+}
+
 /// A browser-side error reported by the client (POST /client-errors) so a
 /// problem on an encoder's PC is visible without them having to call.
 model ClientError {

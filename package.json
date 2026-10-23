@@ -1,7 +1,7 @@
 {
   "name": "ala-eh-stocks-monitoring-system",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Ala Eh Food Products - Online & Offline Stocks Monitoring System (monorepo root)",
   "workspaces": [
     "server",
@@ -17,6 +17,8 @@
     "backup": "node scripts/backup.mjs backup",
     "backup:snapshot": "node scripts/backup.mjs backup --mode snapshot --label pre-migration",
     "restore": "node scripts/backup.mjs restore",
+    "backup:docker": "node scripts/docker-backup.mjs backup",
+    "restore:docker": "node scripts/docker-backup.mjs restore",
     "lint": "eslint .",
     "test": "npm run test --workspaces --if-present",
     "e2e": "node scripts/e2e.mjs"

@@ -1,20 +1,20 @@
 import { prisma } from "../lib/prisma";
 import { toDateOnlyString } from "../utils/date";
-import { buildXlsx, type Cell, type Sheet } from "../utils/xlsx";
+import { renderTablesPdf, type Cell, type PdfTable } from "../utils/tablesPdf";
 import { getDailyOutflow } from "./dailyOutflow.service";
 import { getDailyReport } from "./reports.service";
 
 /**
- * The Daily Report as an Excel workbook, built on the server so it can be saved
- * to Google Drive with the nightly backup without anyone opening a browser.
- * Same content as the report page's own Excel export: Online, Offline and
- * Consolidated, Daily Out and the day's Audit counts, behind a Summary sheet that
- * says whether the day is finished. The figures come from getDailyReport, so a
- * finished day is its frozen snapshot, exactly as the page shows it.
+ * The Daily Report as a PDF, built on the server so it can be saved to Google
+ * Drive the moment a day is finished (or generated) without anyone opening a
+ * browser. Same content as the report page: a summary saying whether the day is
+ * finished, then Online, Offline, Consolidated, Daily Out and the day's Audit
+ * counts. The figures come from getDailyReport, so a finished day is its frozen
+ * snapshot, exactly as the page shows it.
  *
- * Nothing in the workbook depends on when it was built (no "generated at"), so
- * the same report always produces the same bytes - which is how an upload can
- * tell that Drive already holds exactly this file.
+ * Nothing in the file depends on when it was built (no "generated at"), so the
+ * same report always produces the same bytes - which is how an upload can tell
+ * that Drive already holds exactly this file.
  */
 
 interface ProductRef {
@@ -58,7 +58,7 @@ const num = (v: unknown): number => {
 
 const productCells = (p: ProductRef): Cell[] => [p.category, p.sku ?? "", p.name];
 
-function stockSheet(name: string, rows: GridRow[], columns: [string, string][]): Sheet {
+function stockSheet(name: string, rows: GridRow[], columns: [string, string][]): PdfTable {
   return {
     name,
     columns: ["Category", "SKU", "Product", ...columns.map(([, label]) => label)],
@@ -104,7 +104,7 @@ interface ReportInput {
 export function dailyReportSheets(
   report: ReportInput,
   out: { onlineOut: number | null; offlineOut: number | null; totalOut: number | null } | null,
-): Sheet[] {
+): PdfTable[] {
   const total = report.total as TotalRow[];
   const audit = (report.audit ?? []) as AuditRow[];
   const summary: Cell[][] = [
@@ -152,7 +152,7 @@ export function dailyReportSheets(
 }
 
 export function dailyReportFileName(date: string): string {
-  return `daily-report-${date}.xlsx`;
+  return `daily-report-${date}.pdf`;
 }
 
 /// A day with nothing saved is not a report worth keeping.
@@ -160,13 +160,14 @@ function hasSavedRows(report: { online: unknown[]; offline: unknown[] }): boolea
   return [...(report.online as GridRow[]), ...(report.offline as GridRow[])].some((r) => r.isSaved === true);
 }
 
-/// The workbook for `date`, or null when nothing has been saved for it.
-export async function buildDailyReportWorkbook(date: Date): Promise<{ fileName: string; data: Buffer } | null> {
+/// The PDF for `date`, or null when nothing has been saved for it.
+export async function buildDailyReportPdf(date: Date): Promise<{ fileName: string; data: Buffer } | null> {
   const report = await getDailyReport(date);
   if (!hasSavedRows(report)) return null;
   const [out] = await getDailyOutflow(date, date);
   const iso = toDateOnlyString(date);
-  return { fileName: dailyReportFileName(iso), data: buildXlsx(dailyReportSheets(report, out ?? null)) };
+  const tables = dailyReportSheets({ ...report, date: iso }, out ?? null);
+  return { fileName: dailyReportFileName(iso), data: renderTablesPdf({ title: "Daily Report", subtitle: iso, tables }) };
 }
 
 /// The most recent date that has any Online or Offline entry, or null.

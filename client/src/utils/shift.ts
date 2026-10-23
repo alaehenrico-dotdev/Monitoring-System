@@ -20,7 +20,7 @@ export function isWholeDayMode(): boolean {
 export const SHIFT_LABELS: Record<Shift, string> = {
   MORNING: "Morning (7am\u20134pm)",
   get NIGHT() {
-    return wholeDay ? "Whole day" : "Night (4pm\u20131am)";
+    return wholeDay ? "Daily Sheet" : "Night (4pm\u20131am)";
   },
 };
 
@@ -36,11 +36,11 @@ export const SHIFT_LABELS: Record<Shift, string> = {
 export const SHIFT_SHORT_LABELS: Record<Shift, string> = {
   MORNING: "Morning",
   get NIGHT() {
-    return wholeDay ? "Whole day" : "Night";
+    return wholeDay ? "Daily Sheet" : "Night";
   },
 };
 
-/// "Night Shift" / "Morning Shift" for running text - and just "Whole day" for
+/// "Night Shift" / "Morning Shift" for running text - and just "Daily Sheet" for
 /// the whole-day sheet, which is not a shift.
 export function shiftWithWord(shift: Shift): string {
   return wholeDay && shift === "NIGHT" ? SHIFT_SHORT_LABELS.NIGHT : `${SHIFT_SHORT_LABELS[shift]} Shift`;

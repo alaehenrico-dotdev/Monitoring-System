@@ -73,7 +73,7 @@ import { formatDateDisplay } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { auditSnapshotPdf } from "../utils/auditSnapshot";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
-import { coerceShift, getCurrentShiftAndDate, getDefaultAuditSheet, isWholeDayMode, SHIFT_SHORT_LABELS } from "../utils/shift";
+import { coerceShift, getCurrentShiftAndDate, getDefaultAuditSheet, isWholeDayMode, shiftWithWord } from "../utils/shift";
 import { colors } from "../theme";
 import { RowGlowScroll } from "../components/RowGlowScroll";
 import { GridSelectionBar } from "../components/GridSelectionBar";
@@ -1105,7 +1105,7 @@ export function ManualCountPage() {
         downloadTablePdf({
           filename: pdfName,
           title: "Manual Counting & Variance",
-          subtitle: `${formatDateDisplay(date)} - ${SHIFT_SHORT_LABELS[shift]} Shift - ${FILTER_LABEL[sourceFilter]}`,
+          subtitle: `${formatDateDisplay(date)} - ${shiftWithWord(shift)} - ${FILTER_LABEL[sourceFilter]}`,
           sections: [
             stockGridSection(
               visibleRows.map((r) => {
@@ -1315,7 +1315,7 @@ export function ManualCountPage() {
         title={
           <>
             Manual Counting &amp; Variance - {formatDateDisplay(date)} -{" "}
-            {SHIFT_SHORT_LABELS[shift]} Shift - {FILTER_LABEL[sourceFilter]}
+            {shiftWithWord(shift)} - {FILTER_LABEL[sourceFilter]}
           </>
         }
         subtitle="Review and correct manual counts."
@@ -1863,7 +1863,7 @@ export function ManualCountPage() {
           }}
         >
           {unpublishedCount} saved count{unpublishedCount === 1 ? "" : "s"} for{" "}
-          {formatDateDisplay(date)} · {SHIFT_SHORT_LABELS[shift]} Shift will be
+          {formatDateDisplay(date)} · {shiftWithWord(shift)} will be
           approved as final for reporting. Changing a count afterwards takes it
           back to unpublished until you publish again.
           <label

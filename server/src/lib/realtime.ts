@@ -70,7 +70,7 @@ export function attachRealtime(server: HttpServer): void {
     });
   });
 
-  // Standard ws dead-connection reaping (ping/pong) - Nginx and other
+  // Standard ws dead-connection reaping (ping/pong) - Caddy and other
   // proxies in front of this server commonly drop idle connections without
   // ever sending a close frame, so a missed pong is the only signal.
   const heartbeat = setInterval(() => {

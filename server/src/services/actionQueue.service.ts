@@ -4,6 +4,7 @@ import { toDateOnlyString } from "../utils/date";
 import { getTotalStocksGrid } from "./totalStocks.service";
 import { backupHealth } from "./backupVerify.service";
 import { countPendingCorrections } from "./correction.service";
+import { countPendingUnlockRequests, listPendingUnlockRequests, sweepStaleUnlockRequests } from "./unlockRequest.service";
 
 /// How far back the queue looks for missing entries and unexplained variances.
 /// Older history is still in the reports; the queue is for what can still be fixed.
@@ -26,12 +27,21 @@ const key = (d: Date, s: string) => `${toDateOnlyString(d)}|${s}`;
 
 export interface QueueItem {
   id: string;
-  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction";
+  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction" | "unlock-request";
   severity: "high" | "medium" | "low";
   title: string;
   detail: string;
   /// In-app route that opens the record needing attention.
   link: string;
+}
+
+/// An optional section of the queue failing (say, a table not migrated yet) is
+/// logged and left out; it must not take the whole Admin Queue down with it.
+function queueSideListFailed<T>(what: string, fallback: T) {
+  return (err: unknown): T => {
+    console.error(`Admin queue: could not read ${what}:`, err);
+    return fallback;
+  };
 }
 
 export async function getActionQueue(now = new Date()) {
@@ -40,7 +50,7 @@ export async function getActionQueue(now = new Date()) {
   const varianceFrom = addDays(today, -VARIANCE_LOOKBACK_DAYS);
   const yesterday = addDays(today, -1);
 
-  const [online, offline, manual, variances, stockRows, health, pending, pendingCount, negOnline, negOffline, closures] = await Promise.all([
+  const [online, offline, manual, variances, stockRows, health, pending, pendingCount, negOnline, negOffline, closures, unlockRequestResult] = await Promise.all([
     prisma.dailyOnlineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
     prisma.dailyOfflineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
     prisma.manualCount.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
@@ -69,6 +79,10 @@ export async function getActionQueue(now = new Date()) {
     prisma.dailyOnlineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: today }, remainingStock: { lt: 0 } }, _count: { _all: true } }),
     prisma.dailyOfflineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: today }, remainingStock: { lt: 0 } }, _count: { _all: true } }),
     prisma.dayClosure.findMany({ where: { entryDate: { gte: from, lte: today } }, select: { entryDate: true, shift: true, onlineLocked: true, offlineLocked: true } }),
+    // A side list: if it cannot be read the rest of the queue still loads.
+    sweepStaleUnlockRequests()
+      .then(() => Promise.all([listPendingUnlockRequests(), countPendingUnlockRequests()]))
+      .catch(queueSideListFailed("unlock requests", [[], 0] as [Awaited<ReturnType<typeof listPendingUnlockRequests>>, number])),
   ]);
 
   const items: QueueItem[] = [];
@@ -192,16 +206,31 @@ export async function getActionQueue(now = new Date()) {
     });
   }
 
+  // Encoders asking for a locked page to be opened.
+  const [unlockRequests, unlockRequestCount] = unlockRequestResult;
+  for (const u of unlockRequests) {
+    const page = u.location === "ONLINE" ? "Online" : "Offline";
+    items.push({
+      id: `unlock-request:${u.id}`,
+      kind: "unlock-request",
+      severity: "medium",
+      title: `Unlock requested: ${page} ${u.entryDate.toISOString().slice(0, 10)} ${u.shift === "MORNING" ? "Morning" : "Night"}`,
+      detail: u.reason,
+      link: "/admin-queue",
+    });
+  }
+
   const counts = {
     variance: variances.reduce((n, v) => n + v._count._all, 0),
     lowStock: alerts.length,
     missingEntries: missing.length,
     backup: (health.failedSince ? 1 : 0) + (health.overdue ? 1 : 0),
     corrections: pendingCount,
+    unlockRequests: unlockRequestCount,
   };
   return {
     generatedAt: now.toISOString(),
-    total: counts.variance + counts.lowStock + counts.missingEntries + counts.backup + counts.corrections,
+    total: counts.variance + counts.lowStock + counts.missingEntries + counts.backup + counts.corrections + counts.unlockRequests,
     counts,
     items,
   };

@@ -1,7 +1,7 @@
 {
   "name": "@ala-eh/client",
   "private": true,
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "React + TypeScript client for the Ala Eh Stocks Monitoring System",
   "type": "module",
   "scripts": {

@@ -217,7 +217,7 @@ function drawMasthead(doc: jsPDF, pageWidth: number, rightText: string) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...YELLOW);
-  doc.text("ALA EH! FOOD PRODUCTS", MARGIN_X, MASTHEAD_HEIGHT / 2 + 1.4);
+  doc.text("ALA EH! PRODUCT VENTURES", MARGIN_X, MASTHEAD_HEIGHT / 2 + 1.4);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(...CREAM);
@@ -295,7 +295,7 @@ function drawPageChrome(doc: jsPDF, spec: PdfDocumentSpec, pageWidth: number, pa
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
-    doc.text("Ala Eh! Food Products - Stocks Monitoring System", MARGIN_X, pageHeight - 5.5);
+    doc.text("Ala Eh! Product Ventures - Stocks Monitoring System", MARGIN_X, pageHeight - 5.5);
     doc.text(`Page ${page} of ${total}`, right, pageHeight - 5.5, { align: "right" });
   }
 }

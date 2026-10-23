@@ -1,0 +1,105 @@
+# The web server for the app: the built client, the API proxy and the WebSocket.
+# One file for every setup - what differs is set with environment variables:
+#
+#   SITE_ADDRESS   what Caddy answers on. Default ":80" = plain HTTP, any host
+#                  (local / office network). Set it to a domain such as
+#                  "stocks.example.com" and Caddy gets and renews a free HTTPS
+#                  certificate by itself and redirects HTTP to HTTPS (the domain
+#                  must point at this server, and ports 80 and 443 must be open).
+#   API_UPSTREAM   where the API listens. Default "api:4000" (Docker compose).
+#                  On a VPS with PM2 use "127.0.0.1:4000".
+#   SITE_ROOT      the built client (client/dist). Default is the Docker image's
+#                  path; on a VPS use "/var/www/ala-eh/client/dist".
+#
+# Check a change with:  caddy validate --config Caddyfile
+
+{
+	# A bare IP address as SITE_ADDRESS: browsers send no server name for an IP, and
+	# behind Docker the connection arrives on the container's own address, so Caddy
+	# cannot tell which certificate to use. Naming it here makes it the default.
+	default_sni {$DEFAULT_SNI:localhost}
+}
+
+# The proxied responses carry the API's own copies of some security headers
+# (helmet). Drop them so each header goes out once, from here.
+(from_api) {
+	reverse_proxy {$API_UPSTREAM:api:4000} {
+		header_down -X-Content-Type-Options
+		header_down -X-Frame-Options
+		header_down -Referrer-Policy
+		header_down -Strict-Transport-Security
+	}
+}
+
+{$SITE_ADDRESS::80} {
+	root * {$SITE_ROOT:/usr/share/caddy}
+
+	# The bundle and the API's JSON tables compress well; done here at the edge
+	# so it costs the web server, not the Node process.
+	encode zstd gzip
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		# Same policy the build embeds as a <meta> tag (client/vite.config.ts), plus
+		# frame-ancestors/form-action, which only work as a header. style-src keeps
+		# 'unsafe-inline' because components style themselves with inline style
+		# attributes; script-src has no such exception. connect-src names this host
+		# for the realtime WebSocket instead of allowing any wss: origin.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ws://{http.request.hostport} wss://{http.request.hostport}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+	}
+
+	# HSTS only over HTTPS: browsers ignore it on HTTP and it would be misleading.
+	@https protocol https
+	header @https Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	# Restoring a backup uploads a large file and can take a while: a bigger body
+	# limit and longer timeouts, and the upload is streamed, not buffered.
+	handle /api/backup/restore {
+		request_body {
+			max_size 520MB
+		}
+		reverse_proxy {$API_UPSTREAM:api:4000} {
+			flush_interval -1
+			transport http {
+				read_timeout 600s
+				write_timeout 600s
+			}
+			header_down -X-Content-Type-Options
+			header_down -X-Frame-Options
+			header_down -Referrer-Policy
+			header_down -Strict-Transport-Security
+		}
+	}
+
+	# Health checks, the API and the realtime WebSocket (Caddy upgrades it itself).
+	handle /health {
+		import from_api
+	}
+	handle /health/live {
+		import from_api
+	}
+	handle /api/* {
+		import from_api
+	}
+	handle /ws {
+		import from_api
+	}
+
+	# Everything else is the client. Pages and the service worker are never cached
+	# (so a new version is picked up); hashed files under /assets never change.
+	handle {
+		@assets path /assets/*
+		@pages not path /assets/*
+		header @pages Cache-Control "no-cache"
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+
+		# A route the client owns (e.g. /daily-report) falls back to index.html.
+		try_files {path} /index.html
+		file_server
+	}
+}

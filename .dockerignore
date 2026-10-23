@@ -10,4 +10,3 @@
 coverage
 *.md
 !server/ARCHITECTURE.md
-certs

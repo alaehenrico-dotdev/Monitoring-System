@@ -60,11 +60,11 @@ see `server/src/config/env.ts`.
 | `JWT_SECRET` | server | required, no placeholder | Signs/verifies login JWTs |
 | `DATA_RESET_PASSCODE` | server | required, no placeholder | Gates the Data Reset admin panel |
 | `PORT` | server | optional (default `4000`) | API listen port |
-| `HOST` | server | optional (default `127.0.0.1`) | API bind address; keep loopback behind Nginx |
+| `HOST` | server | optional (default `127.0.0.1`) | API bind address; keep loopback behind Caddy |
 | `JWT_EXPIRES_IN` | server | optional (default `8h`) | Login session lifetime |
 | `CLIENT_ORIGIN` | server | optional (default `http://localhost:5173`) | Allowed CORS origin |
-| `NODE_ENV` | server | optional (default `development`) | `production` in a real deployment — see [`PRODUCTION.md`](PRODUCTION.md) |
-| `VITE_API_URL` | client | optional (default `/api`) | Same-origin API base URL; Vite proxies it in development and Nginx proxies it in production |
+| `NODE_ENV` | server | optional (default `development`) | `production` in a real deployment — see [Production deployment](#4-production-deployment) |
+| `VITE_API_URL` | client | optional (default `/api`) | Same-origin API base URL; Vite proxies it in development and Caddy proxies it in production |
 
 ### 2. Install, migrate, seed
 
@@ -97,15 +97,42 @@ You can also start either service separately with `npm run dev:server` or
 
 **Same-origin API:** the client defaults to `/api`; Vite proxies `/api`, `/health`,
 and `/ws` to the local API during development. Production uses the same paths
-through Nginx, so browser clients do not need a hardcoded server IP or
+through Caddy, so browser clients do not need a hardcoded server IP or
 cross-origin API address.
 
 ### 4. Production deployment
 
-For a Hostinger VPS deployment with HTTPS, Nginx, PM2, database backups,
-migrations, and GitHub checkout instructions, follow [`PRODUCTION.md`](PRODUCTION.md).
-Shared hosting is not suitable for the continuously running API and realtime
-WebSocket.
+The web server is **Caddy** ([`deploy/caddy/Caddyfile`](deploy/caddy/Caddyfile)): it serves
+the built client, proxies `/api`, `/health` and the `/ws` WebSocket to the API, and gets
+and renews the HTTPS certificate by itself. Shared hosting is not suitable for the
+continuously running API and realtime WebSocket.
+
+**Docker:** `docker compose up -d --build` serves plain HTTP on `http://localhost:8080`.
+For a real address, point a domain at the server, open ports 80 and 443, and set in `.env`:
+`SITE_ADDRESS=stocks.example.com`, `CLIENT_ORIGIN=https://stocks.example.com`,
+`HTTP_PORT=80`, `HTTPS_PORT=443`. Nothing else to configure.
+
+**Keeping your data safe when updating (Docker):**
+- Your data lives in the `db_data` volume. `git pull` and `docker compose up -d --build` never touch it.
+  **Never run `docker compose down -v`** (or delete the volume in Docker Desktop): that erases the database.
+- Updates run the database migrations automatically on start, and the API takes a snapshot first
+  (`api_backups` volume). If that snapshot fails, the migration does not run.
+- Before any update, and on a schedule, take your own backup outside Docker:
+  `npm run backup:docker` writes a verified `.sql.gz` to `C:\ala-eh-backups\docker` (set `DOCKER_BACKUP_DIR` to change it;
+  the newest 30 are kept). To schedule it daily on Windows:
+  `schtasks /Create /SC DAILY /ST 02:00 /TN "Ala Eh docker backup" /TR "cmd /c cd /d C:\path\to\project && npm run backup:docker"`.
+- Check a backup actually loads, without touching live data:
+  `npm run restore:docker -- --file <backup.sql.gz> --database scratch_check --yes`, then drop `scratch_check`.
+- Real restore: `npm run restore:docker -- --file <backup.sql.gz> --yes` (takes a safety backup first), then `docker compose restart api`.
+- Copy the backup folder to another disk or a cloud drive now and then: a backup on the same disk does not survive the disk.
+- Keep `.env` safe too (passwords, `JWT_SECRET`, `DRIVE_TOKEN_KEY`): it is not in git, and without `DRIVE_TOKEN_KEY` / `JWT_SECRET` you must reconnect Drive and log everyone in again.
+
+**VPS without Docker (PM2 + Caddy):** build the client (`npm run build --workspace client`),
+copy `client/dist` to `/var/www/ala-eh/client/dist`, run the API with PM2
+(`ecosystem.config.cjs`), then run Caddy with the same Caddyfile and:
+`SITE_ADDRESS=stocks.example.com SITE_ROOT=/var/www/ala-eh/client/dist API_UPSTREAM=127.0.0.1:4000 caddy run --config deploy/caddy/Caddyfile`
+(or set those in the Caddy service's environment). Set `CLIENT_ORIGIN` in `server/.env` to
+`https://stocks.example.com`.
 
 ### 5. Tests & linting
 

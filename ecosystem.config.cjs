@@ -1,5 +1,5 @@
-// PM2 runs the API; Nginx serves the built client and proxies API/WebSocket
-// traffic (see PRODUCTION.md).
+// PM2 runs the API; Caddy serves the built client and proxies API/WebSocket
+// traffic (deploy/caddy/Caddyfile, see the README "Production deployment").
 module.exports = {
   apps: [
     {

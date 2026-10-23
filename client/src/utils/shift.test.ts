@@ -89,11 +89,11 @@ describe("whole-day mode (shifts switched off)", () => {
     expect(getDefaultAuditSheet(new Date(2026, 5, 15, 9, 0))).toEqual({ shift: "NIGHT", date: "2026-06-15" });
   });
 
-  it("calls the sheet 'Whole day' and leaves the Morning label alone", () => {
+  it("calls the sheet 'Daily Sheet' and leaves the Morning label alone", () => {
     setWholeDayMode(true);
-    expect(SHIFT_LABELS.NIGHT).toBe("Whole day");
-    expect(SHIFT_SHORT_LABELS.NIGHT).toBe("Whole day");
-    expect(shiftWithWord("NIGHT")).toBe("Whole day");
+    expect(SHIFT_LABELS.NIGHT).toBe("Daily Sheet");
+    expect(SHIFT_SHORT_LABELS.NIGHT).toBe("Daily Sheet");
+    expect(shiftWithWord("NIGHT")).toBe("Daily Sheet");
     expect(shiftWithWord("MORNING")).toBe("Morning Shift");
   });
 

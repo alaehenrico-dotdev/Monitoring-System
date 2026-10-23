@@ -52,8 +52,8 @@ vi.mock("./backupVerify.service", () => ({ recordBackup: vi.fn() }));
 vi.mock("./changeLog.service", () => ({ logSystemEvent: vi.fn() }));
 const realtime = vi.hoisted(() => ({ broadcastNotice: vi.fn() }));
 vi.mock("../lib/realtime", () => realtime);
-const reports = vi.hoisted(() => ({ latestEntryDate: vi.fn(), buildDailyReportWorkbook: vi.fn() }));
-vi.mock("./dailyReportWorkbook.service", () => reports);
+const reports = vi.hoisted(() => ({ latestEntryDate: vi.fn(), buildDailyReportPdf: vi.fn() }));
+vi.mock("./dailyReportPdf.service", () => reports);
 
 import * as google from "../lib/googleDrive";
 import { dumpDatabaseToGzipFile } from "./backup.service";
@@ -96,7 +96,7 @@ beforeEach(async () => {
   db.uploads = [];
   db.setting = null;
   reports.latestEntryDate.mockReset().mockResolvedValue(null);
-  reports.buildDailyReportWorkbook.mockReset().mockResolvedValue(null);
+  reports.buildDailyReportPdf.mockReset().mockResolvedValue(null);
   resetScheduleState();
   vi.mocked(google.refreshAccessToken).mockResolvedValue({ accessToken: "access-1", expiresIn: 3600 });
   vi.mocked(google.findFolders).mockResolvedValue([]);
@@ -332,7 +332,7 @@ describe("runBackup", () => {
 });
 
 describe("Daily Report files (saved with the backup)", () => {
-  const built = (date: string) => ({ fileName: `daily-report-${date}.xlsx`, data: Buffer.from("xlsx-bytes") });
+  const built = (date: string) => ({ fileName: `daily-report-${date}.pdf`, data: Buffer.from("pdf-bytes") });
   const folders = () => vi.mocked(google.createFolder).mock.calls.map((c) => [c[1], c[2]]);
 
   beforeEach(async () => {
@@ -344,7 +344,7 @@ describe("Daily Report files (saved with the backup)", () => {
     vi.mocked(google.createFolder).mockImplementation(async () => `folder-${++n}`);
     vi.mocked(google.listFolder).mockResolvedValue([]);
     reports.latestEntryDate.mockResolvedValue(new Date("2026-10-22T00:00:00Z"));
-    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => built(d.toISOString().slice(0, 10)));
+    reports.buildDailyReportPdf.mockImplementation(async (d: Date) => built(d.toISOString().slice(0, 10)));
   });
 
   const conn = () => db.conn as never;
@@ -359,10 +359,10 @@ describe("Daily Report files (saved with the backup)", () => {
       ["10", "folder-2"],
     ]);
     const names = vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name);
-    expect(names).toEqual(["daily-report-2026-10-22.xlsx", "daily-report-2026-10-21.xlsx"]);
+    expect(names).toEqual(["daily-report-2026-10-22.pdf", "daily-report-2026-10-21.pdf"]);
     expect(vi.mocked(google.uploadFile).mock.calls[0][1]).toMatchObject({
       parentId: "folder-3",
-      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      mimeType: "application/pdf",
     });
     expect(db.uploads.filter((u) => u.kind === "report").map((u) => u.status)).toEqual(["OK", "OK"]);
   });
@@ -384,7 +384,7 @@ describe("Daily Report files (saved with the backup)", () => {
 
   it("replaces that day's earlier file rather than leaving a second copy", async () => {
     vi.mocked(google.listFolder).mockImplementation(async (_t, parent) =>
-      parent === "month-folder" ? [{ id: "old-1", name: "daily-report-2026-10-22.xlsx", createdTime: "" }] : [],
+      parent === "month-folder" ? [{ id: "old-1", name: "daily-report-2026-10-22.pdf", createdTime: "" }] : [],
     );
     db.setting = { value: "root" };
     vi.mocked(google.listFolder).mockImplementation(async (_t, parent) =>
@@ -393,7 +393,7 @@ describe("Daily Report files (saved with the backup)", () => {
         : parent === "y"
           ? [{ id: "month-folder", name: "10", createdTime: "" }]
           : parent === "month-folder"
-            ? [{ id: "old-1", name: "daily-report-2026-10-22.xlsx", createdTime: "" }, { id: "other", name: "notes.txt", createdTime: "" }]
+            ? [{ id: "old-1", name: "daily-report-2026-10-22.pdf", createdTime: "" }, { id: "other", name: "notes.txt", createdTime: "" }]
             : [],
     );
     await saveDailyReports(conn());
@@ -403,9 +403,9 @@ describe("Daily Report files (saved with the backup)", () => {
   });
 
   it("skips a day with nothing saved, and does nothing at all before any entry exists", async () => {
-    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => (d.toISOString().startsWith("2026-10-22") ? built("2026-10-22") : null));
+    reports.buildDailyReportPdf.mockImplementation(async (d: Date) => (d.toISOString().startsWith("2026-10-22") ? built("2026-10-22") : null));
     await saveDailyReports(conn());
-    expect(vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name)).toEqual(["daily-report-2026-10-22.xlsx"]);
+    expect(vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name)).toEqual(["daily-report-2026-10-22.pdf"]);
 
     vi.mocked(google.uploadFile).mockClear();
     reports.latestEntryDate.mockResolvedValue(null);
@@ -435,7 +435,7 @@ describe("Daily Report files (saved with the backup)", () => {
 });
 
 describe("a saved report goes to Drive straight away", () => {
-  const built = (date: string) => ({ fileName: `daily-report-${date}.xlsx`, data: Buffer.from("xlsx-bytes") });
+  const built = (date: string) => ({ fileName: `daily-report-${date}.pdf`, data: Buffer.from("pdf-bytes") });
   const D = (iso: string) => new Date(`${iso}T00:00:00Z`);
 
   beforeEach(async () => {
@@ -445,13 +445,13 @@ describe("a saved report goes to Drive straight away", () => {
     let n = 0;
     vi.mocked(google.createFolder).mockImplementation(async () => `folder-${++n}`);
     vi.mocked(google.listFolder).mockResolvedValue([]);
-    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => built(d.toISOString().slice(0, 10)));
+    reports.buildDailyReportPdf.mockImplementation(async (d: Date) => built(d.toISOString().slice(0, 10)));
   });
 
-  it("uploads just that day's workbook into Reports / year / month", async () => {
+  it("uploads just that day's PDF into Reports / year / month", async () => {
     await queueDailyReportUpload(D("2026-10-22"), 7);
-    expect(vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name)).toEqual(["daily-report-2026-10-22.xlsx"]);
-    expect(reports.buildDailyReportWorkbook).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(google.uploadFile).mock.calls.map((c) => c[1].name)).toEqual(["daily-report-2026-10-22.pdf"]);
+    expect(reports.buildDailyReportPdf).toHaveBeenCalledTimes(1);
     expect(db.uploads.find((u) => u.kind === "report")).toMatchObject({ status: "OK", createdById: 7 });
   });
 
@@ -473,7 +473,7 @@ describe("a saved report goes to Drive straight away", () => {
     const order: string[] = [];
     let release!: () => void;
     const gate = new Promise<void>((r) => (release = r));
-    reports.buildDailyReportWorkbook
+    reports.buildDailyReportPdf
       .mockImplementationOnce(async () => {
         order.push("first-start");
         await gate;
@@ -666,7 +666,7 @@ describe("Drive folders: exact names, and never a second folder of a name", () =
         tree.set(parent ?? "root", [...(tree.get(parent ?? "root") ?? []), { id, name }]);
         return id;
       });
-      reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => ({ fileName: `daily-report-${d.toISOString().slice(0, 10)}.xlsx`, data: Buffer.from(d.toISOString()) }));
+      reports.buildDailyReportPdf.mockImplementation(async (d: Date) => ({ fileName: `daily-report-${d.toISOString().slice(0, 10)}.pdf`, data: Buffer.from(d.toISOString()) }));
       vi.mocked(google.createFolder).mockClear();
 
       await Promise.all([saveGeneratedReport(D("2026-10-21"), 7), saveGeneratedReport(D("2026-10-22"), 7), saveGeneratedReport(D("2026-10-23"), 7)]);
@@ -681,9 +681,9 @@ describe("Drive folders: exact names, and never a second folder of a name", () =
 
 describe("one file per day in Drive: Generate saves it, and never twice", () => {
   const D = (iso: string) => new Date(`${iso}T00:00:00Z`);
-  const bytes = Buffer.from("xlsx-bytes-v1");
+  const bytes = Buffer.from("pdf-bytes-v1");
   const md5 = (b: Buffer) => createHash("md5").update(b).digest("hex");
-  const FILE = "daily-report-2026-10-22.xlsx";
+  const FILE = "daily-report-2026-10-22.pdf";
 
   /// Drive as it stands: root > 2026 > 10, and what is in the month folder.
   const driveHolds = (files: { id: string; name: string; md5Checksum?: string }[]) => {
@@ -704,7 +704,7 @@ describe("one file per day in Drive: Generate saves it, and never twice", () => 
     await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
     vi.mocked(google.createFolder).mockReset();
     vi.mocked(google.createFolder).mockResolvedValue("folder");
-    reports.buildDailyReportWorkbook.mockResolvedValue({ fileName: FILE, data: bytes });
+    reports.buildDailyReportPdf.mockResolvedValue({ fileName: FILE, data: bytes });
     realtime.broadcastNotice.mockClear();
   });
 
@@ -735,7 +735,7 @@ describe("one file per day in Drive: Generate saves it, and never twice", () => 
       { id: "dup-1", name: FILE, md5Checksum: md5(Buffer.from("old")) },
       { id: "keep", name: FILE, md5Checksum: md5(bytes) },
       { id: "dup-2", name: FILE, md5Checksum: md5(Buffer.from("older")) },
-      { id: "other-day", name: "daily-report-2026-10-21.xlsx", md5Checksum: "x" },
+      { id: "other-day", name: "daily-report-2026-10-21.pdf", md5Checksum: "x" },
     ]);
     await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("unchanged");
     expect(vi.mocked(google.trashFile).mock.calls.map((c) => c[1]).sort()).toEqual(["dup-1", "dup-2"]);
@@ -773,7 +773,7 @@ describe("one file per day in Drive: Generate saves it, and never twice", () => 
 
   it("says there is nothing to keep for a date with no saved entries, and for Drive not connected", async () => {
     driveHolds([]);
-    reports.buildDailyReportWorkbook.mockResolvedValue(null);
+    reports.buildDailyReportPdf.mockResolvedValue(null);
     await expect(saveGeneratedReport(D("2026-10-22"), 7)).resolves.toBe("empty");
     expect(google.uploadFile).not.toHaveBeenCalled();
     db.conn = null;
@@ -846,7 +846,7 @@ describe("toasts for what the server saves to Drive on its own", () => {
 
   it("announces a saved Daily Report, and a failed one", async () => {
     await connect();
-    reports.buildDailyReportWorkbook.mockResolvedValue({ fileName: "daily-report-2026-10-22.xlsx", data: Buffer.from("x") });
+    reports.buildDailyReportPdf.mockResolvedValue({ fileName: "daily-report-2026-10-22.pdf", data: Buffer.from("x") });
     await queueDailyReportUpload(D("2026-10-22"));
     expect(realtime.broadcastNotice).toHaveBeenLastCalledWith({ level: "success", message: "Daily Report for 2026-10-22 saved to Google Drive." }, ["SUPERVISOR_ADMIN"]);
 
@@ -859,7 +859,7 @@ describe("toasts for what the server saves to Drive on its own", () => {
 
   it("says nothing for a day with no report to save", async () => {
     await connect();
-    reports.buildDailyReportWorkbook.mockResolvedValue(null);
+    reports.buildDailyReportPdf.mockResolvedValue(null);
     await queueDailyReportUpload(D("2026-10-22"));
     expect(realtime.broadcastNotice).not.toHaveBeenCalled();
   });
@@ -867,7 +867,7 @@ describe("toasts for what the server saves to Drive on its own", () => {
   it("does not toast once per catch-up report inside a backup", async () => {
     await connect();
     reports.latestEntryDate.mockResolvedValue(D("2026-10-22"));
-    reports.buildDailyReportWorkbook.mockImplementation(async (d: Date) => ({ fileName: `daily-report-${d.toISOString().slice(0, 10)}.xlsx`, data: Buffer.from("x") }));
+    reports.buildDailyReportPdf.mockImplementation(async (d: Date) => ({ fileName: `daily-report-${d.toISOString().slice(0, 10)}.pdf`, data: Buffer.from("x") }));
     await runBackup("scheduled");
     expect(realtime.broadcastNotice).toHaveBeenCalledTimes(1); // the backup, not its two reports
   });

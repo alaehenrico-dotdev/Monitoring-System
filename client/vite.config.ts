@@ -138,7 +138,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     // Local production-build preview. Production deploys serve dist/ through
-    // Nginx and proxy these same API, health, and WebSocket paths.
+    // Caddy and proxy these same API, health, and WebSocket paths.
     preview: {
       port: 5173,
       strictPort: true,

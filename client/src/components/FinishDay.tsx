@@ -41,8 +41,8 @@ export function DayLockBanner({
             ? "Closed by an admin, so counts are locked too. "
             : `The ${PAGE_LABEL[other(location)]} page is locked separately. A transfer change on it that would also change this page needs an admin's approval. `}
           {isAdmin
-            ? "Unlock it from the Admin Queue to change it."
-            : "Ask an admin to unlock it if something must change."}
+            ? "Use Unlock in the toolbar to change it."
+            : "Use Request unlock in the toolbar if something must change."}
         </span>
       </div>
       <div className="ae-day-lock-actions">

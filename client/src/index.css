@@ -8174,3 +8174,77 @@ table input[type="number"] {
 :root:root[data-ui="skeuo"][data-theme="dark"] .ae-sticky-head > .ae-header-tabs {
   background: linear-gradient(180deg, rgba(58, 48, 34, 0.7), rgba(42, 34, 24, 0.7));
 }
+
+
+/* ---- Responsive polish: header title, finish area, request-unlock ------------
+   The title was a fixed 1.5em: on a phone "Daily Offline Stock Monitoring - October
+   20, 2026 - Daily Sheet" took four lines. It is fluid now (about 17px on a
+   phone, 24px on a desk), balanced across lines, and breaks a long word rather
+   than pushing the clock off screen. */
+.ae-page-header h2 {
+  font-size: clamp(1.05rem, 0.8rem + 1.1vw, 1.5rem);
+  line-height: 1.2;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* The finish area holds up to two controls (Request unlock, Finish day / Finish
+   pending days): keep them on one line with the bar's own gap, and let the
+   container steps below hide the whole group in favour of the "..." menu. */
+.ae-mb-finish {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ae-mb-gap);
+  min-width: 0;
+}
+/* Request unlock: outlined amber like the Finish family, so it reads as a
+   related, consequential action without competing with the solid Finish button. */
+.ae-mb-btn--warn {
+  border-color: var(--ae-mb-warn);
+  color: var(--ae-mb-warn);
+}
+.ae-mb-btn--warn:hover:not(:disabled) {
+  background: var(--ae-mb-hover);
+}
+.ae-mb-btn--warn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+/* Mid-width bars: the icon alone carries it (the title and the "..." menu
+   spell it out) so Finish keeps its room. */
+@container ae-mb (max-width: 1350px) {
+  .ae-mb-btn--warn > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/* Dialogs: the request box (and any textarea in a modal) is a comfortable touch
+   target on a phone, and 16px so iOS does not zoom the page on focus. */
+@media (pointer: coarse), (max-width: 520px) {
+  .ae-modal-panel textarea.ae-input {
+    font-size: 16px;
+    min-height: 96px;
+  }
+}
+@media (max-width: 520px) {
+  .ae-modal-panel .ae-btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+    justify-content: center;
+  }
+}
+
+/* Admin Queue summary chips already wrap; make the Unlock requests chip (and the
+   rest) a tidy two-up grid on a phone instead of a ragged line. */
+@media (max-width: 520px) {
+  .ae-dash-chip {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+  }
+}

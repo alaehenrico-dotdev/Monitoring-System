@@ -1,6 +1,6 @@
 import { formatDateDisplay } from "./dateFormat";
 import { pdfFileName, stockGridSection, type PdfSection } from "./pdfTables";
-import { SHIFT_SHORT_LABELS } from "./shift";
+import { shiftWithWord } from "./shift";
 import type { Shift } from "../types";
 
 /// A published audit as the server stored it (GET /manual-counts/snapshots/:id).
@@ -70,7 +70,7 @@ export function auditSnapshotPdf(snapshot: AuditSnapshot): { filename: string; t
   return {
     filename: pdfFileName("audit-published", snapshot.entryDate, snapshot.shift),
     title: "Manual Counting & Variance",
-    subtitle: `${formatDateDisplay(snapshot.entryDate)} - ${SHIFT_SHORT_LABELS[snapshot.shift]} Shift - Published ${published} - ${
+    subtitle: `${formatDateDisplay(snapshot.entryDate)} - ${shiftWithWord(snapshot.shift)} - Published ${published} - ${
       snapshot.appliedToOpening ? "applied to the next day's opening stock" : "audit only"
     }`,
     sections: [stockGridSection(rows, columns, { flagKey: "variance" })],

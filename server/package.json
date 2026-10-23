@@ -1,6 +1,6 @@
 {
   "name": "@ala-eh/server",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "Express + TypeScript API for the Ala Eh Stocks Monitoring System",
   "main": "dist/server.js",
   "scripts": {
@@ -26,6 +26,8 @@
     "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "ws": "^8.22.0",
     "zod": "^3.23.8"
   },

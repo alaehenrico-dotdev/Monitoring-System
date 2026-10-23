@@ -5,7 +5,7 @@ import type { Shift } from "../types";
 
 export interface QueueItem {
   id: string;
-  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction";
+  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction" | "unlock-request";
   severity: "high" | "medium" | "low";
   title: string;
   detail: string;
@@ -16,7 +16,7 @@ export interface QueueItem {
 export interface ActionQueue {
   generatedAt: string;
   total: number;
-  counts: { variance: number; lowStock: number; missingEntries: number; backup: number; corrections: number };
+  counts: { variance: number; lowStock: number; missingEntries: number; backup: number; corrections: number; unlockRequests?: number };
   items: QueueItem[];
 }
 
@@ -166,6 +166,18 @@ export const closeDay = (date: string, shift: Shift) => http.post<DayClosure>("/
 /// `location` unlocks one entry page; leave it out to unlock both.
 export const unlockDay = (date: string, shift: Shift, reason: string, location?: EntryLocation) =>
   http.post<DayClosure>("/day-closures/unlock", { date, shift, reason, ...(location ? { location } : {}) });
+
+/// An encoder's ask for a finished page to be unlocked. Waits in the Admin
+/// Queue and is answered when the page is unlocked.
+export interface UnlockRequest {
+  id: number;
+  reason: string;
+  requestedAt: string;
+}
+export const requestUnlock = (date: string, shift: Shift, location: EntryLocation, reason: string) =>
+  http.post<UnlockRequest & { alreadyRequested: boolean }>("/day-closures/unlock-request", { date, shift, location, reason });
+export const getUnlockRequest = (date: string, shift: Shift, location: EntryLocation) =>
+  http.get<UnlockRequest | null>(`/day-closures/unlock-request?date=${date}&shift=${shift}&location=${location}`);
 
 /* ---------------------------------------------------------- corrections */
 

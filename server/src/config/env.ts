@@ -84,7 +84,7 @@ function duration(name: string, fallback: string, maxSeconds: number): string {
 /// Express's `trust proxy`, as an address allowlist rather than a hop count.
 ///
 /// server.ts listens directly, so the API is reachable both through the
-/// reverse proxy (Nginx, per PRODUCTION.md) and straight on its port. A hop
+/// reverse proxy (Caddy, see the README) and straight on its port. A hop
 /// *count* like `1` trusts whatever the nearest sender claims, so a client
 /// connecting directly could forge `X-Forwarded-For`, change `req.ip` at
 /// will, and rotate its way around every IP-keyed limiter in
@@ -92,7 +92,7 @@ function duration(name: string, fallback: string, maxSeconds: number): string {
 /// guards. Trusting addresses instead means a forged header coming from an
 /// untrusted peer is ignored and `req.ip` stays the real socket address.
 ///
-/// Default "loopback": the local reverse proxy (Nginx) runs on this
+/// Default "loopback": the local reverse proxy (Caddy) runs on this
 /// same host, so it connects from 127.0.0.1 or ::1. Set TRUST_PROXY only if
 /// a proxy fronts this API from a different address.
 ///
@@ -114,7 +114,7 @@ function trustProxySetting(): boolean | string[] {
   // reintroducing the forgeable-header hole.
   if (/^\d+$/.test(raw)) {
     throw new Error(
-      `TRUST_PROXY must name the proxy's address, not a hop count ("${raw}"). Use "loopback" for a local reverse proxy such as Nginx, or the proxy's IP/CIDR.`,
+      `TRUST_PROXY must name the proxy's address, not a hop count ("${raw}"). Use "loopback" for a local reverse proxy such as Caddy, or the proxy's IP/CIDR.`,
     );
   }
   const values = raw.split(",").map((v) => v.trim()).filter(Boolean);
