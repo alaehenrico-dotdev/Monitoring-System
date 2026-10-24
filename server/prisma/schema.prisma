@@ -242,6 +242,11 @@ model AuditSnapshot {
   ///            manualCount, variance, isOpeningBalance, remarks }] }
   payload          Json
   createdAt        DateTime @default(now())
+  /// Set when a supervisor reverted this publish (its counts went back to
+  /// unpublished so they can be re-audited). The copy and its history entry stay.
+  revertedAt       DateTime?
+  revertedById     Int?
+  revertReason     String?  @db.VarChar(500)
 
   @@index([entryDate, shift])
   @@map("audit_snapshots")
@@ -275,7 +280,7 @@ model ManualCount {
   location             StockLocation
   systemRemainingStock Decimal       @db.Decimal(14, 2)
   manualCount          Decimal       @db.Decimal(14, 2)
-  variance             Decimal       @db.Decimal(14, 2) // calc: system - manual
+  variance             Decimal       @db.Decimal(14, 2) // calc: manual - system
   // Why the count differs from the system figure - free text, optional (the
   // Audit page's Variance details). Edited on its own, never by a count save.
   remarks              String?       @db.VarChar(500)

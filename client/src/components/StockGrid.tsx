@@ -732,7 +732,7 @@ export function StockGrid({
     onCommitMany(selected.map((productId) => ({ productId, key, value })));
     const label = displayCols.find((c) => c.key === key)?.label ?? key;
     showToast(
-      `Filled ${label} with ${value.toLocaleString()} on ${selected.length} row${selected.length === 1 ? "" : "s"} - save to keep it`,
+      `${label} set on ${selected.length} row${selected.length === 1 ? "" : "s"}. Save to apply.`,
       "success",
     );
   }
@@ -745,7 +745,7 @@ export function StockGrid({
       ),
     );
     showToast(
-      `Cleared ${selected.length} row${selected.length === 1 ? "" : "s"} - save to keep it`,
+      `${selected.length} row${selected.length === 1 ? "" : "s"} cleared. Save to apply.`,
       "success",
     );
   }
@@ -762,12 +762,12 @@ export function StockGrid({
     const n = selectedRows.length;
     const write = navigator.clipboard?.writeText(text);
     if (!write) {
-      showToast("Couldn't copy - the browser blocked clipboard access", "error");
+      showToast("Copy failed. Clipboard access is blocked.", "error");
       return;
     }
     write.then(
-      () => showToast(`Copied ${n} row${n === 1 ? "" : "s"} - paste into Excel`, "success"),
-      () => showToast("Couldn't copy - the browser blocked clipboard access", "error"),
+      () => showToast(`${n} row${n === 1 ? "" : "s"} copied.`, "success"),
+      () => showToast("Copy failed. Clipboard access is blocked.", "error"),
     );
   }
 
@@ -916,7 +916,7 @@ export function StockGrid({
 
     if (plan.tooLarge) {
       showToast(
-        `That paste is ${plan.tooLarge.cells.toLocaleString()} cells - the limit is ${MAX_PASTE_CELLS}. Nothing was pasted.`,
+        `Paste too large (limit ${MAX_PASTE_CELLS} cells). Nothing was changed.`,
         "error",
       );
       return;

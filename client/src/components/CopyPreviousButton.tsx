@@ -152,8 +152,8 @@ export function CopyPreviousButton({
       if (plan.edits.length === 0) {
         showToast(
           plan.protectedCells > 0
-            ? `Nothing copied from ${describePeriod(from)} - the ${plan.protectedCells} matching cell${plan.protectedCells === 1 ? "" : "s"} already hold your own edits.`
-            : `Nothing to copy from ${describePeriod(from)}.`,
+            ? `Nothing copied. Matching cells already have your edits.`
+            : `No values to copy from ${describePeriod(from)}.`,
           "info",
         );
       } else {
@@ -161,17 +161,17 @@ export function CopyPreviousButton({
         onApply(plan.edits);
         const n = plan.edits.length;
         const kept = plan.protectedCells
-          ? ` (${plan.protectedCells} of your own edits kept)`
+          ? ` (${plan.protectedCells} kept)`
           : "";
         showToast(
-          `Copied ${n} value${n === 1 ? "" : "s"} from ${describePeriod(from)}${kept}`,
+          `Copied ${n} value${n === 1 ? "" : "s"} from ${describePeriod(from)}${kept}.`,
           "success",
         );
       }
       setOpen(false);
     } catch (e) {
       showToast(
-        `Couldn't read ${describePeriod(from)}: ${e instanceof Error ? e.message : "request failed"}`,
+        `Could not load ${describePeriod(from)}: ${e instanceof Error ? e.message : "request failed"}.`,
         "error",
       );
     } finally {

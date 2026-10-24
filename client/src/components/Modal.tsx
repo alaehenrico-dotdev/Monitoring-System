@@ -39,7 +39,8 @@ export function Modal({
         position: "fixed",
         inset: 0,
         zIndex: 200,
-        background: "rgba(12, 12, 12, 0.45)",
+        background: "rgba(12, 12, 12, 0.5)",
+        backdropFilter: "blur(2px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -54,13 +55,19 @@ export function Modal({
         className="ae-modal-panel"
         style={{
           position: "relative",
-          background: colors.paper,
+          // A gentle diagonal fade from the surface into the tinted
+          // background, with a neutral hairline and a deep soft shadow, so
+          // the dialog lifts off the dimmed page without any coloured edge.
+          background:
+            "linear-gradient(160deg, var(--ae-surface) 0%, var(--ae-bg-alt) 100%)",
+          border: "1px solid var(--ae-border)",
           color: colors.ink,
           // Same 8px radius as .ae-page-header/.ae-datepicker/.ae-dropdown -
           // overflow: hidden clips the header/body's square corners to it.
           borderRadius: 6,
           overflow: "hidden",
-          boxShadow: "0 12px 40px rgba(12, 12, 12, 0.3)",
+          boxShadow:
+            "0 24px 64px rgba(12, 12, 12, 0.38), 0 2px 8px rgba(12, 12, 12, 0.18)",
           width: "100%",
           maxWidth: width,
           maxHeight: "calc(var(--ae-vh) * 0.85)",
@@ -68,12 +75,6 @@ export function Modal({
           flexDirection: "column",
         }}
       >
-        {/* 0.5px (the class default is 1px) - same thin edge as the nav drawer. */}
-        <div
-          aria-hidden
-          className="ae-modal-border-sweep"
-          style={{ padding: 0.5 }}
-        />
         <div
           className="ae-modal-header no-print"
           style={{

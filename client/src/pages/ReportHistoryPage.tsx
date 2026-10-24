@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   listReportHistory,
   type ReportHistoryEntry,
 } from "../api/reportHistory";
+import { getAuditSnapshotStates, revertAuditSnapshot, type AuditSnapshotState } from "../api/manualCounts";
+import { useAuth } from "../context/AuthContext";
+import { Modal } from "../components/Modal";
+import { Button } from "../components/ui";
 import { matchesSearch } from "../utils/search";
 import { describe } from "../utils/reportHistoryText";
 import { reportHistoryCsv } from "../utils/reportHistoryCsv";
@@ -53,6 +57,32 @@ export function ReportHistoryPage({
   const [fromDay, setFromDay] = useState("");
   const [toDay, setToDay] = useState("");
   const realtimeVersion = useRealtimeVersion();
+  const isAdmin = useAuth().user?.role === "SUPERVISOR_ADMIN";
+
+  // Audit History only: where each published audit stands, so an admin can
+  // revert one (its counts go back to unpublished to be re-audited).
+  const [states, setStates] = useState<Record<number, AuditSnapshotState>>({});
+  const [reverting, setReverting] = useState<ReportHistoryEntry | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const snapshotIds = useMemo(
+    () => (type === "Audit Report" ? [...new Set((history ?? []).map((e) => snapshotIdOf(e)).filter((n): n is number => n !== null))] : []),
+    [type, history],
+  );
+  const loadStates = useCallback(
+    (ids: number[]) => {
+      for (let i = 0; i < ids.length; i += 100) {
+        getAuditSnapshotStates(ids.slice(i, i + 100))
+          .then((list) => setStates((prev) => ({ ...prev, ...Object.fromEntries(list.map((s) => [s.id, s])) })))
+          .catch(() => {
+            // Cosmetic: without it no row offers Revert; Download still works.
+          });
+      }
+    },
+    [],
+  );
+  useEffect(() => {
+    if (snapshotIds.length > 0) loadStates(snapshotIds);
+  }, [snapshotIds, realtimeVersion, loadStates]);
 
   useEffect(() => {
     // Refreshes (a realtime nudge) replace only the newest page, so older pages
@@ -163,6 +193,19 @@ export function ReportHistoryPage({
         variant="error"
         duration={null}
       />
+      <Toast message={notice} onDismiss={() => setNotice(null)} variant="success" duration={8000} />
+      {reverting && (
+        <RevertAuditDialog
+          entry={reverting}
+          onClose={() => setReverting(null)}
+          onDone={(message, id) => {
+            setReverting(null);
+            setNotice(message);
+            loadStates([id]);
+          }}
+          onError={setError}
+        />
+      )}
       {!history ? (
         <TableSkeleton
           headers={["Report"]}
@@ -205,7 +248,12 @@ export function ReportHistoryPage({
               </thead>
               <tbody>
                 {visible.map((entry) => (
-                  <HistoryRow key={entry.id} entry={entry} />
+                  <HistoryRow
+                    key={entry.id}
+                    entry={entry}
+                    state={states[snapshotIdOf(entry) ?? -1]}
+                    onRevert={isAdmin ? () => setReverting(entry) : undefined}
+                  />
                 ))}
               </tbody>
             </table>
@@ -226,7 +274,24 @@ export function ReportHistoryPage({
   );
 }
 
-function HistoryRow({ entry }: { entry: ReportHistoryEntry }) {
+/// The published audit a history row opens (its route carries `snapshot=<id>`);
+/// null for an Audit Report that was only downloaded, not published.
+function snapshotIdOf(entry: ReportHistoryEntry): number | null {
+  if (entry.type !== "Audit Report") return null;
+  const query = entry.route.split("?")[1] ?? "";
+  const id = Number(new URLSearchParams(query).get("snapshot"));
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+function HistoryRow({
+  entry,
+  state,
+  onRevert,
+}: {
+  entry: ReportHistoryEntry;
+  state?: AuditSnapshotState;
+  onRevert?: () => void;
+}) {
   const { title, detail, category } = describe(entry);
   const extra = [detail, category].filter(Boolean).join(" · ");
   const when = new Date(entry.generatedAt);
@@ -243,8 +308,14 @@ function HistoryRow({ entry }: { entry: ReportHistoryEntry }) {
         {entry.generatedBy && (
           <div style={{ fontSize: 12, opacity: 0.7 }}>{entry.generatedBy.name}</div>
         )}
+        {state?.reverted && (
+          <div style={{ fontSize: 12, fontWeight: 600 }} title={state.revertedAt ? new Date(state.revertedAt).toLocaleString() : undefined}>
+            Reverted
+          </div>
+        )}
       </td>
-      <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+      <td style={{ textAlign: "right" }}>
+        <div className="ae-hist-actions">
         {/* Still a navigation under the hood (the report page re-fetches live
             data for this exact date/range and auto-downloads - see the
             `history=1` handling in each report page), but presented as the
@@ -257,8 +328,86 @@ function HistoryRow({ entry }: { entry: ReportHistoryEntry }) {
           <DownloadIcon />
           Download
         </Link>
+        {onRevert && state?.canRevert && (
+          <button
+            type="button"
+            className="ae-btn ae-btn-secondary ae-btn-sm"
+            onClick={onRevert}
+            title="Send this published audit back to unpublished so it can be re-audited"
+          >
+            Revert
+          </button>
+        )}
+        </div>
       </td>
     </tr>
+  );
+}
+
+/// Confirms reverting a published audit: the reason is kept in the change log.
+function RevertAuditDialog({
+  entry,
+  onClose,
+  onDone,
+  onError,
+}: {
+  entry: ReportHistoryEntry;
+  onClose: () => void;
+  onDone: (message: string, id: number) => void;
+  onError: (message: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const id = snapshotIdOf(entry);
+  if (id === null) return null;
+  return (
+    <Modal title={`Revert published audit - ${entry.scope}`} onClose={busy ? () => {} : onClose} width={460}>
+      <p style={{ margin: "0 0 10px", fontSize: 13 }}>
+        The counts this publish released go back to <strong>unpublished</strong>, so you can correct them and publish
+        again. If it was used as the next day's opening stock, that is undone too. This entry stays in Audit History,
+        marked Reverted. It cannot be done on a finished day - unlock it first.
+      </p>
+      <textarea
+        className="ae-input"
+        aria-label="Reason for reverting"
+        rows={3}
+        maxLength={500}
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        style={{ width: "100%", boxSizing: "border-box", height: "auto", padding: 8 }}
+        placeholder="What was wrong with this audit?"
+      />
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, justifyContent: "flex-end", marginTop: 14 }}>
+        <Button className="ae-btn-solid" disabled={busy} onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          className="ae-btn-solid"
+          disabled={reason.trim().length < 5}
+          loading={busy}
+          loadingLabel="Reverting…"
+          onClick={() => {
+            setBusy(true);
+            revertAuditSnapshot(id, reason.trim())
+              .then((r) =>
+                onDone(
+                  r.reverted > 0
+                    ? `Audit reverted: ${r.reverted} count${r.reverted === 1 ? "" : "s"} unpublished. Open Audit to re-audit and publish again.`
+                    : "Marked as reverted. Its counts had already been edited since, so there was nothing left to unpublish.",
+                  id,
+                ),
+              )
+              .catch((e: unknown) => {
+                setBusy(false);
+                onError(e instanceof Error ? e.message : "Could not revert the audit.");
+                onClose();
+              });
+          }}
+        >
+          Revert audit
+        </Button>
+      </div>
+    </Modal>
   );
 }
 

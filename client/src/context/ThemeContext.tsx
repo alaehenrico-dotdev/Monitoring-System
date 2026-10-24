@@ -15,9 +15,10 @@ export type UiStyle =
   | "glass"
   | "minimal"
   | "skeuo"
-  | "carbon";
+  | "aurora"
+  | "plus";
 
-const UI_STYLES: readonly UiStyle[] = ["classic", "enterprise", "brutal", "flat", "glass", "minimal", "skeuo", "carbon"];
+const UI_STYLES: readonly UiStyle[] = ["classic", "enterprise", "brutal", "flat", "glass", "minimal", "skeuo", "aurora", "plus"];
 
 const STORAGE_KEY = "ae-theme";
 const UI_STORAGE_KEY = "ae-ui";

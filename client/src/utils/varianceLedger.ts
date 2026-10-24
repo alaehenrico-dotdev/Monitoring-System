@@ -23,7 +23,7 @@ export interface LedgerRow {
   counts: number;
   /// How many of them were off.
   flagged: number;
-  /// Signed total: positive = the system said more than was there (shortage).
+  /// Signed total: negative = the system said more than was there (shortage).
   net: number;
   /// Total size of the discrepancies, ignoring direction - the honest measure
   /// of how unreliable a SKU is, since a +5 and a -5 do not cancel out.

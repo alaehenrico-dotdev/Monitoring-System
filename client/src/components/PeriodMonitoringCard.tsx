@@ -34,7 +34,7 @@ const TILES: Tile[] = [
   { key: "backloads", label: "Backloads", hint: "Undelivered stock returned by delivery routes" },
   { key: "rts", label: "RTS", hint: "Returned to stock (Online)" },
   { key: "productionIn", label: "Production in", hint: "Online + Offline" },
-  { key: "netVariance", label: "Net variance", hint: "System minus counted; gains and losses cancel" },
+  { key: "netVariance", label: "Net variance", hint: "Counted minus system; gains and losses cancel" },
   { key: "absVariance", label: "Absolute variance", hint: "Total size of the discrepancies, ignoring direction" },
   { key: "flaggedProducts", label: "Products with variance" },
 ];

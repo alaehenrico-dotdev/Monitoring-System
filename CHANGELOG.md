@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- **Variance is now Manual Count - System Remaining Stock** (it was System - Manual Count): a shortage reads negative and an overage positive. A migration flips the sign of every stored count; Audit History snapshots already published keep the figures they were saved with.
+
 ## 2.4.0 - 2026-10-23
 
 ### Added

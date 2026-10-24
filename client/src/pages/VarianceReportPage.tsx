@@ -141,7 +141,7 @@ export function VarianceReportPage() {
     const id = ++requestId.current;
     const requestedDate = date;
 
-    // Variance is System - Manual Count, and both sides come from saved data -
+    // Variance is Manual Count - System, and both sides come from saved data -
     // staged edits on this date would be silently left out of it.
     const unsaved = findUnsavedWork({
       from: requestedDate,

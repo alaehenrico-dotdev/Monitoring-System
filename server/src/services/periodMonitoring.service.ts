@@ -18,10 +18,10 @@ export interface PeriodProductRow {
   rts: number;
   /// Online + Offline production in.
   productionIn: number;
-  /// Sum of (system - counted) over the period's audit counts: gains and
+  /// Sum of (counted - system) over the period's audit counts: gains and
   /// losses cancel.
   netVariance: number;
-  /// Sum of |system - counted|: the total size of the discrepancies.
+  /// Sum of |counted - system|: the total size of the discrepancies.
   absVariance: number;
 }
 

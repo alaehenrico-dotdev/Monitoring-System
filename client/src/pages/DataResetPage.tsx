@@ -118,7 +118,7 @@ export function DataResetPage() {
 
   async function performReset() {
     if (!resetToken) {
-      setError("Passcode session expired - unlock this page again.");
+      setError("Passcode session expired. Unlock this page again.");
       setStatus("error");
       return;
     }

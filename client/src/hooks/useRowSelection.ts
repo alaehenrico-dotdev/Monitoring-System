@@ -81,11 +81,11 @@ export function useRowSelection({
 export function copyRowsToClipboard(text: string, rowCount: number) {
   const write = navigator.clipboard?.writeText(text);
   if (!write) {
-    showToast("Couldn't copy - the browser blocked clipboard access", "error");
+    showToast("Copy failed. Clipboard access is blocked.", "error");
     return;
   }
   write.then(
-    () => showToast(`Copied ${rowCount} row${rowCount === 1 ? "" : "s"} - paste into Excel`, "success"),
-    () => showToast("Couldn't copy - the browser blocked clipboard access", "error"),
+    () => showToast(`${rowCount} row${rowCount === 1 ? "" : "s"} copied.`, "success"),
+    () => showToast("Copy failed. Clipboard access is blocked.", "error"),
   );
 }

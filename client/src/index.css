@@ -106,10 +106,11 @@
   --ae-danger-bg: #f7d9da;
   --ae-success-text: #2f6b3c;
   /* Category group-header bar inside data tables (StockGrid,
-     TotalStocksTable, ManualCountPage) - green (theme.ts's `colors.green`)
-     so the category bar reads distinctly from the red/gold/yellow used
-     elsewhere in the table chrome. */
-  --ae-category-bg: #2f6b3c;
+     TotalStocksTable, ManualCountPage) - warm espresso ink in every theme.
+     Green is already the edited-cell colour, gold marks the grand total and
+     the bar's own left edge, red is an error, so the bar takes the neutral
+     left. White label text on it is about 12:1. */
+  --ae-category-bg: #3a3226;
   /* Editable grid-cell number inputs (.ae-input-cell) - lighter in light
      mode to match the airier table; dark mode keeps the original
      near-black fill since it already suits that surface. */
@@ -233,10 +234,9 @@
      the dark-mode danger hue rather than light mode's tint verbatim. */
   --ae-danger-bg: #3a1518;
   --ae-success-text: #79c987;
-  /* A darker, lower-luminance green than light mode's --ae-category-bg -
-     same relationship as --ae-warning-bg/--ae-danger-text above, so the
-     bar stays green but doesn't glow against the near-black page. */
-  --ae-category-bg: #17331d;
+  /* One step lighter than the charcoal rows: an ink as dark as the light-mode
+     value would vanish against the near-black page. */
+  --ae-category-bg: #35302a;
   --ae-input-cell-bg: #262626;
   --ae-input-cell-text: #fff;
   --ae-input-cell-text-muted: rgba(255, 255, 255, 0.55);
@@ -409,7 +409,7 @@ table input[type="number"] {
   white-space: nowrap;
   color: var(--ae-text);
 }
-/* Category bar: still the green --ae-category-bg, now with light
+/* Category bar: the warm espresso --ae-category-bg, with light
    uppercase label text, a slim gold accent edge and no loud fill flash. */
 .ae-cat-toggle {
   display: flex;
@@ -4586,9 +4586,9 @@ table input[type="number"] {
   height: 28px;
   flex-shrink: 0;
   padding: 0;
-  color: var(--ae-text-muted);
-  background: transparent;
-  border: none;
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
   border-radius: 8px;
   cursor: pointer;
 }
@@ -5158,6 +5158,15 @@ table input[type="number"] {
   }
 }
 
+/* Audit History rows: Download and Revert side by side, wrapping under each other
+   on a narrow screen instead of forcing the table wider. */
+.ae-hist-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 /* ---- Full tier: toolbar actions show their text ----------------------------
    Toolbar.tsx picks the full tier only when every control fits with its label,
    so on a wide screen the icon buttons read as labeled buttons (Undo, Save,
@@ -5348,7 +5357,7 @@ table input[type="number"] {
   filter: none;
 }
 
-/* ---- Dialogs: ink header bar with the gold rule -------------------------- */
+/* ---- Dialogs: ink header bar -------------------------- */
 :root[data-ui="enterprise"] .ae-modal-panel {
   border-radius: 3px;
 }
@@ -5358,7 +5367,7 @@ table input[type="number"] {
 :root[data-ui="enterprise"] .ae-modal-header {
   background: #0c0c0c;
   color: #f1ecde;
-  border-bottom: 2px solid #f5c000 !important;
+  border-bottom: 1px solid var(--ae-border) !important;
 }
 :root[data-ui="enterprise"] .ae-modal-header h3 {
   color: #f1ecde;
@@ -6430,7 +6439,7 @@ table input[type="number"] {
 :root[data-ui="skeuo"] .ae-modal-header {
   background: linear-gradient(180deg, #4a3826 0%, #33261a 100%);
   color: #f6ead0;
-  border-bottom: 2px solid #fdd023 !important;
+  border-bottom: 1px solid var(--ae-border) !important;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 :root[data-ui="skeuo"] .ae-modal-header h3,
@@ -6439,209 +6448,310 @@ table input[type="number"] {
 }
 
 /* =========================================================================
-   Carbon Design System theme (Settings > Appearance > Theme). IBM's Carbon,
-   the "Gray 10" (light) and "Gray 100" (dark) themes: a flat grid of
-   rectangles, IBM Plex Sans, a black global header, 1px grey rules, square
-   controls, bottom-bordered text fields, blue (#0f62fe) for the primary action
-   and the focus ring, and a 2px blue underline on the active tab. Carbon's own
-   palette is used on purpose - this is the system, not a gold remix of it.
-   Scoped to :root[data-ui="carbon"].
+   Aurora theme (Settings > Appearance > Theme). A modern gradient
+   look: one indigo > violet > fuchsia gradient carries the brand moments (the
+   header, the primary action, the active tab, the category bars, the table
+   head) over cool, near-neutral surfaces and a soft gradient page. Everything
+   else stays quiet so the gradient reads as the accent. EVERY corner is 4px:
+   panels, buttons, fields, menus, dialogs, toasts, badges and cells alike (only
+   true circles - dots, avatars, the spinner - stay round). Text on the
+   gradient is white and clears 4.5:1 at both ends. Scoped to
+   :root[data-ui="aurora"].
    ========================================================================= */
-:root[data-ui="carbon"] body,
-:root[data-ui="carbon"] button,
-:root[data-ui="carbon"] input,
-:root[data-ui="carbon"] select,
-:root[data-ui="carbon"] textarea {
-  font-family: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+:root[data-ui="aurora"] {
+  --ae-r: 4px;
+  --tb-radius: 4px;
+  --ae-mb-radius: 4px;
+  --ae-table-radius: 4px;
+  --ae-glass-blur: blur(16px) saturate(160%);
+
+  --ae-au-a: #4f46e5;
+  --ae-au-b: #7c3aed;
+  --ae-au-c: #c026d3;
+  --ae-au-grad: linear-gradient(120deg, var(--ae-au-a) 0%, var(--ae-au-b) 55%, var(--ae-au-c) 100%);
+  --ae-au-grad-soft: linear-gradient(120deg, rgba(79, 70, 229, 0.12), rgba(192, 38, 211, 0.1));
+  --ae-au-accent: #4f46e5;
+  --ae-au-shadow: 0 1px 2px rgba(30, 27, 75, 0.08), 0 8px 20px -8px rgba(30, 27, 75, 0.18);
+  --ae-au-shadow-lg: 0 24px 56px -12px rgba(30, 27, 75, 0.34), 0 4px 12px rgba(30, 27, 75, 0.12);
 }
-:root[data-ui="carbon"] {
-  --ae-glass-blur: none;
-  --ae-cb-blue: #0f62fe;
-  --ae-cb-blue-hover: #0353e9;
-}
-:root[data-ui="carbon"]:not([data-theme="dark"]) {
-  --ae-bg: #f4f4f4;
-  --ae-bg-alt: #e8e8e8;
+:root[data-ui="aurora"]:not([data-theme="dark"]) {
+  --ae-bg: #f5f5fd;
+  --ae-bg-alt: #ebebfa;
   --ae-surface: #ffffff;
-  --ae-surface-hover: #e8e8e8;
-  --ae-text: #161616;
-  --ae-text-muted: #525252;
-  --ae-border: #c6c6c6;
-  --ae-border-soft: #e0e0e0;
-  --ae-header-bg: #e0e0e0;
-  --ae-header-glass: #e0e0e0;
-  --ae-surface-glass: #ffffff;
-  --ae-row-hover: rgba(141, 141, 141, 0.12);
+  --ae-surface-hover: #f0efff;
+  --ae-text: #16162a;
+  --ae-text-muted: #5a5a78;
+  --ae-border: #dcdbf0;
+  --ae-border-soft: #ebeaf8;
+  --ae-hairline: #c9c8e6;
+  --ae-header-bg: #e4e3f7;
+  --ae-header-glass: rgba(228, 227, 247, 0.82);
+  --ae-surface-glass: rgba(255, 255, 255, 0.72);
+  --ae-row-hover: rgba(79, 70, 229, 0.05);
+  --ae-row-focus-bg: rgba(79, 70, 229, 0.12);
   --ae-col-a: #ffffff;
-  --ae-col-b: #f4f4f4;
-  --ae-colh-a: #e0e0e0;
-  --ae-colh-b: #d0d0d0;
-  --ae-focus-ring: #0f62fe;
-  --ae-cb-secondary: #393939;
-  --ae-cb-secondary-hover: #4c4c4c;
+  --ae-col-b: #f7f7fe;
+  --ae-colh-a: #e4e3f7;
+  --ae-colh-b: #d8d7f2;
+  --ae-focus-ring: #4f46e5;
+  --ae-warning-bg: #fdf0cf;
+  --ae-input-cell-bg: #ffffff;
+  --ae-input-cell-text: #16162a;
+  --ae-input-cell-text-muted: #5a5a78;
+  --ae-input-cell-border: #c9c8e6;
+  --ae-input-cell-focus-ring: rgba(79, 70, 229, 0.3);
+  --ae-input-cell-spin: #4f46e5;
+  --ae-input-cell-spin-hover-bg: rgba(79, 70, 229, 0.14);
+  --ae-glass-bg: rgba(255, 255, 255, 0.6);
+  --ae-glass-divider: rgba(22, 22, 42, 0.12);
+  --ae-glass-accent: #4f46e5;
 }
-:root[data-ui="carbon"][data-theme="dark"] {
-  --ae-bg: #161616;
-  --ae-bg-alt: #1c1c1c;
-  --ae-surface: #262626;
-  --ae-surface-hover: #333333;
-  --ae-text: #f4f4f4;
-  --ae-text-muted: #c6c6c6;
-  --ae-border: #525252;
-  --ae-border-soft: #393939;
-  --ae-header-bg: #393939;
-  --ae-header-glass: #393939;
-  --ae-surface-glass: #262626;
-  --ae-row-hover: rgba(141, 141, 141, 0.16);
-  --ae-col-a: #262626;
-  --ae-col-b: #1c1c1c;
-  --ae-colh-a: #393939;
-  --ae-colh-b: #2c2c2c;
-  --ae-focus-ring: #ffffff;
-  --ae-cb-secondary: #6f6f6f;
-  --ae-cb-secondary-hover: #606060;
+:root[data-ui="aurora"][data-theme="dark"] {
+  --ae-au-a: #6366f1;
+  --ae-au-b: #8b5cf6;
+  --ae-au-c: #d946ef;
+  --ae-au-accent: #a5a3ff;
+  --ae-au-grad-soft: linear-gradient(120deg, rgba(99, 102, 241, 0.2), rgba(217, 70, 239, 0.16));
+  --ae-au-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+  --ae-au-shadow-lg: 0 28px 64px -12px rgba(0, 0, 0, 0.75), 0 4px 12px rgba(0, 0, 0, 0.45);
+  --ae-bg: #0e0e1a;
+  --ae-bg-alt: #151528;
+  --ae-surface: #1a1a30;
+  --ae-surface-hover: #24243f;
+  --ae-text: #f3f3ff;
+  --ae-text-muted: #a9a9c8;
+  --ae-border: #33335a;
+  --ae-border-soft: #26264a;
+  --ae-hairline: #44447a;
+  --ae-header-bg: #24243f;
+  --ae-header-glass: rgba(36, 36, 63, 0.84);
+  --ae-surface-glass: rgba(26, 26, 48, 0.72);
+  --ae-row-hover: rgba(165, 163, 255, 0.07);
+  --ae-row-focus-bg: rgba(139, 92, 246, 0.24);
+  --ae-col-a: #1a1a30;
+  --ae-col-b: #14142a;
+  --ae-colh-a: #2a2a4a;
+  --ae-colh-b: #20203a;
+  --ae-focus-ring: #a5a3ff;
+  --ae-warning-bg: #2d2508;
+  --ae-input-cell-bg: #1a1a30;
+  --ae-input-cell-text: #f3f3ff;
+  --ae-input-cell-text-muted: rgba(243, 243, 255, 0.55);
+  --ae-input-cell-border: #3b3b66;
+  --ae-input-cell-focus-ring: rgba(165, 163, 255, 0.4);
+  --ae-input-cell-spin: #a5a3ff;
+  --ae-input-cell-spin-hover-bg: rgba(165, 163, 255, 0.18);
+  --ae-glass-bg: rgba(26, 26, 48, 0.6);
+  --ae-glass-divider: rgba(243, 243, 255, 0.16);
+  --ae-glass-accent: #a5a3ff;
 }
-:root[data-ui="carbon"] .app-shell::before {
+
+/* ---- Page: a soft gradient field, no watermark ---------------------------- */
+:root[data-ui="aurora"] .app-shell {
+  background:
+    radial-gradient(900px 520px at 8% -10%, rgba(99, 102, 241, 0.16), transparent 70%),
+    radial-gradient(800px 520px at 100% 0%, rgba(217, 70, 239, 0.12), transparent 70%),
+    var(--ae-bg);
+}
+:root[data-ui="aurora"][data-theme="dark"] .app-shell {
+  background:
+    radial-gradient(900px 520px at 8% -10%, rgba(99, 102, 241, 0.28), transparent 70%),
+    radial-gradient(800px 520px at 100% 0%, rgba(217, 70, 239, 0.2), transparent 70%),
+    var(--ae-bg);
+}
+:root[data-ui="aurora"] .app-shell::before {
   display: none;
 }
-/* Global header: black in both modes, like Carbon's UI shell. */
-:root[data-ui="carbon"] .ae-page-header {
-  --ae-glass-text: #f4f4f4;
-  --ae-glass-text-muted: #c6c6c6;
-  --ae-glass-accent: #78a9ff;
-  --ae-glass-divider: rgba(244, 244, 244, 0.25);
-  --ae-tb-bg: rgba(255, 255, 255, 0.05);
-  --ae-tb-border: #393939;
-  --ae-tb-field-bg: #262626;
-  --ae-tb-field-bg-hover: #333333;
-  --ae-tb-field-bg-active: #393939;
-  --ae-tb-hairline: #525252;
-  --ae-tb-text: #f4f4f4;
-  --ae-tb-text-muted: #c6c6c6;
-  background: #161616;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  color: #f4f4f4;
+
+/* ---- Header: the gradient, with white text -------------------------------- */
+:root[data-ui="aurora"] .ae-page-header {
+  --ae-glass-text: #ffffff;
+  --ae-glass-text-muted: rgba(255, 255, 255, 0.82);
+  --ae-glass-accent: #ffffff;
+  --ae-glass-divider: rgba(255, 255, 255, 0.28);
+  --ae-tb-bg: rgba(255, 255, 255, 0.12);
+  --ae-tb-border: rgba(255, 255, 255, 0.28);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.16);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.26);
+  --ae-tb-field-bg-active: rgba(255, 255, 255, 0.34);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.32);
+  --ae-tb-text: #ffffff;
+  --ae-tb-text-muted: rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
+    var(--ae-au-grad);
+  color: #ffffff;
   border: 0;
-  border-bottom: 1px solid #393939;
-  border-radius: 0;
-  box-shadow: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), var(--ae-au-shadow-lg);
 }
-:root[data-ui="carbon"] .ae-page-header.ae-page-header--offline {
-  border-bottom: 3px solid var(--ae-danger-text);
-  box-shadow: none;
+:root[data-ui="aurora"] .ae-page-header.ae-page-header--offline {
+  box-shadow: 0 0 0 2px var(--ae-danger-text), var(--ae-au-shadow-lg);
 }
-:root[data-ui="carbon"] .ae-page-header h2,
-:root[data-ui="carbon"] .ae-page-header p {
+:root[data-ui="aurora"] .ae-page-header h2,
+:root[data-ui="aurora"] .ae-page-header p {
   color: inherit;
 }
-:root[data-ui="carbon"] .ae-sticky-head > .ae-header-tabs {
-  background: var(--ae-surface);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-bottom: 1px solid var(--ae-border-soft);
+
+/* ---- Tabs ----------------------------------------------------------------- */
+:root[data-ui="aurora"] .ae-sticky-head > .ae-header-tabs {
+  background: color-mix(in srgb, var(--ae-surface) 70%, transparent);
+  border-radius: 4px;
 }
-:root[data-ui="carbon"] .ae-header-tab {
-  border-radius: 0;
-  font-weight: 400;
+:root[data-ui="aurora"] .ae-header-tab {
+  border-radius: 4px;
   color: var(--ae-text-muted);
 }
-:root[data-ui="carbon"] .ae-header-tab:hover {
-  background: var(--ae-surface-hover);
+:root[data-ui="aurora"] .ae-header-tab:hover {
+  background: var(--ae-au-grad-soft);
   color: var(--ae-text);
 }
-:root[data-ui="carbon"] .ae-header-tab[aria-current="page"] {
+:root[data-ui="aurora"] .ae-header-tab[aria-current="page"] {
   color: var(--ae-text);
-  font-weight: 600;
+  font-weight: 700;
 }
-:root[data-ui="carbon"] .ae-header-tabs-bar {
-  background: var(--ae-cb-blue);
+:root[data-ui="aurora"] .ae-header-tabs-bar {
+  background: var(--ae-au-grad);
   box-shadow: none;
-  border-radius: 0;
-  height: 2px;
+  border-radius: 4px;
+  height: 3px;
 }
-:root[data-ui="carbon"] .ae-header-tab::after {
-  background: var(--ae-border);
-  border-radius: 0;
+:root[data-ui="aurora"] .ae-header-tab::after {
+  background: var(--ae-au-grad);
+  border-radius: 4px;
 }
-:root[data-ui="carbon"] .ae-panel,
-:root[data-ui="carbon"] .ae-dash-stat,
-:root[data-ui="carbon"] .ae-table-scroll,
-:root[data-ui="carbon"] .ae-table-wrap {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-color: var(--ae-border-soft);
-  border-radius: 0;
-  box-shadow: none;
+
+/* ---- Panes, tables, category bars ----------------------------------------- */
+:root[data-ui="aurora"] .ae-panel,
+:root[data-ui="aurora"] .ae-dash-stat,
+:root[data-ui="aurora"] .ae-dash-card,
+:root[data-ui="aurora"] .ae-table-scroll,
+:root[data-ui="aurora"] .ae-table-wrap {
+  border: 1px solid var(--ae-border);
+  box-shadow: var(--ae-au-shadow);
 }
-:root[data-ui="carbon"] .ae-table thead th {
-  background-image: none;
-  text-transform: none;
-  letter-spacing: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow:
-    inset 0 -1px 0 var(--ae-border),
-    inset -1px 0 0 var(--ae-border-soft);
+:root[data-ui="aurora"] .ae-table thead th {
+  background-image: linear-gradient(180deg, rgba(79, 70, 229, 0.1), rgba(192, 38, 211, 0.06));
+  border-bottom: 2px solid transparent;
+  border-image: var(--ae-au-grad) 1;
 }
-:root[data-ui="carbon"] .ae-table td {
-  box-shadow:
-    inset 0 -1px 0 var(--ae-border-soft),
-    inset -1px 0 0 var(--ae-border-soft);
-}
-:root[data-ui="carbon"] .ae-btn {
-  border-radius: 0;
-  border-color: transparent;
-  box-shadow: none;
-  font-weight: 400;
-}
-:root[data-ui="carbon"] .ae-btn:hover:not(:disabled) {
-  filter: none;
-}
-:root[data-ui="carbon"] .ae-btn-primary {
-  background: var(--ae-cb-blue);
+:root[data-ui="aurora"] .ae-table tr.ae-row-grand td {
+  background-color: var(--ae-au-a);
+  background-image: var(--ae-au-grad) !important;
   color: #ffffff;
 }
-:root[data-ui="carbon"] .ae-btn-primary:hover:not(:disabled) {
-  background: var(--ae-cb-blue-hover);
+
+/* ---- Buttons -------------------------------------------------------------- */
+:root[data-ui="aurora"] .ae-btn {
+  border-radius: 4px;
+  transition:
+    background-color var(--ae-dur-micro) var(--ae-ease-out),
+    box-shadow var(--ae-dur-micro) var(--ae-ease-out),
+    filter var(--ae-dur-micro) var(--ae-ease-out),
+    transform var(--ae-dur-micro) var(--ae-ease-out);
 }
-:root[data-ui="carbon"] .ae-btn-secondary {
-  background: var(--ae-cb-secondary);
-  color: #ffffff;
-}
-:root[data-ui="carbon"] .ae-btn-secondary:hover:not(:disabled) {
-  background: var(--ae-cb-secondary-hover);
-}
-/* Text fields: a filled well with only a bottom border, as in Carbon. */
-:root[data-ui="carbon"] .ae-input:not(.ae-input-cell),
-:root[data-ui="carbon"] .ae-select {
-  background: var(--ae-bg);
+:root[data-ui="aurora"] .ae-btn-primary,
+:root[data-ui="aurora"] .ae-btn-secondary,
+:root[data-ui="aurora"] .ae-btn-solid {
+  background: var(--ae-au-grad);
   border-color: transparent;
-  border-bottom: 1px solid #8d8d8d;
-  border-radius: 0;
+  color: #ffffff;
+  box-shadow: 0 6px 14px -6px rgba(79, 70, 229, 0.55);
+}
+:root[data-ui="aurora"] .ae-btn-primary:hover:not(:disabled),
+:root[data-ui="aurora"] .ae-btn-secondary:hover:not(:disabled),
+:root[data-ui="aurora"] .ae-btn-solid:hover:not(:disabled) {
+  filter: brightness(1.08) saturate(1.05);
+  transform: translateY(-1px);
+}
+:root[data-ui="aurora"] .ae-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="aurora"] .ae-btn:hover:not(:disabled),
+  :root[data-ui="aurora"] .ae-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ---- Fields and grid cells ------------------------------------------------ */
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell),
+:root[data-ui="aurora"] .ae-select {
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
   box-shadow: none;
 }
-:root[data-ui="carbon"] .ae-input-cell {
-  border-radius: 0;
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell):hover:not(:disabled):not(:focus),
+:root[data-ui="aurora"] .ae-select:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-hairline);
 }
-:root[data-ui="carbon"] .ae-modal-panel {
-  border: 0;
-  border-radius: 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell):focus,
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell):focus-visible,
+:root[data-ui="aurora"] .ae-select:focus,
+:root[data-ui="aurora"] .ae-select:focus-visible {
+  border-color: var(--ae-au-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ae-au-accent) 28%, transparent);
 }
-:root[data-ui="carbon"] .ae-modal-border-sweep {
+:root[data-ui="aurora"] .ae-input-cell {
+  border: 1px solid var(--ae-input-cell-border);
+}
+:root[data-ui="aurora"] .ae-input-cell:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-au-accent);
+}
+:root[data-ui="aurora"] .ae-input-cell:focus {
+  border-color: var(--ae-au-accent);
+  box-shadow: 0 0 0 2px var(--ae-input-cell-focus-ring);
+}
+
+/* ---- Dialogs, menus, toasts ------------------------------------------------ */
+:root[data-ui="aurora"] .ae-modal-panel {
+  background: linear-gradient(160deg, var(--ae-surface) 0%, var(--ae-bg-alt) 100%) !important;
+  border: 1px solid var(--ae-border);
+  box-shadow: var(--ae-au-shadow-lg) !important;
+}
+:root[data-ui="aurora"] .ae-modal-border-sweep {
   display: none;
 }
-:root[data-ui="carbon"] .ae-modal-header {
-  background: var(--ae-surface);
-  color: var(--ae-text);
-  border-bottom: 1px solid var(--ae-border-soft) !important;
+:root[data-ui="aurora"] .ae-modal-header {
+  background: var(--ae-au-grad);
+  color: #ffffff;
+  border-bottom: 0 !important;
 }
-:root[data-ui="carbon"] .ae-modal-header h3,
-:root[data-ui="carbon"] .ae-modal-header button {
-  color: var(--ae-text) !important;
+:root[data-ui="aurora"] .ae-modal-header h3,
+:root[data-ui="aurora"] .ae-modal-header button {
+  color: #ffffff !important;
+}
+:root[data-ui="aurora"] .ae-toast,
+:root[data-ui="aurora"] .ae-col-menu,
+:root[data-ui="aurora"] .ae-datepicker,
+:root[data-ui="aurora"] .ae-dropdown {
+  box-shadow: var(--ae-au-shadow-lg);
+}
+
+/* ---- One radius: 4px on everything that is not a true circle --------------
+   The classic rules round things at 6, 8, 10px and as pills; this lists them
+   (circles - dots, avatars, swatches, the spinner - are left out on purpose),
+   and the inline-styled ones (dialog panels, chips) are caught by attribute. */
+:root[data-ui="aurora"] :is(
+  .ae-selection-bar, .ae-pager-btn, .ae-panel, .ae-input, .ae-select, .ae-input-cell,
+  .ae-datepicker, .ae-datepicker-title, .ae-datepicker-month, .ae-datepicker-today,
+  .ae-datepicker-day--inrange, .ae-dropdown, .ae-btn, .ae-row-menu-btn, .ae-segment-group,
+  .ae-page-header, .ae-dash-stat-icon, .ae-dash-stat, .ae-dash-quicklink,
+  .ae-dash-quicklink-icon, .ae-dash-card, .ae-dash-stats-error, .ae-hist-empty,
+  .ae-hist-empty-icon, .ae-cat-zero, .ae-unsaved-badge, .ae-col-menu, .ae-col-menu-item,
+  .ae-extra-savemode-switch, .ae-extra-savemode-opt, .ae-toast, .ae-toast-icon,
+  .ae-toast-action, .ae-toast-close, .ae-quickjump, .ae-quickjump-item,
+  .ae-header-search-btn, .ae-copy-prev-row, .ae-cell-history-row, .ae-dash-list-jump,
+  .ae-account-role, .ae-day-lock, .ae-mm-tip, .ae-fl-tip, .ae-modal-panel, .ae-mb-menu,
+  .ae-mb-item, .ae-mb-btn, .ae-mb-trigger, .ae-split, .ae-segment-btn, .ae-table-scroll,
+  .ae-table-wrap, .table-scroll, .ae-choice-card, .ae-choice-card-preview
+) {
+  border-radius: 4px !important;
+}
+:root[data-ui="aurora"] [style*="border-radius"]:not([style*="border-radius: 50%"]):not([style*="border-radius: 0"]) {
+  border-radius: 4px !important;
+}
+:root[data-ui="aurora"] ::-webkit-scrollbar-thumb {
+  border-radius: 4px;
 }
 
 /* ---- Settings > Appearance choice cards (both layouts) ------------------- */
@@ -8155,12 +8265,14 @@ table input[type="number"] {
 :root:root[data-ui="skeuo"] .ae-page-header {
   background: linear-gradient(180deg, rgba(74, 56, 38, 0.76), rgba(51, 38, 26, 0.76));
 }
-:root:root[data-ui="carbon"] .ae-page-header {
-  background: rgba(22, 22, 22, 0.7);
+:root:root[data-ui="aurora"] .ae-page-header {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(120deg, rgba(79, 70, 229, 0.88), rgba(124, 58, 237, 0.88) 55%, rgba(192, 38, 211, 0.88));
 }
 :root:root[data-ui="enterprise"] .ae-sticky-head > .ae-header-tabs,
 :root:root[data-ui="brutal"] .ae-sticky-head > .ae-header-tabs,
-:root:root[data-ui="carbon"] .ae-sticky-head > .ae-header-tabs {
+:root:root[data-ui="aurora"] .ae-sticky-head > .ae-header-tabs {
   background: color-mix(in srgb, var(--ae-surface) 62%, transparent);
 }
 :root:root[data-ui="flat"] .ae-sticky-head > .ae-header-tabs,
@@ -8246,5 +8358,247 @@ table input[type="number"] {
   .ae-dash-chip {
     flex: 1 1 calc(50% - 8px);
     text-align: center;
+  }
+}
+
+/* =========================================================================
+   Classic Plus theme (Settings > Appearance > Theme). The Classic look, refined:
+   the same layout, cream-and-charcoal palette and brand gold, but with the gold
+   halos replaced by a proper elevation scale (soft, neutral, layered shadows),
+   a clearer glass header (stronger blur, a lit top edge, a hairline ring) and
+   slightly cleaner neutrals. Gold is kept for what it means - focus, the active
+   tab, the primary action - instead of glowing around every panel. It inherits
+   every Classic rule and only overrides tokens plus a handful of surfaces, so
+   nothing about layout or behaviour differs. Scoped to :root[data-ui="plus"].
+   ========================================================================= */
+:root[data-ui="plus"] {
+  --ae-bg: #faf7f0;
+  --ae-bg-alt: #f1ebdb;
+  --ae-surface: #ffffff;
+  --ae-surface-hover: #f6f1e3;
+  --ae-text: #1f1a12;
+  --ae-text-muted: #645c4e;
+  --ae-border: #e4dcc6;
+  --ae-border-soft: #efe9d8;
+  --ae-hairline: #cfc6ad;
+  --ae-table-radius: 8px;
+
+  /* Elevation scale: 1 = resting card, 2 = raised/hovered, 3 = floating chrome
+     (header, drawer, dialogs). Two layers each - a tight contact shadow and a
+     wide ambient one - tinted with the page ink so they read warm, not grey. */
+  --ae-elev-1: 0 1px 2px rgba(31, 26, 18, 0.07), 0 1px 1px rgba(31, 26, 18, 0.04);
+  --ae-elev-2: 0 6px 16px -4px rgba(31, 26, 18, 0.12), 0 2px 4px rgba(31, 26, 18, 0.06);
+  --ae-elev-3: 0 20px 44px -10px rgba(31, 26, 18, 0.24), 0 4px 10px rgba(31, 26, 18, 0.08);
+  --ae-ring: 0 0 0 1px rgba(31, 26, 18, 0.08);
+  --ae-lit-edge: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+
+  /* Header / drawer glass: more blur and saturation so the page behind turns
+     into soft colour, a bright top-down sheen, and a lit edge. */
+  --ae-glass-bg: rgba(255, 253, 247, 0.6);
+  --ae-glass-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.8),
+    rgba(255, 255, 255, 0) 70%
+  );
+  --ae-glass-blur: blur(20px) saturate(170%);
+  --ae-glass-text: #1f1a12;
+  --ae-glass-text-muted: #645c4e;
+  --ae-glass-divider: rgba(31, 26, 18, 0.12);
+  --ae-glass-shadow: var(--ae-lit-edge), var(--ae-ring), var(--ae-elev-3);
+  --ae-glass-panel-shadow: var(--ae-lit-edge), var(--ae-ring), var(--ae-elev-3);
+  --ae-header-wash: rgba(212, 160, 0, 0.1);
+
+  --ae-tb-bg: rgba(255, 255, 255, 0.5);
+  --ae-tb-border: rgba(31, 26, 18, 0.12);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.72);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.95);
+  --ae-tb-hairline: rgba(31, 26, 18, 0.14);
+
+  --ae-surface-glass: rgba(255, 255, 255, 0.62);
+  --ae-header-glass: rgba(238, 230, 209, 0.8);
+}
+:root[data-ui="plus"][data-theme="dark"] {
+  --ae-bg: #151515;
+  --ae-bg-alt: #1c1c1c;
+  --ae-surface: #212121;
+  --ae-surface-hover: #2a2a2a;
+  --ae-text: #f5f3ee;
+  --ae-text-muted: #a8a49a;
+  --ae-border: #353535;
+  --ae-border-soft: #2a2a2a;
+  --ae-hairline: #4a4a4a;
+
+  --ae-elev-1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --ae-elev-2: 0 8px 20px -4px rgba(0, 0, 0, 0.55), 0 2px 4px rgba(0, 0, 0, 0.35);
+  --ae-elev-3: 0 24px 56px -10px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --ae-ring: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --ae-lit-edge: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+
+  --ae-glass-bg: rgba(34, 34, 34, 0.58);
+  --ae-glass-sheen: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0) 70%
+  );
+  --ae-glass-text: #f1efe9;
+  --ae-glass-text-muted: #a8a49a;
+  --ae-glass-divider: rgba(255, 255, 255, 0.14);
+  --ae-header-wash: rgba(245, 192, 0, 0.08);
+
+  --ae-tb-bg: rgba(255, 255, 255, 0.04);
+  --ae-tb-border: rgba(255, 255, 255, 0.1);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.07);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.12);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.16);
+
+  --ae-surface-glass: rgba(38, 38, 38, 0.6);
+  --ae-header-glass: rgba(30, 30, 30, 0.82);
+}
+
+/* ---- Header: lit glass card ---------------------------------------------- */
+:root[data-ui="plus"] .ae-page-header {
+  background:
+    linear-gradient(105deg, var(--ae-header-wash), transparent 55%),
+    var(--ae-glass-sheen),
+    var(--ae-glass-bg);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border-radius: 10px;
+}
+
+/* ---- Panes: lifted by shadow, not by glow --------------------------------- */
+:root[data-ui="plus"] .ae-table-scroll,
+:root[data-ui="plus"] .ae-panel {
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  box-shadow: var(--ae-elev-2);
+}
+
+/* ---- Dialogs, menus and toasts share the top elevation ------------------- */
+:root[data-ui="plus"] .ae-modal-panel {
+  border-radius: 12px !important;
+  box-shadow: var(--ae-lit-edge), var(--ae-ring), var(--ae-elev-3) !important;
+}
+:root[data-ui="plus"] .ae-toast {
+  border-radius: 12px;
+  box-shadow: var(--ae-ring), var(--ae-elev-3);
+}
+:root[data-ui="plus"] .ae-col-menu,
+:root[data-ui="plus"] .ae-datepicker,
+:root[data-ui="plus"] .ae-dropdown {
+  box-shadow: var(--ae-ring), var(--ae-elev-3);
+}
+
+/* ---- Controls: softer corners, a tangible hover and press ----------------- */
+:root[data-ui="plus"] .ae-btn {
+  border-radius: 8px;
+  box-shadow: var(--ae-elev-1);
+  transition:
+    background-color var(--ae-dur-micro) var(--ae-ease-out),
+    border-color var(--ae-dur-micro) var(--ae-ease-out),
+    color var(--ae-dur-micro) var(--ae-ease-out),
+    filter var(--ae-dur-micro) var(--ae-ease-out),
+    opacity var(--ae-dur-micro) var(--ae-ease-out),
+    box-shadow var(--ae-dur-micro) var(--ae-ease-out),
+    transform var(--ae-dur-micro) var(--ae-ease-out);
+}
+:root[data-ui="plus"] .ae-btn:hover:not(:disabled) {
+  box-shadow: var(--ae-elev-2);
+  transform: translateY(-1px);
+}
+:root[data-ui="plus"] .ae-btn:active:not(:disabled) {
+  box-shadow: none;
+  transform: translateY(0) scale(0.985);
+}
+:root[data-ui="plus"] .ae-btn-ghost,
+:root[data-ui="plus"] .ae-btn:disabled {
+  box-shadow: none;
+}
+:root[data-ui="plus"] .ae-input,
+:root[data-ui="plus"] .ae-select {
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+}
+:root[data-ui="plus"] .ae-input:hover:not(:disabled):not(:focus),
+:root[data-ui="plus"] .ae-select:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-hairline);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="plus"] .ae-btn,
+  :root[data-ui="plus"] .ae-btn:hover:not(:disabled),
+  :root[data-ui="plus"] .ae-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+
+/* ---- Classic Plus: grid input cells -------------------------------------
+   One 1px line (the thinnest that stays visible on ordinary screens) whose
+   colour says what the cell is doing, instead of a gold box on every cell:
+     resting  - a quiet warm grey, so a full grid reads as a table, not a mesh
+     hover    - brand gold: "this is editable"
+     focus    - blue + a soft ring: "you are typing here"; blue is the one hue
+                nothing else in the grid uses, so the active cell is never
+                mistaken for an edited, flagged or hovered one
+     edited   - green: staged, not saved yet
+     unusual  - amber: a big jump from the saved value, still saves
+     invalid  - red: refused, will not commit
+     locked   - near-invisible, since there is nothing to do there
+   Every pair clears 3:1 against its cell fill in both colour modes. */
+:root[data-ui="plus"] {
+  --ae-cell-rest: #d6cbad;
+  --ae-cell-hover: #c79a00;
+  --ae-cell-focus: #1f6fd6;
+  --ae-cell-focus-ring: rgba(31, 111, 214, 0.28);
+  --ae-cell-edited: #2f6b3c;
+  --ae-cell-warn: #a87400;
+  --ae-cell-error: #c1272d;
+  --ae-cell-locked: #e9e2cd;
+}
+:root[data-ui="plus"][data-theme="dark"] {
+  --ae-cell-rest: #4a4a4a;
+  --ae-cell-hover: #f5c000;
+  --ae-cell-focus: #5aa2f0;
+  --ae-cell-focus-ring: rgba(90, 162, 240, 0.35);
+  --ae-cell-edited: #4caf68;
+  --ae-cell-warn: #f5c000;
+  --ae-cell-error: #e5626a;
+  --ae-cell-locked: #333333;
+}
+:root[data-ui="plus"] .ae-input-cell {
+  border-radius: 3px;
+  border: 1px solid var(--ae-cell-rest);
+  transition:
+    border-color var(--ae-dur-micro) var(--ae-ease-out),
+    box-shadow var(--ae-dur-micro) var(--ae-ease-out),
+    background-color var(--ae-dur-micro) var(--ae-ease-out);
+}
+:root[data-ui="plus"] .ae-input-cell:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-cell-hover);
+}
+:root[data-ui="plus"] .ae-input-cell:focus {
+  border-color: var(--ae-cell-focus);
+  box-shadow: 0 0 0 2px var(--ae-cell-focus-ring);
+}
+:root[data-ui="plus"] .ae-input-cell:disabled {
+  border-color: var(--ae-cell-locked);
+}
+:root[data-ui="plus"] .ae-input-cell.ae-input-cell--edited,
+:root[data-ui="plus"] .ae-input-cell.ae-input-cell--edited:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-cell-edited);
+}
+:root[data-ui="plus"] .ae-input-cell.ae-input-cell--edited:focus {
+  border-color: var(--ae-cell-focus);
+  box-shadow: 0 0 0 2px var(--ae-cell-focus-ring);
+}
+:root[data-ui="plus"] .ae-input-cell.ae-input-cell--suspicious {
+  border-color: var(--ae-cell-warn) !important;
+}
+:root[data-ui="plus"] .ae-input-cell.ae-input-cell--invalid {
+  border-color: var(--ae-cell-error) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="plus"] .ae-input-cell {
+    transition: none;
   }
 }

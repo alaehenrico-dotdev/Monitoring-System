@@ -294,7 +294,7 @@ export function DatabaseRestoreCard() {
         id="restore-done"
         message={
           status === "done" && !doneDismissed
-            ? "Database restored. Reload to see the restored data (you may need to sign in again if accounts changed)."
+            ? "Database restored. Reload to see it. You may need to sign in again."
             : null
         }
         duration={null}

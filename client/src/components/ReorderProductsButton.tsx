@@ -127,7 +127,7 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
       ).map((x) => x.id),
     );
     setAdding(false);
-    showToast(`Added ${created.name} to ${created.category}`, "success");
+    showToast(`${created.name} added to ${created.category}.`, "success");
   }
 
   /// Reads one sheet of the template into rows for the review.

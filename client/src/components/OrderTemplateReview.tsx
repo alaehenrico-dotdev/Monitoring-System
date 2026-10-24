@@ -149,10 +149,10 @@ export function OrderTemplateReview({
         kept,
         r.moved ? `${r.moved} changed` : "",
       ].filter(Boolean);
-      showToast(`Template applied - ${parts.join(", ")}`, "success");
+      showToast(`Template applied: ${parts.join(", ")}.`, "success");
       onDone();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not apply the template");
+      setError(e instanceof Error ? e.message : "Could not apply the template.");
       setSaving(false);
     }
   }
