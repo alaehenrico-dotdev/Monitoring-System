@@ -182,7 +182,7 @@ export function VersionHistoryPanel({
         <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 16px", borderBottom: `1px solid ${colors.border}` }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <strong>Version history</strong>
-            <div style={{ color: colors.subtleInk, fontSize: 13 }}>
+            <div style={{ color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>
               {SHEET_LABEL[sheet]} - {formatDateDisplay(date)} - {shiftWithWord(shift)}
             </div>
           </div>
@@ -219,7 +219,7 @@ export function VersionHistoryPanel({
             {selected && !view && !error && <Spinner />}
             {view && view.rows.length === 0 && <p style={{ color: colors.subtleInk }}>The sheet was empty at this point.</p>}
             {view && view.rows.length > 0 && (
-              <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
+              <table style={{ borderCollapse: "collapse", fontSize: "calc(13px * var(--ae-fs, 1))", width: "100%" }}>
                 <thead>
                   <tr>
                     <th style={cell(true)}>Product</th>
@@ -345,7 +345,7 @@ function Entry({ title, lines, active, onSelect }: { title: string; lines: strin
     >
       <div style={{ fontWeight: 600 }}>{title}</div>
       {lines.map((l) => (
-        <div key={l} style={{ color: colors.subtleInk, fontSize: 13 }}>
+        <div key={l} style={{ color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>
           {l}
         </div>
       ))}

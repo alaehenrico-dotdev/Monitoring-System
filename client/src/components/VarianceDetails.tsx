@@ -57,7 +57,7 @@ export function VarianceDetails({
       onClose={onClose}
       width={720}
     >
-      <p style={{ margin: "0 0 12px", fontSize: 12.5, color: colors.subtleInk }}>
+      <p style={{ margin: "0 0 12px", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
         {formatDateDisplay(date)} · {shiftWithWord(shift)}
       </p>
       {locations.map((loc) => (
@@ -132,7 +132,7 @@ function LocationTrace({
       <h4 style={headingStyle}>{LOCATION_LABEL[location]}</h4>
       {!trace && !error && <Spinner />}
       {error && (
-        <p role="alert" style={{ color: colors.danger, fontSize: 13, margin: "0 0 8px" }}>
+        <p role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))", margin: "0 0 8px" }}>
           {error}
         </p>
       )}
@@ -205,7 +205,7 @@ function LocationTrace({
 
           {trace.count && (
             <div style={{ margin: "10px 0" }}>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: colors.subtleInk, marginBottom: 4 }}>
+              <label style={{ display: "block", fontSize: "calc(12px * var(--ae-fs, 1))", fontWeight: 600, color: colors.subtleInk, marginBottom: 4 }}>
                 Remarks - why does the count differ?
               </label>
               <div style={{ display: "flex", gap: 8 }}>
@@ -241,7 +241,7 @@ function LocationTrace({
             </div>
           )}
 
-          <h5 style={{ ...headingStyle, fontSize: 12, marginTop: 12 }}>Change history</h5>
+          <h5 style={{ ...headingStyle, fontSize: "calc(12px * var(--ae-fs, 1))", marginTop: 12 }}>Change history</h5>
           {trace.history.length === 0 ? (
             <p style={{ ...lineStyle, color: colors.subtleInk }}>No recorded changes.</p>
           ) : (
@@ -278,14 +278,14 @@ const sectionStyle = {
   padding: "10px 12px",
   marginBottom: 12,
 } as const;
-const headingStyle = { margin: "0 0 6px", fontSize: 13, fontWeight: 700, color: colors.ink } as const;
-const lineStyle = { margin: "0 0 6px", fontSize: 13, lineHeight: 1.5, color: colors.ink } as const;
+const headingStyle = { margin: "0 0 6px", fontSize: "calc(13px * var(--ae-fs, 1))", fontWeight: 700, color: colors.ink } as const;
+const lineStyle = { margin: "0 0 6px", fontSize: "calc(13px * var(--ae-fs, 1))", lineHeight: 1.5, color: colors.ink } as const;
 const itemStyle = {
   display: "grid",
   gridTemplateColumns: "110px 1fr",
   gap: 10,
   padding: "5px 0",
-  fontSize: 12.5,
+  fontSize: "calc(12.5px * var(--ae-fs, 1))",
   borderBottom: `1px solid ${colors.border}`,
 } as const;
 const tagStyle = {
@@ -295,7 +295,7 @@ const tagStyle = {
   border: `1px solid ${colors.border}`,
   background: colors.paperAlt,
   color: colors.warningText,
-  fontSize: 11,
+  fontSize: "calc(11px * var(--ae-fs, 1))",
   fontWeight: 600,
   whiteSpace: "nowrap",
 } as const;

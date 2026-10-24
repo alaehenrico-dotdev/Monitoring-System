@@ -23,6 +23,8 @@ const open = () =>
 beforeEach(() => {
   localStorage.clear();
   localStorage.setItem("ae-theme", "light");
+  delete root.dataset.font;
+  delete root.dataset.fs;
   auth.role = "SUPERVISOR_ADMIN";
 });
 afterEach(() => localStorage.clear());
@@ -84,5 +86,56 @@ describe("SettingsPage tabs by role", () => {
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Appearance"]);
     expect(screen.queryByText(/tool$/)).toBeNull();
     expect(screen.getByText("How the app looks on this computer.")).toBeTruthy();
+  });
+});
+
+describe("SettingsPage font settings", () => {
+  it("shows the typeface and text size choices with the defaults selected", () => {
+    open();
+    expect((screen.getByRole("radio", { name: "Inter" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: "Default" }) as HTMLInputElement).checked).toBe(true);
+    for (const name of ["Atkinson Hyperlegible", "IBM Plex Sans", "System", "Serif", "Monospace", "Small", "Large", "Extra large"]) {
+      expect(screen.getByRole("radio", { name })).toBeTruthy();
+    }
+  });
+
+  it("picking a typeface applies at once and is remembered", () => {
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: "Serif" }));
+    expect(root.dataset.font).toBe("serif");
+    expect(localStorage.getItem("ae-font")).toBe("serif");
+    expect((screen.getByRole("radio", { name: "Serif" }) as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("picking a text size applies at once and is remembered", () => {
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: "Large" }));
+    expect(root.dataset.fs).toBe("lg");
+    expect(localStorage.getItem("ae-font-size")).toBe("lg");
+  });
+
+  it("says the data tables keep their own size", () => {
+    open();
+    expect(screen.getByText(/data tables keep their own size/)).toBeTruthy();
+  });
+
+  it("resets to Inter at the default size, and the button is off while nothing is changed", () => {
+    open();
+    const reset = screen.getByRole("button", { name: "Reset font to default" }) as HTMLButtonElement;
+    expect(reset.disabled).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: "Monospace" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Extra large" }));
+    expect(reset.disabled).toBe(false);
+    fireEvent.click(reset);
+    expect(root.dataset.font).toBe("inter");
+    expect(root.dataset.fs).toBe("md");
+    expect(reset.disabled).toBe(true);
+  });
+
+  it("does not disturb the theme and colour mode choices", () => {
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: "Monospace" }));
+    expect((screen.getByRole("radio", { name: /^Classic$/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /Light/ }) as HTMLInputElement).checked).toBe(true);
   });
 });

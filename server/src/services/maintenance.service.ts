@@ -1,6 +1,7 @@
 import { env } from "../config/env";
 import { purgeExpiredIdempotencyKeys } from "../middleware/idempotency";
 import { runArchive } from "./changeLogArchive.service";
+import { purgeClientErrors } from "./clientError.service";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -10,6 +11,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export async function runMaintenance(): Promise<void> {
   try {
     await purgeExpiredIdempotencyKeys();
+    await purgeClientErrors({ olderThanDays: env.clientErrorRetentionDays, maxRows: env.clientErrorMaxRows });
     if (env.changeLogRetentionMonths > 0) await runArchive(env.changeLogRetentionMonths);
   } catch (err) {
     console.error(JSON.stringify({ level: "error", event: "maintenance-failed", message: err instanceof Error ? err.message : String(err) }));

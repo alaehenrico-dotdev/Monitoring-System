@@ -764,7 +764,7 @@ export function OfflineEntryPage() {
         </div>
       )}
       {!roleCanEdit && (
-        <p style={{ fontSize: 12, color: colors.subtleInk, marginTop: 8 }}>
+        <p style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 8 }}>
           Read-only: your role can view but not edit Offline entries.
         </p>
       )}
@@ -811,7 +811,7 @@ export function OfflineEntryPage() {
           <p
             style={{
               margin: "12px 0 0",
-              fontSize: 12.5,
+              fontSize: "calc(12.5px * var(--ae-fs, 1))",
               color: colors.subtleInk,
             }}
           >

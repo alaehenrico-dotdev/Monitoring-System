@@ -38,3 +38,27 @@ export async function listClientErrors({ limit, offset }: { limit: number; offse
   ]);
   return { items, total };
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/// Keeps the error-report table bounded. The endpoint that fills it takes anonymous
+/// input (a crashed login page has no session), rate-limited per IP but not
+/// otherwise capped, so without this the table only ever grows. Deletes reports
+/// older than `olderThanDays`, then - if still over `maxRows` - the oldest ones
+/// beyond the newest `maxRows`. Either limit at 0 is off. Returns how many went.
+export async function purgeClientErrors({ olderThanDays, maxRows }: { olderThanDays: number; maxRows: number }, now = Date.now()): Promise<number> {
+  let removed = 0;
+  if (olderThanDays > 0) {
+    const { count } = await prisma.clientError.deleteMany({ where: { createdAt: { lt: new Date(now - olderThanDays * DAY_MS) } } });
+    removed += count;
+  }
+  if (maxRows > 0) {
+    // The id of the newest row that falls outside the cap; everything at or below it goes.
+    const boundary = await prisma.clientError.findFirst({ orderBy: { id: "desc" }, skip: maxRows, select: { id: true } });
+    if (boundary) {
+      const { count } = await prisma.clientError.deleteMany({ where: { id: { lte: boundary.id } } });
+      removed += count;
+    }
+  }
+  return removed;
+}

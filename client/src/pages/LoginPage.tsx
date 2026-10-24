@@ -57,7 +57,7 @@ export function LoginPage() {
         <h1
           style={{
             fontFamily: fonts.wordmark,
-            fontSize: 26,
+            fontSize: "calc(26px * var(--ae-fs, 1))",
             fontWeight: 800,
             color: colors.yellow,
             margin: "12px 0 2px",
@@ -67,7 +67,7 @@ export function LoginPage() {
         </h1>
         <p
           style={{
-            fontSize: 12.5,
+            fontSize: "calc(12.5px * var(--ae-fs, 1))",
             color: colors.cream,
             opacity: 0.8,
             margin: "0 0 24px",
@@ -125,7 +125,7 @@ export function LoginPage() {
             <p
               style={{
                 color: colors.danger,
-                fontSize: 13,
+                fontSize: "calc(13px * var(--ae-fs, 1))",
                 marginTop: -8,
                 marginBottom: 12,
               }}

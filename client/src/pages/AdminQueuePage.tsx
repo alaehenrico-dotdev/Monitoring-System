@@ -46,7 +46,7 @@ const rowStyle: CSSProperties = {
   gap: 12,
   padding: "10px 16px",
   borderBottom: `1px solid ${colors.border}`,
-  fontSize: 13,
+  fontSize: "calc(13px * var(--ae-fs, 1))",
   color: colors.ink,
 };
 
@@ -174,7 +174,7 @@ function QueueTab() {
                 </span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600 }}>{item.title}</div>
-                  <div style={{ color: colors.subtleInk, fontSize: 12.5 }}>{item.detail}</div>
+                  <div style={{ color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>{item.detail}</div>
                 </span>
                 <Link to={item.link} className="ae-btn ae-btn-solid ae-btn-sm" style={{ textDecoration: "none" }}>
                   Open
@@ -265,11 +265,11 @@ function ClosingTab() {
 
   return (
     <>
-      <p style={{ fontSize: 13, color: colors.subtleInk, marginTop: 0 }}>
+      <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 0 }}>
         A day can be closed once its counts are published and its Daily Report has been exported. Closed days refuse
         edits; a change then needs an unlock (with a reason) or an approved correction.
       </p>
-      <label style={{ fontSize: 12, fontWeight: 600, color: colors.subtleInk, display: "block", marginBottom: 4 }}>
+      <label style={{ fontSize: "calc(12px * var(--ae-fs, 1))", fontWeight: 600, color: colors.subtleInk, display: "block", marginBottom: 4 }}>
         Date
         <input type="date" className="ae-input" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} style={{ marginLeft: 8 }} />
       </label>
@@ -296,7 +296,7 @@ function ClosingTab() {
                   <span className="ae-dash-chip ae-dash-chip--idle">Not ready</span>
                 )}
                 {!closed && !anyLocked && r && !r.ready && (
-                  <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.subtleInk, fontSize: 12.5 }}>
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                     {r.problems.map((p) => <li key={p}>{p}</li>)}
                   </ul>
                 )}
@@ -323,18 +323,18 @@ function ClosingTab() {
         })}
       </div>
 
-      <h3 style={{ fontSize: 14, margin: "20px 0 8px" }}>Recent closures</h3>
+      <h3 style={{ fontSize: "calc(14px * var(--ae-fs, 1))", margin: "20px 0 8px" }}>Recent closures</h3>
       {!closures ? (
         <InlineLoading label="Loading…" />
       ) : closures.length === 0 ? (
-        <p style={{ color: colors.subtleInk, fontSize: 13 }}>No day has been closed yet.</p>
+        <p style={{ color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>No day has been closed yet.</p>
       ) : (
         <div className="ae-panel">
           {closures.slice(0, 30).map((c) => (
             <div key={c.id} style={rowStyle}>
               <span style={{ width: 110 }}>{c.entryDate.slice(0, 10)}</span>
               <span style={{ width: 70 }}>{c.shift === "MORNING" ? "Morning" : "Night"}</span>
-              <span style={{ flex: 1, minWidth: 0, color: colors.subtleInk, fontSize: 12.5 }}>
+              <span style={{ flex: 1, minWidth: 0, color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                 {c.isClosed
                   ? `Closed ${new Date(c.closedAt).toLocaleString()}${c.closedBy ? ` by ${c.closedBy.name}` : ""}`
                   : c.onlineLocked || c.offlineLocked
@@ -351,13 +351,13 @@ function ClosingTab() {
 
       {unlocking && (
         <Modal title={`Unlock ${date} - ${unlocking === "MORNING" ? "Morning" : "Night"}`} onClose={busy ? () => {} : () => setUnlocking(null)} width={440}>
-          <p style={{ margin: "0 0 10px", fontSize: 13 }}>
+          <p style={{ margin: "0 0 10px", fontSize: "calc(13px * var(--ae-fs, 1))" }}>
             Unlocking lets encoders change this day's numbers again. The reason is kept in the change log.
           </p>
           {(() => {
             const pages = lockedPages(unlocking);
             return (
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, margin: "0 0 10px" }}>
+              <label style={{ display: "block", fontSize: "calc(12px * var(--ae-fs, 1))", fontWeight: 600, margin: "0 0 10px" }}>
                 Unlock
                 <select
                   className="ae-input"
@@ -429,12 +429,12 @@ function ErrorsTab() {
               style={{ all: "unset", cursor: "pointer", display: "block" }}
             >
               <div style={{ fontWeight: 600, overflowWrap: "anywhere" }}>{r.message}</div>
-              <div style={{ color: colors.subtleInk, fontSize: 12.5 }}>
+              <div style={{ color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                 {new Date(r.createdAt).toLocaleString()} · {r.page} · {r.user?.name ?? "signed out"} · v{r.appVersion ?? "?"} · {r.source}
               </div>
             </button>
             {open === r.id && (
-              <pre style={{ margin: 0, fontSize: 11.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere", color: colors.subtleInk }}>
+              <pre style={{ margin: 0, fontSize: "calc(11.5px * var(--ae-fs, 1))", whiteSpace: "pre-wrap", overflowWrap: "anywhere", color: colors.subtleInk }}>
                 {r.stack ?? "No stack trace."}
                 {r.userAgent ? `\n\n${r.userAgent}` : ""}
               </pre>
@@ -479,11 +479,11 @@ function ArchiveTab() {
 
   return (
     <>
-      <p style={{ fontSize: 13, color: colors.subtleInk, marginTop: 0 }}>
+      <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 0 }}>
         Old change-log entries are moved here nightly so the Change Log page stays fast. Nothing is deleted. Entries tied to a CSV import stay in the live log.
       </p>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
-        <label style={{ fontSize: 13 }}>
+        <label style={{ fontSize: "calc(13px * var(--ae-fs, 1))" }}>
           Archive entries older than{" "}
           <input
             type="number" onWheel={(e) => e.currentTarget.blur()}
@@ -499,12 +499,12 @@ function ArchiveTab() {
         <Button className="ae-btn-solid" size="sm" loading={busy} loadingLabel="Archiving…" onClick={() => void run()}>
           Archive now
         </Button>
-        <span style={{ fontSize: 12.5, color: colors.subtleInk }}>{pager.total.toLocaleString()} entries in the archive</span>
+        <span style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>{pager.total.toLocaleString()} entries in the archive</span>
       </div>
       {!rows ? (
         pager.error ? <p role="alert" style={{ color: colors.danger }}>{pager.error}</p> : <InlineLoading label="Loading…" />
       ) : pager.total === 0 ? (
-        <p style={{ color: colors.subtleInk, fontSize: 13 }}>The archive is empty.</p>
+        <p style={{ color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>The archive is empty.</p>
       ) : (
         <>
           <div className="ae-panel">

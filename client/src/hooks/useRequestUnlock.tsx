@@ -72,7 +72,7 @@ export function useRequestUnlock({
 
   const dialog = open ? (
     <Modal title={`${direct ? "Unlock" : "Request unlock"} - ${PAGE_LABEL[location]} · ${formatDateDisplay(date)}`} onClose={busy ? () => {} : () => setOpen(false)} width={440}>
-      <p style={{ margin: "0 0 10px", fontSize: 13 }}>
+      <p style={{ margin: "0 0 10px", fontSize: "calc(13px * var(--ae-fs, 1))" }}>
         {direct
           ? "The page opens for changes straight away - no approval needed. The reason is kept in the change log."
           : "An admin will see this in their Admin Queue and can unlock the page so you can change it. Nothing changes until they do."}
@@ -88,7 +88,7 @@ export function useRequestUnlock({
         placeholder={direct ? "Why is this page being reopened?" : "What needs to change, and why?"}
       />
       {error && (
-        <div role="alert" style={{ fontSize: 12, color: "var(--ae-danger-text)", marginTop: 8 }}>
+        <div role="alert" style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: "var(--ae-danger-text)", marginTop: 8 }}>
           {error}
         </div>
       )}

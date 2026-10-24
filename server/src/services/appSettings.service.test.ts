@@ -22,14 +22,14 @@ beforeEach(() => {
 });
 
 describe("getEntryRules", () => {
-  it("keeps the long-standing behaviour (finish in order) when nothing has been set", async () => {
-    expect(await getEntryRules()).toEqual({ requireEarlierDaysFinished: true, useShifts: false });
+  it("keeps the long-standing behaviour (finish in order, shifts on) when nothing has been set", async () => {
+    expect(await getEntryRules()).toEqual({ requireEarlierDaysFinished: true, useShifts: true });
     expect(ENTRY_RULE_DEFAULTS.requireEarlierDaysFinished).toBe(true);
   });
 
   it("reads an admin's choice to turn it off", async () => {
     prismaMock.appSetting.findMany.mockResolvedValue([{ key: KEY, value: "false" }]);
-    expect(await getEntryRules()).toEqual({ requireEarlierDaysFinished: false, useShifts: false });
+    expect(await getEntryRules()).toEqual({ requireEarlierDaysFinished: false, useShifts: true });
   });
 
   it("treats any value other than the word false as on, so a damaged row cannot switch the rule off", async () => {
@@ -50,21 +50,23 @@ describe("getEntryRules", () => {
   it("falls back to the default, rather than failing a save, when the setting cannot be read", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     prismaMock.appSetting.findMany.mockRejectedValue(new Error("Table 'app_settings' doesn't exist"));
-    expect(await getEntryRules()).toEqual({ requireEarlierDaysFinished: true, useShifts: false });
+    expect(await getEntryRules()).toEqual({ requireEarlierDaysFinished: true, useShifts: true });
     expect(error).toHaveBeenCalled();
     error.mockRestore();
   });
 });
 
 describe("shifts switch", () => {
-  it("defaults to one whole day, and is switched on only by the word true", async () => {
-    expect((await getEntryRules()).useShifts).toBe(false);
-    invalidateAll();
-    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "entry.useShifts", value: "true" }]);
+  it("defaults to two shifts a day, and is switched off only by the word false", async () => {
     expect((await getEntryRules()).useShifts).toBe(true);
     invalidateAll();
-    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "entry.useShifts", value: "" }]);
+    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "entry.useShifts", value: "false" }]);
     expect((await getEntryRules()).useShifts).toBe(false);
+    for (const value of ["true", "", "0", "no", "FALSE "]) {
+      invalidateAll();
+      prismaMock.appSetting.findMany.mockResolvedValue([{ key: "entry.useShifts", value }]);
+      expect((await getEntryRules()).useShifts, value).toBe(true);
+    }
   });
 
   it("is stored under its own key", async () => {
@@ -86,7 +88,7 @@ describe("setEntryRules", () => {
       create: { key: KEY, value: "false", updatedById: 7 },
       update: { value: "false", updatedById: 7 },
     });
-    expect(result).toEqual({ requireEarlierDaysFinished: false, useShifts: false });
+    expect(result).toEqual({ requireEarlierDaysFinished: false, useShifts: true });
   });
 
   it("takes effect at once, not after the cache expires", async () => {

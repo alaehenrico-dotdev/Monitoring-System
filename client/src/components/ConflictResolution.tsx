@@ -61,7 +61,7 @@ export function ConflictResolution({
           <p
             style={{
               margin: "0 0 12px",
-              fontSize: 13,
+              fontSize: "calc(13px * var(--ae-fs, 1))",
               color: colors.subtleInk,
             }}
           >

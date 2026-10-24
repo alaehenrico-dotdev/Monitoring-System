@@ -1586,4 +1586,4 @@ const lockedStyle: CSSProperties = {
 };
 // Border/radius/focus ring come from the shared .ae-input class - only the
 // sizing that's specific to this dense grid layout is overridden here.
-const inputStyle: CSSProperties = { width: 64, textAlign: "center" };
+const inputStyle: CSSProperties = { width: "var(--ae-cell-w, 64px)", textAlign: "center" };

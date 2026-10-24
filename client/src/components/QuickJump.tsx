@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { listProducts } from "../api/products";
+import { listProducts, PRODUCTS_CHANGED_EVENT } from "../api/products";
 import {
   defaultGridPageFor,
   GRID_PAGES,
@@ -26,7 +26,8 @@ import type { Product } from "../types";
  */
 let productsCache: Promise<Product[]> | null = null;
 
-function loadProducts(): Promise<Product[]> {
+/// Exported for the cache test (components/QuickJump.cache.test.tsx).
+export function loadProducts(): Promise<Product[]> {
   if (!productsCache) {
     productsCache = listProducts().catch(() => {
       productsCache = null;
@@ -36,9 +37,14 @@ function loadProducts(): Promise<Product[]> {
   return productsCache;
 }
 
-/// Test/reset seam - also called after a Data Reset would invalidate the list.
+/// Drops the cached list so the next open refetches. Runs whenever the product list
+/// changes (api/products.ts announces it) and after a Data Reset.
 export function clearQuickJumpProductCache(): void {
   productsCache = null;
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener(PRODUCTS_CHANGED_EVENT, clearQuickJumpProductCache);
 }
 
 /// Which ribbon group a page sits in, for the row's right-hand hint.

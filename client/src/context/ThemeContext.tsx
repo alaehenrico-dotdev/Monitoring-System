@@ -20,8 +20,40 @@ export type UiStyle =
 
 const UI_STYLES: readonly UiStyle[] = ["classic", "enterprise", "brutal", "flat", "glass", "minimal", "skeuo", "aurora", "plus"];
 
+/// The interface typeface and text size (Settings > Appearance > Font). Like the
+/// theme they are a per-browser preference, applied as data attributes on <html>
+/// that index.css keys off. The data tables are not scaled by the text size - they
+/// have their own View > Zoom.
+export type FontFamily = "inter" | "hyperlegible" | "plex" | "system" | "serif" | "mono";
+export type FontSize = "sm" | "md" | "lg" | "xl";
+
+export const FONT_FAMILIES: readonly FontFamily[] = ["inter", "hyperlegible", "plex", "system", "serif", "mono"];
+export const FONT_SIZES: readonly FontSize[] = ["sm", "md", "lg", "xl"];
+export const DEFAULT_FONT: FontFamily = "inter";
+export const DEFAULT_FONT_SIZE: FontSize = "md";
+
+/// Google Fonts families fetched only when chosen (Inter ships with the page and
+/// the rest are system fonts). The stylesheet is added once, on demand.
+const WEB_FONTS: Partial<Record<FontFamily, string>> = {
+  hyperlegible: "Atkinson+Hyperlegible:wght@400;700",
+  plex: "IBM+Plex+Sans:wght@400;600",
+};
+
+export function ensureWebFont(font: FontFamily) {
+  const family = WEB_FONTS[font];
+  const id = `ae-webfont-${font}`;
+  if (!family || typeof document === "undefined" || document.getElementById(id)) return;
+  const link = document.createElement("link");
+  link.id = id;
+  link.rel = "stylesheet";
+  link.href = `https://fonts.googleapis.com/css2?family=${family}&display=swap`;
+  document.head.appendChild(link);
+}
+
 const STORAGE_KEY = "ae-theme";
 const UI_STORAGE_KEY = "ae-ui";
+const FONT_STORAGE_KEY = "ae-font";
+const FONT_SIZE_STORAGE_KEY = "ae-font-size";
 
 interface ThemeContextValue {
   theme: Theme;
@@ -29,6 +61,12 @@ interface ThemeContextValue {
   setTheme: (theme: Theme) => void;
   uiStyle: UiStyle;
   setUiStyle: (style: UiStyle) => void;
+  fontFamily: FontFamily;
+  setFontFamily: (font: FontFamily) => void;
+  fontSize: FontSize;
+  setFontSize: (size: FontSize) => void;
+  /// Back to Inter at the default size.
+  resetFont: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -48,9 +86,20 @@ function getInitialUiStyle(): UiStyle {
   }
 }
 
+function readChoice<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const stored = localStorage.getItem(key);
+    return allowed.find((v) => v === stored) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [uiStyle, setUiStyle] = useState<UiStyle>(getInitialUiStyle);
+  const [fontFamily, setFontFamily] = useState<FontFamily>(() => readChoice(FONT_STORAGE_KEY, FONT_FAMILIES, DEFAULT_FONT));
+  const [fontSize, setFontSize] = useState<FontSize>(() => readChoice(FONT_SIZE_STORAGE_KEY, FONT_SIZES, DEFAULT_FONT_SIZE));
 
   // useLayoutEffect (not useEffect) so this commits synchronously in the
   // same tick as the state update - ThemeToggle wraps its toggle in
@@ -69,6 +118,33 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     document.documentElement.dataset.ui = uiStyle;
   }, [uiStyle]);
+
+  // Typeface and size are attributes on <html> too (index.css reads them). A web
+  // font is requested only once it is picked; until it arrives the fallback shows.
+  useLayoutEffect(() => {
+    document.documentElement.dataset.font = fontFamily;
+    ensureWebFont(fontFamily);
+  }, [fontFamily]);
+
+  useLayoutEffect(() => {
+    document.documentElement.dataset.fs = fontSize;
+  }, [fontSize]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FONT_STORAGE_KEY, fontFamily);
+    } catch {
+      // Not remembered, still applied for this session.
+    }
+  }, [fontFamily]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(FONT_SIZE_STORAGE_KEY, fontSize);
+    } catch {
+      // Not remembered, still applied for this session.
+    }
+  }, [fontSize]);
 
   useEffect(() => {
     try {
@@ -93,9 +169,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   // Stable value: consumers only re-render when the theme actually changes,
   // not whenever the provider itself re-renders.
+  const resetFont = useCallback(() => {
+    setFontFamily(DEFAULT_FONT);
+    setFontSize(DEFAULT_FONT_SIZE);
+  }, []);
+
   const value = useMemo(
-    () => ({ theme, toggleTheme, setTheme, uiStyle, setUiStyle }),
-    [theme, toggleTheme, uiStyle],
+    () => ({ theme, toggleTheme, setTheme, uiStyle, setUiStyle, fontFamily, setFontFamily, fontSize, setFontSize, resetFont }),
+    [theme, toggleTheme, uiStyle, fontFamily, fontSize, resetFont],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;

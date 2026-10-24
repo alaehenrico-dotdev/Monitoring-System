@@ -41,8 +41,6 @@ export function listPendingReleases(filters: PendingReleaseFilters, offset = 0, 
   return http.get<{ items: PendingRelease[]; total: number }>(`/pending-releases?${params}`);
 }
 
-export const getAwaitingSummary = () => http.get<{ awaiting: number; oldestAgeDays: number }>("/pending-releases/summary");
-
 export const createPendingRelease = (data: {
   location: ReleaseLocation;
   productId: number;

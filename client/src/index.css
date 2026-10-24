@@ -294,14 +294,64 @@
   }
 }
 
+/* ---- Font settings (Settings > Appearance > Font) ---------------------------
+   Typeface and text size are chosen per browser and set on <html> as
+   data-font / data-fs (ThemeContext). The wordmark keeps its own brand face.
+   --ae-fs multiplies every interface font size (the px sizes below are written
+   as calc(Npx * var(--ae-fs, 1))) and html's own size, so rem text and anything
+   without a size of its own follow too. The data tables are left out on purpose:
+   they have their own View > Zoom, and their row and header heights are fixed. */
+:root {
+  --ae-font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ae-fs: 1;
+}
+:root[data-font="hyperlegible"] {
+  --ae-font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+:root[data-font="plex"] {
+  --ae-font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+:root[data-font="system"] {
+  --ae-font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-font="serif"] {
+  --ae-font-body: Georgia, Cambria, "Times New Roman", serif;
+}
+:root[data-font="mono"] {
+  --ae-font-body: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+}
+:root[data-fs="sm"] {
+  --ae-fs: 0.92;
+}
+:root[data-fs="lg"] {
+  --ae-fs: 1.1;
+}
+:root[data-fs="xl"] {
+  --ae-fs: 1.2;
+}
+html {
+  font-size: calc(100% * var(--ae-fs, 1));
+}
+/* Width of the number boxes in the entry and count grids. A fixed 64px box sat in
+   a column of 200-300px on a 22-24 inch screen; it grows in steps with the screen
+   (and stays 64px on anything smaller). */
+:root {
+  --ae-cell-w: 64px;
+}
+@media (min-width: 1500px) {
+  :root {
+    --ae-cell-w: 84px;
+  }
+}
+@media (min-width: 2200px) {
+  :root {
+    --ae-cell-w: 100px;
+  }
+}
+
 body {
   margin: 0;
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--ae-font-body);
   color: var(--ae-text);
   background: var(--ae-bg);
 }
@@ -537,7 +587,7 @@ table input[type="number"] {
   gap: 8px;
   margin-bottom: 8px;
   padding: 6px 10px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   border: 1px solid var(--ae-border);
   border-left: 3px solid #f5c000;
   border-radius: 6px;
@@ -744,7 +794,7 @@ table input[type="number"] {
   background: transparent;
   color: var(--ae-text);
   font: inherit;
-  font-size: 18px;
+  font-size: calc(18px * var(--ae-fs, 1));
   line-height: 1;
   cursor: pointer;
   transition: background-color 120ms ease;
@@ -881,7 +931,7 @@ table input[type="number"] {
 .ae-input,
 .ae-select {
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   padding: 7px 10px;
   border: 0.3px solid var(--ae-hairline);
   border-radius: 6px;
@@ -1088,7 +1138,7 @@ table input[type="number"] {
      panel in the app reads as the same family of rounded brand chrome. */
   border-radius: 6px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   user-select: none;
   outline: none;
 }
@@ -1110,7 +1160,7 @@ table input[type="number"] {
   border-radius: 6px;
   background: transparent;
   color: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--ae-fs, 1));
   font-weight: 700;
   cursor: pointer;
   transition: background-color 120ms ease;
@@ -1156,7 +1206,7 @@ table input[type="number"] {
 .ae-datepicker-weekday {
   padding: 4px 0 6px;
   text-align: center;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ae-fs, 1));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1174,7 +1224,7 @@ table input[type="number"] {
   border-radius: 50%;
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   cursor: pointer;
   transition: background-color 100ms ease;
 }
@@ -1215,7 +1265,7 @@ table input[type="number"] {
   border-radius: 6px;
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   font-weight: 600;
   cursor: pointer;
   transition: background-color 100ms ease;
@@ -1243,7 +1293,7 @@ table input[type="number"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-datepicker-today {
@@ -1253,7 +1303,7 @@ table input[type="number"] {
   border-radius: 6px;
   background: transparent;
   color: #d4a000;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   font-weight: 700;
   cursor: pointer;
   transition: background-color 120ms ease;
@@ -1349,7 +1399,7 @@ table input[type="number"] {
   border: none;
   border-radius: 6px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   outline: none;
 }
 .ae-dropdown-list {
@@ -1378,7 +1428,7 @@ table input[type="number"] {
   border-radius: 0;
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -1423,7 +1473,7 @@ table input[type="number"] {
 
 .ae-btn {
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   font-weight: 700;
   line-height: 1.2;
   padding: 8px 16px;
@@ -1452,7 +1502,7 @@ table input[type="number"] {
 }
 .ae-btn-sm {
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
 }
 .ae-btn-primary {
   background: #c1272d;
@@ -1499,7 +1549,7 @@ table input[type="number"] {
 }
 .ae-subtab {
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--ae-fs, 1));
   font-weight: 500;
   line-height: 1.2;
   padding: 8px 2px 10px;
@@ -1611,7 +1661,7 @@ table input[type="number"] {
      Toolbar lives inside the glass .ae-page-header, so its control colors
      follow the light/dark glass tokens (--ae-tb-* in :root above). */
   --tb-h: 34px;
-  --tb-radius: 6px;
+  --tb-radius: 4px;
   --tb-field-bg: var(--ae-tb-field-bg);
   --tb-field-bg-hover: var(--ae-tb-field-bg-hover);
   --tb-hairline: var(--ae-tb-hairline);
@@ -1780,7 +1830,7 @@ table input[type="number"] {
      toolbar's themed gold .tb-text, which would make every filter look
      "active" all the time. */
   color: var(--ae-text);
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--ae-fs, 1));
   font-weight: 500;
   box-shadow: none !important;
   transition: color 150ms ease;
@@ -2033,7 +2083,7 @@ table input[type="number"] {
   height: var(--tb-h);
   padding: 0 var(--tb-pad-x);
   border-radius: var(--tb-radius);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
   font-weight: 600;
   letter-spacing: 0.1px;
   text-decoration: none;
@@ -2469,7 +2519,7 @@ table input[type="number"] {
   text-decoration: none;
   white-space: nowrap;
   font-family: inherit;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--ae-fs, 1));
   font-weight: 500;
   color: var(--ae-text);
   background: none;
@@ -2545,7 +2595,7 @@ table input[type="number"] {
   background: transparent;
   color: var(--ae-text);
   font-family: inherit;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
   font-weight: 600;
   padding: 0 12px;
   cursor: pointer;
@@ -2568,21 +2618,27 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
-/* App-wide default background: the page color with the Ala Eh! seal as a
-   large, centered, fixed watermark. It is a pseudo-element behind everything
-   (the cards, tables and inputs are opaque and simply cover it, so it only
-   shows in the gaps between them and through the glass header/nav drawer) -
-   it never affects layout or clicks. The image is a transparent cut-out of
-   the seal, so it sits on either theme's page color; the opacity is tuned per
-   theme (the seal is near-black, so light mode needs it much fainter). */
+/* App-wide default background: the page color with the Glossy Black Ala Eh!
+   emblem (public/Glossy Black Ala Eh! Emblem.png) as a large, centered, fixed
+   watermark. It is a pseudo-element behind everything (the cards, tables and
+   inputs are opaque and simply cover it, so it only shows in the gaps between
+   them and through the glass header/nav drawer) - it never affects layout or
+   clicks.
+   The source picture is an opaque black square, so it is NOT drawn as-is. Two
+   transparent copies are made from it (src/assets/emblem-wm-*.webp: brightness
+   turned into transparency, the black backdrop removed): a pale one for dark mode
+   and an ink one for light mode. The watermark is then a plain image at low
+   opacity. (It used mix-blend-mode and a filter instead, but a blend layer under
+   the header's backdrop-filter glass left a hard, flickering seam across the
+   header in Chromium.) The opacity is tuned per theme. */
 .app-shell {
   position: relative;
   background: var(--ae-bg);
-  --ae-watermark-opacity: 0.07;
+  --ae-watermark-opacity: 0.12;
   --ae-watermark-size: min(78vmin, 760px);
 }
 :root[data-theme="dark"] .app-shell {
-  --ae-watermark-opacity: 0.85;
+  --ae-watermark-opacity: 0.3;
 }
 .app-shell::before {
   content: "";
@@ -2590,9 +2646,11 @@ table input[type="number"] {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: url("./assets/alaeh-bg.webp") center / var(--ae-watermark-size)
-    no-repeat;
+  background: url("./assets/emblem-wm-ink.webp") center / var(--ae-watermark-size) no-repeat;
   opacity: var(--ae-watermark-opacity);
+}
+:root[data-theme="dark"] .app-shell::before {
+  background-image: url("./assets/emblem-wm-white.webp");
 }
 .ae-main {
   position: relative;
@@ -2912,12 +2970,7 @@ table input[type="number"] {
   margin: 0 0 3px;
   transition: margin var(--ae-collapse-dur) var(--ae-collapse-ease);
   color: var(--ae-glass-text);
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--ae-font-body);
 }
 /* Collapsed: the logo is smaller, so center the title against it and trim
    the card's vertical padding. (Compound selector so it beats the plain
@@ -2929,6 +2982,18 @@ table input[type="number"] {
 }
 .ae-page-header.ae-page-header--collapsed h2 {
   margin: 0;
+}
+/* A header with no toolbar has nothing to collapse, so it starts out as the
+   compact card (the collapsed rules apply to it too) and drops the toggle
+   and the strip under the title that held it. Title a touch smaller. */
+.ae-page-header.ae-page-header--bare {
+  padding-bottom: 8px;
+}
+.ae-page-header--bare .ae-page-header-collapse-btn {
+  display: none;
+}
+.ae-page-header.ae-page-header--bare h2 {
+  font-size: clamp(0.95rem, 0.75rem + 0.9vw, 1.25rem);
 }
 /* Title row: h2 on the left, clock + theme toggle on the right, both
    vertically centered on the same line. The h2's 3px bottom margin moves
@@ -2955,12 +3020,7 @@ table input[type="number"] {
 .ae-page-header p {
   margin: 0 0 2px;
   color: var(--ae-glass-text-muted);
-  font-family:
-    "Inter",
-    system-ui,
-    -apple-system,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--ae-font-body);
 }
 /* The toolbar's own pill background/border/shadow would double up on the
    card's - strip them so its controls sit directly on the card instead.
@@ -3051,11 +3111,11 @@ table input[type="number"] {
      pattern (see DashboardPage, etc.), so sizing them down here covers all
      of them at once rather than per-page. */
   .ae-main h2 {
-    font-size: 19px;
+    font-size: calc(19px * var(--ae-fs, 1));
     line-height: 1.25;
   }
   .ae-main p {
-    font-size: 13px;
+    font-size: calc(13px * var(--ae-fs, 1));
     line-height: 1.4;
   }
 
@@ -3064,7 +3124,7 @@ table input[type="number"] {
      cards with truncated labels - one full-width column reads far better
      at this size. */
   .ae-dash-stat-value {
-    font-size: 26px;
+    font-size: calc(26px * var(--ae-fs, 1));
   }
 }
 
@@ -3156,7 +3216,7 @@ table input[type="number"] {
    would disappear against the paper background). */
 .ae-dash-subtitle {
   margin: 0 0 8px;
-  font-size: 16px;
+  font-size: calc(16px * var(--ae-fs, 1));
   line-height: 1.4;
   color: var(--ae-text);
 }
@@ -3284,10 +3344,10 @@ table input[type="number"] {
    full-size cards (and than the Change Log page this links to). */
 .ae-dash-hero-activity .ae-dash-heading {
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
 }
 .ae-dash-hero-activity .ae-dash-link {
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
 }
 .ae-dash-hero-activity .ae-dash-card .ae-table {
   font-size: 12px;
@@ -3314,7 +3374,7 @@ table input[type="number"] {
   font-size: clamp(22px, 2.4vw, 34px);
 }
 .ae-dash-hero-left .ae-dash-stat-label {
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   line-height: 1.25;
 }
 @media (min-width: 1500px) {
@@ -3323,7 +3383,7 @@ table input[type="number"] {
     gap: 10px;
   }
   .ae-dash-hero-left .ae-dash-stat-label {
-    font-size: 12px;
+    font-size: calc(12px * var(--ae-fs, 1));
   }
   .ae-dash-hero-activity .ae-dash-card .ae-table {
     font-size: 13px;
@@ -3392,7 +3452,7 @@ table input[type="number"] {
 }
 .ae-dash-stat-label {
   position: relative;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   font-weight: 600;
   color: var(--ae-text-muted);
 }
@@ -3427,7 +3487,7 @@ table input[type="number"] {
   border-radius: 6px;
   color: var(--ae-text);
   text-decoration: none;
-  font-size: 13.5px;
+  font-size: calc(13.5px * var(--ae-fs, 1));
   font-weight: 700;
   box-shadow:
     0 1px 2px rgba(12, 12, 12, 0.04),
@@ -3479,12 +3539,12 @@ table input[type="number"] {
   justify-content: space-between;
   gap: 12px;
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: calc(14px * var(--ae-fs, 1));
   font-weight: 700;
   color: var(--ae-text);
 }
 .ae-dash-link {
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   font-weight: 600;
   color: var(--ae-warning-text);
   text-decoration: none;
@@ -3546,7 +3606,7 @@ table input[type="number"] {
   justify-content: space-between;
   gap: 12px;
   padding: 16px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   color: var(--ae-danger-text);
   background: var(--ae-surface-glass);
   border: 0.3px solid var(--ae-danger-text);
@@ -3566,7 +3626,7 @@ table input[type="number"] {
 /* "vs prev day" change under a figure (neutral - stock has no good/bad direction). */
 .ae-dash-stat-delta {
   position: relative;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ae-fs, 1));
   font-weight: 600;
   white-space: nowrap;
   color: var(--ae-text-muted);
@@ -3584,7 +3644,10 @@ table input[type="number"] {
 .ae-dash-insights {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  /* Wide column gap: each panel's heading carries a link on its right ("Variance
+     report ->"), and with a narrow gap it ran straight into the next panel's
+     heading and read as one line. */
+  gap: 10px 22px;
   margin: 12px 0 0;
   flex-shrink: 0;
 }
@@ -3595,7 +3658,7 @@ table input[type="number"] {
 }
 @media (min-width: 1500px) {
   .ae-dash-insights {
-    gap: 14px;
+    gap: 14px 26px;
   }
 }
 @media (max-width: 1100px) {
@@ -3620,17 +3683,17 @@ table input[type="number"] {
   align-items: center;
   min-height: 24px;
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
 }
 .ae-dash-insight .ae-dash-link {
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
 }
 .ae-dash-insight .ae-dash-card {
   flex: 1;
 }
 .ae-dash-empty {
   padding: 16px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 /* "All clear" state: centred in the (row-stretched) card with a check mark,
@@ -3661,7 +3724,7 @@ table input[type="number"] {
   align-items: center;
   gap: 10px;
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   border-bottom: 0.3px solid var(--ae-border);
 }
 .ae-dash-list-item:last-child {
@@ -3684,7 +3747,7 @@ table input[type="number"] {
   color: var(--ae-text);
 }
 .ae-dash-list-sub {
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-dash-list-value {
@@ -3704,7 +3767,7 @@ table input[type="number"] {
 .ae-dash-chip {
   flex-shrink: 0;
   padding: 1px 6px;
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ae-fs, 1));
   font-weight: 700;
   line-height: 1.5;
   border-radius: 4px;
@@ -3742,13 +3805,13 @@ table input[type="number"] {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
   font-weight: 700;
   color: var(--ae-text);
 }
 .ae-dash-entry-count {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--ae-text-muted);
@@ -3783,7 +3846,7 @@ table input[type="number"] {
   border: none;
   background: transparent;
   font: inherit;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   font-weight: 600;
   color: var(--ae-text-muted);
   cursor: pointer;
@@ -3818,7 +3881,7 @@ table input[type="number"] {
 .ae-dash-cell-sub {
   display: block;
   margin-top: 1px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 
@@ -4005,7 +4068,7 @@ table input[type="number"] {
 }
 .ae-hist-count {
   margin: 0 0 4px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-text-muted, var(--ae-text));
   opacity: 0.75;
 }
@@ -4030,12 +4093,12 @@ table input[type="number"] {
 }
 .ae-hist-empty h3 {
   margin: 6px 0 0;
-  font-size: 16px;
+  font-size: calc(16px * var(--ae-fs, 1));
   color: var(--ae-text);
 }
 .ae-hist-empty p {
   margin: 0 0 12px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   opacity: 0.75;
 }
 .ae-hist-empty-icon {
@@ -4274,7 +4337,7 @@ table input[type="number"] {
   display: inline-flex;
   align-items: center;
   padding: 2px 10px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
   font-weight: 600;
   white-space: nowrap;
   color: var(--ae-text-muted);
@@ -4300,7 +4363,7 @@ table input[type="number"] {
   border: 0.5px solid var(--ae-hairline);
   border-radius: 8px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.45);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
   outline: none;
   animation: ae-col-menu-in 140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -4317,7 +4380,7 @@ table input[type="number"] {
 }
 .ae-col-menu-title {
   padding: 5px 9px 7px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4360,7 +4423,7 @@ table input[type="number"] {
 }
 .ae-col-menu-colors-label {
   margin-bottom: 7px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -4436,7 +4499,7 @@ table input[type="number"] {
 .ae-added-col-del {
   padding: 0 3px;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   line-height: 1;
   color: inherit;
   background: transparent;
@@ -4473,7 +4536,7 @@ table input[type="number"] {
 .ae-extra-savemode-opt {
   padding: 4px 10px;
   font: inherit;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
   font-weight: 600;
   white-space: nowrap;
   color: var(--ae-text-muted);
@@ -4501,7 +4564,8 @@ table input[type="number"] {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
+  /* Right gutter for the corner dismiss X. */
+  padding: 12px 32px 12px 12px;
   background: var(--ae-surface);
   color: var(--ae-text);
   border: 1px solid var(--ae-border);
@@ -4557,7 +4621,7 @@ table input[type="number"] {
 .ae-toast-message {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   line-height: 1.4;
   color: var(--ae-text-muted);
   word-break: break-word;
@@ -4566,7 +4630,7 @@ table input[type="number"] {
   flex-shrink: 0;
   padding: 5px 10px;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   font-weight: 600;
   white-space: nowrap;
   color: var(--ae-text);
@@ -4578,23 +4642,32 @@ table input[type="number"] {
 .ae-toast-action:hover {
   border-color: var(--ae-text-muted);
 }
+/* The dismiss X lives in the toast's top-right corner, out of the content flow:
+   no border, no fill, just the glyph. (The toast reserves a gutter for it, see
+   .ae-toast's right padding, so it never sits on the text or the action.) */
 .ae-toast-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
   padding: 0;
-  color: var(--ae-text);
-  background: var(--ae-bg-alt);
-  border: 1px solid var(--ae-border);
-  border-radius: 8px;
+  color: var(--ae-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
   cursor: pointer;
+  transition: color var(--ae-dur-micro) var(--ae-ease-out);
 }
 .ae-toast-close:hover {
   color: var(--ae-text);
-  background: var(--ae-bg-alt);
+}
+.ae-toast-close:focus-visible {
+  outline: 2px solid var(--ae-focus-ring);
+  outline-offset: 1px;
 }
 
 /* ---- Ctrl+K quick jump (components/QuickJump.tsx) --------------------- */
@@ -4640,7 +4713,7 @@ table input[type="number"] {
   flex-shrink: 0;
   padding: 12px 14px;
   font: inherit;
-  font-size: 14px;
+  font-size: calc(14px * var(--ae-fs, 1));
   color: inherit;
   background: transparent;
   border: none;
@@ -4668,7 +4741,7 @@ table input[type="number"] {
   width: 100%;
   padding: 7px 9px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
   text-align: left;
   color: inherit;
   background: transparent;
@@ -4698,12 +4771,12 @@ table input[type="number"] {
 }
 .ae-quickjump-item-hint {
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: #8f8f8f;
 }
 .ae-quickjump-empty {
   padding: 14px 9px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
   color: #8f8f8f;
   text-align: center;
 }
@@ -4767,7 +4840,7 @@ table input[type="number"] {
 }
 .ae-copy-prev-from {
   padding: 2px 9px 7px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: #8f8f8f;
 }
 .ae-copy-prev-overwrite {
@@ -4792,7 +4865,7 @@ table input[type="number"] {
 }
 .ae-cell-history-note {
   padding: 8px 9px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   color: #8f8f8f;
 }
 .ae-cell-history-row {
@@ -4846,7 +4919,7 @@ table input[type="number"] {
 }
 .ae-cell-history-meta {
   margin-top: 1px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: #8f8f8f;
 }
 
@@ -4949,14 +5022,14 @@ table input[type="number"] {
   overflow: hidden;
   text-overflow: ellipsis;
   color: var(--ae-text);
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
 }
 .ae-variance-details-btn {
   padding: 0 2px;
   border: none;
   background: transparent;
   color: var(--ae-text-muted);
-  font-size: 14px;
+  font-size: calc(14px * var(--ae-fs, 1));
   line-height: 1;
   cursor: pointer;
   transition: color 120ms ease;
@@ -5005,7 +5078,7 @@ table input[type="number"] {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 14px;
+  font-size: calc(14px * var(--ae-fs, 1));
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #0c0c0c;
@@ -5018,7 +5091,7 @@ table input[type="number"] {
 }
 .ae-account-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: calc(14px * var(--ae-fs, 1));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -5029,14 +5102,14 @@ table input[type="number"] {
   align-items: center;
   gap: 8px;
   margin-top: 3px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-account-role {
   padding: 1px 8px;
   border-radius: 999px;
   border: 1px solid var(--ae-glass-divider);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ae-fs, 1));
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -5114,39 +5187,54 @@ table input[type="number"] {
    saved-snapshot notice. Wraps on narrow screens: text first, actions below.
    ------------------------------------------------------------------------ */
 .ae-day-lock {
+  /* The accent stripe and the extra shadow are tokens, so each theme only
+     says what it differs in (see the per-theme rules at the end of the file). */
+  --ae-lock-accent: var(--ae-warning-text, currentColor);
+  --ae-lock-shadow: 0 0 #0000;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 12px;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  font-size: 12.5px;
-  line-height: 1.45;
+  gap: 4px 10px;
+  margin: 0 0 8px;
+  padding: 4px 10px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  line-height: 1.3;
   color: var(--ae-text);
-  background: var(--ae-bg-alt);
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
   border: 1px solid var(--ae-border);
-  border-left: 3px solid var(--ae-warning-text, currentColor);
-  border-radius: 8px;
+  border-radius: 6px;
+  box-shadow: inset 2px 0 0 var(--ae-lock-accent), var(--ae-lock-shadow);
 }
 .ae-day-lock-icon {
   display: inline-flex;
   flex: none;
-  color: var(--ae-warning-text, currentColor);
+  color: var(--ae-lock-accent);
 }
+.ae-day-lock-icon svg {
+  width: 14px;
+  height: 14px;
+}
+/* The title and the detail run on one line and wrap together when they have to,
+   instead of stacking into a tall block. */
 .ae-day-lock-text {
-  display: flex;
+  display: block;
   flex: 1 1 260px;
-  flex-direction: column;
-  gap: 2px;
   min-width: 0;
 }
 .ae-day-lock-text span {
+  margin-left: 6px;
   color: var(--ae-text-muted);
 }
 .ae-day-lock-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+}
+.ae-day-lock .ae-btn-sm {
+  padding: 2px 8px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
 }
 @media (max-width: 520px) {
   .ae-day-lock-actions {
@@ -6796,7 +6884,7 @@ table input[type="number"] {
   border-radius: 50%;
   background: #f5c000;
   color: #0c0c0c;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   font-weight: 800;
 }
 .ae-choice-card:has(input:focus-visible) {
@@ -6880,7 +6968,7 @@ table input[type="number"] {
   .ae-input:not(.ae-input-cell),
   .ae-select,
   textarea {
-    font-size: 16px;
+    font-size: calc(16px * var(--ae-fs, 1));
   }
 }
 
@@ -7001,7 +7089,7 @@ table input[type="number"] {
 .ae-mm-year-label {
   min-width: 44px;
   text-align: center;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   font-weight: 700;
 }
 .ae-mm-view {
@@ -7016,7 +7104,7 @@ table input[type="number"] {
   background: transparent;
   color: var(--ae-text-muted);
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -7044,18 +7132,18 @@ table input[type="number"] {
 .ae-mm-error {
   margin: 0;
   padding: 16px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   color: var(--ae-danger-text);
 }
 .ae-mm-note {
   margin: 14px 0 0;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-mm-legend {
   display: flex;
   gap: 16px;
-  font-size: 11.5px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-mm-legend-item {
@@ -7109,7 +7197,7 @@ table input[type="number"] {
   position: absolute;
   right: 0;
   transform: translateY(50%);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ae-fs, 1));
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--ae-text-muted);
@@ -7226,7 +7314,7 @@ table input[type="number"] {
   align-items: center;
   gap: 3px;
   min-width: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-mm-xlabel-text {
@@ -7259,7 +7347,7 @@ table input[type="number"] {
   background: var(--ae-surface);
   color: var(--ae-text);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   pointer-events: none;
   animation: ae-mm-tip-in var(--ae-dur-micro) var(--ae-ease-out);
 }
@@ -7351,7 +7439,7 @@ table input[type="number"] {
     padding: 0 2px;
   }
   .ae-mm-xlabel {
-    font-size: 10px;
+    font-size: calc(10px * var(--ae-fs, 1));
   }
   .ae-mm-tablewrap .ae-table th,
   .ae-mm-tablewrap .ae-table td {
@@ -7468,7 +7556,7 @@ table input[type="number"] {
   flex-wrap: wrap;
   gap: 6px 18px;
   margin: 4px 0 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-fl-legend-item {
@@ -7497,7 +7585,7 @@ table input[type="number"] {
   position: absolute;
   right: 8px;
   transform: translateY(50%);
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-fl-plot {
@@ -7571,7 +7659,7 @@ table input[type="number"] {
   z-index: 3;
   min-width: 160px;
   padding: 8px 10px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-text);
   background: var(--ae-surface);
   border: 1px solid var(--ae-border);
@@ -7606,7 +7694,7 @@ table input[type="number"] {
   min-width: 0;
   padding-top: 6px;
   overflow: visible;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   text-align: center;
   white-space: nowrap;
   color: var(--ae-text-muted);
@@ -7622,12 +7710,12 @@ table input[type="number"] {
 }
 .ae-fl-split-title {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   font-weight: 700;
 }
 .ae-fl-split-title span {
   margin-left: 6px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   font-weight: 400;
   color: var(--ae-text-muted);
 }
@@ -7666,10 +7754,10 @@ table input[type="number"] {
   line-height: 1.2;
 }
 .ae-donut-center strong {
-  font-size: 18px;
+  font-size: calc(18px * var(--ae-fs, 1));
 }
 .ae-donut-center span {
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
 .ae-donut-legend {
@@ -7677,7 +7765,7 @@ table input[type="number"] {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
 }
 .ae-donut-legend li {
   display: flex;
@@ -7713,7 +7801,7 @@ table input[type="number"] {
    light and a dark value, so nothing in the components names a colour.
    ========================================================================= */
 :root {
-  --ae-mb-radius: 6px;
+  --ae-mb-radius: 4px;
   --ae-mb-gap: 6px;
   --ae-mb-h: 28px; /* control height; never under 28px */
   --ae-mb-line-w: 1px; /* the one border weight */
@@ -7831,7 +7919,7 @@ table input[type="number"] {
   background: transparent;
   color: var(--ae-mb-text);
   font: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -7939,7 +8027,7 @@ table input[type="number"] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
   color: var(--ae-mb-muted);
   white-space: nowrap;
 }
@@ -8014,7 +8102,7 @@ table input[type="number"] {
   border: var(--ae-mb-line-w) solid var(--ae-mb-menu-line);
   border-radius: var(--ae-mb-radius);
   box-shadow: var(--ae-mb-menu-shadow); /* the only shadow in the system */
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
 }
 .ae-mb-item {
   display: flex;
@@ -8058,7 +8146,7 @@ table input[type="number"] {
 .ae-mb-shortcut {
   margin-left: 24px;
   font: inherit;
-  font-size: 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-mb-menu-muted);
 }
 .ae-mb-item-flag {
@@ -8073,7 +8161,7 @@ table input[type="number"] {
 }
 .ae-mb-heading {
   padding: 6px 10px 2px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ae-fs, 1));
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -8094,7 +8182,7 @@ table input[type="number"] {
     border-radius: var(--ae-mb-radius);
     padding: 0 8px;
     max-width: 150px;
-    font-size: 12.5px;
+    font-size: calc(12.5px * var(--ae-fs, 1));
   }
   .ae-mb-zoom,
   .ae-mb-actions .ae-unsaved-badge {
@@ -8119,7 +8207,7 @@ table input[type="number"] {
   }
   .ae-mb-btn,
   .ae-mb-trigger {
-    font-size: 12.5px;
+    font-size: calc(12.5px * var(--ae-fs, 1));
     gap: 4px;
   }
   .ae-mb-btn {
@@ -8191,7 +8279,7 @@ table input[type="number"] {
   /* Never cut a filter label short: a minimum width, and room to grow. */
   min-width: 96px;
   max-width: 360px;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
 }
 .ae-mb--page .ae-mb-filters .ae-select-trigger-text {
   line-height: 1.35;
@@ -8205,7 +8293,7 @@ table input[type="number"] {
 }
 .ae-mb-flagged {
   color: var(--ae-mb-warn);
-  font-size: 13px;
+  font-size: calc(13px * var(--ae-fs, 1));
   font-weight: 600;
   white-space: nowrap;
 }
@@ -8340,7 +8428,7 @@ table input[type="number"] {
    target on a phone, and 16px so iOS does not zoom the page on focus. */
 @media (pointer: coarse), (max-width: 520px) {
   .ae-modal-panel textarea.ae-input {
-    font-size: 16px;
+    font-size: calc(16px * var(--ae-fs, 1));
     min-height: 96px;
   }
 }
@@ -8601,4 +8689,92 @@ table input[type="number"] {
   :root[data-ui="plus"] .ae-input-cell {
     transition: none;
   }
+}
+
+/* ---- Day-lock bar (finished-day banner, saved-report notice) per theme -------
+   One thin bar everywhere; each theme only changes what makes it that theme:
+   corners, edge, fill and shadow, taken from the same tokens its panels use. */
+:root[data-ui="enterprise"] .ae-day-lock {
+  background: var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 3px;
+}
+:root[data-ui="brutal"] .ae-day-lock {
+  --ae-lock-accent: var(--ae-nb-gold);
+  --ae-lock-shadow: 3px 3px 0 var(--ae-nb-line);
+  background: var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 2px solid var(--ae-nb-line);
+  border-radius: 0;
+}
+:root[data-ui="flat"] .ae-day-lock {
+  background: var(--ae-bg-alt);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-color: transparent;
+  border-radius: 4px;
+}
+:root[data-ui="glass"] .ae-day-lock {
+  --ae-lock-shadow: 0 4px 14px rgba(90, 60, 0, 0.14);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 12px;
+}
+:root[data-ui="minimal"] .ae-day-lock {
+  --ae-lock-accent: var(--ae-text-muted);
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 2px;
+}
+:root[data-ui="skeuo"] .ae-day-lock {
+  --ae-lock-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 60%), var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 8px;
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-day-lock {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 60%), var(--ae-surface);
+}
+:root[data-ui="aurora"] .ae-day-lock {
+  --ae-lock-accent: var(--ae-au-b);
+  --ae-lock-shadow: var(--ae-au-shadow);
+  background: linear-gradient(90deg, rgba(79, 70, 229, 0.12), transparent 45%), var(--ae-surface);
+}
+:root[data-ui="plus"] .ae-day-lock {
+  --ae-lock-shadow: var(--ae-elev-1);
+  border-radius: 8px;
+}
+
+/* Grid cell inputs share .ae-input with the interface fields, but sit in a data
+   table: they stay at the table's own size (see Font settings above). */
+.ae-input.ae-input-cell {
+  font-size: 13px;
+}
+
+/* ---- One corner radius for every button, in every theme ----------------------------
+   Buttons were rounded by whichever theme drew them: 6px (the toolbar and menu bar),
+   8px, 12px (Glass), 7px (Skeuomorphism), pills, circles and squares. Every button is
+   now 4px. This sits last and is !important on purpose: the theme blocks and the
+   inline `borderRadius` some components set would otherwise win by specificity.
+   Not buttons in this sense, so left as drawn: the logo (no visible shape), the full-width
+   category bars in the tables, and the collapse ribbon on the header's bottom edge.
+   (Fields, cards and panels keep their own radius; the Aurora theme sets its own 4px.) */
+button:not(.ae-page-header-logo):not(.ae-cat-toggle):not(.ae-page-header-collapse-btn),
+a.ae-btn,
+[role="button"]:not(.ae-page-header-logo),
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+.ae-btn,
+.ae-mb-btn,
+.ae-mb-trigger,
+.ae-split,
+.ae-segment-group,
+.ae-segment-btn,
+.ae-pager-btn,
+.ae-toolbar .ae-toolbar-save {
+  border-radius: 4px !important;
 }

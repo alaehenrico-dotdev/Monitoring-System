@@ -19,7 +19,7 @@ export function PendingChangesPreview({
   const totalNew = sumRounded(items.map((i) => i.newValue));
   if (items.length === 0) {
     return (
-      <p style={{ margin: 0, color: colors.subtleInk, fontSize: 13 }}>
+      <p style={{ margin: 0, color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>
         No unsaved changes.
       </p>
     );

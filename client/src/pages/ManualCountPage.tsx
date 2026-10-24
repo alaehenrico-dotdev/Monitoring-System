@@ -587,22 +587,19 @@ export function ManualCountPage() {
     setPublishing(true);
     setError(null);
     try {
-      const { published, keptManual = 0, heldLocked = 0 } = await publishManualCounts(date, shift, applyToOpening);
+      const { published, leftSaved = 0 } = await publishManualCounts(date, shift, applyToOpening);
       setShowPublishConfirm(false);
       setApplyToOpening(false);
-      const kept = keptManual
-        ? ` · ${keptManual} opening${keptManual === 1 ? "" : "s"} set by an import ${keptManual === 1 ? "was" : "were"} kept`
-        : "";
-      // A later day that is already finished is not rewritten: its new opening
-      // waits in Corrections for an admin.
-      const held = heldLocked
-        ? ` · ${heldLocked} finished later day${heldLocked === 1 ? " is" : "s are"} waiting in Corrections for approval`
+      // Days already saved are never rewritten by a publish: say so, so a day that
+      // keeps its old opening is expected rather than mistaken for a miss.
+      const left = leftSaved
+        ? ` · ${leftSaved} product${leftSaved === 1 ? "" : "s"} with later days saved ${leftSaved === 1 ? "was" : "were"} left unchanged`
         : "";
       setNotice({
         message: `Published ${published} count${published === 1 ? "" : "s"} - ${
           applyToOpening ? "now the next day's opening stock" : "now final for reporting"
-        }${kept}${held}`,
-        variant: heldLocked ? "warning" : "success",
+        }${left}`,
+        variant: "success",
       });
       // The server broadcasts the change; re-read now so the badge and button
       // do not wait for it.
@@ -1513,7 +1510,7 @@ export function ManualCountPage() {
           role="status"
           style={{
             margin: "0 0 10px",
-            fontSize: 12.5,
+            fontSize: "calc(12.5px * var(--ae-fs, 1))",
             color: colors.subtleInk,
           }}
         >
@@ -1672,7 +1669,7 @@ export function ManualCountPage() {
                               onKeyDown={(e) =>
                                 handleCountKeyDown(e, loc, r.product.id)
                               }
-                              style={{ width: 64, textAlign: "center" }}
+                              style={{ width: "var(--ae-cell-w, 64px)", textAlign: "center" }}
                             />
                           </td>
                         );
@@ -1878,9 +1875,10 @@ export function ManualCountPage() {
             />
             <span>
               Also use these counts as the next day&apos;s opening stock
-              <span style={{ display: "block", fontSize: 12, color: colors.subtleInk }}>
-                Online and Offline counts only. An opening that was set by
-                an import is left as it is.
+              <span style={{ display: "block", fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk }}>
+                Online and Offline counts only. The next day entered starts
+                from the counted figure and carries on from there. Days
+                already saved are left as they are.
               </span>
             </span>
           </label>
@@ -1903,7 +1901,7 @@ export function ManualCountPage() {
           onClose={() => setShowConfirm(false)}
         >
           {pendingChanges.length === 0 ? (
-            <p style={{ margin: 0, color: colors.subtleInk, fontSize: 13 }}>
+            <p style={{ margin: 0, color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>
               No unsaved changes.
             </p>
           ) : (
@@ -2081,7 +2079,7 @@ const openingTagStyle = {
   borderRadius: 999,
   background: "var(--ae-btn-yellow)",
   color: "var(--ae-btn-yellow-text)",
-  fontSize: 11,
+  fontSize: "calc(11px * var(--ae-fs, 1))",
   fontWeight: 700,
   whiteSpace: "nowrap",
 } as const;

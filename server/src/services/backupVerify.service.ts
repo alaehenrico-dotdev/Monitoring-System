@@ -217,18 +217,17 @@ export async function listBackupHistory(limit = 50) {
   return rows.map((r) => ({ ...r, sizeBytes: r.sizeBytes === null ? null : Number(r.sizeBytes) }));
 }
 
-/// How long a monthly backup may go before it counts as overdue: a month plus a
-/// few days, so the one at the end of a 31-day month is not flagged the moment it
-/// is a day late.
-const MONTHLY_OVERDUE_HOURS = 33 * 24;
+/// How long a weekly backup may go before it counts as overdue: a week plus a
+/// couple of days, so the Sunday one is not flagged the moment it is a day late.
+const WEEKLY_OVERDUE_HOURS = 9 * 24;
 
 /// When the last good backup was taken, from history and the backup folder,
 /// and whether a newer attempt has failed since.
 ///
 /// "Overdue" is 36 hours by default, which suits a daily backup. When the only
-/// scheduled backup is Google Drive's (monthly, and no backup folder with daily
+/// scheduled backup is Google Drive's (weekly, and no backup folder with daily
 /// scripts is configured), 36 hours would raise the alarm for most of every
-/// month, so the threshold widens to cover a month - never narrower than what
+/// week, so the threshold widens to cover a week - never narrower than what
 /// BACKUP_OVERDUE_HOURS says. With a backup folder configured the configured
 /// threshold is kept, since daily scripts are what that folder is for.
 export async function backupHealth(now = new Date()) {
@@ -238,7 +237,7 @@ export async function backupHealth(now = new Date()) {
     listBackupFiles(),
     prisma.driveConnection.findUnique({ where: { id: 1 }, select: { autoBackup: true } }),
   ]);
-  const overdueHours = !env.backupDir && drive?.autoBackup ? Math.max(env.backupOverdueHours, MONTHLY_OVERDUE_HOURS) : env.backupOverdueHours;
+  const overdueHours = !env.backupDir && drive?.autoBackup ? Math.max(env.backupOverdueHours, WEEKLY_OVERDUE_HOURS) : env.backupOverdueHours;
   const candidates = [lastOk?.createdAt, files[0]?.modifiedAt].filter((d): d is Date => !!d);
   const lastBackupAt = candidates.length ? new Date(Math.max(...candidates.map((d) => d.getTime()))) : null;
   const ageHours = lastBackupAt ? (now.getTime() - lastBackupAt.getTime()) / 3_600_000 : null;

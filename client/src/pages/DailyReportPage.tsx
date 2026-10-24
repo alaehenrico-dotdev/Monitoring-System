@@ -712,7 +712,7 @@ export function DailyReportPage() {
                   </table>
                 </div>
               ) : (
-                <p style={{ fontSize: 13, color: colors.subtleInk }}>
+                <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
                   No Daily Out figures for this date.
                 </p>
               )}
@@ -746,7 +746,7 @@ export function DailyReportPage() {
                   </table>
                 </div>
               ) : (
-                <p style={{ fontSize: 13, color: colors.subtleInk }}>No audit counts were saved for this date.</p>
+                <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>No audit counts were saved for this date.</p>
               )}
             </>
           )}
@@ -754,7 +754,7 @@ export function DailyReportPage() {
       )}
 
       {!report && (
-        <p style={{ fontSize: 13, color: colors.subtleInk }}>
+        <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
           Pick a date and click Generate to build the report.
         </p>
       )}

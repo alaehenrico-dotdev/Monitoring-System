@@ -301,7 +301,7 @@ function UnmatchedImportRowView({
     <div
       style={{ padding: "8px 0", borderBottom: `1px solid ${colors.border}` }}
     >
-      <div style={{ fontSize: 13, color: colors.ink }}>
+      <div style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
         “{row.productName}”
         {row.category ? (
           <span style={{ color: colors.subtleInk }}> in “{row.category}”</span>
@@ -314,7 +314,7 @@ function UnmatchedImportRowView({
             alignItems: "center",
             gap: 8,
             marginTop: 4,
-            fontSize: 12.5,
+            fontSize: "calc(12.5px * var(--ae-fs, 1))",
             color: colors.subtleInk,
           }}
         >
@@ -329,7 +329,7 @@ function UnmatchedImportRowView({
           </Button>
         </div>
       ) : (
-        <div style={{ marginTop: 4, fontSize: 12.5, color: colors.subtleInk }}>
+        <div style={{ marginTop: 4, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
           No match found.
         </div>
       )}
@@ -342,7 +342,7 @@ const targetFieldStyle = {
   gridTemplateColumns: "90px 1fr",
   alignItems: "center",
   gap: 10,
-  fontSize: 13,
+  fontSize: "calc(13px * var(--ae-fs, 1))",
   color: colors.ink,
 } as const;
 
@@ -356,7 +356,7 @@ function ImportTargetBanner({ label }: { label: string }) {
         padding: "8px 10px",
         borderLeft: `4px solid ${colors.red}`,
         background: colors.warningBg,
-        fontSize: 13,
+        fontSize: "calc(13px * var(--ae-fs, 1))",
         fontWeight: 600,
         color: colors.ink,
       }}
@@ -1237,7 +1237,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             <p
               style={{
                 margin: "0 0 14px",
-                fontSize: 13,
+                fontSize: "calc(13px * var(--ae-fs, 1))",
                 color: colors.subtleInk,
               }}
             >
@@ -1342,7 +1342,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                   padding: "10px 12px",
                   borderRadius: 10,
                   border: `1px solid ${colors.border}`,
-                  fontSize: 12.5,
+                  fontSize: "calc(12.5px * var(--ae-fs, 1))",
                   color: colors.warningText,
                 }}
               >
@@ -1395,7 +1395,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 <h4
                   style={{
                     margin: "0 0 6px",
-                    fontSize: 13,
+                    fontSize: "calc(13px * var(--ae-fs, 1))",
                     color: colors.warningText,
                   }}
                 >
@@ -1405,7 +1405,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                   style={{
                     margin: 0,
                     padding: "0 0 0 18px",
-                    fontSize: 12.5,
+                    fontSize: "calc(12.5px * var(--ae-fs, 1))",
                     color: colors.subtleInk,
                   }}
                 >
@@ -1426,7 +1426,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               <p
                 style={{
                   margin: "12px 0 0",
-                  fontSize: 12.5,
+                  fontSize: "calc(12.5px * var(--ae-fs, 1))",
                   color: colors.subtleInk,
                 }}
               >
@@ -1441,7 +1441,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               <p
                 style={{
                   margin: "12px 0 0",
-                  fontSize: 12.5,
+                  fontSize: "calc(12.5px * var(--ae-fs, 1))",
                   color: colors.subtleInk,
                 }}
               >
@@ -1458,10 +1458,10 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                   padding: "12px 14px",
                   borderRadius: 10,
                   border: `1px solid ${colors.border}`,
-                  fontSize: 12.5,
+                  fontSize: "calc(12.5px * var(--ae-fs, 1))",
                 }}
               >
-                <h4 style={{ margin: "0 0 6px", fontSize: 13, color: colors.ink }}>
+                <h4 style={{ margin: "0 0 6px", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
                   The product list differs from this sheet
                 </h4>
                 <p style={{ margin: "0 0 8px", color: colors.subtleInk }}>
@@ -1560,7 +1560,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
             {importReview.unmatchedRows.length > 0 && (
               <div style={{ marginTop: 18 }}>
                 <h4
-                  style={{ margin: "0 0 6px", fontSize: 13, color: colors.ink }}
+                  style={{ margin: "0 0 6px", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}
                 >
                   Unmatched ({importReview.unmatchedRows.length})
                 </h4>
@@ -1633,7 +1633,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               <p
                 style={{
                   margin: "0 0 12px",
-                  fontSize: 13,
+                  fontSize: "calc(13px * var(--ae-fs, 1))",
                   color: colors.danger,
                 }}
               >
@@ -1641,12 +1641,12 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
               </p>
             )}
             {!historyBatches && !historyError && (
-              <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>
+              <p style={{ margin: 0, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
                 Loading…
               </p>
             )}
             {historyBatches && historyBatches.length === 0 && (
-              <p style={{ margin: 0, fontSize: 13, color: colors.subtleInk }}>
+              <p style={{ margin: 0, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
                 No imports recorded yet.
               </p>
             )}
@@ -1688,7 +1688,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                     <div style={{ minWidth: 0 }}>
                       <div
                         style={{
-                          fontSize: 13,
+                          fontSize: "calc(13px * var(--ae-fs, 1))",
                           fontWeight: 600,
                           color: colors.ink,
                           overflow: "hidden",
@@ -1700,7 +1700,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                       </div>
                       <div
                         style={{
-                          fontSize: 12,
+                          fontSize: "calc(12px * var(--ae-fs, 1))",
                           color: colors.subtleInk,
                           marginTop: 2,
                         }}
@@ -1712,7 +1712,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                       </div>
                       <div
                         style={{
-                          fontSize: 12,
+                          fontSize: "calc(12px * var(--ae-fs, 1))",
                           color: colors.subtleInk,
                           marginTop: 2,
                         }}
@@ -1730,7 +1730,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                           flexShrink: 0,
                         }}
                       >
-                        <span style={{ fontSize: 12, color: colors.subtleInk }}>
+                        <span style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk }}>
                           Revert this import?
                         </span>
                         <Button

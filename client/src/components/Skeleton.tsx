@@ -31,39 +31,6 @@ export function Skeleton({
   );
 }
 
-/// A stack of text-line skeletons with varied widths (the last line shorter,
-/// like a real paragraph/label trailing off) rather than identical uniform
-/// bars, which reads more obviously as "text is coming" than a block would.
-export function SkeletonText({
-  lines = 1,
-  lineHeight = 12,
-  gap = 6,
-}: {
-  lines?: number;
-  lineHeight?: number;
-  gap?: number;
-}) {
-  const widths = ["92%", "78%", "85%", "64%"];
-  return (
-    <span
-      aria-hidden="true"
-      style={{ display: "flex", flexDirection: "column", gap }}
-    >
-      {Array.from({ length: lines }, (_, i) => (
-        <Skeleton
-          key={i}
-          height={lineHeight}
-          width={widths[i % widths.length]}
-        />
-      ))}
-    </span>
-  );
-}
-
-export function SkeletonCircle({ size = 32 }: { size?: number }) {
-  return <Skeleton width={size} height={size} radius="50%" />;
-}
-
 /// Wraps any group of Skeleton pieces with the ARIA a screen reader actually
 /// needs (`role="status"`/`aria-busy` + one visually-hidden announcement) -
 /// the individual bars themselves stay `aria-hidden` (see Skeleton above)

@@ -606,7 +606,7 @@ function SystemChangeRow({
               borderBottom: `1px solid ${colors.border}`,
             }}
           >
-            <table className="ae-table" style={{ fontSize: 12.5 }}>
+            <table className="ae-table" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
               <thead>
                 <tr>
                   {["Removed", "Rows"].map((h) => (
@@ -710,13 +710,13 @@ function ChangeLogRow({
             }}
           >
             {diffs.length === 0 ? (
-              <span style={{ fontSize: 12.5, color: colors.subtleInk }}>
+              <span style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
                 {entry.action === "CREATE"
                   ? "New record - no prior value to compare."
                   : "No field-level differences recorded."}
               </span>
             ) : (
-              <table className="ae-table" style={{ fontSize: 12.5 }}>
+              <table className="ae-table" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                 <thead>
                   <tr>
                     {["Field", "Before", "After"].map((h) => (
@@ -817,7 +817,7 @@ function diffFields(
 const groupHeadingStyle: CSSProperties = {
   textAlign: "left",
   padding: "0",
-  fontSize: 13,
+  fontSize: "calc(13px * var(--ae-fs, 1))",
   fontWeight: 700,
   color: colors.ink,
   borderBottom: `1px solid ${colors.border}`,
@@ -843,7 +843,7 @@ const importOnlyStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 6,
-  fontSize: 13,
+  fontSize: "calc(13px * var(--ae-fs, 1))",
   color: colors.ink,
   padding: "0 8px",
   whiteSpace: "nowrap",
@@ -863,7 +863,7 @@ const sourceTagStyle: CSSProperties = {
   border: `1px solid ${colors.border}`,
   background: colors.paperAlt,
   color: colors.subtleInk,
-  fontSize: 11,
+  fontSize: "calc(11px * var(--ae-fs, 1))",
   fontWeight: 600,
   whiteSpace: "nowrap",
 };

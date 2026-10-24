@@ -86,7 +86,7 @@ export function Modal({
             flexShrink: 0,
           }}
         >
-          <h3 style={{ margin: 0, fontSize: 15 }}>{title}</h3>
+          <h3 style={{ margin: 0, fontSize: "calc(15px * var(--ae-fs, 1))" }}>{title}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -96,7 +96,7 @@ export function Modal({
               border: "none",
               background: "transparent",
               cursor: "pointer",
-              fontSize: 18,
+              fontSize: "calc(18px * var(--ae-fs, 1))",
               lineHeight: 1,
               color: colors.subtleInk,
               padding: 4,

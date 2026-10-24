@@ -210,7 +210,7 @@ export function useFinishDay({ date, shift, location, disabled, disabledReason, 
 
       {step === "done" && (
         <Modal title="Day finished" onClose={() => setStep("idle")} width={420}>
-          <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: 0 }}>
+          <p style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55, margin: 0 }}>
             {PAGE_LABEL[location]} · {formatDateDisplay(date)} · {SHIFT_LABELS[shift]} is saved and locked.{" "}
             {reportSaved ? "The report for it is ready to generate." : `The Daily Report is saved once ${otherName} is finished too.`}
           </p>

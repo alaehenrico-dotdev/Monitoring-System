@@ -81,10 +81,10 @@ function AutoCard({
   return (
     <section style={card} aria-label={title}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: 13.5, color: colors.ink }}>{title}</strong>
+        <strong style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", color: colors.ink }}>{title}</strong>
         <span className="ae-dash-chip ae-dash-chip--done">{badge}</span>
       </div>
-      <div style={{ fontSize: 12.5, color: colors.subtleInk }}>
+      <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
         Folder: <strong style={{ color: colors.ink, fontWeight: 600 }}>{folder}</strong>
         <span aria-hidden> · </span>
         {last}
@@ -96,7 +96,7 @@ function AutoCard({
 
 /// Settings > Google Drive - connect one Google account, and everything the
 /// system produces is saved to it by itself: each day's report the moment the
-/// day is finished or corrected, the database at the end of every month, and a
+/// day is finished or corrected, the database every week, and a
 /// copy of every export. The switches apply the moment they are changed.
 export function GoogleDriveSettings() {
   const [status, setStatus] = useState<DriveStatus | null>(null);
@@ -175,14 +175,14 @@ export function GoogleDriveSettings() {
   const shown = useMemo(() => (filter === "all" ? recent : recent.filter((u) => u.kind === filter)), [recent, filter]);
   const failed = recent.filter((u) => u.status === "FAILED").length;
 
-  const cell = { padding: "6px 10px", fontSize: 12.5, textAlign: "left" as const, borderBottom: `1px solid ${colors.border}` };
+  const cell = { padding: "6px 10px", fontSize: "calc(12.5px * var(--ae-fs, 1))", textAlign: "left" as const, borderBottom: `1px solid ${colors.border}` };
   const settings = status?.settings;
   const hourOptions = Array.from({ length: 24 }, (_, h) => h);
 
   return (
     <div className="ae-panel" style={{ maxWidth: 720, padding: "14px 18px" }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>Google Drive</div>
-      <div style={{ fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+      <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>Google Drive</div>
+      <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
         Reports and backups are saved to Google Drive automatically - nobody has to click anything. The system can
         only see the files it puts there, never the rest of the Drive.
       </div>
@@ -192,7 +192,7 @@ export function GoogleDriveSettings() {
           <InlineLoading label="Loading…" />
         </div>
       ) : !status.configured ? (
-        <div role="status" style={{ marginTop: 12, fontSize: 12.5, color: colors.ink }}>
+        <div role="status" style={{ marginTop: 12, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink }}>
           <strong>Google Drive is not set up on this server yet.</strong> Add <code>GOOGLE_CLIENT_ID</code> and{" "}
           <code>GOOGLE_CLIENT_SECRET</code> to the server's <code>.env</code>, then restart it. The steps are in{" "}
           <code>docs/GOOGLE_DRIVE.md</code>. When Google asks for the redirect address, use:
@@ -203,7 +203,7 @@ export function GoogleDriveSettings() {
       ) : !status.connected ? (
         <div style={{ marginTop: 12 }}>
           {!canConnectFromHere() && (
-            <div role="alert" style={{ fontSize: 12.5, color: colors.danger, marginBottom: 8 }}>
+            <div role="alert" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.danger, marginBottom: 8 }}>
               Open this page at <code>http://localhost</code> on the PC that runs the server to connect. Google only
               accepts a plain-http return address for localhost. Once connected, everything works from any PC.
             </div>
@@ -214,7 +214,7 @@ export function GoogleDriveSettings() {
         </div>
       ) : (
         <div style={{ marginTop: 12, display: "grid", gap: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13, color: colors.ink }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
             <span>
               Connected as <strong>{status.accountEmail ?? "your Google account"}</strong>
             </span>
@@ -236,7 +236,7 @@ export function GoogleDriveSettings() {
           </div>
 
           {status.lastError && (
-            <div role="alert" style={{ fontSize: 12.5, color: colors.danger }}>
+            <div role="alert" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.danger }}>
               {status.lastError}{" "}
               <Button className="ae-btn-solid" size="sm" loading={busy === "connect"} onClick={() => void connect()}>
                 Reconnect
@@ -252,7 +252,7 @@ export function GoogleDriveSettings() {
                 folder="Ala Eh Stock Monitoring - Reports / year / month"
                 last={status.lastReportAt ? `Last saved ${when(status.lastReportAt)}` : "No report has been saved yet"}
               >
-                <div style={{ fontSize: 12.5, color: colors.ink }}>
+                <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink }}>
                   Each day's report is saved as a PDF the moment the day is finished, and again if a
                   correction changes it. There is one file per day; earlier days stay as an archive.
                 </div>
@@ -274,7 +274,7 @@ export function GoogleDriveSettings() {
                   </>
                 }
               >
-                <div style={{ display: "grid", gap: 8, fontSize: 13, color: colors.ink }}>
+                <div style={{ display: "grid", gap: 8, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
                     <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <input
@@ -283,14 +283,14 @@ export function GoogleDriveSettings() {
                         disabled={busy !== null}
                         onChange={(e) => void change({ autoBackup: e.target.checked })}
                       />
-                      Back up the database to Drive at the end of every month
+                      Back up the database to Drive every week
                     </label>
                     {settings.autoBackup && (
                       <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        on the last day, at
+                        at
                         <select
                           className="ae-select"
-                          aria-label="Time of the daily backup"
+                          aria-label="Time of the weekly backup"
                           disabled={busy !== null}
                           value={offset === null ? settings.backupHourUtc : utcHourToLocal(settings.backupHourUtc, offset)}
                           onChange={(e) => {
@@ -304,7 +304,7 @@ export function GoogleDriveSettings() {
                             </option>
                           ))}
                         </select>
-                        <span style={{ color: colors.subtleInk, fontSize: 12.5 }}>{offset === null ? "" : "your time"}</span>
+                        <span style={{ color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>{offset === null ? "" : "your time"}</span>
                       </label>
                     )}
                   </div>
@@ -348,7 +348,7 @@ export function GoogleDriveSettings() {
                 folder="Ala Eh Stock Monitoring - Exports"
                 last="Whenever someone downloads a file"
               >
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: colors.ink }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
                   <input
                     type="checkbox"
                     checked={settings.saveExports}
@@ -363,7 +363,7 @@ export function GoogleDriveSettings() {
 
           <section aria-label="Recent activity">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>
+              <div style={{ fontSize: "calc(13px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>
                 Recent activity
                 {failed > 0 && (
                   <span className="ae-dash-chip ae-dash-chip--bad" style={{ marginLeft: 8 }}>
@@ -386,7 +386,7 @@ export function GoogleDriveSettings() {
               </span>
             </div>
             {shown.length === 0 ? (
-              <p style={{ fontSize: 12.5, color: colors.subtleInk, margin: "6px 0 0" }}>
+              <p style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, margin: "6px 0 0" }}>
                 {recent.length === 0 ? "Nothing has been sent to Drive yet." : "Nothing of this kind in the recent activity."}
               </p>
             ) : (
@@ -413,7 +413,7 @@ export function GoogleDriveSettings() {
                             {u.status === "OK" ? "Saved" : "Failed"}
                           </span>
                           {u.status === "FAILED" && u.error && (
-                            <div style={{ fontSize: 11.5, color: colors.danger, marginTop: 2, overflowWrap: "anywhere" }}>{u.error}</div>
+                            <div style={{ fontSize: "calc(11.5px * var(--ae-fs, 1))", color: colors.danger, marginTop: 2, overflowWrap: "anywhere" }}>{u.error}</div>
                           )}
                         </td>
                       </tr>

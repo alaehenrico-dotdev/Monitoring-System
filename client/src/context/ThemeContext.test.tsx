@@ -10,6 +10,9 @@ beforeEach(() => {
   localStorage.clear();
   delete root.dataset.ui;
   delete root.dataset.theme;
+  delete root.dataset.font;
+  delete root.dataset.fs;
+  document.head.querySelectorAll('link[id^="ae-webfont-"]').forEach((l) => l.remove());
 });
 afterEach(() => localStorage.clear());
 
@@ -79,5 +82,82 @@ describe("layout style", () => {
     localStorage.setItem("ae-ui", old);
     const { result } = renderHook(() => useTheme(), { wrapper });
     expect(result.current.uiStyle).toBe("classic");
+  });
+});
+
+describe("font settings", () => {
+  it("defaults to Inter at the default size, and puts both on <html> for the stylesheet", () => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.fontFamily).toBe("inter");
+    expect(result.current.fontSize).toBe("md");
+    expect(root.dataset.font).toBe("inter");
+    expect(root.dataset.fs).toBe("md");
+  });
+
+  it.each(["inter", "hyperlegible", "plex", "system", "serif", "mono"] as const)("switches to %s, applies it at once and remembers it", (font) => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => result.current.setFontFamily(font));
+    expect(root.dataset.font).toBe(font);
+    expect(localStorage.getItem("ae-font")).toBe(font);
+  });
+
+  it.each(["sm", "md", "lg", "xl"] as const)("switches the text size to %s, applies it at once and remembers it", (size) => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => result.current.setFontSize(size));
+    expect(root.dataset.fs).toBe(size);
+    expect(localStorage.getItem("ae-font-size")).toBe(size);
+  });
+
+  it("starts from the remembered choices", () => {
+    localStorage.setItem("ae-font", "serif");
+    localStorage.setItem("ae-font-size", "lg");
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.fontFamily).toBe("serif");
+    expect(result.current.fontSize).toBe("lg");
+    expect(root.dataset.font).toBe("serif");
+    expect(root.dataset.fs).toBe("lg");
+  });
+
+  it("treats an unrecognised stored value as the default rather than breaking the page", () => {
+    localStorage.setItem("ae-font", "comic");
+    localStorage.setItem("ae-font-size", "huge");
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.fontFamily).toBe("inter");
+    expect(result.current.fontSize).toBe("md");
+  });
+
+  it("resets both to the default", () => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => {
+      result.current.setFontFamily("mono");
+      result.current.setFontSize("xl");
+    });
+    act(() => result.current.resetFont());
+    expect(root.dataset.font).toBe("inter");
+    expect(root.dataset.fs).toBe("md");
+  });
+
+  it("is independent of the theme and the colour mode", () => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => result.current.setFontFamily("system"));
+    act(() => result.current.setUiStyle("enterprise"));
+    act(() => result.current.setTheme("dark"));
+    expect(root.dataset.font).toBe("system");
+    expect(result.current.fontFamily).toBe("system");
+  });
+
+  it("fetches a web font only when it is chosen, and only once", () => {
+    const links = () => document.head.querySelectorAll('link[id^="ae-webfont-"]');
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(links()).toHaveLength(0); // Inter ships with the page
+    act(() => result.current.setFontFamily("system"));
+    act(() => result.current.setFontFamily("serif"));
+    expect(links()).toHaveLength(0); // system fonts need no download
+    act(() => result.current.setFontFamily("plex"));
+    expect(links()).toHaveLength(1);
+    expect((links()[0] as HTMLLinkElement).href).toContain("IBM+Plex+Sans");
+    act(() => result.current.setFontFamily("inter"));
+    act(() => result.current.setFontFamily("plex"));
+    expect(links()).toHaveLength(1);
   });
 });

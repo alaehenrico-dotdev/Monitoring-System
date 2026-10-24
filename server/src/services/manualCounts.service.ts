@@ -190,8 +190,11 @@ export type PropagateOutcome = "kept-manual" | "held-locked" | undefined;
 /// the old figure. Walks forward row by row: each changed row's new
 /// Remaining Stock feeds the one after it, stopping once an opening stock
 /// comes out unchanged. Manual counts take part only when applied to opening
-/// stock (see getOpeningStock); a counted row's stored system figure and
-/// variance are re-derived as it moves. TOTAL counts are informational only.
+/// stock (see getOpeningStock), and only for a row first saved after that
+/// count was published: a row saved earlier keeps carrying the chain it was
+/// saved in, so a publish never reaches back into days already entered. A
+/// counted row's stored system figure and variance are re-derived as it moves.
+/// TOTAL counts are informational only.
 ///
 /// A row whose opening was set by an import (openingManual) is never rewritten:
 /// the walk stops there and returns "kept-manual" if that row's opening
@@ -224,8 +227,11 @@ export async function propagateOpeningStock(
       const next = await dailyOnlineStockRepository.findNext(productId, cursor.entryDate, cursor.shift, db);
       if (!next) return;
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
-      const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
+      const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db, next.createdAt);
       if (openingStock === toNum(next.openingStock)) return;
+      // Already opening at what an applied audit gives it (an earlier publish set it
+      // that way): that is a settled starting record, not a drift to undo.
+      if (toNum(next.openingStock) === (await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db))) return;
       if (next.openingManual) return "kept-manual";
       // A carry-forward must not quietly rewrite a closed day: hold it.
       if (next.id !== opts.approvedRowId && (await isLockedForCarry(next.entryDate, next.shift, "ONLINE", db))) {
@@ -260,8 +266,11 @@ export async function propagateOpeningStock(
       const next = await dailyOfflineStockRepository.findNext(productId, cursor.entryDate, cursor.shift, db);
       if (!next) return;
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
-      const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db);
+      const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db, next.createdAt);
       if (openingStock === toNum(next.openingStock)) return;
+      // Already opening at what an applied audit gives it (an earlier publish set it
+      // that way): that is a settled starting record, not a drift to undo.
+      if (toNum(next.openingStock) === (await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db))) return;
       if (next.openingManual) return "kept-manual";
       if (next.id !== opts.approvedRowId && (await isLockedForCarry(next.entryDate, next.shift, "OFFLINE", db))) {
         await holdStaleOpening("OFFLINE", next, openingStock, userId, db, causedById);
@@ -380,18 +389,30 @@ export async function getManualCountGrid(entryDate: Date, shift: Shift, location
   // yet for the product at this location) - the page labels them up front.
   const countedProductIds = location === "TOTAL" ? new Set<number>() : await manualCountRepository.productIdsWithCounts(location);
   const savedDaily = location === "ONLINE" ? onlineByProduct : location === "OFFLINE" ? offlineByProduct : null;
+  // A saved row is judged by the same gate that opened it: an audit published
+  // after the row was first saved never counts as what it should have carried.
+  const savedAt = new Map<number, Date>(savedDaily ? [...savedDaily].map(([id, row]) => [id, row.createdAt]) : []);
   const expectedOpening =
     savedDaily && savedDaily.size
       ? location === "ONLINE"
-        ? await dailyOnlineStockRepository.getOpeningStocksForProducts([...savedDaily.keys()], entryDate, shift)
-        : await dailyOfflineStockRepository.getOpeningStocksForProducts([...savedDaily.keys()], entryDate, shift)
+        ? await dailyOnlineStockRepository.getOpeningStocksForProducts([...savedDaily.keys()], entryDate, shift, savedAt)
+        : await dailyOfflineStockRepository.getOpeningStocksForProducts([...savedDaily.keys()], entryDate, shift, savedAt)
       : new Map<number, number>();
+  // A row that already opens at what an applied audit gives it is a settled
+  // starting record, not a break - so a row the audit did reach is not flagged.
+  const offGate = savedDaily ? [...savedDaily].filter(([id, row]) => expectedOpening.has(id) && toNum(row.openingStock) !== expectedOpening.get(id)).map(([id]) => id) : [];
+  const ungatedOpening = offGate.length
+    ? location === "ONLINE"
+      ? await dailyOnlineStockRepository.getOpeningStocksForProducts(offGate, entryDate, shift)
+      : await dailyOfflineStockRepository.getOpeningStocksForProducts(offGate, entryDate, shift)
+    : new Map<number, number>();
   const openingBreakFor = (productId: number): { expected: number; actual: number } | null => {
     const saved = savedDaily?.get(productId);
     const expected = expectedOpening.get(productId);
     if (!saved || expected === undefined) return null;
     const actual = toNum(saved.openingStock);
-    return actual === expected ? null : { expected, actual };
+    if (actual === expected || actual === ungatedOpening.get(productId)) return null;
+    return { expected, actual };
   };
 
   return products.map((product) => {
@@ -446,10 +467,13 @@ export const MAX_REMARKS_LENGTH = 500;
  * Publishes a sheet's counts (one date + shift, every location): the
  * supervisor's sign-off that the counts are final for reporting. Counts are an
  * audit only unless `applyToOpening` is set, in which case each ONLINE/OFFLINE
- * count also becomes the next day's opening stock and the periods already
- * saved after it are re-derived straight away - except rows whose opening an
- * import set, which are kept (counted in `keptManual`). Each publish is
- * logged against the count, and re-derived rows name that log line as cause.
+ * count becomes a fresh starting record: the first period entered after it
+ * opens at the counted figure, and every period after that carries on from its
+ * own remaining stock, until another count is applied. Periods that were
+ * already saved when it is published keep their figures - nothing is rewritten
+ * (`leftSaved` says how many products have saved days after the counted one).
+ * Variance is untouched: it is still the count against the system's remaining
+ * stock on the counted day. Each publish is logged against the count.
  */
 export async function publishManualCounts(entryDate: Date, shift: Shift, userId?: number, applyToOpening = false) {
   const result = await prisma.$transaction(
@@ -458,39 +482,32 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
       if (pending.length === 0) throw HttpError.badRequest("There are no saved counts waiting to be published for this shift");
 
       const now = new Date();
-      // A count only opens the NEXT day, so a product with no saved row after
-      // this date has nothing to re-derive - skip its walk (the common case)
-      // rather than paying a query per count to find that out.
       const idsFor = (location: StockLocation) => pending.filter((c) => c.location === location).map((c) => c.productId);
+      // Only to report how many already have later days saved - they are left alone.
       const [onlineHasLater, offlineHasLater] = applyToOpening
         ? await Promise.all([
             dailyOnlineStockRepository.productIdsWithRowsAfterDate(idsFor("ONLINE"), entryDate, tx),
             dailyOfflineStockRepository.productIdsWithRowsAfterDate(idsFor("OFFLINE"), entryDate, tx),
           ])
         : [new Set<number>(), new Set<number>()];
-      let keptManual = 0;
-      let heldLocked = 0;
+      let leftSaved = 0;
       const releasedCounts: ManualCount[] = [];
       for (const count of pending) {
         // TOTAL is a combined view and can never be split into an opening.
         const apply = applyToOpening && count.location !== "TOTAL";
         const published = await manualCountRepository.markPublished(count.id, userId ?? null, now, apply, tx);
         releasedCounts.push(published);
-        const changeId = await recordChange(
+        await recordChange(
           { tableName: TABLE, recordId: count.id, action: "UPDATE", changedById: userId, oldValue: count, newValue: published },
           tx,
         );
         const hasLater = count.location === "ONLINE" ? onlineHasLater : offlineHasLater;
-        if (apply && hasLater.has(count.productId)) {
-          const outcome = await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId);
-          if (outcome === "kept-manual") keptManual++;
-          if (outcome === "held-locked") heldLocked++;
-        }
+        if (apply && hasLater.has(count.productId)) leftSaved++;
       }
       // Every publish leaves a frozen copy and an Audit History entry, whether or
       // not the counts were applied to the next day's opening stock.
       const snapshotId = await saveAuditSnapshot(entryDate, shift, now, releasedCounts, applyToOpening, userId, tx);
-      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, keptManual, heldLocked, snapshotId };
+      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, leftSaved, snapshotId };
     },
     { timeout: 120_000, maxWait: 10_000 },
   );
@@ -719,17 +736,31 @@ export async function getVarianceTrace(productId: number, entryDate: Date, shift
       : dailyOfflineStockRepository.findByProductAndDate(productId, entryDate, shift),
   ]);
 
-  const expectedOpening =
+  // Judged by the same gate that opened it: an audit published after this row
+  // was first saved never counts as what it should have carried.
+  const openingFor = (rowCreatedAt?: Date) =>
     location === "ONLINE"
-      ? await dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift)
-      : await dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift);
+      ? dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift, undefined, rowCreatedAt)
+      : dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift, undefined, rowCreatedAt);
+  let expectedOpening = await openingFor(entry?.createdAt);
+  // A row that already opens at what an applied audit gives it (an earlier publish
+  // set it that way) is a settled starting record, not a break.
+  let followsAudit = false;
+  if (entry && toNum(entry.openingStock) !== expectedOpening) {
+    const ungated = await openingFor();
+    if (ungated === toNum(entry.openingStock)) {
+      expectedOpening = ungated;
+      followsAudit = true;
+    }
+  }
   const actualOpening = entry ? toNum(entry.openingStock) : expectedOpening;
   // Only a count applied to opening stock is ever the source; otherwise it is
   // the system carry (or what an import set over it - that shows as isBreak).
   const prior = previousPeriod(entryDate, shift);
-  const latestCount = await manualCountRepository.findLatestBefore(productId, entryDate, shift, location);
-  const source =
-    latestCount && toDateOnlyString(latestCount.entryDate) === toDateOnlyString(prior.entryDate) && latestCount.shift === prior.shift ? "count" : "system";
+  const latestCount = await manualCountRepository.findLatestBefore(productId, entryDate, location, undefined, followsAudit ? undefined : entry?.createdAt);
+  // An applied count is the day's closing figure, whichever shift it was taken
+  // in, so it is the source when it falls on the day the previous period is on.
+  const source = latestCount && toDateOnlyString(latestCount.entryDate) === toDateOnlyString(prior.entryDate) ? "count" : "system";
 
   const entryTable = location === "ONLINE" ? "daily_online_stock" : "daily_offline_stock";
   const [entryLog, countLog] = await Promise.all([

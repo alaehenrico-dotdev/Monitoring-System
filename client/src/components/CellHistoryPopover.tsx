@@ -204,7 +204,7 @@ export function CellHistoryPopover({
             onChange={(e) => setReason(e.target.value)}
             style={{ height: "auto", padding: 6 }}
           />
-          {formError && <div role="alert" style={{ fontSize: 12, color: "var(--ae-danger-text)" }}>{formError}</div>}
+          {formError && <div role="alert" style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: "var(--ae-danger-text)" }}>{formError}</div>}
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
             <button type="button" className="ae-btn ae-btn-solid ae-btn-sm" onClick={() => setRequesting(false)}>
               Cancel

@@ -60,12 +60,12 @@ export class ErrorBoundary extends Component<Props, State> {
           color: colors.ink,
         }}
       >
-        <h1 style={{ margin: 0, fontSize: 20 }}>Something went wrong.</h1>
+        <h1 style={{ margin: 0, fontSize: "calc(20px * var(--ae-fs, 1))" }}>Something went wrong.</h1>
         <p
           style={{
             margin: 0,
             maxWidth: 420,
-            fontSize: 13.5,
+            fontSize: "calc(13.5px * var(--ae-fs, 1))",
             color: colors.subtleInk,
           }}
         >
@@ -79,7 +79,7 @@ export class ErrorBoundary extends Component<Props, State> {
           style={{
             marginTop: 6,
             padding: "9px 20px",
-            fontSize: 13.5,
+            fontSize: "calc(13.5px * var(--ae-fs, 1))",
             fontFamily: "inherit",
             fontWeight: 600,
             color: colors.black,

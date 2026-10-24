@@ -91,11 +91,11 @@ export function DatabaseBackupPage() {
         }}
       >
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>
+          <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>
             Backup
           </div>
           <div
-            style={{ fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}
+            style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}
           >
             Download the whole database as a <code>.sql</code> file.
           </div>
@@ -105,7 +105,7 @@ export function DatabaseBackupPage() {
           <span
             role="status"
             aria-live="polite"
-            style={{ fontSize: 12, color: colors.subtleInk, flexShrink: 0 }}
+            style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk, flexShrink: 0 }}
           >
             {formatBytes(bytes)}
           </span>

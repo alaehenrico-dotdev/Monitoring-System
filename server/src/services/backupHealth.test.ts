@@ -31,18 +31,18 @@ beforeEach(() => {
 });
 
 describe("backupHealth - when a backup counts as overdue", () => {
-  it("keeps the 36-hour rule for a setup with no Drive monthly backup", async () => {
+  it("keeps the 36-hour rule for a setup with no Drive weekly backup", async () => {
     lastBackup(30);
     expect((await backupHealth(NOW)).overdue).toBe(false);
     lastBackup(40);
     expect(await backupHealth(NOW)).toMatchObject({ overdue: true, overdueHours: 36 });
   });
 
-  it("stretches to a month when Drive's monthly backup is the only scheduled one", async () => {
+  it("stretches to a week and a bit when Drive's weekly backup is the only scheduled one", async () => {
     mocks.prisma.driveConnection.findUnique.mockResolvedValue({ autoBackup: true });
-    lastBackup(20 * 24); // 20 days ago: fine for a monthly backup
-    expect(await backupHealth(NOW)).toMatchObject({ overdue: false, overdueHours: 33 * 24 });
-    lastBackup(34 * 24); // a month missed
+    lastBackup(6 * 24); // 6 days ago: fine for a weekly backup
+    expect(await backupHealth(NOW)).toMatchObject({ overdue: false, overdueHours: 9 * 24 });
+    lastBackup(10 * 24); // a Sunday missed
     expect((await backupHealth(NOW)).overdue).toBe(true);
   });
 
@@ -65,7 +65,7 @@ describe("backupHealth - when a backup counts as overdue", () => {
     expect(await backupHealth(NOW)).toMatchObject({ overdue: true, overdueHours: 36 });
   });
 
-  it("never narrows a threshold the admin set wider than a month", async () => {
+  it("never narrows a threshold the admin set wider than the weekly allowance", async () => {
     mocks.env.backupOverdueHours = 90 * 24;
     mocks.prisma.driveConnection.findUnique.mockResolvedValue({ autoBackup: true });
     expect((await backupHealth(NOW)).overdueHours).toBe(90 * 24);

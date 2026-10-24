@@ -89,7 +89,7 @@ export function AddProductForm({
         </Field>
       </div>
       {error && (
-        <div role="alert" style={{ color: colors.danger, fontSize: 13, marginTop: 8 }}>
+        <div role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))", marginTop: 8 }}>
           {error}
         </div>
       )}

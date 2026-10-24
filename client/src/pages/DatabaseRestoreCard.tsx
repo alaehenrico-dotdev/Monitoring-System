@@ -25,7 +25,7 @@ const slotStyle: CSSProperties = {
   height: 32,
   boxSizing: "border-box",
   padding: "0 10px",
-  fontSize: 12.5,
+  fontSize: "calc(12.5px * var(--ae-fs, 1))",
   flexShrink: 0,
 };
 
@@ -144,11 +144,11 @@ export function DatabaseRestoreCard() {
         }}
       >
         <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>
+          <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>
             Restore
           </div>
           <div
-            style={{ fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}
+            style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}
           >
             Replaces all live data with a <code>.sql</code> backup. Current data
             is saved to this device first.
@@ -236,7 +236,7 @@ export function DatabaseRestoreCard() {
           onClick={() => !busy && fileInput.current?.click()}
           style={{
             marginTop: 8,
-            fontSize: 12,
+            fontSize: "calc(12px * var(--ae-fs, 1))",
             color: colors.subtleInk,
             cursor: busy ? "default" : "pointer",
             overflow: "hidden",
@@ -254,7 +254,7 @@ export function DatabaseRestoreCard() {
             marginTop: 8,
             padding: "8px 10px",
             borderRadius: 6,
-            fontSize: 12.5,
+            fontSize: "calc(12.5px * var(--ae-fs, 1))",
             border: `1px solid ${check.state === "done" && check.report.ok ? colors.border : colors.danger}`,
             color: colors.ink,
           }}
@@ -285,7 +285,7 @@ export function DatabaseRestoreCard() {
         </div>
       )}
       {!resetToken && passcodeError && (
-        <div style={{ marginTop: 8, fontSize: 12, color: colors.danger }}>
+        <div style={{ marginTop: 8, fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.danger }}>
           {passcodeError}
         </div>
       )}
@@ -319,12 +319,12 @@ export function DatabaseRestoreCard() {
         >
           {status === "confirming" ? (
             <>
-              <p style={{ margin: "0 0 12px", fontSize: 13.5 }}>
+              <p style={{ margin: "0 0 12px", fontSize: "calc(13.5px * var(--ae-fs, 1))" }}>
                 This will overwrite the entire live database with{" "}
                 <strong>{file?.name}</strong>. Anything saved after that backup
                 was taken will be lost.
               </p>
-              <p style={{ margin: "0 0 18px", fontSize: 13 }}>
+              <p style={{ margin: "0 0 18px", fontSize: "calc(13px * var(--ae-fs, 1))" }}>
                 A backup of the current data will be downloaded first; if that
                 fails, nothing is restored.
               </p>

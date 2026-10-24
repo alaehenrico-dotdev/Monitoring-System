@@ -22,7 +22,7 @@ describe("menu-bar toolbar style", () => {
   });
 
   it("defines its colours, radius and sizes as tokens, with a dark value for the amber", () => {
-    for (const token of ["--ae-mb-radius: 6px", "--ae-mb-h: 28px", "--ae-mb-gap: 6px", "--ae-mb-line-w: 1px", "--ae-mb-menu-bg", "--ae-mb-primary-bg", "--ae-mb-warn"]) {
+    for (const token of ["--ae-mb-radius: 4px", "--ae-mb-h: 28px", "--ae-mb-gap: 6px", "--ae-mb-line-w: 1px", "--ae-mb-menu-bg", "--ae-mb-primary-bg", "--ae-mb-warn"]) {
       expect(block, token).toContain(token);
     }
     expect(block).toMatch(/:root\[data-theme="dark"\] \.ae-mb[^{]*\{[^}]*--ae-mb-warn:/);

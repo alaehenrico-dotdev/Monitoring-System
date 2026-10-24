@@ -28,8 +28,19 @@ about the transfer actually changed).
 
 Any MySQL-compatible server works; on Windows the recommended setup is MySQL Server 8.4 plus
 MySQL Workbench (`winget install Oracle.MySQL Oracle.MySQLWorkbench`; set the root password in
-the MySQL configurator). Create a database, then
-copy the server's env file:
+the MySQL configurator). Create a database and a dedicated account for the app - the app
+should never connect as `root`, which can read and change every database on the server.
+Run this once as root (in MySQL Workbench or the `mysql` client), with your own password:
+
+```sql
+CREATE DATABASE IF NOT EXISTS ala_eh_stocks CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER 'alaeh_app'@'localhost' IDENTIFIED BY 'a-long-random-password';
+GRANT ALL PRIVILEGES ON ala_eh_stocks.* TO 'alaeh_app'@'localhost';
+```
+
+`ALL PRIVILEGES ON ala_eh_stocks.*` covers what the app, its migrations and its backups
+need (`prisma migrate deploy` runs DDL; `mysqldump` reads tables, views, triggers and
+routines) and nothing outside that one database. Then copy the server's env file:
 
 ```bash
 cd server
@@ -37,7 +48,7 @@ cp .env.example .env
 # edit .env - set DATABASE_URL, JWT_SECRET, and DATA_RESET_PASSCODE - the
 # server refuses to start if any of these are missing, with no insecure
 # fallback.
-# e.g. mysql://root:YOUR_ROOT_PASSWORD@localhost:3306/ala_eh_stocks
+# e.g. mysql://alaeh_app:YOUR_APP_PASSWORD@localhost:3306/ala_eh_stocks
 ```
 
 `JWT_SECRET` and `DATA_RESET_PASSCODE` both need a real random value —
