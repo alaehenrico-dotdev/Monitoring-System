@@ -79,7 +79,7 @@ export function Layout() {
           id="server-offline"
           message={
             !online && !offlineDismissed
-              ? "Server unreachable. Reconnect before loading or saving data."
+              ? "Server unreachable. Reconnect to continue."
               : null
           }
           variant="warning"
@@ -90,7 +90,7 @@ export function Layout() {
           id="session-expiring"
           message={
             minutesLeft !== null && !expiryWarnDismissed
-              ? `Your session expires in about ${minutesLeft} min. Save your changes soon.`
+              ? `Session expires in ${minutesLeft} min. Save your work.`
               : null
           }
           variant="warning"
@@ -101,7 +101,7 @@ export function Layout() {
           id="drafts-recovered"
           message={
             recoveredDrafts > 0
-              ? `Recovered your unsaved edits from last time (${recoveredDrafts} sheet${recoveredDrafts === 1 ? "" : "s"}). They aren't saved yet - open the entry page to review and save.`
+              ? `Recovered unsaved edits on ${recoveredDrafts} sheet${recoveredDrafts === 1 ? "" : "s"}. Open the entry page to save.`
               : null
           }
           variant="info"

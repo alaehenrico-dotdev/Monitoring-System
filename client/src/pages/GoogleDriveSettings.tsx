@@ -149,7 +149,7 @@ export function GoogleDriveSettings() {
     run("disconnect", disconnectDrive, (next) => {
       apply(next);
       setConfirmDisconnect(false);
-      setNotice("Google Drive was disconnected. Files already in Drive were left there.");
+      setNotice("Google Drive disconnected. Existing files were kept.");
     });
 
   const change = (patch: Partial<DriveSettings>) => run("save", () => updateDriveSettings(patch), apply);
@@ -165,7 +165,7 @@ export function GoogleDriveSettings() {
     const value = Number(keepText);
     if (!Number.isInteger(value) || value < 1 || value > 365) {
       setKeepText(String(status.settings.keepBackups));
-      setError("Keep between 1 and 365 backups.");
+      setError("Enter 1 to 365 backups.");
       return;
     }
     if (value !== status.settings.keepBackups) void change({ keepBackups: value });

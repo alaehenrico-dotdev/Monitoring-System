@@ -4,7 +4,7 @@ import { manualCountRepository } from "../repositories/manualCountRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
-import { recordChange } from "./changeLog.service";
+import { logSystemEvent, recordChange } from "./changeLog.service";
 import { recordReportHistoryIn } from "./reportHistory.service";
 import { assertPeriodOpen, isLockedForCarry } from "./dayLock.service";
 import { holdStaleOpening } from "./staleOpening.service";
@@ -25,7 +25,7 @@ import { toDateOnlyString } from "../utils/date";
 
 const TABLE = "manual_counts";
 
-/// Section 4.4 - Variance = System Remaining Stock - Manual Count. The system
+/// Section 4.4 - Variance = Manual Count - System Remaining Stock. The system
 /// figure is always pulled fresh from the matching daily table (same shift)
 /// at save time, never typed, so it can't silently disappear the way an
 /// overwritten spreadsheet cell can (Section 2.1).
@@ -555,8 +555,99 @@ export async function getAuditSnapshot(id: number) {
     shift: snapshot.shift,
     publishedAt: snapshot.publishedAt.toISOString(),
     appliedToOpening: snapshot.appliedToOpening,
+    revertedAt: snapshot.revertedAt ? snapshot.revertedAt.toISOString() : null,
     rows: payload.rows ?? [],
   };
+}
+
+export const MAX_SNAPSHOT_STATES = 100;
+
+/// Where each published audit stands, for the Audit History rows: reverted, and
+/// whether it can still be reverted - that is, the sheet's counts still carry
+/// THIS publish's timestamp. Editing a count un-publishes it, so an audit that
+/// was edited (or re-published) since has nothing left to revert.
+export async function getAuditSnapshotStates(ids: number[]) {
+  const wanted = [...new Set(ids)].slice(0, MAX_SNAPSHOT_STATES);
+  if (wanted.length === 0) return [];
+  const snaps = await prisma.auditSnapshot.findMany({
+    where: { id: { in: wanted } },
+    select: { id: true, entryDate: true, shift: true, publishedAt: true, revertedAt: true, revertedById: true },
+  });
+  const open = snaps.filter((s) => !s.revertedAt);
+  const live = open.length
+    ? await prisma.manualCount.findMany({
+        where: { OR: open.map((s) => ({ entryDate: s.entryDate, shift: s.shift, publishedAt: s.publishedAt })) },
+        select: { entryDate: true, shift: true, publishedAt: true },
+        distinct: ["entryDate", "shift", "publishedAt"],
+      })
+    : [];
+  const key = (d: Date, shift: string, at: Date | null) => `${toDateOnlyString(d)}:${shift}:${at ? at.getTime() : ""}`;
+  const stillPublished = new Set(live.map((c) => key(c.entryDate, c.shift, c.publishedAt)));
+  return snaps.map((s) => ({
+    id: s.id,
+    reverted: !!s.revertedAt,
+    revertedAt: s.revertedAt ? s.revertedAt.toISOString() : null,
+    canRevert: !s.revertedAt && stillPublished.has(key(s.entryDate, s.shift, s.publishedAt)),
+  }));
+}
+
+/**
+ * Reverts a published audit so it can be re-audited: every count that this
+ * publish released goes back to unpublished (the same state saving a count
+ * leaves it in). A count that had been applied to the next day's opening stock
+ * has that undone, re-deriving the later periods exactly as a re-save would.
+ * Refused for a finished or closed period (unlock it first). The frozen copy
+ * and its Audit History entry stay, marked as reverted with the reason, and the
+ * counts' own change log shows each step. Everything or nothing, in one transaction.
+ */
+export async function revertAuditSnapshot(id: number, reason: string, userId?: number) {
+  const why = reason.trim();
+  if (why.length < 5) throw HttpError.badRequest("Give a reason (at least 5 characters)");
+  if (why.length > MAX_REMARKS_LENGTH) throw HttpError.badRequest(`The reason is at most ${MAX_REMARKS_LENGTH} characters`);
+
+  const result = await prisma.$transaction(
+    async (tx) => {
+      const snapshot = await tx.auditSnapshot.findUnique({ where: { id } });
+      if (!snapshot) throw HttpError.notFound("That published audit no longer exists");
+      if (snapshot.revertedAt) throw HttpError.conflict("That published audit was already reverted.");
+      await assertPeriodOpen(snapshot.entryDate, snapshot.shift, tx, "count");
+
+      const counts = await tx.manualCount.findMany({
+        where: { entryDate: snapshot.entryDate, shift: snapshot.shift, publishedAt: snapshot.publishedAt },
+      });
+      let keptManual = 0;
+      let heldLocked = 0;
+      for (const count of counts) {
+        const updated = await tx.manualCount.update({
+          where: { id: count.id },
+          data: { publishedAt: null, publishedById: null, appliedToOpening: false },
+        });
+        const changeId = await recordChange(
+          { tableName: TABLE, recordId: count.id, action: "UPDATE", changedById: userId, oldValue: count, newValue: updated },
+          tx,
+        );
+        if (count.appliedToOpening && count.location !== "TOTAL") {
+          const outcome = await propagateOpeningStock(count.productId, snapshot.entryDate, snapshot.shift, count.location, userId, tx, changeId);
+          if (outcome === "kept-manual") keptManual++;
+          if (outcome === "held-locked") heldLocked++;
+        }
+      }
+      await tx.auditSnapshot.update({
+        where: { id },
+        data: { revertedAt: new Date(), revertedById: userId ?? null, revertReason: why },
+      });
+      return { snapshotId: id, reverted: counts.length, keptManual, heldLocked, entryDate: snapshot.entryDate, shift: snapshot.shift };
+    },
+    { timeout: 120_000, maxWait: 10_000 },
+  );
+  await logSystemEvent(
+    "audit_revert",
+    { snapshotId: id, date: toDateOnlyString(result.entryDate), shift: result.shift, counts: result.reverted, reason: why },
+    userId ?? null,
+    "UPDATE",
+  );
+  broadcastRealtimeEvent();
+  return { snapshotId: id, reverted: result.reverted, keptManual: result.keptManual, heldLocked: result.heldLocked };
 }
 
 /// Longest period the Variance Report / Ledger will read in one request.

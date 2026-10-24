@@ -32,7 +32,7 @@ describe("SettingsPage appearance", () => {
     open();
     expect(screen.getByRole("tab", { name: "Appearance", selected: true })).toBeTruthy();
     expect((screen.getByRole("radio", { name: /Light/ }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("radio", { name: /Classic/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /^Classic$/ }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("switching the theme applies at once and is remembered", () => {
@@ -49,7 +49,7 @@ describe("SettingsPage appearance", () => {
     [/Glassmorphism/, "glass"],
     [/Minimalism/, "minimal"],
     [/Skeuomorphism/, "skeuo"],
-    [/Carbon/, "carbon"],
+    [/Aurora/, "aurora"],
   ] as const)("switching to the %s theme applies at once and is remembered", (name, value) => {
     open();
     fireEvent.click(screen.getByRole("radio", { name }));

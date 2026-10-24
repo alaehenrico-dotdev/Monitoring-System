@@ -74,9 +74,9 @@ export function calculateOfflineRemaining(
   return round2(offlineStock + productionIn - deliveryOut - upsellOut + backloads);
 }
 
-/// Section 4.4 - Variance = System Remaining Stock - Manual Count.
+/// Section 4.4 - Variance = Manual Count - System Remaining Stock.
 export function calculateVariance(systemRemainingStock: number, manualCount: number): number {
-  return round2(systemRemainingStock - manualCount);
+  return round2(manualCount - systemRemainingStock);
 }
 
 /// Negative-stock guard - a channel's own Remaining Stock is the actual

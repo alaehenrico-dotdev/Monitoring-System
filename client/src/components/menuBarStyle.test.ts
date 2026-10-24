@@ -6,7 +6,10 @@ import { describe, expect, it } from "vitest";
 // these guard the stylesheet and the components' source: the spec's rules about
 // tokens, targets and tiers must stay true as the code changes.
 const css = readFileSync(join(__dirname, "../index.css"), "utf8");
-const block = css.slice(css.indexOf("Menu-bar toolbar (components/EntryToolbar.tsx"));
+// Ends where the Classic Plus theme begins: later theme blocks restyle these
+// controls on purpose and are not part of the menu bar's own spec.
+const blockStart = css.indexOf("Menu-bar toolbar (components/EntryToolbar.tsx");
+const block = css.slice(blockStart, css.indexOf("Classic Plus theme (Settings", blockStart));
 const source = (name: string) => readFileSync(join(__dirname, name), "utf8");
 const COMPONENTS = ["MenuBar.tsx", "SplitButton.tsx", "SaveStatus.tsx", "DateStepper.tsx", "FilterSlot.tsx", "EntryToolbar.tsx", "PageToolbar.tsx"];
 

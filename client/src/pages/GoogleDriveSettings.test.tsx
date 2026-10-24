@@ -165,7 +165,7 @@ describe("once connected", () => {
     const input = screen.getByLabelText("Number of backups to keep");
     fireEvent.change(input, { target: { value: bad } });
     fireEvent.blur(input);
-    expect(await screen.findByText("Keep between 1 and 365 backups.")).toBeInTheDocument();
+    expect(await screen.findByText("Enter 1 to 365 backups.")).toBeInTheDocument();
     expect(input).toHaveValue(14);
     expect(api.updateDriveSettings).not.toHaveBeenCalled();
   });

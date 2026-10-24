@@ -68,16 +68,22 @@ const THEMES: Choice<UiStyle>[] = [
     preview: <SkeuoPreview />,
   },
   {
-    value: "carbon",
-    label: "Carbon Design System",
-    description: "IBM Carbon: a black shell header, square grey-ruled layout, IBM Plex Sans, blue primary buttons and an underlined active tab.",
-    preview: <CarbonPreview />,
+    value: "aurora",
+    label: "Aurora",
+    description: "A modern indigo-to-violet-to-pink gradient on the header, buttons, active tab and category bars, over cool soft surfaces. Every corner is 4px. Same pages and shortcuts as Classic.",
+    preview: <AuroraPreview />,
+  },
+  {
+    value: "plus",
+    label: "Classic Plus",
+    description: "Classic, refined: the same cream and charcoal with brand gold, but a clearer frosted header and soft layered shadows instead of glow. Same pages and shortcuts as Classic.",
+    preview: <PlusPreview />,
   },
 ];
 
 /**
  * Settings > Appearance: how the app looks on THIS browser. The color mode
- * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Carbon) are independent, remembered per
+ * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Aurora, Classic Plus) are independent, remembered per
  * browser (ThemeContext), apply immediately, and change only how things are
  * drawn - never the pages, the controls or the data - which is why every role can
  * reach them, unlike the other Settings tabs.
@@ -281,19 +287,33 @@ function SkeuoPreview() {
   );
 }
 
-function CarbonPreview() {
+function PlusPreview() {
+  const lift = "0 6px 14px -4px rgba(31,26,18,0.22), 0 1px 2px rgba(31,26,18,0.1)";
   return (
-    <span style={{ display: "block", background: "#f4f4f4", height: 86, borderRadius: 4, overflow: "hidden" }}>
-      <span style={{ display: "block", height: 16, background: "#161616" }} />
-      <span style={{ display: "flex", gap: 8, padding: "5px 8px 0", background: "#ffffff", borderBottom: "1px solid #e0e0e0" }}>
-        <span style={{ display: "block", width: 26, height: 7, borderBottom: "2px solid #0f62fe", background: "#e0e0e0", borderRadius: 0 }} />
-        <span style={bar(26, 5, "#c6c6c6", { borderRadius: 0 })} />
-      </span>
-      <span style={{ display: "block", padding: "6px 8px" }}>
-        <span style={{ display: "block", ...bar("100%", 7, "#e0e0e0", { borderRadius: 0 }) }} />
-        <span style={{ display: "block", ...bar("100%", 6, "#ffffff", { borderRadius: 0, marginTop: 1 }) }} />
-        <span style={{ display: "block", ...bar(34, 9, "#0f62fe", { borderRadius: 0, marginTop: 6 }) }} />
-      </span>
+    <span style={{ display: "block", background: "#faf7f0", padding: 8, height: 86, borderRadius: 4 }}>
+      <span
+        style={{
+          display: "block",
+          height: 24,
+          borderRadius: 8,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,253,247,0.6))",
+          border: "1px solid rgba(255,255,255,0.8)",
+          boxShadow: `inset 0 1px 0 #fff, 0 0 0 1px rgba(31,26,18,0.08), ${lift}`,
+        }}
+      />
+      <span style={{ display: "block", ...bar("100%", 18, "#ffffff", { marginTop: 10, borderRadius: 6, border: "1px solid #e4dcc6", boxShadow: "0 3px 8px -2px rgba(31,26,18,0.14)" }) }} />
+      <span style={{ display: "block", ...bar(34, 8, "#f5c000", { marginTop: 8, borderRadius: 4 }) }} />
+    </span>
+  );
+}
+
+function AuroraPreview() {
+  const grad = "linear-gradient(120deg, #4f46e5, #7c3aed 55%, #c026d3)";
+  return (
+    <span style={{ display: "block", background: "radial-gradient(90px 60px at 0% 0%, rgba(99,102,241,0.25), transparent 70%), radial-gradient(90px 60px at 100% 0%, rgba(217,70,239,0.2), transparent 70%), #f5f5fd", height: 86, borderRadius: 4, padding: 8 }}>
+      <span style={{ display: "block", height: 22, borderRadius: 4, background: grad, boxShadow: "0 6px 14px -6px rgba(79,70,229,0.6)" }} />
+      <span style={{ display: "block", ...bar("100%", 20, "#ffffff", { marginTop: 8, borderRadius: 4, border: "1px solid #dcdbf0", boxShadow: "0 3px 8px -3px rgba(30,27,75,0.2)" }) }} />
+      <span style={{ display: "block", ...bar(34, 9, "#4f46e5", { marginTop: 8, borderRadius: 4, background: grad }) }} />
     </span>
   );
 }

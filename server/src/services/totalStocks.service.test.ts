@@ -68,23 +68,23 @@ describe("getTotalStocksGrid - totalVariance", () => {
       Promise.resolve(shift === "NIGHT" ? [offlineRow(30)] : [])) as never);
   });
 
-  it("uses the same System Remaining Stock - Manual Count sign convention as Manual Count's own variance", async () => {
+  it("uses the same Manual Count - System Remaining Stock sign convention as Manual Count's own variance", async () => {
     // totalRemainingStock is 80 (see above). A TOTAL-location manual count
-    // of 75 (undercounted vs. system) should read as a positive 5, same
+    // of 75 (undercounted vs. system) should read as a negative 5, same
     // sign Manual Count's own calculateVariance would give.
     vi.mocked(manualCountRepository.findForTotals).mockResolvedValue([
       { productId: PRODUCT_ID, location: "TOTAL", shift: "NIGHT", manualCount: 75 },
     ] as never);
     const rows = await getTotalStocksGrid(DATE);
-    expect(rows[0].totalVariance).toBe(5);
+    expect(rows[0].totalVariance).toBe(-5);
   });
 
-  it("is negative when the physical count is HIGHER than the system total - an overage, not an error", async () => {
+  it("is positive when the physical count is HIGHER than the system total - an overage, not an error", async () => {
     vi.mocked(manualCountRepository.findForTotals).mockResolvedValue([
       { productId: PRODUCT_ID, location: "TOTAL", shift: "NIGHT", manualCount: 90 },
     ] as never);
     const rows = await getTotalStocksGrid(DATE);
-    expect(rows[0].totalVariance).toBe(-10);
+    expect(rows[0].totalVariance).toBe(10);
   });
 });
 
@@ -108,7 +108,7 @@ describe("getTotalStocksGrid - an opening balance is not a variance", () => {
   it("still reports the real variance for an ordinary count", async () => {
     vi.mocked(manualCountRepository.findForTotals).mockResolvedValue(count(false));
     const [row] = await getTotalStocksGrid(DATE);
-    expect(row.totalVariance).toBe(-120);
+    expect(row.totalVariance).toBe(120);
   });
 });
 

@@ -8,10 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // reads the products' names for it (tx.product).
 const snapshotTx = vi.hoisted(() => ({
   product: { findMany: vi.fn() },
-  auditSnapshot: { create: vi.fn(), findUnique: vi.fn() },
+  auditSnapshot: { create: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn() },
+  manualCount: { findMany: vi.fn(), update: vi.fn() },
 }));
 vi.mock("../lib/prisma", () => ({
-  prisma: { $transaction: (cb: (tx: unknown) => unknown) => cb(snapshotTx), auditSnapshot: snapshotTx.auditSnapshot },
+  prisma: { $transaction: (cb: (tx: unknown) => unknown) => cb(snapshotTx), auditSnapshot: snapshotTx.auditSnapshot, manualCount: snapshotTx.manualCount },
 }));
 const recordReportHistoryIn = vi.hoisted(() => vi.fn());
 vi.mock("./reportHistory.service", () => ({ recordReportHistoryIn }));
@@ -62,7 +63,7 @@ vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(), findActive: vi.fn() },
 }));
 vi.mock("./dayLock.service", () => ({ assertPeriodOpen: vi.fn(), isLockedForCarry: vi.fn().mockResolvedValue(false) }));
-vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
+vi.mock("./changeLog.service", () => ({ recordChange: vi.fn(), logSystemEvent: vi.fn() }));
 
 import { manualCountRepository } from "../repositories/manualCountRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
@@ -71,7 +72,7 @@ import { productRepository } from "../repositories/productRepository";
 import { changeLogRepository } from "../repositories/changeLogRepository";
 import { userRepository } from "../repositories/userRepository";
 import { recordChange } from "./changeLog.service";
-import { getAuditSnapshot, getManualCountGrid, getVarianceReport, getVarianceTrace, publishManualCounts, saveManualCount, setCountRemarks } from "./manualCounts.service";
+import { getAuditSnapshot, getAuditSnapshotStates, revertAuditSnapshot, getManualCountGrid, getVarianceReport, getVarianceTrace, publishManualCounts, saveManualCount, setCountRemarks } from "./manualCounts.service";
 
 const PRODUCT_ID = 1;
 const DATE = new Date("2026-06-15T00:00:00.000Z");
@@ -120,8 +121,8 @@ describe("getManualCountGrid - blank (not yet counted) vs. a real zero count", (
   });
 });
 
-describe("saveManualCount - Variance = System Remaining Stock - Manual Count", () => {
-  it("is positive when the physical count is LOWER than system stock (a shortage)", async () => {
+describe("saveManualCount - Variance = Manual Count - System Remaining Stock", () => {
+  it("is negative when the physical count is LOWER than system stock (a shortage)", async () => {
     vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({ remainingStock: 100 } as never);
     vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
     vi.mocked(manualCountRepository.upsert).mockImplementation(((_id: number | undefined, data: object) =>
@@ -129,10 +130,10 @@ describe("saveManualCount - Variance = System Remaining Stock - Manual Count", (
 
     await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 95);
 
-    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: 5 }), expect.anything());
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: -5 }), expect.anything());
   });
 
-  it("is negative when the physical count is HIGHER than system stock (an overage, same sign convention everywhere else)", async () => {
+  it("is positive when the physical count is HIGHER than system stock (an overage, same sign convention everywhere else)", async () => {
     vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue({ remainingStock: 100 } as never);
     vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
     vi.mocked(manualCountRepository.upsert).mockImplementation(((_id: number | undefined, data: object) =>
@@ -140,7 +141,7 @@ describe("saveManualCount - Variance = System Remaining Stock - Manual Count", (
 
     await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 110);
 
-    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: -10 }), expect.anything());
+    expect(manualCountRepository.upsert).toHaveBeenCalledWith(undefined, expect.objectContaining({ variance: 10 }), expect.anything());
   });
 });
 
@@ -513,7 +514,7 @@ describe("opening balance - the first count of a product at a location", () => {
     await saveManualCount(PRODUCT_ID, DATE, SHIFT, "ONLINE", 95);
     expect(manualCountRepository.upsert).toHaveBeenCalledWith(
       undefined,
-      expect.objectContaining({ isOpeningBalance: false, variance: 5 }),
+      expect.objectContaining({ isOpeningBalance: false, variance: -5 }),
       expect.anything(),
     );
   });
@@ -571,6 +572,7 @@ describe("getAuditSnapshot", () => {
       shift: "NIGHT",
       publishedAt: "2026-06-16T01:00:00.000Z",
       appliedToOpening: true,
+      revertedAt: null,
       rows: [{ location: "ONLINE", productId: 10, name: "APPLE", manualCount: 18 }],
     });
   });
@@ -578,5 +580,49 @@ describe("getAuditSnapshot", () => {
   it("says so when the published audit no longer exists", async () => {
     snapshotTx.auditSnapshot.findUnique.mockResolvedValue(null);
     await expect(getAuditSnapshot(99)).rejects.toThrow(/no longer exists/);
+  });
+});
+
+describe("reverting a published audit", () => {
+  const PUBLISHED_AT = new Date("2026-06-16T01:00:00.000Z");
+  const snapshot = { id: 7, entryDate: DATE, shift: SHIFT, publishedAt: PUBLISHED_AT, revertedAt: null };
+  const count = { id: 31, productId: PRODUCT_ID, entryDate: DATE, shift: SHIFT, location: "ONLINE", publishedAt: PUBLISHED_AT, appliedToOpening: false };
+
+  it("sends the counts that publish released back to unpublished, keeps the copy and marks it", async () => {
+    snapshotTx.auditSnapshot.findUnique.mockResolvedValue(snapshot);
+    snapshotTx.manualCount.findMany.mockResolvedValue([count, { ...count, id: 32, location: "OFFLINE" }]);
+    snapshotTx.manualCount.update.mockImplementation(async ({ where }: { where: { id: number } }) => ({ ...count, id: where.id, publishedAt: null }));
+
+    const result = await revertAuditSnapshot(7, "Counted the wrong shelf", 9);
+
+    expect(result).toMatchObject({ snapshotId: 7, reverted: 2 });
+    // Only the counts carrying THIS publish's timestamp are touched.
+    expect(snapshotTx.manualCount.findMany.mock.calls[0][0].where).toMatchObject({ entryDate: DATE, shift: SHIFT, publishedAt: PUBLISHED_AT });
+    expect(snapshotTx.manualCount.update.mock.calls[0][0].data).toEqual({ publishedAt: null, publishedById: null, appliedToOpening: false });
+    expect(snapshotTx.auditSnapshot.update.mock.calls[0][0].data).toMatchObject({ revertedById: 9, revertReason: "Counted the wrong shelf" });
+    expect(snapshotTx.auditSnapshot.update.mock.calls[0][0].data.revertedAt).toBeInstanceOf(Date);
+    // Each count's change is logged.
+    expect(vi.mocked(recordChange)).toHaveBeenCalledTimes(2);
+  });
+
+  it("refuses without a real reason, and refuses one already reverted", async () => {
+    await expect(revertAuditSnapshot(7, "no", 9)).rejects.toThrow(/reason/);
+    snapshotTx.auditSnapshot.findUnique.mockResolvedValue({ ...snapshot, revertedAt: new Date() });
+    await expect(revertAuditSnapshot(7, "Counted the wrong shelf", 9)).rejects.toThrow(/already reverted/);
+    expect(snapshotTx.manualCount.update).not.toHaveBeenCalled();
+  });
+
+  it("says so when the audit does not exist", async () => {
+    snapshotTx.auditSnapshot.findUnique.mockResolvedValue(null);
+    await expect(revertAuditSnapshot(99, "Counted the wrong shelf", 9)).rejects.toThrow(/no longer exists/);
+  });
+
+  it("an audit whose counts were edited since has nothing left to revert (canRevert is false)", async () => {
+    snapshotTx.auditSnapshot.findMany.mockResolvedValue([snapshot, { ...snapshot, id: 8, shift: "MORNING" }]);
+    // Only the Night sheet still carries this publish's timestamp.
+    snapshotTx.manualCount.findMany.mockResolvedValue([{ entryDate: DATE, shift: "NIGHT", publishedAt: PUBLISHED_AT }]);
+    const states = await getAuditSnapshotStates([7, 8]);
+    expect(states.find((s) => s.id === 7)).toMatchObject({ reverted: false, canRevert: true });
+    expect(states.find((s) => s.id === 8)).toMatchObject({ reverted: false, canRevert: false });
   });
 });

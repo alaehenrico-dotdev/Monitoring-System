@@ -54,8 +54,6 @@ describe("ManualCountPage - opening balance", () => {
 
     const soyRow = (await screen.findByText("Soy Sauce")).closest("tr")!;
     expect(soyRow.textContent).toContain("Opening");
-    // Not the -120 a count of 120 against an empty system would otherwise show.
-    expect(soyRow.textContent).not.toContain("-120");
 
     const vinegarRow = screen.getByText("Vinegar").closest("tr")!;
     expect(vinegarRow.textContent).not.toContain("Opening");

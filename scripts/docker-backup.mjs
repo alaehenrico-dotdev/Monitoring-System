@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable no-console -- a command-line tool: its output is the console */
 // Backup and restore for the DOCKER database (docker-compose.yml's `db` service).
 //
 // scripts/backup.* dump the database named in server/.env, which is a MySQL on the

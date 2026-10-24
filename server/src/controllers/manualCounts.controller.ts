@@ -11,7 +11,10 @@ import {
   getSystemRemainingStock,
   getVarianceReport,
   getVarianceTrace,
+  MAX_SNAPSHOT_STATES,
   getAuditSnapshot,
+  getAuditSnapshotStates,
+  revertAuditSnapshot,
   publishManualCounts,
   saveManualCount,
   setCountRemarks,
@@ -107,6 +110,30 @@ export async function getAuditSnapshotHandler(req: Request, res: Response) {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) throw HttpError.badRequest("Invalid snapshot id");
   res.json(await getAuditSnapshot(id));
+}
+
+/// GET /manual-counts/snapshots/states?ids=1,2,3 - whether each published audit is
+/// reverted / can still be reverted, for the Audit History rows.
+export async function getAuditSnapshotStatesHandler(req: Request, res: Response) {
+  const ids = String(req.query.ids ?? "")
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isInteger(n) && n > 0);
+  if (ids.length === 0) throw HttpError.badRequest("ids is required");
+  if (ids.length > MAX_SNAPSHOT_STATES) throw HttpError.badRequest(`At most ${MAX_SNAPSHOT_STATES} ids at a time`);
+  res.json(await getAuditSnapshotStates(ids));
+}
+
+const revertSchema = z.object({ reason: z.string().trim().min(5, "Give a reason (at least 5 characters)").max(MAX_REMARKS_LENGTH) });
+
+/// POST /manual-counts/snapshots/:id/revert - send a published audit back to
+/// unpublished so it can be re-audited. Supervisor/Admin only, like Publish.
+export async function postRevertSnapshot(req: Request, res: Response) {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) throw HttpError.badRequest("Invalid snapshot id");
+  const parsed = revertSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest(parsed.error.issues[0]?.message ?? "Invalid request", parsed.error.flatten());
+  res.json(await revertAuditSnapshot(id, parsed.data.reason, req.user?.id));
 }
 
 /// POST /manual-counts/publish?date&shift - approve a sheet's saved counts as

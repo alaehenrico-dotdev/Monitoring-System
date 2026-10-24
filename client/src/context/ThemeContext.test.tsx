@@ -61,7 +61,7 @@ describe("layout style", () => {
 
 
 
-  it.each(["brutal", "flat", "glass", "minimal", "skeuo", "carbon"] as const)("switches to %s, applies it at once and remembers it", (style) => {
+  it.each(["brutal", "flat", "glass", "minimal", "skeuo", "aurora"] as const)("switches to %s, applies it at once and remembers it", (style) => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setUiStyle(style));
     expect(result.current.uiStyle).toBe(style);
@@ -69,7 +69,7 @@ describe("layout style", () => {
     expect(localStorage.getItem("ae-ui")).toBe(style);
   });
 
-  it.each(["brutal", "flat", "glass", "minimal", "skeuo", "carbon"] as const)("restores a remembered %s theme", (style) => {
+  it.each(["brutal", "flat", "glass", "minimal", "skeuo", "aurora"] as const)("restores a remembered %s theme", (style) => {
     localStorage.setItem("ae-ui", style);
     const { result } = renderHook(() => useTheme(), { wrapper });
     expect(result.current.uiStyle).toBe(style);

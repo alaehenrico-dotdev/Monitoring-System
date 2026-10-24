@@ -127,6 +127,27 @@ export function publishManualCounts(date: string, shift: Shift, applyToOpening =
   );
 }
 
+/// Where a published audit stands (Audit History): reverted, and whether it can
+/// still be reverted (its counts still carry that publish).
+export interface AuditSnapshotState {
+  id: number;
+  reverted: boolean;
+  revertedAt: string | null;
+  canRevert: boolean;
+}
+
+export function getAuditSnapshotStates(ids: number[]) {
+  return http.get<AuditSnapshotState[]>(`/manual-counts/snapshots/states?ids=${ids.join(",")}`);
+}
+
+/// Sends a published audit back to unpublished so it can be re-audited. Admin only.
+export function revertAuditSnapshot(id: number, reason: string) {
+  return http.post<{ snapshotId: number; reverted: number; keptManual: number; heldLocked: number }>(
+    `/manual-counts/snapshots/${id}/revert`,
+    { reason },
+  );
+}
+
 /// A published audit exactly as it was released - what Audit History reopens.
 export function getAuditSnapshot(id: number) {
   return http.get<AuditSnapshot>(`/manual-counts/snapshots/${id}`);

@@ -149,7 +149,7 @@ describe("StockGrid - paste from a spreadsheet", () => {
 
     expect(onCommitMany).not.toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(
-      expect.stringContaining(`the limit is ${MAX_PASTE_CELLS}`),
+      expect.stringContaining(`limit ${MAX_PASTE_CELLS} cells`),
       "error",
     );
     expect(onCommitMany).not.toHaveBeenCalled();

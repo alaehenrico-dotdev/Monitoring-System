@@ -12,9 +12,9 @@ export interface PeriodProductRow {
   backloads: number;
   rts: number;
   productionIn: number;
-  /// Sum of system - counted (gains and losses cancel).
+  /// Sum of counted - system (gains and losses cancel).
   netVariance: number;
-  /// Sum of |system - counted| (the total size of the discrepancies).
+  /// Sum of |counted - system| (the total size of the discrepancies).
   absVariance: number;
 }
 

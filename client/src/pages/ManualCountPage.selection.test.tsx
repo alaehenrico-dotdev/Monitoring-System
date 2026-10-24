@@ -18,7 +18,7 @@ const row = (id: number, name: string, category: string, loc: "ONLINE" | "OFFLIN
   product: { id, sku: `SKU${id}`, name, category, unit: "pc", isActive: true, sortOrder: id },
   entry: {
     productId: id, entryDate: "2026-10-09", shift: "NIGHT", location: loc,
-    systemRemainingStock: system, manualCount: count, variance: count === null ? null : system - count,
+    systemRemainingStock: system, manualCount: count, variance: count === null ? null : count - system,
   },
   isSaved: count !== null,
   isFlagged: count !== null && system !== count,
@@ -137,7 +137,7 @@ describe("ManualCountPage - selecting rows", () => {
     expect(writeText).toHaveBeenCalledWith(
       [
         "SKU\tProduct\tSystem Remaining\tOffline Count\tOnline Count\tTotal Count\tVariance",
-        "SKU1\tSoy Sauce\t20\t\t8\t8\t2",
+        "SKU1\tSoy Sauce\t20\t\t8\t8\t-2",
         "SKU2\tVinegar\t10\t\t5\t5\t0",
       ].join("\n"),
     );

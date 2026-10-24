@@ -69,16 +69,16 @@ describe("calculateOfflineRemaining (Section 4.3)", () => {
 });
 
 describe("calculateVariance (Section 4.4)", () => {
-  it("is system remaining minus manual count", () => {
-    expect(calculateVariance(100, 95)).toBe(5);
+  it("is manual count minus system remaining", () => {
+    expect(calculateVariance(95, 100)).toBe(5);
   });
 
-  it("is negative when the physical count is HIGHER than system stock", () => {
+  it("is negative when the physical count is LOWER than system stock", () => {
     // A meaningful case to pin down: on the Variance Report a negative
-    // number means an *overage* (more counted than the system expected),
-    // not an error - flipping this sign anywhere would silently invert
-    // every overage/shortage on the report.
-    expect(calculateVariance(90, 100)).toBe(-10);
+    // number means a *shortage* (less counted than the system expected) -
+    // flipping this sign anywhere would silently invert every
+    // overage/shortage on the report.
+    expect(calculateVariance(100, 90)).toBe(-10);
   });
 
   it("is 0 when the count matches exactly - not flagged as a variance", () => {

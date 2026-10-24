@@ -125,7 +125,7 @@ const csvColumns = [
   },
   // Also system-computed (calculateVariance, server-side) - a file's own
   // "VARIANCE" column is never imported, so it can't disagree with what the
-  // server derives from System Remaining - Manual Count.
+  // server derives from Manual Count - System Remaining.
   { key: "variance", label: "Variance" },
 ];
 
@@ -242,7 +242,7 @@ function blankPublished(rows: ManualCountGridRow[]): ManualCountGridRow[] {
 }
 
 /// Section 4.4 - the supervisor (or encoder on duty) enters the physical
-/// count at each location; Variance = System Remaining Stock - Count is
+/// count at each location; Variance = Count - System Remaining Stock is
 /// always system-calculated, never typed directly. The Total column is just
 /// the Offline + Online counts added together.
 export function ManualCountPage() {
@@ -720,7 +720,7 @@ export function ManualCountPage() {
     setFuture([]);
     setSaving(false);
     setShowConfirm(false);
-    if (failed.length) setError(`Failed to save: ${failed.join("; ")}`);
+    if (failed.length) setError(`Save failed: ${failed.join("; ")}`);
     setSaveFailed(failed.length > 0);
     if (failed.length === 0) setSavedAt(Date.now());
   }
@@ -765,7 +765,7 @@ export function ManualCountPage() {
     : null;
 
   // Live figures per row for the current filter: a staged draft overrides the
-  // saved count, and its variance is recomputed (System Remaining - Count,
+  // saved count, and its variance is recomputed (Count - System Remaining,
   // same formula as the server) so subtotals/grand total update before
   // anything is saved. With both locations shown, variance adds up each
   // location that HAS a count (an uncounted location contributes nothing
@@ -791,13 +791,13 @@ export function ManualCountPage() {
         (variance ?? 0) +
         (isOpening("ONLINE")
           ? 0
-          : toNum(r.entries.ONLINE.systemRemainingStock) - online);
+          : online - toNum(r.entries.ONLINE.systemRemainingStock));
     if (offline !== null)
       variance =
         (variance ?? 0) +
         (isOpening("OFFLINE")
           ? 0
-          : toNum(r.entries.OFFLINE.systemRemainingStock) - offline);
+          : offline - toNum(r.entries.OFFLINE.systemRemainingStock));
     const counted: CountLocation[] = [
       ...(online !== null ? (["ONLINE"] as const) : []),
       ...(offline !== null ? (["OFFLINE"] as const) : []),
@@ -1163,7 +1163,7 @@ export function ManualCountPage() {
     if (pendingCount > 0) {
       // One-shot message for a one-shot trigger (printAfterLoad), not derived state.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setError("Save your changes first - the PDF reflects only saved counts.");
+      setError("Save first. The PDF includes saved counts only.");
       return;
     }
     void handlePdf(false);
@@ -1260,6 +1260,12 @@ export function ManualCountPage() {
               onSelect: () => setReorderOpen(true),
             },
             {
+              id: "history",
+              label: "Audit history…",
+              icon: <HistoryIcon />,
+              onSelect: () => navigate("/audit-history"),
+            },
+            {
               id: "version-history",
               label: "Version history",
               icon: <HistoryIcon />,
@@ -1296,12 +1302,6 @@ export function ManualCountPage() {
               icon: <ReportIcon />,
               disabledReason: pendingCount > 0 ? "Save your counts first - the report only reads saved data" : undefined,
               onSelect: () => navigate(`/variance-report?date=${date}`),
-            },
-            {
-              id: "history",
-              label: "Audit history…",
-              icon: <HistoryIcon />,
-              onSelect: () => navigate("/audit-history"),
             },
           ],
         },

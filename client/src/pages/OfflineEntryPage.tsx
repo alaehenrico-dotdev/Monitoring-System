@@ -428,7 +428,7 @@ export function OfflineEntryPage() {
     // Column names still being typed are saved with the sheet.
     await extraLabels.flush();
     if (!online) {
-      setError("Server unreachable. Reconnect before saving changes.");
+      setError("Server unreachable. Reconnect to save.");
       setSaveFailed(true);
       return false;
     }
@@ -546,7 +546,7 @@ export function OfflineEntryPage() {
       });
     }
     if (failed.length) {
-      setError(`Failed to save: ${failed.join("; ")}`);
+      setError(`Save failed: ${failed.join("; ")}`);
     }
     if (heldNames.length)
       setHeldNotice(
