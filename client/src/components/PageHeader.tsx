@@ -63,6 +63,9 @@ export function PageHeader({
   children,
 }: PageHeaderProps) {
   const [collapsed, setCollapsed] = useState(false);
+  // No toolbar means nothing to collapse: the header is the compact card from the start.
+  const bare = !children;
+  const compact = collapsed || bare;
   const { open, toggle } = useNavDrawer();
   const { online } = useOnlineStatus();
   const [logoSpin, setLogoSpin] = useState(0);
@@ -113,7 +116,7 @@ export function PageHeader({
       <div
         ref={headerRef}
         onMouseMove={trackRibbon}
-        className={`ae-page-header${collapsed ? " ae-page-header--collapsed" : ""}${online ? "" : " ae-page-header--offline"}`}
+        className={`ae-page-header${compact ? " ae-page-header--collapsed" : ""}${bare ? " ae-page-header--bare" : ""}${online ? "" : " ae-page-header--offline"}`}
       >
         <div className="ae-page-header-top">
           <button
@@ -127,7 +130,7 @@ export function PageHeader({
             title={open ? "Close navigation" : "Open navigation"}
           >
             <LogoMark
-              size={collapsed ? LOGO_SIZE_COLLAPSED : LOGO_SIZE}
+              size={compact ? LOGO_SIZE_COLLAPSED : LOGO_SIZE}
               spin={logoSpin}
             />
           </button>

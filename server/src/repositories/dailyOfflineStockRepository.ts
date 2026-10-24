@@ -81,7 +81,7 @@ export const dailyOfflineStockRepository = {
   /// consulted here - it can't be unambiguously split back into an
   /// Online/Offline balance, so it stays purely informational (Variance
   /// Report / Total Stocks) rather than ever overriding this table.
-  async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+  async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma, rowCreatedAt?: Date): Promise<number> {
     const prior = await db.dailyOfflineStock.findFirst({
       where: {
         productId,
@@ -95,9 +95,11 @@ export const dailyOfflineStockRepository = {
     });
     // Manual counts are an audit only: Opening is this carried-forward figure
     // (or an import's). The one exception is a
-    // count a supervisor applied to opening stock when publishing it - the
-    // latest such count competes with the latest row, and the later wins.
-    const count = await manualCountRepository.findLatestBefore(productId, entryDate, shift, "OFFLINE", db);
+    // count a supervisor applied to opening stock when publishing it - a fresh
+    // starting record. The latest such count competes with the latest row, and
+    // the later wins. `rowCreatedAt` is for a period that already has a saved
+    // row: a count published after that row was first saved never reaches it.
+    const count = await manualCountRepository.findLatestBefore(productId, entryDate, "OFFLINE", db, rowCreatedAt);
     if (count && (!prior || count.entryDate.getTime() >= prior.entryDate.getTime())) {
       return resolveOpeningStock(count.manualCount, 0);
     }
@@ -113,7 +115,7 @@ export const dailyOfflineStockRepository = {
   /// (either path below, never both), so the one follow-up manual-count
   /// query - covering every resolved period at once - is enough regardless
   /// of how many products are missing.
-  async getOpeningStocksForProducts(productIds: number[], entryDate: Date, shift: Shift): Promise<Map<number, number>> {
+  async getOpeningStocksForProducts(productIds: number[], entryDate: Date, shift: Shift, createdAtByProduct?: Map<number, Date>): Promise<Map<number, number>> {
     if (!productIds.length) return new Map();
     const result = new Map<number, number>();
     const candidates = new Map<number, { entryDate: Date; shift: Shift; remainingStock: unknown }>();
@@ -149,7 +151,7 @@ export const dailyOfflineStockRepository = {
     }
 
     // Same rule as getOpeningStock: only an applied count beats the carry.
-    const counts = await manualCountRepository.findLatestBeforeForProducts(productIds, entryDate, shift, "OFFLINE");
+    const counts = await manualCountRepository.findLatestBeforeForProducts(productIds, entryDate, "OFFLINE", createdAtByProduct);
     const countByProduct = new Map(counts.map((m) => [m.productId, m]));
 
     for (const productId of productIds) {

@@ -53,12 +53,12 @@ export function BackupHistoryCard() {
   }
 
   const health = history?.health;
-  const cell = { padding: "6px 10px", fontSize: 12.5, textAlign: "left" as const, borderBottom: `1px solid ${colors.border}` };
+  const cell = { padding: "6px 10px", fontSize: "calc(12.5px * var(--ae-fs, 1))", textAlign: "left" as const, borderBottom: `1px solid ${colors.border}` };
 
   return (
     <div className="ae-panel" style={{ maxWidth: 640, marginTop: 16, padding: "14px 18px" }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>Backup history</div>
-      <div style={{ fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+      <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>Backup history</div>
+      <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
         {health?.lastBackupAt
           ? `Last good backup: ${new Date(health.lastBackupAt).toLocaleString()}.`
           : "No good backup has been recorded yet."}{" "}
@@ -67,7 +67,7 @@ export function BackupHistoryCard() {
         )}
       </div>
       {health?.failedSince && (
-        <div role="alert" style={{ fontSize: 12.5, color: colors.danger, marginTop: 6 }}>
+        <div role="alert" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.danger, marginTop: 6 }}>
           A backup failed or was invalid after the last good one: {health.failedSince.fileName}
           {health.failedSince.error ? ` - ${health.failedSince.error}` : ""}
         </div>
@@ -76,7 +76,7 @@ export function BackupHistoryCard() {
       {!history ? (
         <div style={{ marginTop: 10 }}><InlineLoading label="Loading history…" /></div>
       ) : history.records.length === 0 ? (
-        <p style={{ fontSize: 12.5, color: colors.subtleInk }}>Nothing recorded yet. Downloads from this page appear here.</p>
+        <p style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>Nothing recorded yet. Downloads from this page appear here.</p>
       ) : (
         <div style={{ overflowX: "auto", marginTop: 10 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", color: colors.ink }}>
@@ -110,9 +110,9 @@ export function BackupHistoryCard() {
 
       {history && history.files.length > 0 && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 600, color: colors.ink, margin: "16px 0 6px" }}>Scheduled backup files</div>
+          <div style={{ fontSize: "calc(13px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink, margin: "16px 0 6px" }}>Scheduled backup files</div>
           {history.files.slice(0, 10).map((f) => (
-            <div key={f.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 12.5, color: colors.ink, padding: "4px 0" }}>
+            <div key={f.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink, padding: "4px 0" }}>
               <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                 {f.name} · {formatBytes(f.sizeBytes)} · {new Date(f.modifiedAt).toLocaleString()}
               </span>
@@ -125,7 +125,7 @@ export function BackupHistoryCard() {
       )}
 
       {report && (
-        <div role="status" style={{ marginTop: 10, fontSize: 12.5, color: colors.ink }}>
+        <div role="status" style={{ marginTop: 10, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink }}>
           <strong style={{ color: report.ok ? undefined : colors.danger }}>
             {report.fileName}: {report.ok ? "complete and restorable." : "not usable."}
           </strong>

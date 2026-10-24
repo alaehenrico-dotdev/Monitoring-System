@@ -488,7 +488,7 @@ export function DashboardPage() {
 
 function CardMessage({ children }: { children: ReactNode }) {
   return (
-    <div style={{ padding: "16px", fontSize: 13, color: colors.subtleInk }}>
+    <div style={{ padding: "16px", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
       {children}
     </div>
   );

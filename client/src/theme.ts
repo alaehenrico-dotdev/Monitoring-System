@@ -51,7 +51,9 @@ export const fonts = {
   // (Linear, Notion, GitHub, HubSpot's own UI, etc.) build their UI text on,
   // instead of whatever sans the OS happens to ship. Falls back to the old
   // system stack if the Google Fonts request is ever blocked.
-  body: "'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif",
+  // The typeface is a setting (Settings > Appearance > Font); index.css defines
+  // --ae-font-body for each choice, with Inter as the default and the fallback.
+  body: "var(--ae-font-body, 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif)",
 } as const;
 
 /**

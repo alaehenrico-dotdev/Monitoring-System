@@ -299,17 +299,17 @@ function HistoryRow({
     <tr>
       <td>
         <strong>{title}</strong>
-        {extra && <div style={{ fontSize: 12, opacity: 0.7 }}>{extra}</div>}
+        {extra && <div style={{ fontSize: "calc(12px * var(--ae-fs, 1))", opacity: 0.7 }}>{extra}</div>}
       </td>
       <td title={when.toLocaleString()}>
         {when.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
         {", "}
         {when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
         {entry.generatedBy && (
-          <div style={{ fontSize: 12, opacity: 0.7 }}>{entry.generatedBy.name}</div>
+          <div style={{ fontSize: "calc(12px * var(--ae-fs, 1))", opacity: 0.7 }}>{entry.generatedBy.name}</div>
         )}
         {state?.reverted && (
-          <div style={{ fontSize: 12, fontWeight: 600 }} title={state.revertedAt ? new Date(state.revertedAt).toLocaleString() : undefined}>
+          <div style={{ fontSize: "calc(12px * var(--ae-fs, 1))", fontWeight: 600 }} title={state.revertedAt ? new Date(state.revertedAt).toLocaleString() : undefined}>
             Reverted
           </div>
         )}
@@ -362,7 +362,7 @@ function RevertAuditDialog({
   if (id === null) return null;
   return (
     <Modal title={`Revert published audit - ${entry.scope}`} onClose={busy ? () => {} : onClose} width={460}>
-      <p style={{ margin: "0 0 10px", fontSize: 13 }}>
+      <p style={{ margin: "0 0 10px", fontSize: "calc(13px * var(--ae-fs, 1))" }}>
         The counts this publish released go back to <strong>unpublished</strong>, so you can correct them and publish
         again. If it was used as the next day's opening stock, that is undone too. This entry stays in Audit History,
         marked Reverted. It cannot be done on a finished day - unlock it first.

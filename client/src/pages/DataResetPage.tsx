@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "../api/http";
 import { resetAllData, verifyResetPasscode } from "../api/dataReset";
+import { notifyProductsChanged } from "../api/products";
 import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
@@ -158,6 +159,8 @@ export function DataResetPage() {
       // already gone on any remount/navigation - there's nothing left for a
       // reset to clean up.
       clearAllPendingEntryState();
+      // The quick-jump palette keeps its own copy of the product list.
+      notifyProductsChanged();
       setStatus("done");
     } catch (err) {
       // The reset token is single-use-window (~5 min) - if it's expired or
@@ -213,11 +216,11 @@ export function DataResetPage() {
             <LockIcon size={17} />
           </span>
           <div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: PANEL_TEXT }}>
+            <div style={{ fontSize: "calc(15px * var(--ae-fs, 1))", fontWeight: 600, color: PANEL_TEXT }}>
               Restricted
             </div>
             <div
-              style={{ fontSize: 12.5, color: PANEL_TEXT_MUTED, marginTop: 2 }}
+              style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: PANEL_TEXT_MUTED, marginTop: 2 }}
             >
               Enter the reset passcode to continue.
             </div>
@@ -228,7 +231,7 @@ export function DataResetPage() {
           <label
             style={{
               display: "block",
-              fontSize: 12.5,
+              fontSize: "calc(12.5px * var(--ae-fs, 1))",
               color: PANEL_TEXT_MUTED,
               marginBottom: 8,
             }}
@@ -249,7 +252,7 @@ export function DataResetPage() {
               width: "100%",
               boxSizing: "border-box",
               fontFamily: "inherit",
-              fontSize: 15,
+              fontSize: "calc(15px * var(--ae-fs, 1))",
               letterSpacing: 3,
               padding: "10px 12px",
               // Pill, matching every other text input in the app (.ae-input).
@@ -262,7 +265,7 @@ export function DataResetPage() {
           />
 
           {lockError && (
-            <p style={{ margin: "0 0 14px", fontSize: 12.5, color: PANEL_RED }}>
+            <p style={{ margin: "0 0 14px", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: PANEL_RED }}>
               {lockError}
             </p>
           )}
@@ -293,7 +296,7 @@ export function DataResetPage() {
     <div style={{ width: "100%", maxWidth: 760, margin: "0 auto" }}>
       <p
         style={{
-          fontSize: 13,
+          fontSize: "calc(13px * var(--ae-fs, 1))",
           color: colors.subtleInk,
           margin: "0 0 20px",
           maxWidth: 760,
@@ -334,7 +337,7 @@ export function DataResetPage() {
           />
           <span
             style={{
-              fontSize: 11.5,
+              fontSize: "calc(11.5px * var(--ae-fs, 1))",
               fontWeight: 700,
               letterSpacing: 2.5,
               color: PANEL_RED,
@@ -348,7 +351,7 @@ export function DataResetPage() {
         <h3
           style={{
             margin: "0 0 10px",
-            fontSize: 21,
+            fontSize: "calc(21px * var(--ae-fs, 1))",
             fontWeight: 700,
             color: PANEL_TEXT,
           }}
@@ -358,7 +361,7 @@ export function DataResetPage() {
         <p
           style={{
             margin: "0 0 28px",
-            fontSize: 13.5,
+            fontSize: "calc(13.5px * var(--ae-fs, 1))",
             lineHeight: 1.6,
             color: PANEL_TEXT_MUTED,
             maxWidth: 560,
@@ -386,7 +389,7 @@ export function DataResetPage() {
           <div>
             <div
               style={{
-                fontSize: 11,
+                fontSize: "calc(11px * var(--ae-fs, 1))",
                 fontWeight: 700,
                 letterSpacing: 1.5,
                 color: PANEL_RED,
@@ -410,14 +413,14 @@ export function DataResetPage() {
                 <li
                   key={item}
                   style={{
-                    fontSize: 13,
+                    fontSize: "calc(13px * var(--ae-fs, 1))",
                     color: PANEL_TEXT,
                     display: "flex",
                     alignItems: "baseline",
                     gap: 8,
                   }}
                 >
-                  <span style={{ color: PANEL_RED, fontSize: 11 }}>✕</span>
+                  <span style={{ color: PANEL_RED, fontSize: "calc(11px * var(--ae-fs, 1))" }}>✕</span>
                   {item}
                 </li>
               ))}
@@ -426,7 +429,7 @@ export function DataResetPage() {
           <div>
             <div
               style={{
-                fontSize: 11,
+                fontSize: "calc(11px * var(--ae-fs, 1))",
                 fontWeight: 700,
                 letterSpacing: 1.5,
                 color: PANEL_GOLD,
@@ -450,14 +453,14 @@ export function DataResetPage() {
                 <li
                   key={item}
                   style={{
-                    fontSize: 13,
+                    fontSize: "calc(13px * var(--ae-fs, 1))",
                     color: PANEL_TEXT,
                     display: "flex",
                     alignItems: "baseline",
                     gap: 8,
                   }}
                 >
-                  <span style={{ color: PANEL_GOLD, fontSize: 11 }}>✓</span>
+                  <span style={{ color: PANEL_GOLD, fontSize: "calc(11px * var(--ae-fs, 1))" }}>✓</span>
                   {item}
                 </li>
               ))}
@@ -487,7 +490,7 @@ export function DataResetPage() {
             <p
               style={{
                 margin: 0,
-                fontSize: 12.5,
+                fontSize: "calc(12.5px * var(--ae-fs, 1))",
                 color: PANEL_GOLD,
                 fontWeight: 600,
               }}
@@ -497,7 +500,7 @@ export function DataResetPage() {
             </p>
           )}
           {status === "error" && error && (
-            <p style={{ margin: 0, fontSize: 12.5, color: PANEL_RED }}>
+            <p style={{ margin: 0, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: PANEL_RED }}>
               {error}
             </p>
           )}
@@ -514,16 +517,16 @@ export function DataResetPage() {
         >
           {status === "confirming" ? (
             <>
-              <p style={{ margin: "0 0 12px", fontSize: 13.5 }}>
+              <p style={{ margin: "0 0 12px", fontSize: "calc(13.5px * var(--ae-fs, 1))" }}>
                 This will permanently delete <strong>all</strong> entries,
                 counts, and reports. This cannot be undone. A full backup will
                 be downloaded to this device first.
               </p>
-              <p style={{ margin: "0 0 18px", fontSize: 13 }}>
+              <p style={{ margin: "0 0 18px", fontSize: "calc(13px * var(--ae-fs, 1))" }}>
                 {secondsLeft > 0 ? (
                   <>
                     "Reset Now" unlocks in{" "}
-                    <strong style={{ color: colors.danger, fontSize: 16 }}>
+                    <strong style={{ color: colors.danger, fontSize: "calc(16px * var(--ae-fs, 1))" }}>
                       {secondsLeft}
                     </strong>{" "}
                     second{secondsLeft === 1 ? "" : "s"}. Nothing happens until

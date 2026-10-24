@@ -73,7 +73,7 @@ export const dailyOnlineStockRepository = {
   /// the full reasoning (why it's only the one period being carried forward
   /// from, why it never ripples into a later already-saved period, and why
   /// a TOTAL-location count is never consulted here).
-  async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+  async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma, rowCreatedAt?: Date): Promise<number> {
     const prior = await db.dailyOnlineStock.findFirst({
       where: {
         productId,
@@ -87,9 +87,11 @@ export const dailyOnlineStockRepository = {
     });
     // Manual counts are an audit only: Opening is this carried-forward figure
     // (or an import's). The one exception is a
-    // count a supervisor applied to opening stock when publishing it - the
-    // latest such count competes with the latest row, and the later wins.
-    const count = await manualCountRepository.findLatestBefore(productId, entryDate, shift, "ONLINE", db);
+    // count a supervisor applied to opening stock when publishing it - a fresh
+    // starting record. The latest such count competes with the latest row, and
+    // the later wins. `rowCreatedAt` is for a period that already has a saved
+    // row: a count published after that row was first saved never reaches it.
+    const count = await manualCountRepository.findLatestBefore(productId, entryDate, "ONLINE", db, rowCreatedAt);
     if (count && (!prior || count.entryDate.getTime() >= prior.entryDate.getTime())) {
       return resolveOpeningStock(count.manualCount, 0);
     }
@@ -106,7 +108,7 @@ export const dailyOnlineStockRepository = {
   /// resolution as getOpeningStock above - including its manual-count
   /// override, applied here as one extra batched query (covering every
   /// resolved period at once) rather than one per product.
-  async getOpeningStocksForProducts(productIds: number[], entryDate: Date, shift: Shift): Promise<Map<number, number>> {
+  async getOpeningStocksForProducts(productIds: number[], entryDate: Date, shift: Shift, createdAtByProduct?: Map<number, Date>): Promise<Map<number, number>> {
     if (!productIds.length) return new Map();
     const result = new Map<number, number>();
     const candidates = new Map<number, { entryDate: Date; shift: Shift; remainingStock: unknown }>();
@@ -144,7 +146,7 @@ export const dailyOnlineStockRepository = {
     }
 
     // Same rule as getOpeningStock: only an applied count beats the carry.
-    const counts = await manualCountRepository.findLatestBeforeForProducts(productIds, entryDate, shift, "ONLINE");
+    const counts = await manualCountRepository.findLatestBeforeForProducts(productIds, entryDate, "ONLINE", createdAtByProduct);
     const countByProduct = new Map(counts.map((m) => [m.productId, m]));
 
     for (const productId of productIds) {

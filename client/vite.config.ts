@@ -77,7 +77,8 @@ function pwaPrecachePlugin(): Plugin {
     closeBundle() {
       const files = walk(outDir)
         .map((f) => "/" + relative(outDir, f).split("\\").join("/"))
-        .filter((f) => f !== "/sw.js" && !f.endsWith(".map") && !/\.(webm|mp4)$/.test(f))
+        // The emblem source PNG (1.3 MB) is only the master the watermark images were made from.
+        .filter((f) => f !== "/sw.js" && !f.endsWith(".map") && !/\.(webm|mp4)$/.test(f) && f !== "/Glossy Black Ala Eh! Emblem.png")
         .sort();
       const version = createHash("sha1").update(files.join(",")).digest("hex").slice(0, 10);
       const swPath = join(outDir, "sw.js");
@@ -91,6 +92,13 @@ function pwaPrecachePlugin(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "VITE_");
+  // The dev server and `vite preview` listen on localhost only. They used to bind every
+  // network interface (`host: true`), which put the dev server - and the API it proxies -
+  // in reach of the whole LAN for as long as `npm run dev` ran, and dev servers carry
+  // their own known file-read / cross-site-request weaknesses. To open it from another
+  // device on purpose, start it with VITE_DEV_LAN=true (or put that in client/.env.local).
+  const devHost: string | boolean =
+    env.VITE_DEV_LAN === "true" || process.env.VITE_DEV_LAN === "true" ? true : "localhost";
   // For an absolute API URL, CSP needs its origin rather than the full path.
   // Same-origin deployments use the page origin and secure WebSocket scheme.
   let apiOrigin = "";
@@ -130,7 +138,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       strictPort: true,
-      host: true,
+      host: devHost,
       proxy: {
         "/health": { target: "http://127.0.0.1:4000", changeOrigin: true },
         "/api": { target: "http://127.0.0.1:4000", changeOrigin: true },
@@ -142,7 +150,7 @@ export default defineConfig(({ mode }) => {
     preview: {
       port: 5173,
       strictPort: true,
-      host: true,
+      host: devHost,
       proxy: {
         "/health": { target: "http://127.0.0.1:4000", changeOrigin: true },
         "/api": { target: "http://127.0.0.1:4000", changeOrigin: true },

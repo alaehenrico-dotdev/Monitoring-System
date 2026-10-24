@@ -383,7 +383,7 @@ export function ProductsAdminPage() {
                           padding: "1px 7px",
                           border: `1px solid ${colors.subtleInk}`,
                           borderRadius: 6,
-                          fontSize: 10.5,
+                          fontSize: "calc(10.5px * var(--ae-fs, 1))",
                           fontWeight: 700,
                           letterSpacing: "0.04em",
                           textTransform: "uppercase",

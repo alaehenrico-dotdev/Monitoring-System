@@ -114,38 +114,38 @@ describe("once connected", () => {
   it("shows the account and its settings", async () => {
     await show(connected());
     expect(screen.getByText("owner@gmail.com")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /end of every month/ })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: /every week/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /copy of every Excel/ })).toBeChecked();
     expect(screen.getByLabelText("Number of backups to keep")).toHaveValue(14);
   });
 
   it("shows the backup time on the person's own clock, not in UTC", async () => {
     await show(connected());
-    expect(screen.getByLabelText("Time of the daily backup")).toHaveDisplayValue("2:00 AM");
+    expect(screen.getByLabelText("Time of the weekly backup")).toHaveDisplayValue("2:00 AM");
   });
 
   it("saves a new backup time as the UTC hour the server stores", async () => {
     api.updateDriveSettings.mockResolvedValue(connected());
     await show(connected());
-    fireEvent.change(screen.getByLabelText("Time of the daily backup"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Time of the weekly backup"), { target: { value: "3" } });
     await waitFor(() => expect(api.updateDriveSettings).toHaveBeenCalledWith({ backupHourUtc: 19 }));
   });
 
   it("falls back to plain UTC hours in a half-hour time zone instead of guessing", async () => {
     vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(-330);
     await show(connected());
-    expect(screen.getByLabelText("Time of the daily backup")).toHaveDisplayValue("18:00 UTC");
+    expect(screen.getByLabelText("Time of the weekly backup")).toHaveDisplayValue("18:00 UTC");
   });
 
   it("hides the time picker while the daily backup is off", async () => {
     await show(connected({ settings: { autoBackup: false, backupHourUtc: 18, keepBackups: 14, saveExports: true } }));
-    expect(screen.queryByLabelText("Time of the daily backup")).toBeNull();
+    expect(screen.queryByLabelText("Time of the weekly backup")).toBeNull();
   });
 
   it("applies each switch the moment it is changed", async () => {
     api.updateDriveSettings.mockResolvedValue(connected());
     await show(connected());
-    fireEvent.click(screen.getByRole("checkbox", { name: /end of every month/ }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /every week/ }));
     await waitFor(() => expect(api.updateDriveSettings).toHaveBeenLastCalledWith({ autoBackup: false }));
     fireEvent.click(screen.getByRole("checkbox", { name: /copy of every Excel/ }));
     await waitFor(() => expect(api.updateDriveSettings).toHaveBeenLastCalledWith({ saveExports: false }));
@@ -225,15 +225,15 @@ describe("once connected", () => {
     expect(within(rows[2]).getByText("3.0 MB")).toBeInTheDocument();
   });
 
-  it("says the backup is monthly, at the end of the month, and when the next one is due", async () => {
+  it("says the backup is weekly, and when the next one is due", async () => {
     await show(connected({ nextBackupAt: "2026-10-31T18:00:00Z" }));
     const card = screen.getByRole("region", { name: "Database backup" });
-    expect(within(card).getByRole("checkbox", { name: /end of every month/ })).toBeChecked();
-    expect(within(card).getByText(/on the last day, at/)).toBeInTheDocument();
+    expect(within(card).getByRole("checkbox", { name: /every week/ })).toBeChecked();
+    expect(within(card).getByLabelText("Time of the weekly backup")).toBeInTheDocument();
     expect(within(card).getByText(/Next backup/)).toBeInTheDocument();
   });
 
-  it("shows no next-backup time while the monthly backup is off", async () => {
+  it("shows no next-backup time while the weekly backup is off", async () => {
     await show(connected({ nextBackupAt: null, settings: { autoBackup: false, backupHourUtc: 18, keepBackups: 14, saveExports: true } }));
     expect(screen.queryByText(/Next backup/)).toBeNull();
   });

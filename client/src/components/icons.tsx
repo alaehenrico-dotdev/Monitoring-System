@@ -18,10 +18,8 @@ import {
   History,
   Layers,
   Lock,
-  MapPin,
   Moon,
   Package,
-  Pin,
   Play,
   Printer,
   RefreshCw,
@@ -85,10 +83,6 @@ export function SunIcon() {
 
 export function MoonIcon() {
   return <Moon {...look(15, 1.6)} />;
-}
-
-export function PinIcon({ filled = false }: { filled?: boolean }) {
-  return <Pin {...look(14, 1.5)} fill={filled ? "currentColor" : "none"} />;
 }
 
 export function ArrowUpIcon() {
@@ -157,10 +151,6 @@ export function PlayIcon() {
 
 export function ZoomIcon() {
   return <ZoomIn {...look(14, 1.6)} />;
-}
-
-export function MapPinIcon() {
-  return <MapPin {...look(14, 1.5)} />;
 }
 
 export function SyncIcon() {

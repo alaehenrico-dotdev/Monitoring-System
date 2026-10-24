@@ -306,7 +306,7 @@ export function VarianceLedgerPage() {
                         >
                           <table
                             className="ae-table"
-                            style={{ fontSize: 12.5, minWidth: 0 }}
+                            style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", minWidth: 0 }}
                           >
                             <thead>
                               <tr>
@@ -399,7 +399,7 @@ const tagStyle = {
   border: `1px solid ${colors.border}`,
   background: colors.paperAlt,
   color: colors.warningText,
-  fontSize: 11,
+  fontSize: "calc(11px * var(--ae-fs, 1))",
   fontWeight: 600,
   whiteSpace: "nowrap",
 } as const;

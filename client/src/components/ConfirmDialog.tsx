@@ -32,7 +32,7 @@ export function ConfirmDialog({
 }) {
   return (
     <Modal title={title} onClose={busy ? () => {} : onCancel} width={420}>
-      <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>{children}</div>
+      <div style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55 }}>{children}</div>
       <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 20 }}>
         <Button variant="secondary" onClick={onCancel} disabled={busy} autoFocus>
           Cancel

@@ -2,8 +2,8 @@
 
 Settings > **Google Drive** connects the system to one Google account. Once connected:
 
-- **Database backups** are taken automatically at the **end of every month** (the last day, at the hour you
-  set; and on demand with *Back up now*), gzipped, and uploaded to a
+- **Database backups** are taken automatically **every week** (on Sunday, at the hour you
+  set - 18:00 UTC by default, just after Sunday's Night shift closes; and on demand with *Back up now*), gzipped, and uploaded to a
   Drive folder called **Ala Eh Stock Monitoring - Backups**. The newest *N* are kept (default 14); older ones go to
   the Drive trash. Each one also appears in the existing Backup history, and a failed one raises the same
   "backup failed / overdue" warnings as any other.
@@ -12,7 +12,7 @@ Settings > **Google Drive** connects the system to one Google account. Once conn
   nothing when Drive already holds exactly the same report, so there is never more than one file per date.
 - **Daily Report PDFs** are saved automatically: the moment a day's report is saved (an encoder
   finishes the day, "Finish through" runs, or a correction re-saves a frozen report), and again with each
-  backup (monthly, and on *Back up now*) for the latest day and the day before it, as a catch-up. Each is an
+  backup (weekly, and on *Back up now*) for the latest day and the day before it, as a catch-up. Each is an
   PDF (`daily-report-YYYY-MM-DD.pdf`, with a Summary, then the Online, Offline, Consolidated, Daily Out and Audit
   tables) in
   **Ala Eh Stock Monitoring - Reports / year / month**. A day's
@@ -66,9 +66,9 @@ on Settings showing the account.
 > connecting (backups, exports from any PC on the network) works from any address.
 
 > **Backup-overdue warning:** the Admin Queue flags "Backup overdue" when the newest backup is older than
-> `BACKUP_OVERDUE_HOURS` (36 by default, which suits a daily backup). When the monthly Drive backup is your only
-> scheduled backup (no `BACKUP_DIR` with daily scripts), the limit widens by itself to 33 days, so the warning
-> does not show most of the month. If you do run daily backup scripts and set `BACKUP_DIR`, the 36-hour
+> `BACKUP_OVERDUE_HOURS` (36 by default, which suits a daily backup). When the weekly Drive backup is your only
+> scheduled backup (no `BACKUP_DIR` with daily scripts), the limit widens by itself to 9 days, so the warning
+> does not show most of the week. If you do run daily backup scripts and set `BACKUP_DIR`, the 36-hour
 > default stays in force.
 
 ## What is stored, and where
@@ -85,7 +85,7 @@ on Settings showing the account.
 - **Settings > Google Drive** shows the account and one card for each thing saved automatically - *Daily
   reports* (when the last one landed; nothing to switch), *Database backup* and *Export copies* - then a
   *Recent activity* list you can filter by Reports, Backups or Exports (failures are counted and show their
-  reason). The switches: monthly backup on/off and its time, how many backups to keep,
+  reason). The switches: weekly backup on/off and its time, how many backups to keep,
   and whether to save export copies.
 - **Disconnect** revokes the token at Google and forgets it here. Files already in Drive stay.
 - If you remove the app at <https://myaccount.google.com/permissions>, or Google expires the grant, the page

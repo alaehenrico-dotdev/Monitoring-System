@@ -69,7 +69,3 @@ export function consumeQuickJump(has: (productId: number) => boolean): number | 
   return productId;
 }
 
-/// Test seam - drops any pending request without consuming it.
-export function clearQuickJump(): void {
-  target = null;
-}

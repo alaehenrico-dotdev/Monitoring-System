@@ -66,6 +66,3 @@ export async function listArchive(opts: { limit: number; offset?: number; tableN
   return { items, total };
 }
 
-export function archiveStats() {
-  return prisma.changeLogArchive.count();
-}

@@ -26,6 +26,26 @@ client/vite.config.d.ts
 *.key
 *.p12
 *.pfx
+*.p8
+*.jks
+*.keystore
+*.asc
+*.gpg
+id_rsa*
+id_ed25519*
+id_ecdsa*
+
+# Credential stores that tools drop in a working folder: package-registry tokens,
+# HTTP auth, cloud CLIs, and anything named as a secret.
+.netrc
+.htpasswd
+.aws/
+.ssh/
+secrets/
+.secrets/
+*.secret
+*.secrets
+*.secrets.json
 
 # Google credentials (Settings > Google Drive, docs/GOOGLE_DRIVE.md). The console's
 # "Download JSON" button on an OAuth client saves client_secret_<id>.json, which holds
@@ -43,6 +63,18 @@ service-account*.json
 # and are source.
 *.sql.gz
 *.sql.gz.*
+*.sql.zip
+*.sql.bz2
+*.sql.xz
+*.sql.zst
+*.sql.7z
+# A SQLite/other embedded database file or an engine data dump left in the tree.
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+*.db-wal
+*.rdb
 # Dumps by name, in case one is left unzipped in the project (a plain "*.sql" is
 # not ignored on purpose - the migrations are SQL).
 db_backup_*.sql
@@ -51,11 +83,14 @@ premigrate_*
 *.dump
 backups/
 snapshots/
+# User uploads / restored files, if one is ever staged inside the project.
+uploads/
 
 # --- Docker -----------------------------------------------------------------
 # A personal compose override (ports, volumes) and anything Caddy writes if its data
 # folders are ever bind-mounted into the project instead of the named volumes.
 docker-compose.override.yml
+docker-compose.*.override.yml
 caddy_data/
 caddy_config/
 
@@ -75,14 +110,28 @@ logs/
 # --- Editors and OS ------------------------------------------------------------
 .idea/
 .vscode/
+.history/
 *.swp
 Thumbs.db
 Desktop.ini
+*.lnk
+$RECYCLE.BIN/
 # Office lock/temp files left beside an open spreadsheet (e.g. the encoder order .xlsx).
 ~$*
 *.tmp
 
 # --- Build caches and tool output ------------------------------------------------
+# Node memory/CPU profiles and crash dumps can contain request data and secrets from memory.
+*.heapsnapshot
+*.cpuprofile
+*.heapprofile
+*.diagnostic.json
+report.*.json
+core.[0-9]*
+.cache/
+.parcel-cache/
+.turbo/
+.tmp/
 # Vite/ESLint caches and the TypeScript incremental build files (client/tsconfig.tsbuildinfo
 # was being left in the working tree).
 .vite/

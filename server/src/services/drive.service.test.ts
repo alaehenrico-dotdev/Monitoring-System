@@ -873,62 +873,74 @@ describe("toasts for what the server saves to Drive on its own", () => {
   });
 });
 
-describe("isBackupDue (monthly, at the end of the month)", () => {
+describe("isBackupDue (weekly, on Sunday)", () => {
   const at = (iso: string) => new Date(iso);
   const conn = (lastBackupAt: string | null, backupHourUtc = 18, autoBackup = true) => ({
     autoBackup,
     backupHourUtc,
     lastBackupAt: lastBackupAt ? at(lastBackupAt) : null,
   });
+  // 2026-10-25 is a Sunday.
 
-  it("is due once the last day of the month has reached the set hour with no backup since the month before", () => {
-    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-10-31T18:00:00Z"))).toBe(true);
-    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-11-01T03:00:00Z"))).toBe(true);
+  it("is due once Sunday has reached the set hour with no backup since the Sunday before", () => {
+    expect(isBackupDue(conn("2026-10-18T18:05:00Z"), at("2026-10-25T18:00:00Z"))).toBe(true);
+    expect(isBackupDue(conn("2026-10-18T18:05:00Z"), at("2026-10-26T03:00:00Z"))).toBe(true);
   });
 
-  it("is not due mid-month, or before the hour on the last day", () => {
-    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-10-22T20:00:00Z"))).toBe(false);
-    expect(isBackupDue(conn("2026-09-30T18:05:00Z"), at("2026-10-31T17:59:00Z"))).toBe(false);
+  it("is not due during the week, or before the hour on Sunday", () => {
+    expect(isBackupDue(conn("2026-10-18T18:05:00Z"), at("2026-10-21T20:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-18T18:05:00Z"), at("2026-10-25T17:59:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-18T18:05:00Z"), at("2026-10-24T23:59:00Z"))).toBe(false); // Saturday night
   });
 
-  it("is not due again after the backup that covered this month's slot", () => {
-    expect(isBackupDue(conn("2026-10-31T18:05:00Z"), at("2026-11-02T09:00:00Z"))).toBe(false);
-    expect(isBackupDue(conn("2026-10-31T18:05:00Z"), at("2026-11-30T17:00:00Z"))).toBe(false);
-    expect(isBackupDue(conn("2026-10-31T18:05:00Z"), at("2026-11-30T18:00:00Z"))).toBe(true);
+  it("is not due again after the backup that covered this week's slot", () => {
+    expect(isBackupDue(conn("2026-10-25T18:05:00Z"), at("2026-10-27T09:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-25T18:05:00Z"), at("2026-11-01T17:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-25T18:05:00Z"), at("2026-11-01T18:00:00Z"))).toBe(true);
   });
 
-  it("finds the last day of every month, including February and leap years", () => {
-    expect(isBackupDue(conn("2027-01-31T18:05:00Z"), at("2027-02-27T23:00:00Z"))).toBe(false);
-    expect(isBackupDue(conn("2027-01-31T18:05:00Z"), at("2027-02-28T18:00:00Z"))).toBe(true); // Feb 2027 has 28 days
-    expect(isBackupDue(conn("2028-01-31T18:05:00Z"), at("2028-02-28T18:00:00Z"))).toBe(false); // ...2028 has 29
-    expect(isBackupDue(conn("2028-01-31T18:05:00Z"), at("2028-02-29T18:00:00Z"))).toBe(true);
-    expect(isBackupDue(conn("2026-11-30T18:05:00Z"), at("2026-12-31T18:00:00Z"))).toBe(true); // across the year
+  it("finds the Sunday across a month and a year boundary", () => {
+    expect(isBackupDue(conn("2026-12-27T18:05:00Z"), at("2027-01-02T23:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-12-27T18:05:00Z"), at("2027-01-03T18:00:00Z"))).toBe(true); // 2027-01-03 is a Sunday
+    expect(isBackupDue(conn("2028-02-20T18:05:00Z"), at("2028-02-27T18:00:00Z"))).toBe(true); // leap year, still Sunday
   });
 
-  it("a manual backup mid-month does not bring the scheduled one forward", () => {
-    expect(isBackupDue(conn("2026-10-15T10:00:00Z"), at("2026-10-30T20:00:00Z"))).toBe(false);
-    expect(isBackupDue(conn("2026-10-15T10:00:00Z"), at("2026-10-31T18:00:00Z"))).toBe(true);
+  it("honours a different hour", () => {
+    expect(isBackupDue(conn("2026-10-18T02:05:00Z", 2), at("2026-10-25T02:00:00Z"))).toBe(true);
+    expect(isBackupDue(conn("2026-10-18T02:05:00Z", 2), at("2026-10-25T01:59:00Z"))).toBe(false);
   });
 
-  it("catches up after downtime: a missed month-end is due as soon as the server is back", () => {
-    expect(isBackupDue(conn("2026-08-31T18:05:00Z"), at("2026-10-04T09:00:00Z"))).toBe(true);
+  it("a manual backup mid-week does not bring the scheduled one forward", () => {
+    expect(isBackupDue(conn("2026-10-21T10:00:00Z"), at("2026-10-24T20:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-21T10:00:00Z"), at("2026-10-25T18:00:00Z"))).toBe(true);
+  });
+
+  it("catches up after downtime: a missed Sunday is due as soon as the server is back", () => {
+    expect(isBackupDue(conn("2026-10-04T18:05:00Z"), at("2026-10-22T09:00:00Z"))).toBe(true);
   });
 
   it("is due straight away for a connection that has never been backed up", () => {
-    expect(isBackupDue(conn(null), at("2026-10-05T03:00:00Z"))).toBe(true);
+    expect(isBackupDue(conn(null), at("2026-10-21T03:00:00Z"))).toBe(true);
   });
 
   it("is never due when automatic backups are off", () => {
-    expect(isBackupDue(conn(null, 18, false), at("2026-10-31T20:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn(null, 18, false), at("2026-10-25T20:00:00Z"))).toBe(false);
   });
 });
 
 describe("nextBackupAt", () => {
-  it("is the last day of this month at the hour, or next month's once that has passed", () => {
-    expect(nextBackupAt(18, new Date("2026-10-22T09:00:00Z")).toISOString()).toBe("2026-10-31T18:00:00.000Z");
-    expect(nextBackupAt(18, new Date("2026-10-31T18:00:00Z")).toISOString()).toBe("2026-11-30T18:00:00.000Z");
-    expect(nextBackupAt(18, new Date("2026-12-31T19:00:00Z")).toISOString()).toBe("2027-01-31T18:00:00.000Z");
-    expect(nextBackupAt(2, new Date("2028-02-10T00:00:00Z")).toISOString()).toBe("2028-02-29T02:00:00.000Z");
+  it("is this Sunday at the hour, or next Sunday's once that has passed", () => {
+    expect(nextBackupAt(18, new Date("2026-10-22T09:00:00Z")).toISOString()).toBe("2026-10-25T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-10-25T17:59:00Z")).toISOString()).toBe("2026-10-25T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-10-25T18:00:00Z")).toISOString()).toBe("2026-11-01T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-12-30T19:00:00Z")).toISOString()).toBe("2027-01-03T18:00:00.000Z");
+    expect(nextBackupAt(2, new Date("2028-02-24T00:00:00Z")).toISOString()).toBe("2028-02-27T02:00:00.000Z");
+  });
+
+  it("is always a Sunday", () => {
+    for (const day of [20, 21, 22, 23, 24, 25, 26, 27]) {
+      expect(nextBackupAt(18, new Date(`2026-10-${day}T05:00:00Z`)).getUTCDay()).toBe(0);
+    }
   });
 });
 

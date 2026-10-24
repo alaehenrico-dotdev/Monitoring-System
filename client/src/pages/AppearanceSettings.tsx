@@ -1,5 +1,15 @@
-import { useId, type CSSProperties, type ReactNode } from "react";
-import { useTheme, type Theme, type UiStyle } from "../context/ThemeContext";
+import { useEffect, useId, type CSSProperties, type ReactNode } from "react";
+import {
+  DEFAULT_FONT,
+  DEFAULT_FONT_SIZE,
+  ensureWebFont,
+  FONT_FAMILIES,
+  useTheme,
+  type FontFamily,
+  type FontSize,
+  type Theme,
+  type UiStyle,
+} from "../context/ThemeContext";
 import { colors } from "../theme";
 
 interface Choice<T extends string> {
@@ -81,9 +91,70 @@ const THEMES: Choice<UiStyle>[] = [
   },
 ];
 
+
+const FONT_CHOICES: Choice<FontFamily>[] = [
+  { value: "inter", label: "Inter", description: "The default: clean and easy to read at small sizes.", preview: <FontPreview family="'Inter', system-ui, sans-serif" /> },
+  { value: "hyperlegible", label: "Atkinson Hyperlegible", description: "Designed for low vision: every letter is easy to tell apart.", preview: <FontPreview family="'Atkinson Hyperlegible', system-ui, sans-serif" /> },
+  { value: "plex", label: "IBM Plex Sans", description: "A neutral, slightly technical sans-serif.", preview: <FontPreview family="'IBM Plex Sans', system-ui, sans-serif" /> },
+  { value: "system", label: "System", description: "The font your device already uses. Nothing to download.", preview: <FontPreview family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif" /> },
+  { value: "serif", label: "Serif", description: "A traditional book-style face.", preview: <FontPreview family="Georgia, Cambria, 'Times New Roman', serif" /> },
+  { value: "mono", label: "Monospace", description: "Every character the same width, so figures line up.", preview: <FontPreview family="ui-monospace, 'Cascadia Mono', Consolas, monospace" /> },
+];
+
+const SIZE_STEPS: Record<FontSize, number> = { sm: 0.92, md: 1, lg: 1.1, xl: 1.2 };
+const SIZE_CHOICES: Choice<FontSize>[] = [
+  { value: "sm", label: "Small", description: "Fits more on the screen.", preview: <SizePreview step="sm" /> },
+  { value: "md", label: "Default", description: "The standard size.", preview: <SizePreview step="md" /> },
+  { value: "lg", label: "Large", description: "Easier to read from a distance.", preview: <SizePreview step="lg" /> },
+  { value: "xl", label: "Extra large", description: "The biggest step.", preview: <SizePreview step="xl" /> },
+];
+
+function FontPreview({ family }: { family: string }) {
+  return (
+    <span style={{ display: "block", background: "var(--ae-surface)", color: "var(--ae-text)", padding: "10px 12px", height: 62, borderRadius: 4, fontFamily: family }}>
+      <span style={{ display: "block", fontSize: 22, fontWeight: 700, lineHeight: 1.1 }}>Aa 123</span>
+      <span style={{ display: "block", fontSize: 12, marginTop: 4, color: "var(--ae-text-muted)" }}>Ala Eh! Stock 1,284.50</span>
+    </span>
+  );
+}
+
+function SizePreview({ step }: { step: FontSize }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", background: "var(--ae-surface)", color: "var(--ae-text)", padding: "0 12px", height: 62, borderRadius: 4 }}>
+      <span style={{ fontSize: 14 * SIZE_STEPS[step], fontWeight: 600, lineHeight: 1.2 }}>Stock on hand: 1,284</span>
+    </span>
+  );
+}
+
+/// Settings > Appearance > Font: the typeface and the text size, per browser like
+/// the theme. The text size scales the interface; the data tables keep their own
+/// View > Zoom.
+function FontSettings() {
+  const { fontFamily, setFontFamily, fontSize, setFontSize, resetFont } = useTheme();
+  // The two downloadable faces are fetched here so their previews are real.
+  useEffect(() => {
+    FONT_FAMILIES.forEach(ensureWebFont);
+  }, []);
+  const isDefault = fontFamily === DEFAULT_FONT && fontSize === DEFAULT_FONT_SIZE;
+  return (
+    <>
+      <ChoiceGroup legend="Font" choices={FONT_CHOICES} value={fontFamily} onChange={setFontFamily} />
+      <ChoiceGroup legend="Text size" choices={SIZE_CHOICES} value={fontSize} onChange={setFontSize} />
+      <p style={{ margin: 0, fontSize: 12.5, color: colors.subtleInk }}>
+        Text size changes the menus, forms and pages. The data tables keep their own size: use View, then Zoom, on the page.
+      </p>
+      <div>
+        <button type="button" className="ae-btn ae-btn-secondary ae-btn-sm" onClick={resetFont} disabled={isDefault}>
+          Reset font to default
+        </button>
+      </div>
+    </>
+  );
+}
+
 /**
  * Settings > Appearance: how the app looks on THIS browser. The color mode
- * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Aurora, Classic Plus) are independent, remembered per
+ * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Aurora, Classic Plus) and the font are independent, remembered per
  * browser (ThemeContext), apply immediately, and change only how things are
  * drawn - never the pages, the controls or the data - which is why every role can
  * reach them, unlike the other Settings tabs.
@@ -94,6 +165,7 @@ export function AppearanceSettings() {
     <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", display: "grid", gap: 22 }}>
       <ChoiceGroup legend="Color mode" choices={MODES} value={theme} onChange={setTheme} />
       <ChoiceGroup legend="Theme" choices={THEMES} value={uiStyle} onChange={setUiStyle} />
+      <FontSettings />
       <p style={{ margin: 0, fontSize: 12.5, color: colors.subtleInk }}>
         These are saved in this browser only. Another computer, or another person signing in here after you, keeps their own choice.
       </p>

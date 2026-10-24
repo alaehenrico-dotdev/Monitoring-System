@@ -23,7 +23,7 @@ const rowStyle: CSSProperties = {
   gap: 12,
   padding: "10px 16px",
   borderBottom: `1px solid ${colors.border}`,
-  fontSize: 13,
+  fontSize: "calc(13px * var(--ae-fs, 1))",
   color: colors.ink,
 };
 
@@ -95,11 +95,11 @@ export function MonthCloseTab() {
 
   return (
     <>
-      <p style={{ fontSize: 13, color: colors.subtleInk, marginTop: 0 }}>
+      <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 0 }}>
         A month can be closed once it has ended and every day in it is finished, its counts are published and no correction is waiting. A closed month refuses
         every edit dated in it; a change then needs an unlock (with a reason) or an approved correction.
       </p>
-      <label style={{ fontSize: 12, fontWeight: 600, color: colors.subtleInk, display: "block", marginBottom: 4 }}>
+      <label style={{ fontSize: "calc(12px * var(--ae-fs, 1))", fontWeight: 600, color: colors.subtleInk, display: "block", marginBottom: 4 }}>
         Month
         <input
           type="month"
@@ -118,7 +118,7 @@ export function MonthCloseTab() {
             {closure ? (
               <>
                 <span className="ae-dash-chip ae-dash-chip--done">Closed</span>
-                <span style={{ marginLeft: 8, color: colors.subtleInk, fontSize: 12.5 }}>
+                <span style={{ marginLeft: 8, color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                   {new Date(closure.closedAt).toLocaleString()}
                   {closure.closedBy ? ` by ${closure.closedBy.name}` : ""}
                 </span>
@@ -131,14 +131,14 @@ export function MonthCloseTab() {
               <span className="ae-dash-chip ae-dash-chip--idle">Not ready</span>
             )}
             {!closure && r && r.problems.length > 0 && (
-              <ul aria-label="Problems" style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.danger, fontSize: 12.5 }}>
+              <ul aria-label="Problems" style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.danger, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                 {r.problems.map((p) => (
                   <li key={p}>{p}</li>
                 ))}
               </ul>
             )}
             {!closure && r && r.warnings.length > 0 && (
-              <ul aria-label="Warnings" style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.warningText, fontSize: 12.5 }}>
+              <ul aria-label="Warnings" style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.warningText, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                 {r.warnings.map((w) => (
                   <li key={w}>{w}</li>
                 ))}
@@ -165,17 +165,17 @@ export function MonthCloseTab() {
         </div>
       </div>
 
-      <h3 style={{ fontSize: 14, margin: "20px 0 8px" }}>Months</h3>
+      <h3 style={{ fontSize: "calc(14px * var(--ae-fs, 1))", margin: "20px 0 8px" }}>Months</h3>
       {!closures ? (
         <InlineLoading label="Loading…" />
       ) : closures.length === 0 ? (
-        <p style={{ color: colors.subtleInk, fontSize: 13 }}>No month has been closed yet.</p>
+        <p style={{ color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>No month has been closed yet.</p>
       ) : (
         <div className="ae-panel">
           {closures.map((c) => (
             <div key={c.id} style={rowStyle}>
               <span style={{ width: 90 }}>{c.yearMonth}</span>
-              <span style={{ flex: 1, minWidth: 0, color: colors.subtleInk, fontSize: 12.5 }}>
+              <span style={{ flex: 1, minWidth: 0, color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                 {c.isClosed
                   ? `Closed ${new Date(c.closedAt).toLocaleString()}${c.closedBy ? ` by ${c.closedBy.name}` : ""}`
                   : `Unlocked ${c.unlockedAt ? new Date(c.unlockedAt).toLocaleString() : ""}${c.unlockedBy ? ` by ${c.unlockedBy.name}` : ""}${c.unlockReason ? ` - ${c.unlockReason}` : ""}`}

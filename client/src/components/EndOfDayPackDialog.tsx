@@ -133,7 +133,7 @@ export function EndOfDayPackDialog({
     >
       {phase === "setup" && (
         <>
-          <p style={{ margin: "0 0 14px", fontSize: 13.5, lineHeight: 1.55 }}>
+          <p style={{ margin: "0 0 14px", fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55 }}>
             Builds the day's reports and a database backup and saves them
             together as one <code>.zip</code>.
           </p>
@@ -146,7 +146,7 @@ export function EndOfDayPackDialog({
             }}
           >
             <span
-              style={{ fontSize: 12, fontWeight: 600, color: colors.subtleInk }}
+              style={{ fontSize: "calc(12px * var(--ae-fs, 1))", fontWeight: 600, color: colors.subtleInk }}
             >
               Date
             </span>
@@ -158,7 +158,7 @@ export function EndOfDayPackDialog({
               style={{ maxWidth: 180 }}
             />
           </div>
-          <div style={{ display: "grid", gap: 8, fontSize: 13.5 }}>
+          <div style={{ display: "grid", gap: 8, fontSize: "calc(13.5px * var(--ae-fs, 1))" }}>
             <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 type="checkbox"
@@ -190,7 +190,7 @@ export function EndOfDayPackDialog({
               role="alert"
               style={{
                 marginTop: 14,
-                fontSize: 13,
+                fontSize: "calc(13px * var(--ae-fs, 1))",
                 lineHeight: 1.5,
                 color: colors.danger,
               }}
@@ -243,7 +243,7 @@ export function EndOfDayPackDialog({
       {phase !== "setup" && (
         <>
           <div
-            style={{ display: "grid", gap: 8, fontSize: 13.5 }}
+            style={{ display: "grid", gap: 8, fontSize: "calc(13.5px * var(--ae-fs, 1))" }}
             role="status"
             aria-live="polite"
           >
@@ -282,7 +282,7 @@ export function EndOfDayPackDialog({
                     <span style={{ flex: 1 }}>{STEP_LABEL[id]}</span>
                     <span
                       style={{
-                        fontSize: 12,
+                        fontSize: "calc(12px * var(--ae-fs, 1))",
                         color:
                           state.status === "error"
                             ? colors.danger
@@ -297,7 +297,7 @@ export function EndOfDayPackDialog({
           </div>
 
           {phase === "done" && (
-            <div style={{ marginTop: 16, fontSize: 13.5, lineHeight: 1.55 }}>
+            <div style={{ marginTop: 16, fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55 }}>
               {fatal && (
                 <div role="alert" style={{ color: colors.danger }}>
                   {fatal}

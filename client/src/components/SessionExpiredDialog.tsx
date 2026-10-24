@@ -48,7 +48,7 @@ export function SessionExpiredDialog() {
   return (
     <Modal title="Session expired" onClose={() => {}} width={400}>
       <form onSubmit={handleSubmit}>
-        <p style={{ margin: "0 0 12px", fontSize: 13.5, lineHeight: 1.55 }}>
+        <p style={{ margin: "0 0 12px", fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55 }}>
           Your session expired.{" "}
           {staged > 0
             ? `Your ${staged} unsaved change${staged === 1 ? "" : "s"} ${staged === 1 ? "is" : "are"} still here - `
@@ -69,7 +69,7 @@ export function SessionExpiredDialog() {
         {error && (
           <div
             role="alert"
-            style={{ color: colors.danger, fontSize: 12.5, marginBottom: 12 }}
+            style={{ color: colors.danger, fontSize: "calc(12.5px * var(--ae-fs, 1))", marginBottom: 12 }}
           >
             {error}
           </div>

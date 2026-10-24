@@ -65,8 +65,8 @@ export function EntryRulesSettings() {
 
   return (
     <div className="ae-panel" style={{ maxWidth: 640, padding: "14px 18px" }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: colors.ink }}>Entry rules</div>
-      <div style={{ fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+      <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>Entry rules</div>
+      <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
         How the Online and Offline entry pages behave for everyone.
       </div>
 
@@ -76,7 +76,7 @@ export function EntryRulesSettings() {
         </div>
       ) : (
         <div style={{ marginTop: 14 }}>
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: colors.ink }}>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
             <input
               type="checkbox"
               style={{ marginTop: 3 }}
@@ -86,7 +86,7 @@ export function EntryRulesSettings() {
             />
             <span>
               <strong>Finish days in order</strong>
-              <span style={{ display: "block", fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+              <span style={{ display: "block", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
                 On: an entry page stays read-only while an earlier day with saved entries is still unfinished, and
                 shows "Finish that day first".
                 <br />
@@ -95,7 +95,7 @@ export function EntryRulesSettings() {
             </span>
           </label>
 
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 13, color: colors.ink, marginTop: 16 }}>
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink, marginTop: 16 }}>
             <input
               type="checkbox"
               style={{ marginTop: 3 }}
@@ -105,7 +105,7 @@ export function EntryRulesSettings() {
             />
             <span>
               <strong>Use Morning and Night shifts</strong>
-              <span style={{ display: "block", fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+              <span style={{ display: "block", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
                 On: each day has a Morning (7am–4pm) and a Night (4pm–1am) sheet, and the entry pages open on the one
                 the clock says.
                 <br />
@@ -116,7 +116,7 @@ export function EntryRulesSettings() {
           </label>
 
           {!rules.requireEarlierDaysFinished && (
-            <div role="status" style={{ marginTop: 10, fontSize: 12.5, color: colors.ink }}>
+            <div role="status" style={{ marginTop: 10, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink }}>
               While earlier days are open, their figures can still change, and the opening stock that carries forward
               into later days follows them. <strong>Finishing a day still goes in order</strong> - a later day cannot
               be finished until the earlier ones are - so locked days never move.

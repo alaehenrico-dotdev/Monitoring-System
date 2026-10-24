@@ -255,7 +255,7 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
           </Button>
         )}
         {template && (
-          <span style={{ fontSize: 12, color: colors.subtleInk, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }} title={template.fileName}>
+          <span style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 220 }} title={template.fileName}>
             {template.fileName}
           </span>
         )}
@@ -280,7 +280,7 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
         )}
       </div>
       {templateError && (
-        <div role="alert" style={{ color: colors.danger, fontSize: 13, marginBottom: 10 }}>
+        <div role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))", marginBottom: 10 }}>
           {templateError}
         </div>
       )}
@@ -305,16 +305,16 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
       ) : (
         <>
       {adding && items && <AddProductForm products={items} onAdded={handleAdded} onCancel={() => setAdding(false)} />}
-      <p style={{ margin: "0 0 12px", fontSize: 13, color: colors.subtleInk }}>
+      <p style={{ margin: "0 0 12px", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
         Drag a row by its handle, or use the arrows. Each product keeps its SKU. The new order applies to every page
         and report, for everyone.
       </p>
       {error && (
-        <div role="alert" style={{ color: colors.danger, fontSize: 13, marginBottom: 10 }}>
+        <div role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))", marginBottom: 10 }}>
           {error}
         </div>
       )}
-      {!items && !error && <div style={{ fontSize: 13, color: colors.subtleInk }}>Loading…</div>}
+      {!items && !error && <div style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>Loading…</div>}
       {items && (
         <ol
           style={{
@@ -364,16 +364,16 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
               <span
                 aria-hidden
                 title="Drag to move"
-                style={{ cursor: "grab", color: colors.subtleInk, userSelect: "none", fontSize: 16, lineHeight: 1 }}
+                style={{ cursor: "grab", color: colors.subtleInk, userSelect: "none", fontSize: "calc(16px * var(--ae-fs, 1))", lineHeight: 1 }}
               >
                 ⠿
               </span>
-              <span style={{ width: 28, textAlign: "right", fontSize: 12, color: colors.subtleInk }}>{i + 1}</span>
+              <span style={{ width: 28, textAlign: "right", fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk }}>{i + 1}</span>
               <span style={{ flex: 1, minWidth: 0 }}>
                 <span
                   style={{
                     display: "block",
-                    fontSize: 13,
+                    fontSize: "calc(13px * var(--ae-fs, 1))",
                     fontWeight: 600,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -382,7 +382,7 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
                 >
                   {p.name}
                 </span>
-                <span style={{ display: "block", fontSize: 11, color: colors.subtleInk }}>
+                <span style={{ display: "block", fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}>
                   {p.sku ?? "No SKU"} · {p.category}
                 </span>
               </span>

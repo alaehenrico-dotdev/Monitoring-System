@@ -195,6 +195,8 @@ export const env = {
     globalLimit: limitCount("RATE_LIMIT_GLOBAL_MAX", 600),
     globalWindowMs: limitWindowMs("RATE_LIMIT_GLOBAL_WINDOW_MS", 5 * 60 * 1000),
     loginLimit: limitCount("RATE_LIMIT_LOGIN_MAX", 10),
+    // Failed logins per IP across ALL usernames, in the same window (see loginIpLimiter).
+    loginIpLimit: limitCount("RATE_LIMIT_LOGIN_IP_MAX", 50),
     loginWindowMs: limitWindowMs("RATE_LIMIT_LOGIN_WINDOW_MS", 15 * 60 * 1000),
     passcodeLimit: limitCount("RATE_LIMIT_PASSCODE_MAX", 10),
     passcodeWindowMs: limitWindowMs("RATE_LIMIT_PASSCODE_WINDOW_MS", 15 * 60 * 1000),
@@ -203,6 +205,12 @@ export const env = {
   // by the nightly maintenance job (services/maintenance.service.ts). 0 turns
   // archiving off.
   changeLogRetentionMonths: nonNegativeInt("CHANGE_LOG_RETENTION_MONTHS", 12),
+  // Browser error reports (POST /api/client-errors) accept anonymous input, so the
+  // table is bounded: reports older than this many days are deleted by the nightly
+  // maintenance job, and no more than this many are ever kept (oldest go first).
+  // 0 turns either limit off.
+  clientErrorRetentionDays: nonNegativeInt("CLIENT_ERROR_RETENTION_DAYS", 90),
+  clientErrorMaxRows: nonNegativeInt("CLIENT_ERROR_MAX_ROWS", 20_000),
   // A backup older than this many hours (or none at all) shows as overdue in
   // the admin action queue.
   backupOverdueHours: limitCount("BACKUP_OVERDUE_HOURS", 36),

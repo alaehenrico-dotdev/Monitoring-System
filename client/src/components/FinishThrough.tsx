@@ -130,7 +130,7 @@ export function FinishThroughDialog({
   if (done !== null) {
     return (
       <Modal title="Days finished" onClose={onClose} width={440}>
-        <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: 0 }}>
+        <p style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55, margin: 0 }}>
           {done} {page} shift{done === 1 ? "" : "s"} up to {formatDateDisplay(through)} {done === 1 ? "is" : "are"} saved and locked. A day's report
           is saved once both pages of it are finished.
         </p>
@@ -145,7 +145,7 @@ export function FinishThroughDialog({
 
   return (
     <Modal title={`Finish ${page} through a date`} onClose={action.busy ? () => {} : onClose} width={520}>
-      <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+      <div style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55 }}>
         <p style={{ margin: "0 0 12px" }}>
           Finishes every unfinished {page} shift up to and including the date you pick, oldest first, in one go. If anything can't be finished, nothing is. The{" "}
           {PAGE_LABEL[location === "ONLINE" ? "OFFLINE" : "ONLINE"]} page is not affected.

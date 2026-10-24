@@ -2,7 +2,7 @@ import { API_URL, ApiError, getToken, http } from "./http";
 
 export interface DriveSettings {
   autoBackup: boolean;
-  /// The UTC hour (0-23) the daily backup becomes due.
+  /// The UTC hour (0-23) the weekly (Sunday) backup becomes due.
   backupHourUtc: number;
   keepBackups: number;
   saveExports: boolean;

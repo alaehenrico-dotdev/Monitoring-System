@@ -137,7 +137,7 @@ export function Sidebar() {
           {user && (
             <div
               style={{
-                fontSize: 12,
+                fontSize: "calc(12px * var(--ae-fs, 1))",
                 color: "var(--ae-glass-text)",
                 opacity: 0.85,
                 padding: "8px 14px 4px",
@@ -156,7 +156,7 @@ export function Sidebar() {
                 title="Log out"
                 style={{
                   width: "auto",
-                  fontSize: 12,
+                  fontSize: "calc(12px * var(--ae-fs, 1))",
                   fontFamily: "inherit",
                   cursor: "pointer",
                   background: "transparent",
@@ -182,7 +182,7 @@ export function Sidebar() {
           style={{
             flexShrink: 0,
             padding: "6px 14px 10px",
-            fontSize: 11,
+            fontSize: "calc(11px * var(--ae-fs, 1))",
             color: "var(--ae-glass-text)",
             opacity: 0.55,
             borderTop:

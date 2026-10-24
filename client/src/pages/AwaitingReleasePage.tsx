@@ -95,7 +95,7 @@ export function AwaitingReleasePage() {
         subtitle="Finished goods that can't be sold yet (no label, no sticker). They are not stock until released."
       />
       <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
-        <p style={{ fontSize: 13, lineHeight: 1.55, color: colors.subtleInk, margin: "0 0 10px" }}>
+        <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", lineHeight: 1.55, color: colors.subtleInk, margin: "0 0 10px" }}>
           Leave these out of the night's entries and count, and record them here instead - the day can finish without them. When they're labeled, release them:
           the quantity is added to Production (In) on the shift they become sellable, so nothing already reported changes.
         </p>
@@ -188,7 +188,7 @@ function ItemRow({
   const awaiting = item.status === "AWAITING";
   const stale = awaiting && item.ageDays >= STALE_AFTER_DAYS;
   return (
-    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, color: colors.ink }}>
+    <div style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
         <span className={`ae-dash-chip ae-dash-chip--${TONE[item.status]}`}>{STATUS_LABEL[item.status]}</span>
         <strong>
@@ -279,7 +279,7 @@ function DialogButtons({
 
 function FormError({ message }: { message: string | null }) {
   return message ? (
-    <p role="alert" style={{ color: colors.danger, fontSize: 13, margin: "12px 0 0" }}>
+    <p role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))", margin: "12px 0 0" }}>
       {message}
     </p>
   ) : null;
@@ -390,7 +390,7 @@ function ReleaseDialog({ item, onClose, onDone }: { item: PendingRelease; onClos
 
   return (
     <Modal title="Release into stock" onClose={busy ? () => {} : onClose} width={460}>
-      <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: "0 0 12px" }}>
+      <p style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55, margin: "0 0 12px" }}>
         Adds <strong>{qty(item.quantity)}</strong> {item.product.unit} of <strong>{item.product.name}</strong> to {PAGE_LABEL[item.location]} Production (In) for the shift below. It
         counts as stock from that shift on. It can only go into the current shift: a day that was already reported is never changed.
       </p>
@@ -472,7 +472,7 @@ function CancelDialog({ item, onClose, onDone }: { item: PendingRelease; onClose
 
   return (
     <Modal title="Write off" onClose={busy ? () => {} : onClose} width={440}>
-      <p style={{ fontSize: 13.5, lineHeight: 1.55, margin: "0 0 12px" }}>
+      <p style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55, margin: "0 0 12px" }}>
         {qty(item.quantity)} {item.product.unit} of <strong>{item.product.name}</strong> will never be released into stock (spoiled, never finished, merged elsewhere). It stays in the history with
         your reason.
       </p>

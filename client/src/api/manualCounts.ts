@@ -116,12 +116,12 @@ export function setCountRemarks(
 }
 
 /// Approves a sheet's saved counts (one date + shift, every location) as final.
-/// With `applyToOpening` they also become the next day's opening stock, except
-/// where an import had set one (`keptManual` says how many were left alone) or
-/// where the next day is already finished (`heldLocked`: held for an admin).
+/// With `applyToOpening` they also start a new record: the next day entered
+/// opens at the counted figure and carries on from there. Days already saved
+/// are left as they are (`leftSaved` says how many counted products have some).
 /// Supervisor/Admin only.
 export function publishManualCounts(date: string, shift: Shift, applyToOpening = false) {
-  return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; keptManual?: number; heldLocked?: number; snapshotId?: number }>(
+  return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; leftSaved?: number; snapshotId?: number }>(
     `/manual-counts/publish?date=${date}&shift=${shift}`,
     { applyToOpening },
   );

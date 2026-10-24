@@ -174,6 +174,36 @@ describe("the shipped limiters trip at their configured threshold and reset afte
     });
   });
 
+  it("loginIpLimiter - failed logins per IP, across usernames", async () => {
+    const { loginIpLimiter } = await loadLimiters({ RATE_LIMIT_LOGIN_IP_MAX: "3", RATE_LIMIT_LOGIN_WINDOW_MS: "1000" });
+    const app = express();
+    app.use(express.json());
+    // 401 for a wrong password, 200 for the right one - only the failures may count.
+    app.post("/login", loginIpLimiter, (req, res) => {
+      res.status(req.body?.password === "right" ? 200 : 401).json({});
+    });
+    const attempt = (username: string, password: string): RequestInit => ({
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    await withServer(app, async (baseUrl) => {
+      // Successful sign-ins never count, however many people share the address.
+      expect(await hit(`${baseUrl}/login`, 6, attempt("encoder", "right"))).toEqual([200, 200, 200, 200, 200, 200]);
+      // Three failures against three DIFFERENT usernames use up the one shared bucket...
+      expect(await hit(`${baseUrl}/login`, 1, attempt("a", "wrong"))).toEqual([401]);
+      expect(await hit(`${baseUrl}/login`, 1, attempt("b", "wrong"))).toEqual([401]);
+      expect(await hit(`${baseUrl}/login`, 1, attempt("c", "wrong"))).toEqual([401]);
+      // ...so the fourth username is turned away without being tried.
+      expect(await hit(`${baseUrl}/login`, 1, attempt("d", "wrong"))).toEqual([429]);
+      // A correct password still gets through the limiter's count, but the bucket is spent: blocked too.
+      expect(await hit(`${baseUrl}/login`, 1, attempt("encoder", "right"))).toEqual([429]);
+      await sleep(1100);
+      expect(await hit(`${baseUrl}/login`, 1, attempt("d", "wrong"))).toEqual([401]);
+    });
+  });
+
   it("authLimiter - login", async () => {
     const { authLimiter } = await loadLimiters({ RATE_LIMIT_LOGIN_MAX: "2", RATE_LIMIT_LOGIN_WINDOW_MS: "1000" });
     const app = express();

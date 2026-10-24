@@ -45,17 +45,17 @@ export function UserPasswordsPage() {
 
   return (
     <div style={{ width: "100%", maxWidth: 760, margin: "0 auto" }}>
-      <p style={{ fontSize: 13, color: colors.subtleInk, margin: "0 0 20px" }}>
+      <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk, margin: "0 0 20px" }}>
         Only an administrator can change passwords. Pick an account and set a
         new one, then hand it to the user.
       </p>
       {loadError && (
-        <p role="alert" style={{ color: colors.danger, fontSize: 13 }}>
+        <p role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))" }}>
           {loadError}
         </p>
       )}
       {!accounts && !loadError && (
-        <p style={{ fontSize: 13, color: colors.subtleInk }}>Loading…</p>
+        <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>Loading…</p>
       )}
       {accounts && (
         <div className="ae-account-list">
@@ -170,7 +170,7 @@ function SetPasswordModal({
         {(tooShort || mismatch || error) && (
           <p
             role="alert"
-            style={{ margin: 0, fontSize: 12.5, color: colors.danger }}
+            style={{ margin: 0, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.danger }}
           >
             {error ??
               (tooShort

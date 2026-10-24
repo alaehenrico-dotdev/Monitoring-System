@@ -3,10 +3,45 @@
 .git
 .github
 .claude
-**/.env
-**/.env.local
 **/*.log
 **/*.tsbuildinfo
 coverage
+**/coverage
 *.md
 !server/ARCHITECTURE.md
+
+# Secrets: every real environment file at any depth (.env, .env.local, .env.production,
+# .env.docker ...). Only the committed *.example templates may enter the build context.
+# (This list used to name just .env and .env.local, so a stray .env.production or
+# .env.docker would have been copied into the image by `COPY client client` /
+# `COPY server/prisma ...` and stayed in a layer.)
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+
+# Keys, certificates and Google credentials.
+**/*.pem
+**/*.crt
+**/*.key
+**/*.p12
+**/*.pfx
+**/client_secret*.json
+**/service-account*.json
+
+# Database dumps and backups - data, never part of an image.
+**/*.sql.gz
+**/*.dump
+**/db_backup_*
+**/docker_db_backup_*
+**/premigrate_*
+**/backups
+**/snapshots
+
+# Editor, OS and local-tool leftovers.
+**/.vscode
+**/.idea
+**/.vite
+**/.eslintcache
+**/Thumbs.db
+**/.DS_Store

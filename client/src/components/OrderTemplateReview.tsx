@@ -160,7 +160,7 @@ export function OrderTemplateReview({
   const label = (p: Product) => `${p.name} (${p.sku ?? p.category})`;
   return (
     <>
-      <div role="status" style={{ fontSize: 13, marginBottom: 10 }}>
+      <div role="status" style={{ fontSize: "calc(13px * var(--ae-fs, 1))", marginBottom: 10 }}>
         <strong>
           {plan.items.length} product{plan.items.length === 1 ? "" : "s"} in {categories} categor{categories === 1 ? "y" : "ies"}
         </strong>
@@ -177,7 +177,7 @@ export function OrderTemplateReview({
         </span>
       </div>
       {error && (
-        <div role="alert" style={{ color: colors.danger, fontSize: 13, marginBottom: 10 }}>
+        <div role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))", marginBottom: 10 }}>
           {error}
         </div>
       )}
@@ -211,7 +211,7 @@ export function OrderTemplateReview({
                 <li
                   style={{
                     padding: "5px 8px",
-                    fontSize: 12,
+                    fontSize: "calc(12px * var(--ae-fs, 1))",
                     fontWeight: 700,
                     letterSpacing: "0.04em",
                     textTransform: "uppercase",
@@ -232,27 +232,27 @@ export function OrderTemplateReview({
                   borderBottom: `1px solid ${colors.border}`,
                 }}
               >
-                <span style={{ width: 28, textAlign: "right", fontSize: 12, color: colors.subtleInk }}>{i + 1}</span>
-                <span style={{ flex: 1, minWidth: 140, fontSize: 13, fontWeight: 600 }}>
+                <span style={{ width: 28, textAlign: "right", fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk }}>{i + 1}</span>
+                <span style={{ flex: 1, minWidth: 140, fontSize: "calc(13px * var(--ae-fs, 1))", fontWeight: 600 }}>
                   {/* The system's own name wins over the template's spelling. */}
                   {current && (linked || merging) ? current.name : item.name}
                   {current && (linked || merging) && current.name !== item.name && (
-                    <span style={{ fontWeight: 400, fontSize: 11, color: colors.subtleInk }}> (template: {item.name})</span>
+                    <span style={{ fontWeight: 400, fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}> (template: {item.name})</span>
                   )}
                 </span>
-                {isNew && <span style={{ fontSize: 11, fontWeight: 700, color: colors.warningText }}>NEW</span>}
+                {isNew && <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", fontWeight: 700, color: colors.warningText }}>NEW</span>}
                 {duplicate && !merging && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: colors.warningText }} title="No SKU: added earlier, not one of the original products">
+                  <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", fontWeight: 700, color: colors.warningText }} title="No SKU: added earlier, not one of the original products">
                     NEW · no SKU
                   </span>
                 )}
                 {merging && current && duplicate && (
-                  <span style={{ fontSize: 11, color: colors.subtleInk }}>
+                  <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}>
                     merges &quot;{duplicate.name}&quot; into it
                   </span>
                 )}
-                {linked && current && <span style={{ fontSize: 11, color: colors.subtleInk }}>same as {label(current)}</span>}
-                {moves && current && <span style={{ fontSize: 11, color: colors.subtleInk }}>moves from {current.category}</span>}
+                {linked && current && <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}>same as {label(current)}</span>}
+                {moves && current && <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}>moves from {current.category}</span>}
                 {canChoose && choices.length > 0 && (
                   <Select
                     aria-label={`Is ${item.name} an existing product?`}
@@ -264,7 +264,7 @@ export function OrderTemplateReview({
                       if (duplicate) setMerges((prev) => ({ ...prev, [key]: id }));
                       else setLinks((prev) => ({ ...prev, [key]: id }));
                     }}
-                    style={{ width: "auto", maxWidth: 240, fontSize: 12 }}
+                    style={{ width: "auto", maxWidth: 240, fontSize: "calc(12px * var(--ae-fs, 1))" }}
                   >
                     <option value="">{duplicate ? "Keep as a separate product" : "Add as a new product"}</option>
                     {choices.map((p) => (
@@ -299,7 +299,7 @@ export function OrderTemplateReview({
         })}
       </ol>
       {unclaimed.length > 0 && (
-        <div style={{ margin: "10px 0 0", fontSize: 12.5 }}>
+        <div style={{ margin: "10px 0 0", fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
           <label style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
             <input
               type="checkbox"
@@ -330,7 +330,7 @@ export function OrderTemplateReview({
         </div>
       )}
       {mergeCount > 0 && (
-        <p role="note" style={{ margin: "10px 0 0", fontSize: 12.5, color: colors.warningText }}>
+        <p role="note" style={{ margin: "10px 0 0", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.warningText }}>
           {mergeCount} merge{mergeCount === 1 ? "" : "s"}: all of the entries, counts and added columns of the duplicate move to the
           product it is the same as, and the duplicate is deleted. This cannot be undone - take a backup first.
         </p>

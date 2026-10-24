@@ -35,20 +35,26 @@ export const manualCountRepository = {
     });
   },
 
-  /// The most recent count strictly before the given period that a supervisor
+  /// The most recent count strictly before the given date that a supervisor
   /// applied to opening stock when publishing it (counts are otherwise an audit
   /// only). It is looked up on its own because it applies whether or not a
   /// daily row exists for the counted period.
-  findLatestBefore(productId: number, entryDate: Date, shift: Shift, location: StockLocation, db: Db = prisma) {
-    // An applied count is the opening stock of the NEXT DAY only: it feeds
-    // that date's Morning shift, never a Night shift.
-    if (shift === "NIGHT") return Promise.resolve(null);
+  ///
+  /// An applied count is a fresh starting record: whichever shift the next
+  /// period turns out to be, it opens from this figure unless a saved row sits
+  /// between the count and it (the caller compares the two).
+  ///
+  /// `rowCreatedAt` is for a period that ALREADY has a saved row: only a count
+  /// published before that row was first saved can have opened it. A count
+  /// published afterwards leaves the row exactly as it was (days saved before
+  /// a publish are never rewritten by it).
+  findLatestBefore(productId: number, entryDate: Date, location: StockLocation, db: Db = prisma, rowCreatedAt?: Date) {
     return db.manualCount.findFirst({
       where: {
         productId,
         location,
         // Only a published count that was applied to opening stock.
-        publishedAt: { not: null },
+        publishedAt: rowCreatedAt ? { not: null, lte: rowCreatedAt } : { not: null },
         appliedToOpening: true,
         entryDate: { lt: entryDate },
       },
@@ -57,21 +63,46 @@ export const manualCountRepository = {
     });
   },
 
-  /// Batched findLatestBefore - one latest count per product.
-  findLatestBeforeForProducts(productIds: number[], entryDate: Date, shift: Shift, location: StockLocation) {
-    if (!productIds.length || shift === "NIGHT") return Promise.resolve([]);
-    return prisma.manualCount.findMany({
-      where: {
-        productId: { in: productIds },
-        location,
-        publishedAt: { not: null },
-        appliedToOpening: true,
-        entryDate: { lt: entryDate },
-      },
-      orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
-      distinct: ["productId"],
-      select: { productId: true, entryDate: true, shift: true, manualCount: true },
+  /// Batched findLatestBefore - one latest count per product. `createdAtByProduct`
+  /// carries the saved row's first-save time for the products that already have
+  /// one (see findLatestBefore); the rest read the latest applied count.
+  async findLatestBeforeForProducts(
+    productIds: number[],
+    entryDate: Date,
+    location: StockLocation,
+    createdAtByProduct?: Map<number, Date>,
+  ) {
+    if (!productIds.length) return [];
+    const where = {
+      productId: { in: productIds },
+      location,
+      publishedAt: { not: null },
+      appliedToOpening: true,
+      entryDate: { lt: entryDate },
+    };
+    const orderBy = [{ entryDate: "desc" as const }, { shift: "desc" as const }];
+    if (!createdAtByProduct?.size) {
+      return prisma.manualCount.findMany({
+        where,
+        orderBy,
+        distinct: ["productId"],
+        select: { productId: true, entryDate: true, shift: true, manualCount: true },
+      });
+    }
+    const all = await prisma.manualCount.findMany({
+      where,
+      orderBy,
+      select: { productId: true, entryDate: true, shift: true, manualCount: true, publishedAt: true },
     });
+    // Newest first, so the first one that qualifies per product is the latest.
+    const picked = new Map<number, (typeof all)[number]>();
+    for (const c of all) {
+      if (picked.has(c.productId)) continue;
+      const savedAt = createdAtByProduct.get(c.productId);
+      if (savedAt && c.publishedAt && c.publishedAt.getTime() > savedAt.getTime()) continue;
+      picked.set(c.productId, c);
+    }
+    return [...picked.values()].map(({ publishedAt: _publishedAt, ...rest }) => rest);
   },
 
   /// True when any count at all exists for the product at this location. The

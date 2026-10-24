@@ -142,7 +142,7 @@ export function Button({
 
 export function Label({ children, ...rest }: LabelHTMLAttributes<HTMLLabelElement> & { children: ReactNode }) {
   return (
-    <label style={{ display: "block", fontSize: 12, marginBottom: 4, color: colors.subtleInk, fontWeight: 600 }} {...rest}>
+    <label style={{ display: "block", fontSize: "calc(12px * var(--ae-fs, 1))", marginBottom: 4, color: colors.subtleInk, fontWeight: 600 }} {...rest}>
       {children}
     </label>
   );

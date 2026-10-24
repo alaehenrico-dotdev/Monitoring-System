@@ -69,6 +69,22 @@ export const authLimiter = rateLimit({
 /// req.user to key on either. Moving authenticate first would let an
 /// unauthenticated flood reach JWT verification before being rate limited,
 /// which is the worse trade.
+/// A ceiling on FAILED logins per IP, whatever username they try. authLimiter above is
+/// keyed by IP *and* username so one hammered account cannot lock out a whole office,
+/// but that also gives every new username a fresh bucket - so one address could try a
+/// password against every account (password spraying / username probing) and only the
+/// global limiter would notice. Only failures count (`skipSuccessfulRequests`), so an
+/// office behind one address signing in normally never reaches it.
+export const loginIpLimiter = rateLimit({
+  windowMs: env.rateLimit.loginWindowMs,
+  limit: env.rateLimit.loginIpLimit,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: "Too many failed login attempts from this address - please wait a few minutes and try again." },
+  keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ""),
+});
+
 export const passcodeLimiter = rateLimit({
   windowMs: env.rateLimit.passcodeWindowMs,
   limit: env.rateLimit.passcodeLimit,

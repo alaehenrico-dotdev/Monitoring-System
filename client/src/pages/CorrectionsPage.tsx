@@ -120,7 +120,7 @@ export function CorrectionsPage() {
         ) : (
           <div className="ae-panel">
             {rows.map((c) => (
-              <div key={c.id} style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: 13, color: colors.ink }}>
+              <div key={c.id} style={{ padding: "12px 16px", borderBottom: `1px solid ${colors.border}`, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   <span className={`ae-dash-chip ae-dash-chip--${TONE[c.status]}`}>{c.status.toLowerCase()}</span>
                   <strong>
@@ -159,11 +159,11 @@ export function CorrectionsPage() {
                 </div>
                 <div style={{ color: colors.subtleInk, marginTop: 4 }}>Reason: {c.reason}</div>
                 {isStaleOpening(c) && c.status === "PENDING" && (
-                  <div style={{ color: colors.subtleInk, fontSize: 12.5, marginTop: 4 }}>
+                  <div style={{ color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))", marginTop: 4 }}>
                     Approving re-derives this day's opening from the day before it. The figure shown is today's expectation; it is worked out again when you approve.
                   </div>
                 )}
-                <ol style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.subtleInk, fontSize: 12.5 }}>
+                <ol style={{ margin: "6px 0 0", paddingLeft: 18, color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                   {c.events.map((ev) => (
                     <li key={ev.id}>
                       {ev.event.toLowerCase()} · {ev.by?.name ?? "removed user"} · {new Date(ev.at).toLocaleString()}
@@ -172,7 +172,7 @@ export function CorrectionsPage() {
                   ))}
                 </ol>
                 {c.status === "APPROVED" && c.appliedBefore !== null && c.appliedBefore !== c.beforeValue && (
-                  <div style={{ color: colors.subtleInk, fontSize: 12.5, marginTop: 4 }}>
+                  <div style={{ color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))", marginTop: 4 }}>
                     The figure had changed to {c.appliedBefore} by the time this was approved.
                   </div>
                 )}
@@ -185,7 +185,7 @@ export function CorrectionsPage() {
 
       {approving && (
         <Modal title="Approve correction" onClose={busyOn ? () => {} : () => setApproving(null)} width={460}>
-          <div style={{ fontSize: 13.5, lineHeight: 1.55 }}>
+          <div style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", lineHeight: 1.55 }}>
             <p style={{ margin: "0 0 10px" }}>
               {TABLE_LABEL[approving.tableName] ?? approving.tableName} #{approving.recordId} · {fieldLabel(approving)}:{" "}
               {approving.beforeValue} → <strong>{approving.proposedValue}</strong>. The finished day's report is saved again with the new figure.
@@ -194,7 +194,7 @@ export function CorrectionsPage() {
               <input type="checkbox" checked={cascade} onChange={(e) => setCascade(e.target.checked)} style={{ marginTop: 3 }} />
               <span>
                 Also apply to the finished days after it. Their opening stock will change, and so will their reports.
-                <span style={{ display: "block", color: colors.subtleInk, fontSize: 12.5 }}>
+                <span style={{ display: "block", color: colors.subtleInk, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                   Leave this off to review each of those days separately; each one then waits here for its own approval. A closed month always does.
                 </span>
               </span>

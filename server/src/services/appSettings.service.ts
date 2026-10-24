@@ -14,14 +14,14 @@ export interface EntryRules {
   /// present day while earlier days are still open. (Finish Day itself always
   /// goes in order, so the locks stay in sequence either way.)
   requireEarlierDaysFinished: boolean;
-  /// Two shifts a day (Morning 7am-4pm, Night 4pm-1am). Off, a day is one whole
-  /// sheet: entries are saved as the Night sheet of the calendar date, however
+  /// Two shifts a day (Morning 7am-4pm, Night 4pm-1am), on unless an admin turns
+  /// it off. Off, a day is one whole sheet: entries are saved as the Night sheet of the calendar date, however
   /// late it is, and the Morning sheet is not used. Days that were already
   /// entered by shift stay as they are and show combined, read-only.
   useShifts: boolean;
 }
 
-export const ENTRY_RULE_DEFAULTS: EntryRules = { requireEarlierDaysFinished: true, useShifts: false };
+export const ENTRY_RULE_DEFAULTS: EntryRules = { requireEarlierDaysFinished: true, useShifts: true };
 
 const KEYS = { requireEarlierDaysFinished: "entry.requireEarlierDaysFinished", useShifts: "entry.useShifts" } as const;
 const CACHE_KEY = "app-settings:entry-rules";
@@ -34,7 +34,7 @@ async function load(): Promise<EntryRules> {
   const value = (key: string) => rows.find((r) => r.key === key)?.value;
   return {
     requireEarlierDaysFinished: value(KEYS.requireEarlierDaysFinished) !== "false",
-    useShifts: value(KEYS.useShifts) === "true",
+    useShifts: value(KEYS.useShifts) !== "false",
   };
 }
 

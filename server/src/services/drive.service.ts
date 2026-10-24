@@ -660,32 +660,36 @@ setReportSavedHandler((date) => void queueDailyReportUpload(date));
 
 // --- Schedule -----------------------------------------------------------------
 
-/// The scheduled backup is monthly: the last day of each month (by the UTC
-/// calendar, which is what the server runs on) at `hourUtc`. `Date.UTC` rolls a
-/// month of -1 or 12 over into the neighbouring year, and day 0 is the last day
-/// of the month before - so no month length is spelled out anywhere.
-function monthEndSlot(year: number, month: number, hourUtc: number): number {
-  return Date.UTC(year, month + 1, 0, hourUtc);
+/// The scheduled backup is weekly: every Sunday at `hourUtc` (by the UTC
+/// calendar, which is what the server runs on). With the default 18:00 that is
+/// right after Sunday's Night shift closes (1am Monday in the Philippines), so
+/// the copy holds the whole week. `Date.UTC` rolls a day-of-month below 1 into
+/// the month before, so no month length is spelled out anywhere.
+const WEEK_MS = 7 * 24 * HOUR_MS;
+
+/// This week's Sunday slot (the Sunday on or before `now`'s UTC date).
+function sundaySlot(now: Date, hourUtc: number): number {
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay(), hourUtc);
 }
 
 /// The most recent scheduled time that is not in the future.
 function latestBackupSlot(hourUtc: number, now: Date): number {
-  const thisMonth = monthEndSlot(now.getUTCFullYear(), now.getUTCMonth(), hourUtc);
-  return now.getTime() >= thisMonth ? thisMonth : monthEndSlot(now.getUTCFullYear(), now.getUTCMonth() - 1, hourUtc);
+  const thisWeek = sundaySlot(now, hourUtc);
+  return now.getTime() >= thisWeek ? thisWeek : thisWeek - WEEK_MS;
 }
 
 /// The next scheduled time after `now`.
 export function nextBackupAt(hourUtc: number, now: Date): Date {
-  const thisMonth = monthEndSlot(now.getUTCFullYear(), now.getUTCMonth(), hourUtc);
-  return new Date(now.getTime() < thisMonth ? thisMonth : monthEndSlot(now.getUTCFullYear(), now.getUTCMonth() + 1, hourUtc));
+  const thisWeek = sundaySlot(now, hourUtc);
+  return new Date(now.getTime() < thisWeek ? thisWeek : thisWeek + WEEK_MS);
 }
 
-/// A backup is due when the most recent end-of-month slot has passed with no
-/// backup since. "A month since the last one" would instead drift (and fire
-/// early whenever the hour is changed); a slot also catches up by itself after
-/// downtime, and a manual "Back up now" mid-month does not bring it forward.
+/// A backup is due when the most recent Sunday slot has passed with no backup
+/// since. "A week since the last one" would instead drift (and fire early
+/// whenever the hour is changed); a slot also catches up by itself after
+/// downtime, and a manual "Back up now" mid-week does not bring it forward.
 /// A connection that has never been backed up is due straight away, so there is
-/// a first copy without waiting for the month to end.
+/// a first copy without waiting for Sunday.
 export function isBackupDue(
   conn: { autoBackup: boolean; backupHourUtc: number; lastBackupAt: Date | null },
   now: Date,
