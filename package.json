@@ -1,7 +1,7 @@
 {
   "name": "ala-eh-stocks-monitoring-system",
   "private": true,
-  "version": "2.4.2",
+  "version": "2.4.3",
   "description": "Ala Eh Food Products - Online & Offline Stocks Monitoring System (monorepo root)",
   "workspaces": [
     "server",
