@@ -38,9 +38,18 @@ describe("dailyReportSheets", () => {
     expect(sheets.map((s) => s.name)).toEqual(["Summary", "Online", "Offline", "Consolidated", "Daily Out", "Audit"]);
     expect(sheets[1].columns).toEqual(["Category", "SKU", "Product", "Stocks (Opening)", "Stocks In (Off→Ol)", "Stocks Out (Ol→Off)", "Online Stocks", "Production (In)", "Fulfillment (Out)", "RTS", "Remaining Stocks"]);
     expect(sheets[1].rows[0]).toEqual(["Class A", "A1", "Alpha", 10, 0, 0, 10, 5, 3, 1, 13]);
-    expect(sheets[2].rows[0]).toEqual(["Class A", "", "Alpha", 4, 0, 0, 4, 0, 2, 0.5, 1, 1.5]);
+    expect(sheets[2].rows[0]).toEqual(["Class A", "", "Alpha", 4, 0, 0, 4, 0, 2, 0.5, 1.5]);
     expect(sheets[3].rows[0]).toEqual(["Class A", "A1", "Alpha", 13, 1.5, 14.5, null, null]);
     expect(sheets[4].rows).toEqual([[3, 2.5, 5.5]]);
+  });
+
+  it("does not print an Upsell (Out) column, even for a row that has an upsell amount", () => {
+    // The sample offline row has upsellOut: 1. The entry pages have no such column; the
+    // amount stays stored and counted in Remaining Stocks, it is just not a column here.
+    expect(report.offline[0].entry.upsellOut).toBe(1);
+    const offline = dailyReportSheets(report, null).find((x) => x.name === "Offline")!;
+    expect(offline.columns.join("|")).not.toMatch(/upsell/i);
+    expect(offline.columns).toEqual(["Category", "SKU", "Product", "Stocks (Opening)", "Stocks In (Ol→Off)", "Stocks Out (Off→Ol)", "Offline Stocks", "Production (In)", "Delivery (Out)", "Backloads", "Remaining Stocks"]);
   });
 
   it("keeps the Daily Out sheet empty when there are no figures, rather than inventing zeros", () => {
@@ -165,7 +174,7 @@ describe("added columns on the Online and Offline sheets", () => {
   it("is unchanged for a day with no added columns", () => {
     const sheets = dailyReportSheets(report, null);
     expect(sheet(sheets, "Online").columns).toHaveLength(3 + 8);
-    expect(sheet(sheets, "Offline").columns).toHaveLength(3 + 9);
+    expect(sheet(sheets, "Offline").columns).toHaveLength(3 + 8);
   });
 
   it("ignores keys that only look like added columns", () => {

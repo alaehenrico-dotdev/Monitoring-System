@@ -30,7 +30,8 @@ interface GridRow {
   isSaved?: boolean;
 }
 
-// Labels as on the entry pages (client/src/config/stockColumns.ts).
+// Labels as on the entry pages (client/src/config/stockColumns.ts), which have no
+// Upsell (Out) column - it is still stored and counted in Remaining Stocks, just not printed.
 const ONLINE_COLUMNS: [string, string][] = [
   ["openingStock", "Stocks (Opening)"],
   ["stockInOffToOl", "Stocks In (Off→Ol)"],
@@ -49,7 +50,6 @@ const OFFLINE_COLUMNS: [string, string][] = [
   ["productionIn", "Production (In)"],
   ["deliveryOut", "Delivery (Out)"],
   ["backloads", "Backloads"],
-  ["upsellOut", "Upsell (Out)"],
   ["remainingStock", "Remaining Stocks"],
 ];
 
