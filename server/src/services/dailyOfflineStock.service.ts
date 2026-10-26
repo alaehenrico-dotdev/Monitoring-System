@@ -87,7 +87,7 @@ function resolveDelivery(existing: Record<string, unknown> | null, input: Offlin
 }
 
 /// Section 4.6 - same shift-aware carry-forward principle as the Online table.
-export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+function computeOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
   return dailyOfflineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 }
 

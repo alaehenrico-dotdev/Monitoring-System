@@ -22,7 +22,7 @@ export const CORRECTIONS_TABLE_FOR: Record<EntryLocation, string> = {
 };
 
 /// The figures on each page that are mirrored onto the other one.
-export const TRANSFER_FIELDS: Record<EntryLocation, readonly string[]> = {
+const TRANSFER_FIELDS: Record<EntryLocation, readonly string[]> = {
   ONLINE: ["stockInOffToOl", "stockOutOlToOff"],
   OFFLINE: ["stockInOlToOff", "stockOutOffToOl"],
 };

@@ -11,7 +11,7 @@ export interface NavGroup {
   links: NavLinkDef[];
 }
 
-export const ALL_ROLES: Role[] = [
+const ALL_ROLES: Role[] = [
   "ONLINE_ENCODER",
   "OFFLINE_ENCODER",
   "SUPERVISOR_ADMIN",

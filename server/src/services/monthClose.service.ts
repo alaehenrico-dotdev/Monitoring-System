@@ -5,7 +5,7 @@ import { toDateOnlyString } from "../utils/date";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { recordChange } from "./changeLog.service";
 
-export const MONTH_CLOSURES_TABLE = "month_closures";
+const MONTH_CLOSURES_TABLE = "month_closures";
 
 const SHIFT_LABELS = { MORNING: "Morning", NIGHT: "Night" } as const;
 

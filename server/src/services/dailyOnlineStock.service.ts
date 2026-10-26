@@ -70,7 +70,7 @@ type OnlineFigures = Required<Omit<OnlineEntryInput, "openingStock" | "extras" |
 
 /// Section 4.6 - auto carry-forward (delegated to the repository, which owns
 /// the "immediately preceding shift" query).
-export function computeOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
+function computeOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma): Promise<number> {
   return dailyOnlineStockRepository.getOpeningStock(productId, entryDate, shift, db);
 }
 

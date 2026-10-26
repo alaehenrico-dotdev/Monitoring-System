@@ -17,7 +17,7 @@ const USERINFO_URL = "https://openid.googleapis.com/v1/userinfo";
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 
-export const DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file", "openid", "email"];
+const DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file", "openid", "email"];
 
 export interface OAuthClient {
   clientId: string;

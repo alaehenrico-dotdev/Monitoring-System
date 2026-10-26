@@ -157,7 +157,6 @@ export interface MonthReadiness {
 }
 
 export const listMonthClosures = () => http.get<MonthClosure[]>("/month-closures");
-export const getMonthStatus = (yearMonth: string) => http.get<{ yearMonth: string; isClosed: boolean }>(`/month-closures/${yearMonth}`);
 export const getMonthReadiness = (yearMonth: string) => http.get<MonthReadiness>(`/month-closures/${yearMonth}/readiness`);
 export const closeMonth = (yearMonth: string) => http.post<MonthClosure & { warnings: string[] }>(`/month-closures/${yearMonth}/close`, {});
 export const unlockMonth = (yearMonth: string, reason: string) => http.post<MonthClosure>(`/month-closures/${yearMonth}/unlock`, { reason });

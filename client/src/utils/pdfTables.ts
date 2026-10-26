@@ -78,7 +78,7 @@ export interface PdfDocumentSpec {
 // ---------------------------------------------------------------------------
 
 /** Number coercion matching StockGrid's `toNum`: blank / null -> 0. */
-export function num(value: unknown): number {
+function num(value: unknown): number {
   if (value === null || value === undefined || value === "") return 0;
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;

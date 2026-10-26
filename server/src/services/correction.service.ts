@@ -13,11 +13,11 @@ import { broadcastRealtimeEvent } from "../lib/realtime";
 import { previousPeriod } from "../utils/shift";
 import { toDateOnlyString } from "../utils/date";
 
-export const CORRECTIONS_TABLE = "correction_requests";
+const CORRECTIONS_TABLE = "correction_requests";
 
 /// Which figures a correction may name. Derived columns (remaining stock,
 /// variance, ...) are deliberately absent: they follow from these.
-export const CORRECTABLE_FIELDS: Record<string, readonly string[]> = {
+const CORRECTABLE_FIELDS: Record<string, readonly string[]> = {
   daily_online_stock: ["stockInOffToOl", "stockOutOlToOff", "productionIn", "fulfillmentOut", "rts"],
   daily_offline_stock: ["stockInOlToOff", "stockOutOffToOl", "productionIn", "delivery1", "delivery2", "delivery3", "delivery4", "delivery5", "backloads", "upsellOut"],
   manual_counts: ["manualCount"],

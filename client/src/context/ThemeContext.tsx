@@ -28,7 +28,7 @@ export type FontFamily = "inter" | "hyperlegible" | "plex" | "system" | "serif" 
 export type FontSize = "sm" | "md" | "lg" | "xl";
 
 export const FONT_FAMILIES: readonly FontFamily[] = ["inter", "hyperlegible", "plex", "system", "serif", "mono"];
-export const FONT_SIZES: readonly FontSize[] = ["sm", "md", "lg", "xl"];
+const FONT_SIZES: readonly FontSize[] = ["sm", "md", "lg", "xl"];
 export const DEFAULT_FONT: FontFamily = "inter";
 export const DEFAULT_FONT_SIZE: FontSize = "md";
 

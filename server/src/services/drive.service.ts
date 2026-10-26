@@ -73,7 +73,7 @@ export const MAX_EXPORT_BYTES = 30 * 1024 * 1024;
 
 const tokenSecret = () => env.driveTokenKey || env.jwtSecret;
 
-export function isConfigured(): boolean {
+function isConfigured(): boolean {
   return Boolean(env.googleClientId && env.googleClientSecret);
 }
 

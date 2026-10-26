@@ -47,7 +47,7 @@ export function subscribeQuickJump(fn: () => void): () => void {
 }
 
 /// The pending product id, or null if there is none (or it has expired).
-export function peekQuickJump(): number | null {
+function peekQuickJump(): number | null {
   if (!target) return null;
   if (Date.now() - target.at > TARGET_TTL_MS) {
     target = null;

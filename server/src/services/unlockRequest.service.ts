@@ -21,9 +21,9 @@ import { getEntryRules } from "./appSettings.service";
  * shifts are now switched off, which shows it combined and read-only.
  */
 
-export const MAX_REASON_LENGTH = 500;
+const MAX_REASON_LENGTH = 500;
 
-export async function findPendingUnlockRequest(location: EntryLocation, entryDate: Date, shift: Shift, db: Db = prisma) {
+async function findPendingUnlockRequest(location: EntryLocation, entryDate: Date, shift: Shift, db: Db = prisma) {
   return db.unlockRequest.findFirst({
     where: { location: location as StockLocation, entryDate, shift, status: "PENDING" },
     orderBy: { id: "asc" },
@@ -34,7 +34,7 @@ export async function findPendingUnlockRequest(location: EntryLocation, entryDat
 /// Whether the page is, right now, closed to entry: finished, held up by an
 /// earlier unfinished day (while that rule is on), or a day entered by shift
 /// while shifts are off (the whole-day view of it is read-only).
-export async function isLockedForEntry(location: EntryLocation, entryDate: Date, shift: Shift): Promise<boolean> {
+async function isLockedForEntry(location: EntryLocation, entryDate: Date, shift: Shift): Promise<boolean> {
   const closure = await prisma.dayClosure.findUnique({
     where: { entryDate_shift: { entryDate, shift } },
     select: { onlineLocked: true, offlineLocked: true },
@@ -51,7 +51,7 @@ export async function isLockedForEntry(location: EntryLocation, entryDate: Date,
   return false;
 }
 
-export async function resolveUnlockRequest(id: number, db: Db = prisma) {
+async function resolveUnlockRequest(id: number, db: Db = prisma) {
   await db.unlockRequest.updateMany({ where: { id, status: "PENDING" }, data: { status: "RESOLVED", resolvedAt: new Date() } });
 }
 

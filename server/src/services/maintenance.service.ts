@@ -8,7 +8,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /// Nightly housekeeping that keeps the hot tables small: archive old change-log
 /// rows and drop expired idempotency keys. Failures are logged, never thrown -
 /// housekeeping must not take the API down.
-export async function runMaintenance(): Promise<void> {
+async function runMaintenance(): Promise<void> {
   try {
     await purgeExpiredIdempotencyKeys();
     await purgeClientErrors({ olderThanDays: env.clientErrorRetentionDays, maxRows: env.clientErrorMaxRows });

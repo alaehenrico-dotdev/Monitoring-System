@@ -7,7 +7,7 @@ import { recordChange } from "./changeLog.service";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { getEntryRules } from "./appSettings.service";
 
-export const DAY_CLOSURES_TABLE = "day_closures";
+const DAY_CLOSURES_TABLE = "day_closures";
 
 const SHIFT_LABELS: Record<Shift, string> = { MORNING: "Morning", NIGHT: "Night" };
 
@@ -42,18 +42,18 @@ export function isSideLocked(
 export const otherLocation = (location: EntryLocation): EntryLocation => (location === "ONLINE" ? "OFFLINE" : "ONLINE");
 
 /// "YYYY-MM" of a business date.
-export const yearMonthOf = (entryDate: Date): string => toDateOnlyString(entryDate).slice(0, 7);
+const yearMonthOf = (entryDate: Date): string => toDateOnlyString(entryDate).slice(0, 7);
 
 /// Whether the calendar month holding `entryDate` has been closed by an admin
 /// (monthClose.service.ts) - the lock layer above a day's own.
-export async function isMonthClosed(entryDate: Date, db: Db = prisma): Promise<boolean> {
+async function isMonthClosed(entryDate: Date, db: Db = prisma): Promise<boolean> {
   const row = await db.monthClosure.findUnique({ where: { yearMonth: yearMonthOf(entryDate) } });
   return !!row?.isClosed;
 }
 
 /// Refuses a write into a closed month. Lifted only by an approved correction,
 /// the one recorded way into a closed period.
-export async function assertMonthOpen(entryDate: Date, db: Db = prisma): Promise<void> {
+async function assertMonthOpen(entryDate: Date, db: Db = prisma): Promise<void> {
   if (adjustment.getStore()) return;
   if (await isMonthClosed(entryDate, db)) {
     throw HttpError.conflict(`${yearMonthOf(entryDate)} is a closed month. Ask an admin to reopen it, or request a correction instead.`);

@@ -68,7 +68,7 @@ export function fieldLabel(key: string): string {
   return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
 }
 
-export function formatValue(value: unknown, key?: string): string {
+function formatValue(value: unknown, key?: string): string {
   // A publication stamp reads as its state, not as a timestamp.
   if (key === "publishedAt") return value ? "Published" : "Not published";
   if (value === null || value === undefined || value === "") return "—";

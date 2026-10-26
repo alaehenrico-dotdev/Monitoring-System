@@ -30,7 +30,7 @@ export function recordReportHistory(data: ReportHistoryInput, userId?: number) {
   return prisma.$transaction((tx) => recordReportHistoryIn(tx, data, userId));
 }
 
-export const REPORT_HISTORY_PAGE = 50;
+const REPORT_HISTORY_PAGE = 50;
 
 export async function listReportHistory(type?: string, cursor?: number, limit = REPORT_HISTORY_PAGE) {
   const rows = await reportHistoryRepository.findPage({ type }, { limit, cursor });

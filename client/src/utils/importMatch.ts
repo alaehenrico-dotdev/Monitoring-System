@@ -82,7 +82,7 @@ export function unmatchedColumns(columns: ImportableColumn[], header: string[]):
 /// "Class A (Liter)" (or "SWEET A" and "Sweet A") are recognized as the same
 /// thing despite the case and punctuation differences a manually-maintained
 /// spreadsheet tends to accumulate.
-export function normalizeForMatch(s: string): string {
+function normalizeForMatch(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
@@ -138,7 +138,7 @@ export function findMatchingProduct<T extends { product: { name: string; categor
   return matches.length === 1 || (category !== undefined && matches.length > 1) ? matches[0] : undefined;
 }
 
-export function levenshtein(a: string, b: string): number {
+function levenshtein(a: string, b: string): number {
   if (a.length === 0) return b.length;
   if (b.length === 0) return a.length;
   const prevRow = new Array<number>(b.length + 1);

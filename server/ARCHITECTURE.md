@@ -119,3 +119,13 @@ instead of each maintaining its own copy.
 3. `controllers/x.controller.ts` - validate input, call the service, shape the response.
 4. `routes/x.routes.ts` - wire paths/verbs/role guards to controller functions.
 5. Mount it in `routes/index.ts`.
+
+## Migration safety
+
+`scripts/check-migrations.mjs` (`npm run check:migrations`, also run in CI and before
+`npm run db:migrate:deploy`) fails when a migration drops, renames, rewrites or deletes
+data, or adds a `NOT NULL` column with no default, unless it is listed with a note in
+`server/prisma/reviewed-migrations.json`. Before listing one: restore a real backup
+into a scratch database, run the migration, compare row counts and totals, and take a
+backup before deploying. Prefer additive changes (nullable or defaulted columns) and
+drop things a release after the code stops using them.

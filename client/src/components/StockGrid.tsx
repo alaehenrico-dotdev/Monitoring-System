@@ -95,7 +95,7 @@ export interface GridColumn {
   /**
    * Header color coding for stock movement columns: "in" (stocks in), "out"
    * (stocks out) and "delivery" (delivery / fulfillment out). Purely visual -
-   * see columnToneStyle below; unused by CSV/PDF/Excel exports.
+   * see columnTintStyle below; unused by CSV/PDF/Excel exports.
    */
   tone?: "in" | "out" | "delivery";
 }
@@ -110,28 +110,18 @@ function extraCellClass(i: number): string {
   return i === 0 ? "ae-extra-col ae-extra-col--first" : "ae-extra-col";
 }
 
-// Header fills for the color-coded columns. Pastel fills on purpose, with the
-// near-black brand ink as the label color, so the header text stays readable
-// in both light and dark mode (these do not flip with the theme).
+// Base colors for the color-coded columns (pastel, theme-independent); the
+// body cells use them as a translucent tint (see columnTintStyle below).
 const TONE_COLOR: Record<NonNullable<GridColumn["tone"]>, string> = {
   in: "#9DB0FF", // light blue / periwinkle
   out: "#F59A9A", // light red
   delivery: "#F7A8CC", // pink
 };
-export const columnToneStyle: Record<
-  NonNullable<GridColumn["tone"]>,
-  CSSProperties
-> = {
-  in: { background: TONE_COLOR.in, color: "#0C0C0C" },
-  out: { background: TONE_COLOR.out, color: "#0C0C0C" },
-  delivery: { background: TONE_COLOR.delivery, color: "#0C0C0C" },
-};
-
 // Body-cell tint for the same columns. Drawn as a translucent background-IMAGE
 // layer (not background-color), so the table's row-hover fill - which is a
 // background-color - keeps showing through underneath and the hover effect is
 // unchanged.
-export const columnTintStyle: Record<
+const columnTintStyle: Record<
   NonNullable<GridColumn["tone"]>,
   CSSProperties
 > = {

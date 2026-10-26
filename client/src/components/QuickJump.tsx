@@ -293,7 +293,7 @@ export function QuickJump() {
 /// through every page's PageHeader - the palette is mounted once in Layout,
 /// far from the button, and a context provider for one boolean would be more
 /// machinery than this needs.
-export const QUICK_JUMP_OPEN_EVENT = "ae:quick-jump-open";
+const QUICK_JUMP_OPEN_EVENT = "ae:quick-jump-open";
 
 export function openQuickJump(): void {
   window.dispatchEvent(new Event(QUICK_JUMP_OPEN_EVENT));

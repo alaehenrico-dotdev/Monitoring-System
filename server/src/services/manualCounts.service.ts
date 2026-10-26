@@ -668,7 +668,7 @@ export async function revertAuditSnapshot(id: number, reason: string, userId?: n
 }
 
 /// Longest period the Variance Report / Ledger will read in one request.
-export const MAX_VARIANCE_RANGE_DAYS = 366;
+const MAX_VARIANCE_RANGE_DAYS = 366;
 
 /// Sets (or, with an empty string/null, clears) the reason on a SAVED count.
 /// Logged like any other change to the count. No-op (and no log row) when the

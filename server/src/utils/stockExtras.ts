@@ -41,7 +41,7 @@ export const EXTRA_COLUMNS: Record<"ONLINE" | "OFFLINE", readonly string[]> = {
 /// beyond the fifth are ordinary daily_stock_extra rows.
 export const DELIVERY_COLUMN = "deliveryOut";
 export const DELIVERY_LEGACY_SLOTS = 5;
-export const deliverySlotField = (slot: number) => `delivery${slot}` as const;
+const deliverySlotField = (slot: number) => `delivery${slot}` as const;
 
 /// Splits Delivery (Out)'s extras into the legacy columns and the rest.
 export function splitDeliveryExtras(extras: StockExtraInput[]) {

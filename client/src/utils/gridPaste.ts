@@ -26,7 +26,7 @@ export type SkipReason =
   | "negative"
   | "out-of-range";
 
-export const SKIP_REASON_TEXT: Record<SkipReason, string> = {
+const SKIP_REASON_TEXT: Record<SkipReason, string> = {
   "not-editable": "calculated column",
   "has-extra-columns": "column is split into extra columns",
   "non-numeric": "not a number",

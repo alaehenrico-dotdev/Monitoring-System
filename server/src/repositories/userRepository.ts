@@ -1,7 +1,7 @@
 import { Role } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 
-export const PUBLIC_USER_SELECT = {
+const PUBLIC_USER_SELECT = {
   id: true,
   name: true,
   username: true,

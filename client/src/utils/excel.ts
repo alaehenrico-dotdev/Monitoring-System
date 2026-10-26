@@ -16,7 +16,7 @@ import { copyExportToDrive } from "./driveCopy";
 /// correctly, but whose layout toExcelTable's flat headers/rows signature
 /// can't express (e.g. a multi-row grouped header), don't have to
 /// duplicate this.
-export function escapeHtml(value: string | number): string {
+function escapeHtml(value: string | number): string {
   return String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

@@ -11,7 +11,7 @@
  * just means history does not survive navigation.
  */
 
-export const HISTORY_PREFIX = "ala-eh-history:";
+const HISTORY_PREFIX = "ala-eh-history:";
 
 /// Snapshots are whole staged sets, so this bounds the stored size well under
 /// the ~5 MB sessionStorage quota even on a long sheet. In memory the pages

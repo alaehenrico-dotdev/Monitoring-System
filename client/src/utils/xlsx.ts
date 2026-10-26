@@ -20,7 +20,7 @@ export interface XlsxSheet {
 }
 
 /// Refuse oversized input before inflating anything (zip bombs / wrong file).
-export const MAX_XLSX_BYTES = 15 * 1024 * 1024;
+const MAX_XLSX_BYTES = 15 * 1024 * 1024;
 const MAX_PART_BYTES = 40 * 1024 * 1024;
 
 interface ZipEntry {

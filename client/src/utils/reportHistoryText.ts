@@ -3,12 +3,12 @@ import { SHIFT_SHORT_LABELS } from "./shift";
 
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
-export function parseDay(value: string): Date | null {
+function parseDay(value: string): Date | null {
   const m = ISO_DAY.exec(value.trim());
   return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
 }
 
-export const fullDate = (d: Date) =>
+const fullDate = (d: Date) =>
   d.toLocaleDateString(undefined, {
     weekday: "short",
     year: "numeric",

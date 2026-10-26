@@ -7,7 +7,7 @@ import { HttpError } from "../utils/HttpError";
 import { asyncHandler } from "../utils/asyncHandler";
 
 const KEY_PATTERN = /^[A-Za-z0-9_-]{8,100}$/;
-export const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
+const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000;
 const MUTATING = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function requestHash(req: Request): string {

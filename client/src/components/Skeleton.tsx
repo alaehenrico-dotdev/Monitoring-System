@@ -9,7 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
  * by `background-position`, so it never touches the main thread and is
  * automatically flattened to a static tint under `prefers-reduced-motion`.
  */
-export function Skeleton({
+function Skeleton({
   width = "100%",
   height = 14,
   radius = 6,
@@ -35,7 +35,7 @@ export function Skeleton({
 /// needs (`role="status"`/`aria-busy` + one visually-hidden announcement) -
 /// the individual bars themselves stay `aria-hidden` (see Skeleton above)
 /// since they're purely decorative shape, not content.
-export function SkeletonRegion({
+function SkeletonRegion({
   label = "Loading…",
   children,
   style,
@@ -125,7 +125,7 @@ export function TableSkeleton({
 /// Mirrors one `.ae-dash-stat` tile (DashboardPage.tsx) - a big number over
 /// a label, same padding/proportions as the real StatCard so the four
 /// tiles don't visibly resize once real numbers land.
-export function StatCardSkeleton() {
+function StatCardSkeleton() {
   return (
     <div
       className="ae-dash-stat"

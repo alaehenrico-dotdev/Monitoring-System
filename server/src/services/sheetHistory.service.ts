@@ -2,7 +2,7 @@ import type { Shift } from "@prisma/client";
 import { changeLogRepository } from "../repositories/changeLogRepository";
 
 /// The sheets that keep a version history, and the stock table behind each.
-export const SHEET_TABLES = {
+const SHEET_TABLES = {
   online: "daily_online_stock",
   offline: "daily_offline_stock",
   manual: "manual_counts",

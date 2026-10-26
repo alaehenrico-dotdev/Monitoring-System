@@ -14,7 +14,7 @@ const TRAILER = "-- Dump completed";
 const TAIL_BYTES = 4096;
 const CARRY_CHARS = 200;
 const TABLE_RE = /CREATE TABLE (?:IF NOT EXISTS )?`([^`]+)`/g;
-export const RESTORE_MAX_BYTES = 512 * 1024 * 1024;
+const RESTORE_MAX_BYTES = 512 * 1024 * 1024;
 
 /// Tables a usable backup of this system cannot be missing.
 export const REQUIRED_TABLES = ["users", "products", "daily_online_stock", "daily_offline_stock", "manual_counts", "change_log"];

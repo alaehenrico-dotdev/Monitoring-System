@@ -32,6 +32,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check migrations for unreviewed data-risky statements
+        run: npm run check:migrations
+
       - name: Test (both workspaces)
         run: npm test
 

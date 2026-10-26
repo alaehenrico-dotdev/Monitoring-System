@@ -25,7 +25,7 @@ import { saveOfflineEntry } from "./dailyOfflineStock.service";
  * locked day and no reported figure moves.
  */
 
-export const PENDING_RELEASES_TABLE = "pending_releases";
+const PENDING_RELEASES_TABLE = "pending_releases";
 
 /// A release goes into the current shift: within a day of today. The finished-day
 /// lock already stops an older day; this stops an old day that was merely left

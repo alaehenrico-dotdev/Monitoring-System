@@ -74,7 +74,7 @@ type StyleSet = NonNullable<UserOptions["styles"]>;
 // marks). Anything else is drawn as garbage, so map or replace it up front.
 const NOT_IN_WINANSI = /[^\u0020-\u007E\u00A0-\u00FF\u2013\u2014\u2018\u2019\u201C\u201D\u2022\u2026\u20AC\u2122]/g;
 
-export function toPdfText(value: string | number): string {
+function toPdfText(value: string | number): string {
   return String(value)
     .replace(/\u2192/g, "->") // "Stocks In (Off→Ol)" - arrows aren't in WinAnsi
     .replace(/\u2190/g, "<-")

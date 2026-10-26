@@ -74,6 +74,10 @@
   pointer-events: none;
   animation: ae-logo-orbit 1.3s linear infinite;
   will-change: transform;
+  /* Glow on the wrapper, not the arc: the arc is masked into a thin ring and a
+     filter on it would be clipped by its own mask. This lights the whole beam. */
+  filter: drop-shadow(0 0 calc(var(--t) * 1.5) var(--ring))
+    drop-shadow(0 0 calc(var(--t) * 4) color-mix(in srgb, var(--ring) 55%, transparent));
 }
 .ae-logo-orbit-arc {
   position: absolute;
