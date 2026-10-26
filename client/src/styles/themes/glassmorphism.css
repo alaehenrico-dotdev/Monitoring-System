@@ -41,7 +41,7 @@
     radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.32), transparent 60%),
     var(--ae-bg);
   background-attachment: fixed;
-  --ae-watermark-opacity: 0.03;
+  --ae-watermark-opacity: 0.3;
 }
 :root[data-ui="glass"][data-theme="dark"] .app-shell {
   background:
@@ -50,7 +50,7 @@
     radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.3), transparent 60%),
     var(--ae-bg);
   background-attachment: fixed;
-  --ae-watermark-opacity: 0.3;
+  --ae-watermark-opacity: 0.5;
 }
 :root[data-ui="glass"] .ae-page-header {
   -webkit-backdrop-filter: blur(22px) saturate(170%);

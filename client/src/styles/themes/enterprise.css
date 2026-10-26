@@ -33,10 +33,8 @@
   --ae-glass-blur: none;
 }
 
-/* A flat page: the seal watermark is a classic flourish. */
-:root[data-ui="enterprise"] .app-shell::before {
-  display: none;
-}
+/* The Glossy Black emblem watermark stays on, like every other theme (the cards are
+   opaque, so it shows in the gaps between them). Opacity: the base values. */
 
 /* ---- Page header: the same card, drawn as an ink bar with a gold rule ---- */
 :root[data-ui="enterprise"] .ae-page-header {

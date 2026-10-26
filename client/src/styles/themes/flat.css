@@ -24,9 +24,7 @@
   --ae-header-glass: #303030;
   --ae-row-hover: rgba(245, 192, 0, 0.1);
 }
-:root[data-ui="flat"] .app-shell::before {
-  display: none;
-}
+/* The emblem watermark stays on (base opacity) behind the solid colour blocks. */
 :root[data-ui="flat"] .ae-page-header {
   --ae-glass-text: #0c0c0c;
   --ae-glass-text-muted: #3a3426;

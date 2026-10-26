@@ -32,10 +32,7 @@
   --ae-row-hover: rgba(245, 192, 0, 0.12);
 }
 
-/* ---- Page: flat. The seal watermark is a soft flourish, so it goes -------- */
-:root[data-ui="brutal"] .app-shell::before {
-  display: none;
-}
+/* ---- Page: flat. The emblem watermark stays on (base opacity), in the gaps between the outlined cards -------- */
 
 /* ---- Page header: a flat gold slab, thick outline, hard shadow ------------ */
 :root[data-ui="brutal"] .ae-page-header {

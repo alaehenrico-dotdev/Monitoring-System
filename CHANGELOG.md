@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **The Glossy Black Ala Eh! emblem is now the background in every theme, and more visible.** Enterprise, Neobrutalism, Flat, Minimalism and Aurora used to hide it; they now show it like Classic, Glass and Skeuomorphism do (pale in dark mode, ink in light mode, see-through, so text stays readable). Each theme keeps its own colours and gradients behind it. It is stronger than before: 30% in light mode and 50% in dark (it was 12% and 30%), with Minimalism a little quieter (20% and 40%).
+
+### Fixed
+- **The emblem background was not loading at all** since the stylesheet was split into `src/styles/`: its two image paths still pointed at the old folder, so the build bundled neither image and every theme showed no emblem. Paths corrected, and a new test checks that every `url()` in the stylesheets points at a file that exists.
+
 ## 2.4.3 - 2026-10-26
 
 ### Fixed

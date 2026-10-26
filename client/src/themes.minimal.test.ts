@@ -81,8 +81,9 @@ describe("Minimalism theme", () => {
     expect(rule(":root[data-ui=\"minimal\"] .ae-modal-panel")).toContain(shadows[0]);
   });
 
-  it("removes the seal watermark and the grid's alternating column tint", () => {
-    expect(rule(':root[data-ui="minimal"] .app-shell::before')).toContain("display: none");
+  it("keeps the emblem watermark (quieter) and removes the grid's alternating column tint", () => {
+    expect(block).not.toContain(':root[data-ui="minimal"] .app-shell::before'); // not hidden: the base rule shows it
+    expect(rule(':root[data-ui="minimal"] .app-shell')).toContain("--ae-watermark-opacity");
     for (const t of [light, dark]) {
       expect(t["--ae-col-a"]).toBe(t["--ae-col-b"]);
       expect(t["--ae-colh-a"]).toBe(t["--ae-colh-b"]);

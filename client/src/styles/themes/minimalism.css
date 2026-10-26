@@ -70,9 +70,12 @@
   --ae-mini-wash-strong: rgba(255, 255, 255, 0.11);
 }
 
-/* No seal watermark behind the page. */
-:root[data-ui="minimal"] .app-shell::before {
-  display: none;
+/* The emblem stays behind the page like every theme, only quieter. */
+:root[data-ui="minimal"] .app-shell {
+  --ae-watermark-opacity: 0.2;
+}
+:root[data-ui="minimal"][data-theme="dark"] .app-shell {
+  --ae-watermark-opacity: 0.4;
 }
 
 /* ---- Page header: plain text on the page, one hairline beneath ---------- */

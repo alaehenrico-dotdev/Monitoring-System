@@ -1018,11 +1018,11 @@
 .app-shell {
   position: relative;
   background: var(--ae-bg);
-  --ae-watermark-opacity: 0.12;
+  --ae-watermark-opacity: 0.3;
   --ae-watermark-size: min(78vmin, 760px);
 }
 :root[data-theme="dark"] .app-shell {
-  --ae-watermark-opacity: 0.3;
+  --ae-watermark-opacity: 0.5;
 }
 .app-shell::before {
   content: "";
@@ -1030,11 +1030,11 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: url("./assets/emblem-wm-ink.webp") center / var(--ae-watermark-size) no-repeat;
+  background: url("../assets/emblem-wm-ink.webp") center / var(--ae-watermark-size) no-repeat;
   opacity: var(--ae-watermark-opacity);
 }
 :root[data-theme="dark"] .app-shell::before {
-  background-image: url("./assets/emblem-wm-white.webp");
+  background-image: url("../assets/emblem-wm-white.webp");
 }
 .ae-main {
   position: relative;

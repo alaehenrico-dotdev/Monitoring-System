@@ -68,7 +68,7 @@ const THEMES: Choice<UiStyle>[] = [
   {
     value: "minimal",
     label: "Minimalism",
-    description: "Only what is information: no fills, shadows, glow or watermark. Plain text on a quiet page, hairline rules, ink buttons and a muted-to-dark text scale. Same pages and shortcuts as Classic.",
+    description: "Only what is information: no fills, shadows or glow. Plain text on a quiet page, hairline rules, ink buttons and a muted-to-dark text scale. Same pages and shortcuts as Classic.",
     preview: <MinimalPreview />,
   },
   {

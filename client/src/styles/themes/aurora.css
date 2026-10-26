@@ -97,7 +97,7 @@
   --ae-glass-accent: #a5a3ff;
 }
 
-/* ---- Page: a soft gradient field, no watermark ---------------------------- */
+/* ---- Page: a soft gradient field, with the emblem watermark over it ---------------------------- */
 :root[data-ui="aurora"] .app-shell {
   background:
     radial-gradient(900px 520px at 8% -10%, rgba(99, 102, 241, 0.16), transparent 70%),
@@ -109,9 +109,6 @@
     radial-gradient(900px 520px at 8% -10%, rgba(99, 102, 241, 0.28), transparent 70%),
     radial-gradient(800px 520px at 100% 0%, rgba(217, 70, 239, 0.2), transparent 70%),
     var(--ae-bg);
-}
-:root[data-ui="aurora"] .app-shell::before {
-  display: none;
 }
 
 /* ---- Header: the gradient, with white text -------------------------------- */

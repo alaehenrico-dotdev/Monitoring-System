@@ -98,6 +98,7 @@ caddy_config/
 # Personal Claude Code settings (the shared agents/skills under .claude/ stay tracked).
 .claude/settings.local.json
 .claude/**/*.local.*
+.claude/ 
 # Vite leaves these behind when its config fails to load.
 vite.config.*.timestamp-*
 # Test and process output.
