@@ -2,7 +2,7 @@ import { Shift, StockLocation } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/HttpError";
 import { toDateOnlyString } from "../utils/date";
-import { EXTRA_COLUMNS, MAX_EXTRAS_PER_COLUMN } from "../utils/stockExtras";
+import { EXTRA_COLUMNS, extraCellKey, MAX_EXTRAS_PER_COLUMN } from "../utils/stockExtras";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { logSystemEvent } from "./changeLog.service";
 
@@ -16,6 +16,32 @@ export async function listExtraLabels(location: GridLocation, entryDate: Date, s
     select: { columnKey: true, slotIndex: true, label: true },
   });
   return rows;
+}
+
+export interface DayExtraNames {
+  ONLINE: Record<string, string>;
+  OFFLINE: Record<string, string>;
+}
+
+/// The names typed into a day's added columns, for the Daily Report and its PDF.
+/// A name belongs to one shift's sheet, but the report lays both shifts out
+/// together, so a slot named differently on each shows both ("Route A / Route B"),
+/// Morning first. Keyed by `extraCellKey` (the column's key in a report row).
+export async function getDayExtraNames(entryDate: Date): Promise<DayExtraNames> {
+  const rows = await prisma.extraColumnLabel.findMany({
+    where: { entryDate },
+    select: { location: true, shift: true, columnKey: true, slotIndex: true, label: true },
+  });
+  const out: DayExtraNames = { ONLINE: {}, OFFLINE: {} };
+  const order = (s: string) => (s === "MORNING" ? 0 : 1);
+  for (const r of [...rows].sort((a, b) => order(a.shift) - order(b.shift))) {
+    if (r.location !== "ONLINE" && r.location !== "OFFLINE") continue;
+    const key = extraCellKey(r.columnKey, r.slotIndex);
+    const have = out[r.location][key];
+    if (!have) out[r.location][key] = r.label;
+    else if (!have.split(" / ").includes(r.label)) out[r.location][key] = `${have} / ${r.label}`;
+  }
+  return out;
 }
 
 /**

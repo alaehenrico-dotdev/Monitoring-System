@@ -1,6 +1,8 @@
 import { prisma } from "../lib/prisma";
 import { toDateOnlyString } from "../utils/date";
+import { extraCellKey, parseExtraCellKey } from "../utils/stockExtras";
 import { renderTablesPdf, type Cell, type PdfTable } from "../utils/tablesPdf";
+import { getDayExtraNames, type DayExtraNames } from "./extraColumnLabels.service";
 import { getDailyOutflow } from "./dailyOutflow.service";
 import { getDailyReport } from "./reports.service";
 
@@ -58,7 +60,36 @@ const num = (v: unknown): number => {
 
 const productCells = (p: ProductRef): Cell[] => [p.category, p.sku ?? "", p.name];
 
-function stockSheet(name: string, rows: GridRow[], columns: [string, string][]): PdfTable {
+/// The sheet's columns with the day's added columns right after the column each
+/// one was added to - what the entry page and the report page show. They are not
+/// in the fixed lists: each row carries them as `<column>__x<slot>` values, so the
+/// slots in use are read off the rows. A typed name wins; otherwise "<label> +<slot>".
+export function columnsWithExtras(rows: GridRow[], columns: [string, string][], names: Record<string, string> = {}): [string, string][] {
+  const known = new Set(columns.map(([key]) => key));
+  const slots = new Map<string, Set<number>>();
+  for (const row of rows) {
+    for (const key of Object.keys(row.entry)) {
+      const parsed = parseExtraCellKey(key);
+      if (!parsed || !known.has(parsed.columnKey)) continue;
+      const set = slots.get(parsed.columnKey) ?? new Set<number>();
+      set.add(parsed.slotIndex);
+      slots.set(parsed.columnKey, set);
+    }
+  }
+  return columns.flatMap(([key, label]): [string, string][] => [
+    [key, label],
+    ...[...(slots.get(key) ?? [])]
+      .sort((a, b) => a - b)
+      .map((slot): [string, string] => {
+        const cellKey = extraCellKey(key, slot);
+        const typed = names[cellKey]?.trim();
+        return [cellKey, typed ? typed : `${label} +${slot}`];
+      }),
+  ]);
+}
+
+function stockSheet(name: string, rows: GridRow[], baseColumns: [string, string][], names: Record<string, string> = {}): PdfTable {
+  const columns = columnsWithExtras(rows, baseColumns, names);
   return {
     name,
     columns: ["Category", "SKU", "Product", ...columns.map(([, label]) => label)],
@@ -104,6 +135,7 @@ interface ReportInput {
 export function dailyReportSheets(
   report: ReportInput,
   out: { onlineOut: number | null; offlineOut: number | null; totalOut: number | null } | null,
+  extraNames?: DayExtraNames,
 ): PdfTable[] {
   const total = report.total as TotalRow[];
   const audit = (report.audit ?? []) as AuditRow[];
@@ -115,8 +147,8 @@ export function dailyReportSheets(
   ];
   return [
     { name: "Summary", columns: ["Item", "Value"], rows: summary },
-    stockSheet("Online", report.online as GridRow[], ONLINE_COLUMNS),
-    stockSheet("Offline", report.offline as GridRow[], OFFLINE_COLUMNS),
+    stockSheet("Online", report.online as GridRow[], ONLINE_COLUMNS, extraNames?.ONLINE),
+    stockSheet("Offline", report.offline as GridRow[], OFFLINE_COLUMNS, extraNames?.OFFLINE),
     {
       name: "Consolidated",
       columns: ["Category", "SKU", "Product", "Online Remaining", "Offline Remaining", "Consolidated Remaining", "Manual Count", "Variance"],
@@ -165,8 +197,11 @@ export async function buildDailyReportPdf(date: Date): Promise<{ fileName: strin
   const report = await getDailyReport(date);
   if (!hasSavedRows(report)) return null;
   const [out] = await getDailyOutflow(date, date);
+  // Best effort, like the page: if the names cannot be read the added columns
+  // still print, under their generic "+1" labels.
+  const extraNames = await getDayExtraNames(date).catch(() => undefined);
   const iso = toDateOnlyString(date);
-  const tables = dailyReportSheets({ ...report, date: iso }, out ?? null);
+  const tables = dailyReportSheets({ ...report, date: iso }, out ?? null, extraNames);
   return { fileName: dailyReportFileName(iso), data: renderTablesPdf({ title: "Daily Report", subtitle: iso, tables }) };
 }
 

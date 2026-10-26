@@ -11,6 +11,7 @@ import {
   splitDeliveryExtras,
   EXTRA_COLUMNS,
   extraCellKey,
+  parseExtraCellKey,
   flattenExtras,
   isExtraColumn,
   MAX_EXTRAS_PER_COLUMN,
@@ -212,5 +213,19 @@ describe("sumExtras / unionLayouts (a day entered by shift, viewed as one sheet)
   it("keeps a column that only one of the sheets was saved with", () => {
     const merged = unionLayouts([{ columnKey: "deliveryOut", slotIndex: 1 }], [{ columnKey: "deliveryOut", slotIndex: 1 }, { columnKey: "deliveryOut", slotIndex: 2 }]);
     expect(merged).toHaveLength(2);
+  });
+});
+
+describe("parseExtraCellKey", () => {
+  it("is the reverse of extraCellKey", () => {
+    for (const [column, slot] of [["fulfillmentOut", 1], ["deliveryOut", 10], ["stockInOffToOl", 3]] as const) {
+      expect(parseExtraCellKey(extraCellKey(column, slot))).toEqual({ columnKey: column, slotIndex: slot });
+    }
+  });
+
+  it("is null for an ordinary column or a malformed key", () => {
+    for (const key of ["remainingStock", "__x1", "deliveryOut__x", "deliveryOut__x0", "deliveryOut__x1.5", "deliveryOut__xA"]) {
+      expect(parseExtraCellKey(key)).toBeNull();
+    }
   });
 });

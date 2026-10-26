@@ -9,7 +9,7 @@ vi.mock("./dayLock.service", () => ({ assertPeriodOpen, assertEarlierDaysFinishe
 const logSystemEvent = vi.hoisted(() => vi.fn());
 vi.mock("./changeLog.service", () => ({ logSystemEvent }));
 
-import { saveExtraLabel } from "./extraColumnLabels.service";
+import { getDayExtraNames, saveExtraLabel } from "./extraColumnLabels.service";
 
 const DATE = new Date("2026-10-14T00:00:00.000Z");
 const base = { location: "OFFLINE" as const, entryDate: DATE, shift: "NIGHT" as const, columnKey: "deliveryOut", slotIndex: 1 };
@@ -42,5 +42,32 @@ describe("saveExtraLabel", () => {
     await expect(saveExtraLabel({ ...base, columnKey: "remainingStock", label: "x" })).rejects.toThrow();
     assertPeriodOpen.mockRejectedValueOnce(new Error("closed"));
     await expect(saveExtraLabel({ ...base, label: "x" })).rejects.toThrow("closed");
+  });
+});
+
+describe("getDayExtraNames", () => {
+  beforeEach(() => vi.clearAllMocks());
+  const row = (location: string, shift: string, columnKey: string, slotIndex: number, label: string) => ({ location, shift, columnKey, slotIndex, label });
+
+  it("keys the names by the column's key in a report row, per location", async () => {
+    prismaMock.extraColumnLabel.findMany.mockResolvedValue([row("OFFLINE", "NIGHT", "deliveryOut", 1, "Route A"), row("ONLINE", "NIGHT", "fulfillmentOut", 2, "Shopee")]);
+    expect(await getDayExtraNames(DATE)).toEqual({ ONLINE: { fulfillmentOut__x2: "Shopee" }, OFFLINE: { deliveryOut__x1: "Route A" } });
+    expect(prismaMock.extraColumnLabel.findMany.mock.calls[0][0].where).toEqual({ entryDate: DATE });
+  });
+
+  it("shows both names, Morning first, when the two shifts named a slot differently", async () => {
+    // Returned Night-first on purpose: the order must not depend on the database's.
+    prismaMock.extraColumnLabel.findMany.mockResolvedValue([row("OFFLINE", "NIGHT", "deliveryOut", 1, "Route B"), row("OFFLINE", "MORNING", "deliveryOut", 1, "Route A")]);
+    expect((await getDayExtraNames(DATE)).OFFLINE.deliveryOut__x1).toBe("Route A / Route B");
+  });
+
+  it("does not repeat a name both shifts agree on", async () => {
+    prismaMock.extraColumnLabel.findMany.mockResolvedValue([row("OFFLINE", "MORNING", "deliveryOut", 1, "Route A"), row("OFFLINE", "NIGHT", "deliveryOut", 1, "Route A")]);
+    expect((await getDayExtraNames(DATE)).OFFLINE.deliveryOut__x1).toBe("Route A");
+  });
+
+  it("is empty for a day with no names", async () => {
+    prismaMock.extraColumnLabel.findMany.mockResolvedValue([]);
+    expect(await getDayExtraNames(DATE)).toEqual({ ONLINE: {}, OFFLINE: {} });
   });
 });

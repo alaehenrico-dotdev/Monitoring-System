@@ -103,8 +103,21 @@ export interface StockExtraInput {
 /// column's key, then the slot number. The client builds exactly this key
 /// (useExtraColumns.extraColumnKey) and reads it straight off the grid row, so
 /// the two spellings must stay identical.
+const EXTRA_SEP = "__x";
+
 export function extraCellKey(columnKey: string, slotIndex: number): string {
-  return `${columnKey}__x${slotIndex}`;
+  return `${columnKey}${EXTRA_SEP}${slotIndex}`;
+}
+
+/// The reverse of `extraCellKey`: which main column and slot a row key belongs to,
+/// or null when the key is an ordinary column. Same rules as the client's
+/// parseExtraColumnKey (useExtraColumns.ts).
+export function parseExtraCellKey(key: string): { columnKey: string; slotIndex: number } | null {
+  const at = key.lastIndexOf(EXTRA_SEP);
+  if (at <= 0) return null;
+  const slotIndex = Number(key.slice(at + EXTRA_SEP.length));
+  if (!Number.isInteger(slotIndex) || slotIndex < 1) return null;
+  return { columnKey: key.slice(0, at), slotIndex };
 }
 
 export function isExtraColumn(location: StockLocation, columnKey: string): boolean {

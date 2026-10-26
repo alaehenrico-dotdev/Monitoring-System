@@ -3,13 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getDailyReport: vi.fn(),
   getDailyOutflow: vi.fn(),
+  // A plain function, not a spy: vitest tracks a spy's rejected promise without
+  // handling it, which would report an "unhandled rejection" for a failure the
+  // code under test does handle.
+  names: { impl: (async () => ({ ONLINE: {}, OFFLINE: {} })) as (date: Date) => Promise<unknown>, calls: [] as Date[] },
   prisma: { dailyOnlineStock: { aggregate: vi.fn() }, dailyOfflineStock: { aggregate: vi.fn() } },
+}));
+vi.mock("./extraColumnLabels.service", () => ({
+  getDayExtraNames: (date: Date) => {
+    mocks.names.calls.push(date);
+    return mocks.names.impl(date);
+  },
 }));
 vi.mock("./reports.service", () => ({ getDailyReport: mocks.getDailyReport }));
 vi.mock("./dailyOutflow.service", () => ({ getDailyOutflow: mocks.getDailyOutflow }));
 vi.mock("../lib/prisma", () => ({ prisma: mocks.prisma }));
 
-import { buildDailyReportPdf, dailyReportFileName, dailyReportSheets, latestEntryDate } from "./dailyReportPdf.service";
+import { buildDailyReportPdf, columnsWithExtras, dailyReportFileName, dailyReportSheets, latestEntryDate } from "./dailyReportPdf.service";
 
 const product = { category: "Class A", sku: "A1", name: "Alpha" };
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
@@ -110,5 +120,76 @@ describe("latestEntryDate / dailyReportFileName", () => {
 
   it("names the file by date", () => {
     expect(dailyReportFileName("2026-10-22")).toBe("daily-report-2026-10-22.pdf");
+  });
+});
+
+describe("added columns on the Online and Offline sheets", () => {
+  beforeEach(() => {
+    mocks.names.impl = async () => ({ ONLINE: {}, OFFLINE: {} });
+    mocks.names.calls = [];
+  });
+  // Rows carry an added column's amount as "<column>__x<slot>", beside the main column's total.
+  const withExtras = {
+    ...report,
+    online: [{ product, isSaved: true, entry: { openingStock: 10, onlineStock: 10, productionIn: 5, fulfillmentOut: 5, fulfillmentOut__x1: 3, fulfillmentOut__x2: 2, rts: 1, remainingStock: 11 } }],
+    offline: [{ product, isSaved: true, entry: { openingStock: 4, offlineStock: 4, deliveryOut: 6, deliveryOut__x1: 4, deliveryOut__x2: 2, remainingStock: 1 } }],
+  };
+  const sheet = (sheets: ReturnType<typeof dailyReportSheets>, name: string) => sheets.find((s) => s.name === name)!;
+
+  it("puts each added column right after the column it was added to, with its amount", () => {
+    const online = sheet(dailyReportSheets(withExtras, null), "Online");
+    expect(online.columns).toEqual([
+      "Category", "SKU", "Product", "Stocks (Opening)", "Stocks In (Off→Ol)", "Stocks Out (Ol→Off)", "Online Stocks", "Production (In)",
+      "Fulfillment (Out)", "Fulfillment (Out) +1", "Fulfillment (Out) +2", "RTS", "Remaining Stocks",
+    ]);
+    expect(online.rows[0]).toEqual(["Class A", "A1", "Alpha", 10, 0, 0, 10, 5, 5, 3, 2, 1, 11]);
+    const offline = sheet(dailyReportSheets(withExtras, null), "Offline");
+    expect(offline.columns).toContain("Delivery (Out) +1");
+    expect(offline.columns.indexOf("Delivery (Out) +1")).toBe(offline.columns.indexOf("Delivery (Out)") + 1);
+  });
+
+  it("uses the names typed for the day's added columns, falling back to +N for an unnamed one", () => {
+    const names = { ONLINE: { fulfillmentOut__x1: "Shopee" }, OFFLINE: { deliveryOut__x2: "Route B / Route C" } };
+    const sheets = dailyReportSheets(withExtras, null, names);
+    expect(sheet(sheets, "Online").columns).toEqual(expect.arrayContaining(["Shopee", "Fulfillment (Out) +2"]));
+    expect(sheet(sheets, "Offline").columns).toEqual(expect.arrayContaining(["Delivery (Out) +1", "Route B / Route C"]));
+  });
+
+  it("keeps every row the same width when only some products use an added column", () => {
+    const mixed = { ...report, online: [withExtras.online[0], { product: { ...product, sku: "B2", name: "Beta" }, isSaved: true, entry: { openingStock: 1, remainingStock: 1 } }] };
+    const online = sheet(dailyReportSheets(mixed, null), "Online");
+    for (const row of online.rows) expect(row).toHaveLength(online.columns.length);
+    expect(online.rows[1].slice(-5)).toEqual([0, 0, 0, 0, 1]); // no amounts for Beta: zeros, not a shifted row
+  });
+
+  it("is unchanged for a day with no added columns", () => {
+    const sheets = dailyReportSheets(report, null);
+    expect(sheet(sheets, "Online").columns).toHaveLength(3 + 8);
+    expect(sheet(sheets, "Offline").columns).toHaveLength(3 + 9);
+  });
+
+  it("ignores keys that only look like added columns", () => {
+    const odd = { ...report, online: [{ product, isSaved: true, entry: { ...report.online[0].entry, notAColumn__x1: 9, rts__x0: 4, rts__xA: 1 } }] };
+    expect(sheet(dailyReportSheets(odd, null), "Online").columns).toHaveLength(3 + 8);
+  });
+
+  it("orders the slots 1, 2, 10 numerically, not as text", () => {
+    const rows = [{ product, entry: { rts__x10: 1, rts__x2: 1, rts__x1: 1 } }];
+    expect(columnsWithExtras(rows, [["rts", "RTS"]]).map(([key]) => key)).toEqual(["rts", "rts__x1", "rts__x2", "rts__x10"]);
+  });
+
+  it("the saved PDF reads the day's names, and still builds if they cannot be read", async () => {
+    mocks.getDailyReport.mockResolvedValue({ ...withExtras, snapshot: null });
+    mocks.getDailyOutflow.mockResolvedValue([]);
+    mocks.names.impl = async () => ({ ONLINE: { fulfillmentOut__x1: "Shopee" }, OFFLINE: {} });
+    const named = await buildDailyReportPdf(d("2026-10-24"));
+    expect(mocks.names.calls).toEqual([d("2026-10-24")]);
+    mocks.names.impl = async () => {
+      throw new Error("db down");
+    };
+    const generic = await buildDailyReportPdf(d("2026-10-24"));
+    expect(named).not.toBeNull();
+    expect(generic).not.toBeNull();
+    expect(named!.data.equals(generic!.data)).toBe(false); // the typed name changes the file
   });
 });
