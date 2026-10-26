@@ -1,11 +1,17 @@
 # Changelog
 
-## Unreleased
+## 2.4.2 - 2026-10-26
+
+Also includes everything that shipped as 2.4.1.
 
 ### Added
 - **Font settings** (Settings > Appearance > Font). Pick the typeface - Inter (default), Atkinson Hyperlegible, IBM Plex Sans, System, Serif or Monospace - and the text size - Small, Default, Large or Extra large. Both apply at once, are remembered in this browser only, and have a Reset button. The text size scales the menus, forms, dialogs and pages; the data tables keep their own size (View > Zoom), so row and header heights never shift. The two downloadable typefaces are fetched only when chosen.
 
 ### Fixed
+- **Google Drive backup:** a failed or aborted upload no longer risks an unhandled stream error after its temp file is removed (the read stream is now closed first).
+- **Backup page:** after a download the button shows a check and fades back, and the progress line fades out; after a restore (success or failure) the card fades back to its locked starting state.
+- **Loading indicators:** the top loading line, the backup download line, the toast border and the logo's loading beam now glow; the backup line also sweeps while a download runs so a slow one never looks stuck.
+- **Sub-tabs** in Settings, Admin queue and Corrections now use the main navigation's underline, with a glow on the current tab.
 - **A flickering vertical line across the header (dark mode).** The background emblem was drawn with a blend mode underneath the header's frosted glass, which Chromium renders with a hard, flickering seam. The emblem is now a plain transparent image at low opacity (two ready-made copies in `src/assets`, a pale one for dark mode and an ink one for light mode, about 220 KB each), and the 1.3 MB source PNG is no longer downloaded for offline use.
 - **The Ctrl+K palette's product list now refreshes** after a product is added, renamed, reordered or switched off, and after a Data Reset (it used to keep its first copy until the page was reloaded).
 - Removed unused code: nine unreferenced helpers and one unused test dependency.
@@ -21,6 +27,8 @@
 - **Dev server:** `npm run dev` and `vite preview` now listen on localhost only. Set `VITE_DEV_LAN=true` to open them to other devices on purpose.
 
 ### Changed
+- **Internal:** the 8,780-line stylesheet is split into `client/src/styles/` (same cascade, same look); unused code and unneeded exports removed; the server's layering rules are now enforced by ESLint and `server/ARCHITECTURE.md` corrected to match the code.
+- **Migration safety:** `npm run check:migrations` (also in CI and before `db:migrate:deploy`) fails on any migration that drops, renames, rewrites or deletes data, or adds a required column with no default, unless it is reviewed in `server/prisma/reviewed-migrations.json`.
 - **Every button is 4px, in every theme.** Toolbar and menu-bar buttons were 6px, Glass 12px, Skeuomorphism 7px, and some were pills or circles (the theme toggle, calendar days). One rule at the end of the stylesheet now sets 4px on all buttons. Fields, cards and panels keep their own radius; the logo, the table category bars and the header collapse ribbon are not rounded.
 - **The browser tab icon is now the Ala Eh! 3D logo** (`alaeh-logo-3d-poster.png`), also used as the Apple touch icon and as the 384px app icon in the manifest, replacing the old favicon and the missing 256px icon.
 - **The default background is now the Glossy Black Ala Eh! emblem** (`client/public/Glossy Black Ala Eh! Emblem.png`), centered behind every page. It is blended with the page - screened on in dark mode, inverted into fine engraving lines in light mode - so the picture's black square never shows. Themes that already turn the watermark off still do.
