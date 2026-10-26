@@ -14,7 +14,13 @@ vi.mock("../config/env", () => ({
   },
 }));
 
-const db = vi.hoisted(() => ({ conn: null as Record<string, unknown> | null, uploads: [] as Record<string, unknown>[], setting: null as { value: string } | null }));
+const db = vi.hoisted(() => ({
+  conn: null as Record<string, unknown> | null,
+  uploads: [] as Record<string, unknown>[],
+  setting: null as { value: string } | null,
+  /// Columns the (mock) drive_connection table has; a restore of an older dump has fewer.
+  columns: null as string[] | null,
+}));
 vi.mock("../lib/prisma", () => ({
   prisma: {
     driveConnection: {
@@ -22,7 +28,21 @@ vi.mock("../lib/prisma", () => ({
       upsert: vi.fn(async ({ create, update }: { create: object; update: object }) => (db.conn = { ...(db.conn ?? {}), ...(db.conn ? update : create) })),
       update: vi.fn(async ({ data }: { data: object }) => (db.conn = { ...db.conn, ...data })),
       delete: vi.fn(async () => (db.conn = null)),
+      deleteMany: vi.fn(async () => {
+        db.conn = null;
+      }),
     },
+    $queryRaw: vi.fn(async () =>
+      (db.columns ?? [
+        "id", "accountEmail", "refreshTokenEnc", "backupFolderId", "exportFolderId", "autoBackup", "backupWeekday",
+        "backupHourUtc", "keepBackups", "saveExports", "lastBackupAt", "lastError", "connectedById", "connectedAt", "updatedAt",
+      ]).map((Field) => ({ Field })),
+    ),
+    // The raw INSERT used to write the connection back: read its column list and values.
+    $executeRaw: vi.fn(async (q: { sql: string; values: unknown[] }) => {
+      const names = [...q.sql.matchAll(/`(\w+)`/g)].map((m) => m[1]);
+      db.conn = Object.fromEntries(names.map((n, i) => [n, q.values[i]]));
+    }),
     appSetting: {
       findUnique: vi.fn(async () => db.setting),
       upsert: vi.fn(async ({ create }: { create: { value: string } }) => (db.setting = { value: create.value })),
@@ -62,6 +82,7 @@ import { open } from "../utils/secretBox";
 import {
   completeConnect,
   disconnect,
+  keepDriveConnectionAcross,
   exportFileInfo,
   FOLDER_NAMES,
   isBackupDue,
@@ -124,6 +145,7 @@ beforeEach(async () => {
   vi.mocked(google.createFolder).mockReset();
   // The columns the real database fills in from the schema defaults.
   Object.assign(db.conn!, { autoBackup: true, backupWeekday: 0, backupHourUtc: 18, keepBackups: 3, saveExports: true, lastBackupAt: null });
+  db.columns = null;
 });
 
 describe("connecting", () => {
@@ -1011,5 +1033,63 @@ describe("the weekly backup day", () => {
 
   it("works across a month and year boundary", () => {
     expect(nextBackupAt(18, at("2026-12-30T00:00:00Z"), 6).toISOString()).toBe("2027-01-02T18:00:00.000Z");
+  });
+});
+
+describe("keepDriveConnectionAcross (a database restore)", () => {
+  it("puts this server's own connection back when the restored file held a different one", async () => {
+    const mine = { ...db.conn! };
+    await keepDriveConnectionAcross(async () => {
+      // The restore overwrites the table with the backup file's row.
+      db.conn = { ...mine, accountEmail: "someone-else@gmail.com", refreshTokenEnc: "v1.stale.token.sealed-by-another-key", backupFolderId: "foreign-folder" };
+    });
+    expect(db.conn).toEqual(mine);
+  });
+
+  it("still puts it back when the restored table is an OLDER one without the newest column", async () => {
+    const mine = { ...db.conn! };
+    await keepDriveConnectionAcross(async () => {
+      // A dump taken before the backupWeekday migration brings back the old table shape.
+      db.columns = Object.keys(mine).filter((c) => c !== "backupWeekday");
+      db.conn = null;
+    });
+    const { backupWeekday: _newest, ...rest } = mine;
+    expect(db.conn).toEqual(rest);
+    expect(db.conn).not.toHaveProperty("backupWeekday");
+    expect((db.conn as { refreshTokenEnc: string }).refreshTokenEnc).toBe(mine.refreshTokenEnc as string);
+  });
+
+  it("removes a connection that came from the file when this server had none", async () => {
+    await disconnect(7);
+    expect(db.conn).toBeNull();
+    await keepDriveConnectionAcross(async () => {
+      db.conn = { id: 1, accountEmail: "from-the-file@gmail.com", refreshTokenEnc: "v1.x.y.z" };
+    });
+    expect(db.conn).toBeNull();
+  });
+
+  it("keeps the connection even when the restore itself fails, and still reports that failure", async () => {
+    const mine = { ...db.conn! };
+    await expect(
+      keepDriveConnectionAcross(async () => {
+        db.conn = null; // half the tables replaced, the connection row already gone
+        throw new Error("mysql stopped partway");
+      }),
+    ).rejects.toThrow("mysql stopped partway");
+    expect(db.conn).toEqual(mine);
+  });
+
+  it("forgets the cached access token so the next call uses the kept connection", async () => {
+    await runBackup("manual"); // makes sure an access token is cached
+    vi.mocked(google.refreshAccessToken).mockClear();
+    await runBackup("manual");
+    expect(google.refreshAccessToken).not.toHaveBeenCalled(); // served from the cache
+    await keepDriveConnectionAcross(async () => undefined);
+    await runBackup("manual");
+    expect(google.refreshAccessToken).toHaveBeenCalledTimes(1); // the cache was dropped, so it refreshed
+  });
+
+  it("returns whatever the restore returns", async () => {
+    await expect(keepDriveConnectionAcross(async () => 42)).resolves.toBe(42);
   });
 });

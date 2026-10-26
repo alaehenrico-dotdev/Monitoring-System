@@ -155,15 +155,21 @@ export async function listBackupFiles(): Promise<BackupFile[]> {
   } catch {
     return [];
   }
-  const files: BackupFile[] = [];
-  for (const name of names.filter((n) => BACKUP_FILE_RE.test(n))) {
-    try {
-      const s = await stat(path.join(env.backupDir, name));
-      if (s.isFile()) files.push({ name, sizeBytes: s.size, modifiedAt: s.mtime });
-    } catch {
-      /* removed between readdir and stat */
-    }
-  }
+  // Stat the files side by side, not one after another: a folder of many dumps
+  // would otherwise cost one disk round-trip per file, in a row.
+  const stats = await Promise.all(
+    names
+      .filter((n) => BACKUP_FILE_RE.test(n))
+      .map(async (name): Promise<BackupFile | null> => {
+        try {
+          const s = await stat(path.join(env.backupDir, name));
+          return s.isFile() ? { name, sizeBytes: s.size, modifiedAt: s.mtime } : null;
+        } catch {
+          return null; // removed between readdir and stat
+        }
+      }),
+  );
+  const files = stats.filter((f): f is BackupFile => f !== null);
   return files.sort((a, b) => b.modifiedAt.getTime() - a.modifiedAt.getTime()).slice(0, 100);
 }
 
@@ -230,11 +236,13 @@ const WEEKLY_OVERDUE_HOURS = 9 * 24;
 /// week, so the threshold widens to cover a week - never narrower than what
 /// BACKUP_OVERDUE_HOURS says. With a backup folder configured the configured
 /// threshold is kept, since daily scripts are what that folder is for.
-export async function backupHealth(now = new Date()) {
+/// `knownFiles`: a listing the caller already has (the history endpoint lists the
+/// folder itself), so the folder is not scanned twice per request.
+export async function backupHealth(now = new Date(), knownFiles?: BackupFile[]) {
   const [lastOk, lastBad, files, drive] = await Promise.all([
     prisma.backupRecord.findFirst({ where: { status: "OK" }, orderBy: { createdAt: "desc" }, select: { createdAt: true } }),
     prisma.backupRecord.findFirst({ where: { status: { in: ["FAILED", "INVALID"] } }, orderBy: { createdAt: "desc" }, select: { createdAt: true, fileName: true, error: true } }),
-    listBackupFiles(),
+    knownFiles ?? listBackupFiles(),
     prisma.driveConnection.findUnique({ where: { id: 1 }, select: { autoBackup: true } }),
   ]);
   const overdueHours = !env.backupDir && drive?.autoBackup ? Math.max(env.backupOverdueHours, WEEKLY_OVERDUE_HOURS) : env.backupOverdueHours;

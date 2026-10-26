@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { restoreDatabaseFromStream, streamDatabaseBackup } from "../services/backup.service";
 import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveResetToken } from "../services/dataReset.service";
 import { logSystemEvent } from "../services/changeLog.service";
+import { keepDriveConnectionAcross } from "../services/drive.service";
 import { HttpError } from "../utils/HttpError";
 import {
   backupHealth,
@@ -69,7 +70,9 @@ export async function postRestore(req: Request, res: Response) {
   const tokenId = assertValidResetToken(token, req.user!);
   reserveResetToken(tokenId);
   try {
-    await restoreDatabaseFromStream(req);
+    // The file replaces every table, the Drive connection included; keep this
+    // server's own so a stale or foreign token in the file cannot replace it.
+    await keepDriveConnectionAcross(() => restoreDatabaseFromStream(req));
     consumeResetToken(tokenId);
     // Written into the restored database, so it is the first line of its history.
     await logSystemEvent("backup_restore", {}, req.user?.id, "UPDATE");
@@ -83,7 +86,9 @@ export async function postRestore(req: Request, res: Response) {
 /// Backup history (what this system has taken and verified) plus whatever the
 /// backup scripts left in BACKUP_DIR, and whether one is overdue or failing.
 export async function getBackupHistory(_req: Request, res: Response) {
-  const [records, files, health] = await Promise.all([listBackupHistory(), listBackupFiles(), backupHealth()]);
+  // The folder is listed once and shared with the health check.
+  const filesP = listBackupFiles();
+  const [records, files, health] = await Promise.all([listBackupHistory(), filesP, filesP.then((f) => backupHealth(new Date(), f))]);
   res.json({ records, files, health });
 }
 

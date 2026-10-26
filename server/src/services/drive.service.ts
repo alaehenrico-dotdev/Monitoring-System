@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma";
 import {
   createFolder,
@@ -162,6 +163,44 @@ export async function disconnect(userId: number): Promise<void> {
   await prisma.driveConnection.delete({ where: { id: CONNECTION_ID } });
   clearAccessToken();
   await logSystemEvent("drive_disconnected", { accountEmail: conn.accountEmail }, userId, "DELETE");
+}
+
+/// Inserts `row` into whatever `drive_connection` table the restore left behind.
+/// A backup taken before a migration brings back the OLDER table, without the
+/// newer columns (mysqldump drops and recreates every table), and a normal
+/// Prisma insert naming a column that is not there would fail and leave Drive
+/// disconnected. So only the columns the table really has are written; a newer
+/// column that is missing simply takes its default once the migrations are run.
+async function writeConnectionBack(row: Connection): Promise<void> {
+  const present = new Set((await prisma.$queryRaw<{ Field: string }[]>`SHOW COLUMNS FROM drive_connection`).map((c) => c.Field));
+  const entries = Object.entries(row).filter(([name]) => present.has(name) && /^[A-Za-z0-9_]+$/.test(name));
+  await prisma.$executeRaw(
+    Prisma.sql`INSERT INTO drive_connection (${Prisma.join(entries.map(([name]) => Prisma.raw(`\`${name}\``)))}) VALUES (${Prisma.join(entries.map(([, value]) => value))})`,
+  );
+}
+
+/// A database restore replaces every table, including the one holding this
+/// server's Drive connection - so the backup file's connection (an older token,
+/// one sealed with another server's key, a different Google account, or none at
+/// all) would silently become the live one and the next Drive call would fail.
+/// This runs `work` and then puts back exactly the connection this server had
+/// before it, even if the restore stops partway, and forgets the cached access
+/// token. No connection before means none after: whatever the file held is
+/// removed rather than left half-working.
+export async function keepDriveConnectionAcross<T>(work: () => Promise<T>): Promise<T> {
+  // Read before anything is touched: if this fails, the restore never starts.
+  const before = await prisma.driveConnection.findUnique({ where: { id: CONNECTION_ID } });
+  try {
+    return await work();
+  } finally {
+    try {
+      await prisma.driveConnection.deleteMany({});
+      if (before) await writeConnectionBack(before);
+    } catch (err) {
+      console.error(JSON.stringify({ level: "error", event: "drive-connection-keep-failed", message: messageOf(err) }));
+    }
+    clearAccessToken();
+  }
 }
 
 // --- Access tokens ----------------------------------------------------------

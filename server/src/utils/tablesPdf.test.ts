@@ -22,6 +22,25 @@ describe("renderTablesPdf", () => {
     expect(pdf.length).toBeGreaterThan(1000);
   });
 
+  it("is a portrait A4 page (taller than it is wide)", () => {
+    const pdf = renderTablesPdf({ title: "Daily Report", tables: [table()] });
+    const box = pdf.toString("latin1").match(/\/MediaBox \[\s*0 0 ([\d.]+) ([\d.]+)\s*\]/);
+    expect(box).not.toBeNull();
+    const [width, height] = [Number(box![1]), Number(box![2])];
+    expect(height).toBeGreaterThan(width);
+    expect(Math.round(width)).toBe(595); // A4 is 210 mm = 595 pt wide
+  });
+
+  it("fits a wide table of big numbers on a portrait page: same bytes each time and still one table per heading", () => {
+    const columns = ["Category", "SKU", "Product", ...Array.from({ length: 9 }, (_, i) => `Figure ${i + 1}`)];
+    const rows = Array.from({ length: 60 }, (_, r) => ["Class A", `SKU${r}`, `Product number ${r}`, ...Array.from({ length: 9 }, (_, c) => (r + 1) * 123456.789 * (c + 1))]);
+    const wide = { name: "Wide", columns, rows };
+    const a = renderTablesPdf({ title: "Wide", tables: [wide] });
+    const b = renderTablesPdf({ title: "Wide", tables: [wide] });
+    expect(a.equals(b)).toBe(true);
+    expect(pages(a)).toBeGreaterThan(1); // 60 rows run onto more than one page
+  });
+
   it("produces the same bytes every time for the same tables - nothing in it records when it was made", async () => {
     const spec = { title: "Daily Report", subtitle: "2026-10-22", tables: [table()] };
     const a = renderTablesPdf(spec);

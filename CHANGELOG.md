@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 2.4.3 - 2026-10-26
+
+### Fixed
+- **Restoring a backup no longer breaks Google Drive.** A restore replaces every table, including the stored Drive connection, so the backup file's older, foreign or missing token used to become the live one and the next Drive call failed. This server's own connection is now kept across a restore (and put back even if the restore stops partway), and its cached access token is dropped. A server with no connection stays disconnected rather than inheriting the file's.
+
+### Changed
+- **The Daily Report PDF saved to Google Drive is now portrait** (it was landscape). The text size is chosen per table: it starts at 9 pt for narrow tables and steps down only as far as needed for the widest number in each column to fit the page, so figures never run off the edge. Reports already in Drive are re-saved once in the new layout the next time each day is generated.
 
 ### Added
 - **Choose the day of the weekly Google Drive backup** (Settings > Google Drive > Database backup). A day picker sits next to the time picker, both on your own clock. **Saturday is the default** (2:00 AM Philippine time, just after Friday's Night shift closes); existing connections move from Sunday to Saturday when the update is applied, and can be changed back in the picker. Includes a migration (`drive_backup_weekday`, a new column with a default - no existing data is changed).
@@ -23,7 +29,7 @@ Also includes everything that shipped as 2.4.1.
 - **Wide screens (22-24 inch).** The number boxes in the Online, Offline and Manual Count grids now grow with the screen (64px, 84px from 1500px wide, 100px from 2200px wide) instead of sitting small in very wide columns. On the Dashboard the panel headings no longer run into each other (a wider gap between the four panels). The background emblem is quieter behind the glass cards, in both light and dark mode.
 
 ### Security
-- **Dependencies:** `body-parser` (denial of service), `ip-address` (slow parsing) and `zod` (memory exhaustion, upgraded to 4.6.7) are updated to patched releases. Still open and accepted: the Prisma CLI chain and the dev-only test/dev-server tooling, which need major upgrades (see `docs/DEBUG_FINDINGS.md`).
+- **Dependencies:** `body-parser` (denial of service), `ip-address` (slow parsing) and `zod` (memory exhaustion, upgraded to 4.6.7) are updated to patched releases. Still open and accepted: the Prisma CLI chain and the dev-only test/dev-server tooling, which need major upgrades (accepted for now; none of it is in the shipped images).
 - **The API image no longer contains dev tooling.** It is built from a production-only install (vitest, vite, esbuild and tsx are gone), is about 12% smaller, and `prisma` is now a regular dependency because the container runs migrations at start.
 - **Docker hardening:** no-new-privileges on every service, all Linux capabilities dropped for the API and web containers (Caddy keeps only the one that binds ports 80/443), and MySQL's local-file loading explicitly off. Run `docker compose up -d --build` to apply it.
 - **`.dockerignore` now excludes every real env file** (`.env.production`, `.env.docker`, ...), keys, credentials and database dumps, not just `.env` and `.env.local`. `.gitignore` gained more key, credential, dump and profile patterns.

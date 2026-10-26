@@ -121,6 +121,12 @@ $RECYCLE.BIN/
 *.tmp
 
 # --- Build caches and tool output ------------------------------------------------
+# Git bundles (`git bundle create`) hold a repository's whole history, secrets and
+# rewritten-away commits included; Windows crash dumps (Git Bash) hold process memory;
+# `*.tmp.*` is for throwaway scripts that should never be committed.
+*.bundle
+*.stackdump
+*.tmp.*
 # Node memory/CPU profiles and crash dumps can contain request data and secrets from memory.
 *.heapsnapshot
 *.cpuprofile

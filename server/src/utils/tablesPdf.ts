@@ -2,7 +2,7 @@ import { jsPDF } from "jspdf";
 import autoTable, { type CellDef, type RowInput } from "jspdf-autotable";
 
 /**
- * Plain tables as a landscape A4 PDF, for reports the server saves on its own
+ * Plain tables as a portrait A4 PDF, for reports the server saves on its own
  * (the Daily Report in Google Drive). Black header bars on cream, like the PDFs
  * the app makes in the browser; one section per table, grouped by category when
  * the first column is "Category", page numbers in the footer.
@@ -62,6 +62,16 @@ export function pdfText(value: string): string {
 
 const num = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
+const CELL_PAD = 1.2;
+const MIN_FONT_SIZE = 6;
+
+/// Body text size to start from: fewer columns leave room for bigger numbers.
+function baseFontSize(columnCount: number): number {
+  if (columnCount <= 5) return 9;
+  if (columnCount <= 8) return 8.5;
+  return 8;
+}
+
 /// Numbers with thousands separators (pinned to en-US so the PDF never depends on
 /// the server's locale), nothing as a dash.
 function cellText(value: Cell): string {
@@ -72,8 +82,29 @@ function cellText(value: Cell): string {
 const isNumeric = (table: PdfTable, col: number) =>
   table.rows.length > 0 && table.rows.every((r) => r[col] === null || r[col] === undefined || r[col] === "" || typeof r[col] === "number");
 
+/// The biggest text size (stepping down from `start` in half points) at which the
+/// longest unbreakable word in every column - a number, a SKU, one word of a
+/// heading - still fits across the page. AutoTable wraps between words but never
+/// inside one, so without this a wide table's figures would run off the page
+/// edge. Measured in bold, the widest style, to stay on the safe side.
+function fitFontSize(doc: jsPDF, header: string[], rows: string[][], availableWidth: number, start: number): number {
+  for (let size = start; size > MIN_FONT_SIZE; size -= 0.5) {
+    doc.setFont("helvetica", "bold").setFontSize(size);
+    let needed = 0;
+    header.forEach((title, ci) => {
+      let widest = 0;
+      for (const text of [title, ...rows.map((r) => r[ci] ?? "")]) {
+        for (const word of text.split(/\s+/)) if (word) widest = Math.max(widest, doc.getTextWidth(word));
+      }
+      needed += widest + CELL_PAD * 2;
+    });
+    if (needed <= availableWidth) return size;
+  }
+  return MIN_FONT_SIZE;
+}
+
 export function renderTablesPdf(spec: { title: string; subtitle?: string; tables: PdfTable[] }): Buffer {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
   doc.setCreationDate(FIXED_DATE);
   doc.setFileId(FIXED_FILE_ID);
   doc.setProperties({ title: pdfText(`${spec.title}${spec.subtitle ? ` - ${spec.subtitle}` : ""}`), creator: "Ala Eh Stock Monitoring" });
@@ -119,13 +150,16 @@ export function renderTablesPdf(spec: { title: string; subtitle?: string; tables
     doc.text(pdfText(table.name.toUpperCase()), margin, y);
 
     const offset = grouped ? 1 : 0;
+    const dataRows = table.rows.map((r) => r.slice(offset).map(cellText));
+    const headerText = columns.map((c) => pdfText(c));
+    const fontSize = fitFontSize(doc, headerText, dataRows, pageWidth - margin * 2, baseFontSize(columns.length));
     autoTable(doc, {
       startY: y + 2,
       margin: { left: margin, right: margin, bottom: 12 },
       head: [columns.map((c) => pdfText(c))],
       body: body.length ? body : [[{ content: "Nothing recorded.", colSpan: Math.max(columns.length, 1), styles: { halign: "left", fontStyle: "italic" } }]],
       theme: "grid",
-      styles: { font: "helvetica", fontSize: 7, cellPadding: 1.2, lineColor: [200, 200, 200], lineWidth: 0.1, textColor: INK, overflow: "linebreak", valign: "middle" },
+      styles: { font: "helvetica", fontSize, cellPadding: CELL_PAD, lineColor: [200, 200, 200], lineWidth: 0.1, textColor: INK, overflow: "linebreak", valign: "middle" },
       headStyles: { fillColor: BLACK, textColor: CREAM, fontStyle: "bold", lineColor: BLACK },
       columnStyles: Object.fromEntries(
         columns.map((_, i) => [i, { halign: isNumeric(table, i + offset) ? ("right" as const) : ("left" as const) }]),
