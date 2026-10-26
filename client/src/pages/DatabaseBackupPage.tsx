@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { downloadDatabaseBackup } from "../api/backup";
 import { Button } from "../components/ui";
-import { DownloadIcon } from "../components/icons";
+import { CheckIcon, DownloadIcon } from "../components/icons";
 import { Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { DatabaseRestoreCard } from "./DatabaseRestoreCard";
@@ -43,8 +43,22 @@ export function DatabaseBackupPage() {
   const [error, setError] = useState<string | null>(null);
   // Bumped when a download finishes so the history card re-reads.
   const [historyKey, setHistoryKey] = useState(0);
+  // After a successful download the button shows a check, then the check and
+  // the bar fade back to the idle look (the status itself stays "done" so the
+  // toast keeps its message).
+  const [showCheck, setShowCheck] = useState(false);
+  const [barFading, setBarFading] = useState(false);
+  const timers = useRef<number[]>([]);
+  const clearTimers = () => {
+    timers.current.forEach(window.clearTimeout);
+    timers.current = [];
+  };
+  useEffect(() => clearTimers, []);
 
   async function handleDownload() {
+    clearTimers();
+    setShowCheck(false);
+    setBarFading(false);
     setStatus("downloading");
     setDoneDismissed(false);
     setBytes(0);
@@ -53,6 +67,11 @@ export function DatabaseBackupPage() {
       await downloadDatabaseBackup(setBytes);
       setStatus("done");
       setHistoryKey((k) => k + 1);
+      setShowCheck(true);
+      timers.current.push(
+        window.setTimeout(() => setBarFading(true), 900),
+        window.setTimeout(() => setShowCheck(false), 1700),
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Failed to download backup.",
@@ -119,16 +138,26 @@ export function DatabaseBackupPage() {
           style={{
             display: "inline-flex",
             alignItems: "center",
+            justifyContent: "center",
             gap: 6,
             flexShrink: 0,
+            minWidth: 118,
           }}
         >
-          {downloading ? (
-            <Spinner size="sm" color={colors.cream} />
-          ) : (
-            <DownloadIcon />
-          )}
-          {downloading ? "Downloading…" : "Download"}
+          <span
+            key={downloading ? "busy" : showCheck ? "ok" : "idle"}
+            className="ae-fade-in"
+            style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+          >
+            {downloading ? (
+              <Spinner size="sm" color={colors.cream} />
+            ) : showCheck ? (
+              <CheckIcon />
+            ) : (
+              <DownloadIcon />
+            )}
+            {downloading ? "Downloading…" : showCheck ? "Done" : "Download"}
+          </span>
         </Button>
         <Toast
           id="backup-done"
@@ -146,20 +175,23 @@ export function DatabaseBackupPage() {
           duration={null}
         />
 
-        {(downloading || status === "done") && (
+        {(downloading || (status === "done" && showCheck)) && (
           <div
             aria-hidden="true"
+            className={`ae-dl-track${barFading ? " is-fading" : ""}`}
             style={{
               position: "absolute",
               left: 0,
               right: 0,
               bottom: 0,
-              height: 2,
+              height: 3,
               background: colors.paperAlt,
             }}
           >
             <div
+              className={`ae-dl-bar${downloading ? " is-busy" : ""}`}
               style={{
+                color: colors.yellow,
                 height: "100%",
                 width: "100%",
                 transform: `scaleX(${percent / 100})`,

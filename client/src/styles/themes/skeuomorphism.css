@@ -1,0 +1,226 @@
+/* =========================================================================
+   Skeuomorphism theme (Settings > Appearance > Theme). Things that look like
+   real objects: a parchment desk, a stitched leather header, paper cards with
+   a lit top edge, embossed metal table headers, glossy gold and red push
+   buttons that press in, and recessed input wells. Scoped to
+   :root[data-ui="skeuo"]; sizes are untouched.
+   ========================================================================= */
+:root[data-ui="skeuo"] {
+  --ae-glass-blur: none;
+  --ae-sk-paper: 0 2px 4px rgba(60, 40, 0, 0.25), 0 8px 16px -6px rgba(60, 40, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+:root[data-ui="skeuo"]:not([data-theme="dark"]) {
+  --ae-bg: #e9dfc6;
+  --ae-bg-alt: #dccfae;
+  --ae-surface: #fdf8ea;
+  --ae-surface-hover: #f3ead0;
+  --ae-border: #b8a77c;
+  --ae-border-soft: #d4c7a3;
+  --ae-surface-glass: #fdf8ea;
+  --ae-header-glass: #d9ccaa;
+  --ae-col-a: #fdf8ea;
+  --ae-col-b: #f4ecd6;
+  --ae-colh-a: #d9ccaa;
+  --ae-colh-b: #cbbd98;
+  --ae-row-hover: rgba(120, 80, 0, 0.08);
+}
+:root[data-ui="skeuo"][data-theme="dark"] {
+  --ae-bg: #1d1812;
+  --ae-bg-alt: #241e16;
+  --ae-surface: #2b241b;
+  --ae-surface-hover: #362d21;
+  --ae-border: #4a3f2e;
+  --ae-border-soft: #3a3124;
+  --ae-surface-glass: #2b241b;
+  --ae-header-glass: #3a3022;
+  --ae-col-a: #2b241b;
+  --ae-col-b: #221c14;
+  --ae-colh-a: #3a3022;
+  --ae-colh-b: #2e261a;
+  --ae-sk-paper: 0 2px 4px rgba(0, 0, 0, 0.5), 0 8px 16px -6px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="skeuo"] .app-shell {
+  background:
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.018) 0 2px, transparent 2px 5px),
+    radial-gradient(1000px 700px at 50% 0%, rgba(255, 255, 255, 0.4), transparent 70%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.05;
+}
+:root[data-ui="skeuo"][data-theme="dark"] .app-shell {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.012) 0 2px, transparent 2px 5px),
+    radial-gradient(1000px 700px at 50% 0%, rgba(245, 192, 0, 0.07), transparent 70%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.4;
+}
+:root[data-ui="skeuo"] .ae-page-header {
+  --ae-glass-text: #f6ead0;
+  --ae-glass-text-muted: #d8c7a2;
+  --ae-glass-accent: #fdd023;
+  --ae-glass-divider: rgba(246, 234, 208, 0.25);
+  --ae-tb-bg: rgba(0, 0, 0, 0.18);
+  --ae-tb-border: rgba(0, 0, 0, 0.35);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.08);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.16);
+  --ae-tb-field-bg-active: rgba(253, 208, 35, 0.3);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.16);
+  --ae-tb-text: #fdd023;
+  --ae-tb-text-muted: rgba(253, 208, 35, 0.75);
+  background: linear-gradient(180deg, #4a3826 0%, #33261a 100%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #f6ead0;
+  border: 1px solid #1f160c;
+  border-radius: 10px;
+  box-shadow:
+    0 6px 14px rgba(40, 25, 5, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.35);
+  /* The stitching. */
+  outline: 1.5px dashed rgba(253, 208, 35, 0.55);
+  outline-offset: -6px;
+}
+:root[data-ui="skeuo"] .ae-page-header h2,
+:root[data-ui="skeuo"] .ae-page-header p {
+  color: inherit;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+:root[data-ui="skeuo"] .ae-page-header.ae-page-header--offline {
+  outline-color: var(--ae-danger-text);
+}
+:root[data-ui="skeuo"] .ae-sticky-head > .ae-header-tabs {
+  background: linear-gradient(180deg, #e6d9b8, #d3c49c);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 1px solid #a89668;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-sticky-head > .ae-header-tabs {
+  background: linear-gradient(180deg, #3a3022, #2a2218);
+  border-bottom-color: #14100a;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="skeuo"] .ae-header-tabs-bar,
+:root[data-ui="skeuo"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="skeuo"] .ae-header-tab {
+  border-radius: 6px 6px 0 0;
+  font-weight: 600;
+}
+:root[data-ui="skeuo"] .ae-header-tab[aria-current="page"] {
+  background: linear-gradient(180deg, #fff7dc, #f0e1b0);
+  color: #2b1f00;
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 -1px 3px rgba(0, 0, 0, 0.25);
+}
+:root[data-ui="skeuo"] .ae-panel,
+:root[data-ui="skeuo"] .ae-dash-stat,
+:root[data-ui="skeuo"] .ae-table-scroll,
+:root[data-ui="skeuo"] .ae-table-wrap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  box-shadow: var(--ae-sk-paper);
+}
+:root[data-ui="skeuo"] .ae-panel,
+:root[data-ui="skeuo"] .ae-dash-stat {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-panel,
+:root[data-ui="skeuo"][data-theme="dark"] .ae-dash-stat {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40%);
+}
+:root[data-ui="skeuo"] .ae-table thead th {
+  background-image: linear-gradient(180deg, #f5ecd0, #d6c8a2);
+  color: #3b2d14;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    inset 0 -1px 0 #a89668,
+    inset -1px 0 0 rgba(0, 0, 0, 0.1);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-table thead th {
+  background-image: linear-gradient(180deg, #4a3d2b, #352b1d);
+  color: #f1e3c2;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 #14100a,
+    inset -1px 0 0 rgba(0, 0, 0, 0.3);
+}
+:root[data-ui="skeuo"] .ae-btn {
+  border-radius: 7px;
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    filter var(--ae-dur-micro) ease-out;
+}
+:root[data-ui="skeuo"] .ae-btn-primary {
+  background: linear-gradient(180deg, #e0454b 0%, #c1272d 50%, #9e1f24 51%, #b3242a 100%);
+  border-color: #7d171c;
+  color: #ffffff;
+  text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 2px 3px rgba(0, 0, 0, 0.35);
+}
+:root[data-ui="skeuo"] .ae-btn-secondary {
+  background: linear-gradient(180deg, #ffe36b 0%, #f5c000 50%, #dba500 51%, #eab400 100%);
+  border-color: #a37800;
+  color: #2b1f00;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 2px 3px rgba(0, 0, 0, 0.3);
+}
+:root[data-ui="skeuo"] .ae-btn-primary:hover:not(:disabled),
+:root[data-ui="skeuo"] .ae-btn-secondary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+:root[data-ui="skeuo"] .ae-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+:root[data-ui="skeuo"] .ae-input:not(.ae-input-cell),
+:root[data-ui="skeuo"] .ae-select {
+  border: 1px solid #a89668;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 2px 4px rgba(60, 40, 0, 0.28),
+    0 1px 0 rgba(255, 255, 255, 0.7);
+}
+:root[data-ui="skeuo"][data-theme="dark"] .ae-input:not(.ae-input-cell),
+:root[data-ui="skeuo"][data-theme="dark"] .ae-select {
+  border-color: #14100a;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.55),
+    0 1px 0 rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="skeuo"] .ae-modal-panel {
+  border: 1px solid var(--ae-border);
+  border-radius: 10px;
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+:root[data-ui="skeuo"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="skeuo"] .ae-modal-header {
+  background: linear-gradient(180deg, #4a3826 0%, #33261a 100%);
+  color: #f6ead0;
+  border-bottom: 1px solid var(--ae-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+:root[data-ui="skeuo"] .ae-modal-header h3,
+:root[data-ui="skeuo"] .ae-modal-header button {
+  color: #f6ead0 !important;
+}
+

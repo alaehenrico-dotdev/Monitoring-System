@@ -17,10 +17,12 @@ HTTP request
        ▼
 ┌─────────────┐   All business rules: carry-forward, Online<->Offline
 │  services/  │   mirroring, variance calculation, change-log writes,
-└──────┬──────┘   report composition. Talks to repositories, never to
-       ▼          Prisma directly, and never to Express types (req/res).
-┌─────────────┐   One file per Prisma model. Every prisma.* call in the
-│repositories/│   codebase lives here. Pure data access - no business rules.
+└──────┬──────┘   report composition. Talks to repositories and, in
+       ▼          practice, to Prisma directly (transactions, multi-model
+                  queries). Never to Express types (req/res).
+┌─────────────┐   One file per Prisma model, for the simple/shared queries.
+│repositories/│   Pure data access - no business rules. (Many services also
+│             │   query Prisma directly; that is allowed, see below.)
 └──────┬──────┘
        ▼
 ┌─────────────┐
@@ -41,6 +43,11 @@ types/      express.d.ts          - augments Express's Request with req.user
 ```
 
 ## Dependency rule
+
+Enforced by ESLint (`no-restricted-imports` in `eslint.config.mjs`): controllers/routes
+never import `lib/prisma` or repositories; repositories never import services,
+controllers, routes or Express; services never import controllers, routes or Express
+(`backup.service.ts` is a known exception to clean up).
 
 Each layer may only depend on the layer(s) below it:
 

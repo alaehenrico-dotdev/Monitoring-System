@@ -1,4 +1,4 @@
-import { createReadStream } from "fs";
+import { createReadStream, type ReadStream } from "fs";
 import { rm, stat } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -336,6 +336,7 @@ async function doBackup(trigger: "manual" | "scheduled", userId?: number) {
   const conn = await requireConnection();
   const fileName = backupFileName();
   const tmp = join(tmpdir(), `ala-eh-drive-${process.pid}-${Date.now()}.sql.gz`);
+  let body: ReadStream | undefined;
   try {
     const summary = await dumpDatabaseToGzipFile(tmp);
     if (!summary.complete) throw new Error('mysqldump finished without its closing "Dump completed" line.');
@@ -345,7 +346,7 @@ async function doBackup(trigger: "manual" | "scheduled", userId?: number) {
       parentId: conn.backupFolderId,
       mimeType: "application/gzip",
       size,
-      body: createReadStream(tmp),
+      body: (body = createReadStream(tmp)),
     });
     await recordBackup({ fileName, trigger, status: "OK", sizeBytes: summary.sizeBytes, sha256: summary.sha256, createdById: userId, verified: true });
     await logUpload({ kind: "backup", fileName, driveFileId: id, sizeBytes: summary.sizeBytes, status: "OK", createdById: userId });
@@ -370,6 +371,9 @@ async function doBackup(trigger: "manual" | "scheduled", userId?: number) {
     }
     throw err;
   } finally {
+    // createReadStream opens lazily; if the upload failed (or never read it)
+    // the file would be opened after rm() below and emit an unhandled ENOENT.
+    body?.destroy();
     await rm(tmp, { force: true });
   }
 }

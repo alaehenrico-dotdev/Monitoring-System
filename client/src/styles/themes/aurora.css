@@ -1,0 +1,1256 @@
+/* =========================================================================
+   Aurora theme (Settings > Appearance > Theme). A modern gradient
+   look: one indigo > violet > fuchsia gradient carries the brand moments (the
+   header, the primary action, the active tab, the category bars, the table
+   head) over cool, near-neutral surfaces and a soft gradient page. Everything
+   else stays quiet so the gradient reads as the accent. EVERY corner is 4px:
+   panels, buttons, fields, menus, dialogs, toasts, badges and cells alike (only
+   true circles - dots, avatars, the spinner - stay round). Text on the
+   gradient is white and clears 4.5:1 at both ends. Scoped to
+   :root[data-ui="aurora"].
+   ========================================================================= */
+:root[data-ui="aurora"] {
+  --ae-r: 4px;
+  --tb-radius: 4px;
+  --ae-mb-radius: 4px;
+  --ae-table-radius: 4px;
+  --ae-glass-blur: blur(16px) saturate(160%);
+
+  --ae-au-a: #4f46e5;
+  --ae-au-b: #7c3aed;
+  --ae-au-c: #c026d3;
+  --ae-au-grad: linear-gradient(120deg, var(--ae-au-a) 0%, var(--ae-au-b) 55%, var(--ae-au-c) 100%);
+  --ae-au-grad-soft: linear-gradient(120deg, rgba(79, 70, 229, 0.12), rgba(192, 38, 211, 0.1));
+  --ae-au-accent: #4f46e5;
+  --ae-au-shadow: 0 1px 2px rgba(30, 27, 75, 0.08), 0 8px 20px -8px rgba(30, 27, 75, 0.18);
+  --ae-au-shadow-lg: 0 24px 56px -12px rgba(30, 27, 75, 0.34), 0 4px 12px rgba(30, 27, 75, 0.12);
+}
+:root[data-ui="aurora"]:not([data-theme="dark"]) {
+  --ae-bg: #f5f5fd;
+  --ae-bg-alt: #ebebfa;
+  --ae-surface: #ffffff;
+  --ae-surface-hover: #f0efff;
+  --ae-text: #16162a;
+  --ae-text-muted: #5a5a78;
+  --ae-border: #dcdbf0;
+  --ae-border-soft: #ebeaf8;
+  --ae-hairline: #c9c8e6;
+  --ae-header-bg: #e4e3f7;
+  --ae-header-glass: rgba(228, 227, 247, 0.82);
+  --ae-surface-glass: rgba(255, 255, 255, 0.72);
+  --ae-row-hover: rgba(79, 70, 229, 0.05);
+  --ae-row-focus-bg: rgba(79, 70, 229, 0.12);
+  --ae-col-a: #ffffff;
+  --ae-col-b: #f7f7fe;
+  --ae-colh-a: #e4e3f7;
+  --ae-colh-b: #d8d7f2;
+  --ae-focus-ring: #4f46e5;
+  --ae-warning-bg: #fdf0cf;
+  --ae-input-cell-bg: #ffffff;
+  --ae-input-cell-text: #16162a;
+  --ae-input-cell-text-muted: #5a5a78;
+  --ae-input-cell-border: #c9c8e6;
+  --ae-input-cell-focus-ring: rgba(79, 70, 229, 0.3);
+  --ae-input-cell-spin: #4f46e5;
+  --ae-input-cell-spin-hover-bg: rgba(79, 70, 229, 0.14);
+  --ae-glass-bg: rgba(255, 255, 255, 0.6);
+  --ae-glass-divider: rgba(22, 22, 42, 0.12);
+  --ae-glass-accent: #4f46e5;
+}
+:root[data-ui="aurora"][data-theme="dark"] {
+  --ae-au-a: #6366f1;
+  --ae-au-b: #8b5cf6;
+  --ae-au-c: #d946ef;
+  --ae-au-accent: #a5a3ff;
+  --ae-au-grad-soft: linear-gradient(120deg, rgba(99, 102, 241, 0.2), rgba(217, 70, 239, 0.16));
+  --ae-au-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 8px 20px -8px rgba(0, 0, 0, 0.6);
+  --ae-au-shadow-lg: 0 28px 64px -12px rgba(0, 0, 0, 0.75), 0 4px 12px rgba(0, 0, 0, 0.45);
+  --ae-bg: #0e0e1a;
+  --ae-bg-alt: #151528;
+  --ae-surface: #1a1a30;
+  --ae-surface-hover: #24243f;
+  --ae-text: #f3f3ff;
+  --ae-text-muted: #a9a9c8;
+  --ae-border: #33335a;
+  --ae-border-soft: #26264a;
+  --ae-hairline: #44447a;
+  --ae-header-bg: #24243f;
+  --ae-header-glass: rgba(36, 36, 63, 0.84);
+  --ae-surface-glass: rgba(26, 26, 48, 0.72);
+  --ae-row-hover: rgba(165, 163, 255, 0.07);
+  --ae-row-focus-bg: rgba(139, 92, 246, 0.24);
+  --ae-col-a: #1a1a30;
+  --ae-col-b: #14142a;
+  --ae-colh-a: #2a2a4a;
+  --ae-colh-b: #20203a;
+  --ae-focus-ring: #a5a3ff;
+  --ae-warning-bg: #2d2508;
+  --ae-input-cell-bg: #1a1a30;
+  --ae-input-cell-text: #f3f3ff;
+  --ae-input-cell-text-muted: rgba(243, 243, 255, 0.55);
+  --ae-input-cell-border: #3b3b66;
+  --ae-input-cell-focus-ring: rgba(165, 163, 255, 0.4);
+  --ae-input-cell-spin: #a5a3ff;
+  --ae-input-cell-spin-hover-bg: rgba(165, 163, 255, 0.18);
+  --ae-glass-bg: rgba(26, 26, 48, 0.6);
+  --ae-glass-divider: rgba(243, 243, 255, 0.16);
+  --ae-glass-accent: #a5a3ff;
+}
+
+/* ---- Page: a soft gradient field, no watermark ---------------------------- */
+:root[data-ui="aurora"] .app-shell {
+  background:
+    radial-gradient(900px 520px at 8% -10%, rgba(99, 102, 241, 0.16), transparent 70%),
+    radial-gradient(800px 520px at 100% 0%, rgba(217, 70, 239, 0.12), transparent 70%),
+    var(--ae-bg);
+}
+:root[data-ui="aurora"][data-theme="dark"] .app-shell {
+  background:
+    radial-gradient(900px 520px at 8% -10%, rgba(99, 102, 241, 0.28), transparent 70%),
+    radial-gradient(800px 520px at 100% 0%, rgba(217, 70, 239, 0.2), transparent 70%),
+    var(--ae-bg);
+}
+:root[data-ui="aurora"] .app-shell::before {
+  display: none;
+}
+
+/* ---- Header: the gradient, with white text -------------------------------- */
+:root[data-ui="aurora"] .ae-page-header {
+  --ae-glass-text: #ffffff;
+  --ae-glass-text-muted: rgba(255, 255, 255, 0.82);
+  --ae-glass-accent: #ffffff;
+  --ae-glass-divider: rgba(255, 255, 255, 0.28);
+  --ae-tb-bg: rgba(255, 255, 255, 0.12);
+  --ae-tb-border: rgba(255, 255, 255, 0.28);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.16);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.26);
+  --ae-tb-field-bg-active: rgba(255, 255, 255, 0.34);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.32);
+  --ae-tb-text: #ffffff;
+  --ae-tb-text-muted: rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
+    var(--ae-au-grad);
+  color: #ffffff;
+  border: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), var(--ae-au-shadow-lg);
+}
+:root[data-ui="aurora"] .ae-page-header.ae-page-header--offline {
+  box-shadow: 0 0 0 2px var(--ae-danger-text), var(--ae-au-shadow-lg);
+}
+:root[data-ui="aurora"] .ae-page-header h2,
+:root[data-ui="aurora"] .ae-page-header p {
+  color: inherit;
+}
+
+/* ---- Tabs ----------------------------------------------------------------- */
+:root[data-ui="aurora"] .ae-sticky-head > .ae-header-tabs {
+  background: color-mix(in srgb, var(--ae-surface) 70%, transparent);
+  border-radius: 4px;
+}
+:root[data-ui="aurora"] .ae-header-tab {
+  border-radius: 4px;
+  color: var(--ae-text-muted);
+}
+:root[data-ui="aurora"] .ae-header-tab:hover {
+  background: var(--ae-au-grad-soft);
+  color: var(--ae-text);
+}
+:root[data-ui="aurora"] .ae-header-tab[aria-current="page"] {
+  color: var(--ae-text);
+  font-weight: 700;
+}
+:root[data-ui="aurora"] .ae-header-tabs-bar {
+  background: var(--ae-au-grad);
+  box-shadow: none;
+  border-radius: 4px;
+  height: 3px;
+}
+:root[data-ui="aurora"] .ae-header-tab::after {
+  background: var(--ae-au-grad);
+  border-radius: 4px;
+}
+
+/* ---- Panes, tables, category bars ----------------------------------------- */
+:root[data-ui="aurora"] .ae-panel,
+:root[data-ui="aurora"] .ae-dash-stat,
+:root[data-ui="aurora"] .ae-dash-card,
+:root[data-ui="aurora"] .ae-table-scroll,
+:root[data-ui="aurora"] .ae-table-wrap {
+  border: 1px solid var(--ae-border);
+  box-shadow: var(--ae-au-shadow);
+}
+:root[data-ui="aurora"] .ae-table thead th {
+  background-image: linear-gradient(180deg, rgba(79, 70, 229, 0.1), rgba(192, 38, 211, 0.06));
+  border-bottom: 2px solid transparent;
+  border-image: var(--ae-au-grad) 1;
+}
+:root[data-ui="aurora"] .ae-table tr.ae-row-grand td {
+  background-color: var(--ae-au-a);
+  background-image: var(--ae-au-grad) !important;
+  color: #ffffff;
+}
+
+/* ---- Buttons -------------------------------------------------------------- */
+:root[data-ui="aurora"] .ae-btn {
+  border-radius: 4px;
+  transition:
+    background-color var(--ae-dur-micro) var(--ae-ease-out),
+    box-shadow var(--ae-dur-micro) var(--ae-ease-out),
+    filter var(--ae-dur-micro) var(--ae-ease-out),
+    transform var(--ae-dur-micro) var(--ae-ease-out);
+}
+:root[data-ui="aurora"] .ae-btn-primary,
+:root[data-ui="aurora"] .ae-btn-secondary,
+:root[data-ui="aurora"] .ae-btn-solid {
+  background: var(--ae-au-grad);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 6px 14px -6px rgba(79, 70, 229, 0.55);
+}
+:root[data-ui="aurora"] .ae-btn-primary:hover:not(:disabled),
+:root[data-ui="aurora"] .ae-btn-secondary:hover:not(:disabled),
+:root[data-ui="aurora"] .ae-btn-solid:hover:not(:disabled) {
+  filter: brightness(1.08) saturate(1.05);
+  transform: translateY(-1px);
+}
+:root[data-ui="aurora"] .ae-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.985);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="aurora"] .ae-btn:hover:not(:disabled),
+  :root[data-ui="aurora"] .ae-btn:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+/* ---- Fields and grid cells ------------------------------------------------ */
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell),
+:root[data-ui="aurora"] .ae-select {
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  box-shadow: none;
+}
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell):hover:not(:disabled):not(:focus),
+:root[data-ui="aurora"] .ae-select:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-hairline);
+}
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell):focus,
+:root[data-ui="aurora"] .ae-input:not(.ae-input-cell):focus-visible,
+:root[data-ui="aurora"] .ae-select:focus,
+:root[data-ui="aurora"] .ae-select:focus-visible {
+  border-color: var(--ae-au-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ae-au-accent) 28%, transparent);
+}
+:root[data-ui="aurora"] .ae-input-cell {
+  border: 1px solid var(--ae-input-cell-border);
+}
+:root[data-ui="aurora"] .ae-input-cell:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-au-accent);
+}
+:root[data-ui="aurora"] .ae-input-cell:focus {
+  border-color: var(--ae-au-accent);
+  box-shadow: 0 0 0 2px var(--ae-input-cell-focus-ring);
+}
+
+/* ---- Dialogs, menus, toasts ------------------------------------------------ */
+:root[data-ui="aurora"] .ae-modal-panel {
+  background: linear-gradient(160deg, var(--ae-surface) 0%, var(--ae-bg-alt) 100%) !important;
+  border: 1px solid var(--ae-border);
+  box-shadow: var(--ae-au-shadow-lg) !important;
+}
+:root[data-ui="aurora"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="aurora"] .ae-modal-header {
+  background: var(--ae-au-grad);
+  color: #ffffff;
+  border-bottom: 0 !important;
+}
+:root[data-ui="aurora"] .ae-modal-header h3,
+:root[data-ui="aurora"] .ae-modal-header button {
+  color: #ffffff !important;
+}
+:root[data-ui="aurora"] .ae-toast,
+:root[data-ui="aurora"] .ae-col-menu,
+:root[data-ui="aurora"] .ae-datepicker,
+:root[data-ui="aurora"] .ae-dropdown {
+  box-shadow: var(--ae-au-shadow-lg);
+}
+
+/* ---- One radius: 4px on everything that is not a true circle --------------
+   The classic rules round things at 6, 8, 10px and as pills; this lists them
+   (circles - dots, avatars, swatches, the spinner - are left out on purpose),
+   and the inline-styled ones (dialog panels, chips) are caught by attribute. */
+:root[data-ui="aurora"] :is(
+  .ae-selection-bar, .ae-pager-btn, .ae-panel, .ae-input, .ae-select, .ae-input-cell,
+  .ae-datepicker, .ae-datepicker-title, .ae-datepicker-month, .ae-datepicker-today,
+  .ae-datepicker-day--inrange, .ae-dropdown, .ae-btn, .ae-row-menu-btn, .ae-segment-group,
+  .ae-page-header, .ae-dash-stat-icon, .ae-dash-stat, .ae-dash-quicklink,
+  .ae-dash-quicklink-icon, .ae-dash-card, .ae-dash-stats-error, .ae-hist-empty,
+  .ae-hist-empty-icon, .ae-cat-zero, .ae-unsaved-badge, .ae-col-menu, .ae-col-menu-item,
+  .ae-extra-savemode-switch, .ae-extra-savemode-opt, .ae-toast, .ae-toast-icon,
+  .ae-toast-action, .ae-toast-close, .ae-quickjump, .ae-quickjump-item,
+  .ae-header-search-btn, .ae-copy-prev-row, .ae-cell-history-row, .ae-dash-list-jump,
+  .ae-account-role, .ae-day-lock, .ae-mm-tip, .ae-fl-tip, .ae-modal-panel, .ae-mb-menu,
+  .ae-mb-item, .ae-mb-btn, .ae-mb-trigger, .ae-split, .ae-segment-btn, .ae-table-scroll,
+  .ae-table-wrap, .table-scroll, .ae-choice-card, .ae-choice-card-preview
+) {
+  border-radius: 4px !important;
+}
+:root[data-ui="aurora"] [style*="border-radius"]:not([style*="border-radius: 50%"]):not([style*="border-radius: 0"]) {
+  border-radius: 4px !important;
+}
+:root[data-ui="aurora"] ::-webkit-scrollbar-thumb {
+  border-radius: 4px;
+}
+
+/* ---- Settings > Appearance choice cards (both layouts) ------------------- */
+.ae-choice-card {
+  position: relative;
+  display: block;
+  padding: 10px;
+  border: 1px solid var(--ae-border);
+  border-radius: 6px;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  cursor: pointer;
+}
+.ae-choice-card input {
+  /* Covers the card so the whole thing is the click target, but stays a real,
+     focusable radio for the keyboard and screen readers. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.ae-choice-card:hover {
+  border-color: #d4a000;
+}
+.ae-choice-card--selected {
+  border-color: #d4a000;
+  box-shadow: 0 0 0 2px rgba(245, 192, 0, 0.4);
+}
+.ae-choice-card--selected::after {
+  content: "\2713";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f5c000;
+  color: #0c0c0c;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 800;
+}
+.ae-choice-card:has(input:focus-visible) {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
+.ae-choice-card-preview {
+  display: block;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid var(--ae-border);
+}
+
+/* ---- Calm page change ---------------------------------------------------
+   A page fades in over 160ms when it opens (opacity only: no movement, no
+   scale), so clicking a tab is smooth rather than a hard cut and nothing
+   shifts while it happens. The pinned header (tabs + title card) is left out:
+   it is the same on every page, so it stays put and only the content below it
+   fades - the navigation never flickers when you change page. */
+@keyframes ae-page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.ae-main > div > :not(.ae-sticky-head) {
+  animation: ae-page-in 160ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-main > div > :not(.ae-sticky-head) {
+    animation: none;
+  }
+}
+
+/* ---- Responsive refinements ---------------------------------------------
+   Added on top of the page-header / tab-strip / table breakpoints above, for
+   what they did not cover on a phone or tablet. Touch rules key off the input
+   (pointer: coarse), not the width, so a touch laptop gets them too and a
+   narrow desktop window does not. The dense places - the toolbar and the grid
+   cells - are left alone on purpose: shrinking their hit area is the price of
+   fitting a whole product list on screen, and they scroll rather than wrap. */
+@media (pointer: coarse) {
+  /* Buttons and tabs people actually tap, outside the toolbar: 44px, the usual
+     comfortable minimum. */
+  .ae-panel .ae-btn,
+  .ae-modal-body .ae-btn,
+  .ae-subtab {
+    min-height: 44px;
+  }
+  .ae-subtab {
+    display: inline-flex;
+    align-items: center;
+  }
+  .ae-pager-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .ae-modal-header button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  /* The main navigation: tall enough to tap without making the pinned header
+     eat the screen (the active line measures itself from the tab's height). */
+  .ae-header-tab {
+    min-height: 40px;
+  }
+  .ae-modal-body input[type="checkbox"],
+  .ae-modal-body input[type="radio"],
+  .ae-panel input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (max-width: 768px) and (pointer: coarse) {
+  /* iOS zooms the whole page when a field under 16px is focused, and does not
+     zoom back out. Text fields and selects are 16px on phones; the grid cells
+     (.ae-input-cell) keep their compact size. */
+  .ae-input:not(.ae-input-cell),
+  .ae-select,
+  textarea {
+    font-size: calc(16px * var(--ae-fs, 1));
+  }
+}
+
+@media (max-width: 520px) {
+  .ae-subtabs {
+    gap: 16px;
+  }
+  /* Dialogs use nearly the whole screen: a phone has little to spare, and the
+     panel's own body scrolls when the content is taller. The overlay's padding
+     and the panel's max height are inline styles, hence !important. */
+  .ae-modal-overlay {
+    padding: 8px !important;
+  }
+  .ae-modal-panel {
+    max-height: calc(var(--ae-vh) - 16px) !important;
+  }
+}
+
+/* ---- Toolbar: steady resize, wrapping floor tier -------------------------
+   1. Steady. The toolbar changes tier because the WINDOW changed size; that is
+      a reflow, not an event to watch. Anything that animated a size, a gap, a
+      padding or a corner radius made buttons visibly squash and slide while it
+      settled, and the hidden measuring clones could catch it mid-way. So no
+      size-related property transitions here: items take their new shape at
+      once. Colour, border and press feedback still ease (see .ae-btn).
+   2. A label that collapses is gone (display: none), not shrunk to zero width
+      with a fade - the button is its icon at once, with no stray gap left.
+   3. Wrapping. The circle tier used to scroll sideways with the scrollbar
+      hidden, so on a phone the actions past the edge were simply not
+      discoverable. It now wraps: the filters on the first row, the action
+      buttons on the next. Scoped away from the measuring clones
+      (.ae-toolbar--sizer), which must stay one nowrap line. */
+.ae-toolbar,
+.ae-toolbar > div:first-child:not(.ae-toolbar-controls),
+.ae-toolbar-controls,
+.ae-toolbar .ae-segment-group,
+.ae-toolbar .ae-toolbar-btn-label,
+.ae-toolbar .ae-segment-label {
+  transition: none;
+}
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-btn,
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger {
+  transition:
+    color var(--ae-dur-micro) ease-out,
+    background-color var(--ae-dur-micro) ease-out,
+    border-color var(--ae-dur-micro) ease-out,
+    opacity var(--ae-dur-micro) ease-out,
+    filter var(--ae-dur-micro) ease-out,
+    transform 90ms ease-out;
+}
+.ae-toolbar--compact .ae-toolbar-btn-label,
+.ae-toolbar--compact .ae-segment-label {
+  display: none;
+}
+
+.ae-toolbar--circle:not(.ae-toolbar--sizer) {
+  flex-wrap: wrap;
+  row-gap: 6px;
+  /* No hidden sideways scroll any more: everything wraps into view. */
+  overflow-x: hidden;
+}
+.ae-toolbar--circle:not(.ae-toolbar--sizer) > div:first-child:not(.ae-toolbar-controls),
+.ae-toolbar--circle:not(.ae-toolbar--sizer) > :first-child:not(.ae-toolbar-controls) {
+  flex: 1 1 100%;
+  width: auto;
+  max-width: 100%;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+/* The thin "|" between filters is drawn by each item's ::before; once the
+   filters can wrap it would end up stranded at the start of a row. */
+.ae-toolbar--circle:not(.ae-toolbar--sizer) > :first-child:not(.ae-toolbar-controls) > *:not(:first-child)::before {
+  display: none;
+}
+.ae-toolbar--circle:not(.ae-toolbar--sizer) .ae-toolbar-controls {
+  margin-left: 0;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+/* A divider between control groups means nothing on its own row. */
+.ae-toolbar--circle:not(.ae-toolbar--sizer) .ae-toolbar-divider {
+  display: none;
+}
+
+/* Touch: the smallest tier's buttons are tapped, not clicked. 40px (the toolbar
+   is denser than the rest of the app, which uses 44px). It applies to the
+   measuring clone as well, so the tier decision stays consistent. */
+@media (pointer: coarse) {
+  .ae-toolbar--circle {
+    --tb-h: 40px;
+  }
+}
+
+/* ---- Dashboard > Monthly Monitoring --------------------------------------
+   Grouped columns on one shared scale. Series colors are the --ae-viz-*
+   tokens (validated per theme); everything else is a text or hairline token,
+   so text never wears a series color and the grid stays recessive. */
+.ae-mm-heading {
+  margin: 0;
+  padding: 14px 20px 0;
+}
+.ae-mm-controls {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ae-mm-year {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ae-mm-year-label {
+  min-width: 44px;
+  text-align: center;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 700;
+}
+.ae-mm-view {
+  display: inline-flex;
+  overflow: hidden;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 4px;
+}
+.ae-mm-view-btn {
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ae-text-muted);
+  font: inherit;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--ae-dur-micro) var(--ae-ease-out),
+    color var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-mm-view-btn + .ae-mm-view-btn {
+  border-left: 0.3px solid var(--ae-hairline);
+}
+.ae-mm-view-btn:hover {
+  background: var(--ae-row-hover);
+  color: var(--ae-text);
+}
+.ae-mm-view-btn[aria-pressed="true"] {
+  background: var(--ae-text);
+  color: var(--ae-surface);
+}
+.ae-mm-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 20px 12px;
+}
+.ae-mm-error {
+  margin: 0;
+  padding: 16px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  color: var(--ae-danger-text);
+}
+.ae-mm-note {
+  margin: 14px 0 0;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-mm-legend {
+  display: flex;
+  gap: 16px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-mm-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Legend mirrors the mark: a block for the bars, a stroke for each line. */
+.ae-mm-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--ae-viz-bar);
+}
+.ae-mm-key {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+}
+.ae-mm-key--online,
+.ae-mm-dot--online {
+  background: var(--ae-viz-online);
+}
+.ae-mm-key--offline,
+.ae-mm-dot--offline {
+  background: var(--ae-viz-offline);
+}
+/* Scrolls sideways (rather than squeezing the months) below ~560px. */
+.ae-mm-scroll {
+  display: flex;
+  flex: 1;
+  min-height: 240px;
+  margin-top: 14px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.ae-mm-chart {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 34px 1fr;
+  grid-template-rows: 1fr auto;
+  column-gap: 8px;
+  min-width: 560px;
+  /* Room for the top tick label, which is centred on its gridline. */
+  padding-top: 8px;
+}
+.ae-mm-yaxis {
+  position: relative;
+}
+.ae-mm-yaxis span {
+  position: absolute;
+  right: 0;
+  transform: translateY(50%);
+  font-size: calc(10.5px * var(--ae-fs, 1));
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ae-text-muted);
+}
+.ae-mm-plot {
+  position: relative;
+  min-height: 200px;
+}
+.ae-mm-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ae-text) 9%, transparent);
+  pointer-events: none;
+}
+.ae-mm-grid--base {
+  border-top-color: color-mix(in srgb, var(--ae-text) 28%, transparent);
+}
+/* No gap between months: a month's centre is exactly (i + 0.5) / 12 of the
+   width, which is where its line points and crosshair are drawn. */
+.ae-mm-cols,
+.ae-mm-xaxis {
+  display: flex;
+}
+.ae-mm-cols {
+  position: absolute;
+  inset: 0;
+}
+.ae-mm-col {
+  display: flex;
+  flex: 1 1 0;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 0;
+  height: 100%;
+  padding: 0 5px;
+  border-radius: 4px;
+  transition: background-color var(--ae-dur-micro) var(--ae-ease-out);
+}
+/* Many narrow points (a month or more of days): slimmer air between bars. */
+.ae-mm-chart--dense .ae-mm-col {
+  padding: 0 2px;
+}
+.ae-mm-col:focus-visible {
+  outline: 2px solid var(--ae-focus-ring);
+  outline-offset: -2px;
+}
+.ae-mm-col--active {
+  background: color-mix(in srgb, var(--ae-text) 6%, transparent);
+}
+/* The combined total, kept quiet so the two lines carry the story. */
+.ae-mm-bar {
+  flex: 1 1 0;
+  /* Capped so a wide desktop chart is air around slim columns, not slabs. */
+  max-width: 24px;
+  /* Rounded at the data end, square on the baseline. */
+  border-radius: 4px 4px 0 0;
+  background: var(--ae-viz-bar);
+  transition:
+    height 0.3s var(--ae-ease-out),
+    background-color var(--ae-dur-micro) var(--ae-ease-out);
+}
+.ae-mm-col--active .ae-mm-bar {
+  background: var(--ae-viz-bar-active);
+}
+.ae-mm-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.ae-mm-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.ae-mm-line--online {
+  stroke: var(--ae-viz-online);
+}
+.ae-mm-line--offline {
+  stroke: var(--ae-viz-offline);
+}
+/* Snaps to the month under the pointer, like the dots on it. */
+.ae-mm-cross {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--ae-text) 45%, transparent);
+  pointer-events: none;
+}
+.ae-mm-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  transform: translate(-50%, 50%);
+  border-radius: 50%;
+  /* The 2px surface ring that keeps it legible over a line or bar. */
+  box-shadow: 0 0 0 2px var(--ae-surface);
+  pointer-events: none;
+}
+.ae-mm-xaxis {
+  grid-column: 2;
+  margin-top: 6px;
+}
+.ae-mm-xlabel {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 0;
+  font-size: calc(11px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-mm-xlabel-text {
+  padding-bottom: 1px;
+  /* A thinned-out label may be wider than its own column; let it overhang. */
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.ae-mm-xlabel--current {
+  font-weight: 800;
+  color: var(--ae-text);
+}
+.ae-mm-xlabel--current .ae-mm-xlabel-text {
+  border-bottom-color: var(--ae-viz-now);
+}
+.ae-mm-flag {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--ae-danger-text);
+}
+.ae-mm-tip {
+  position: absolute;
+  top: 4px;
+  z-index: 3;
+  min-width: 190px;
+  padding: 8px 10px;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 6px;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  font-size: calc(12px * var(--ae-fs, 1));
+  pointer-events: none;
+  animation: ae-mm-tip-in var(--ae-dur-micro) var(--ae-ease-out);
+}
+@keyframes ae-mm-tip-in {
+  from {
+    opacity: 0;
+  }
+}
+.ae-mm-tip-title {
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+/* One row per series: its color, its name, its value at the right edge. */
+.ae-mm-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.7;
+}
+.ae-mm-tip-label {
+  flex: 1;
+  color: var(--ae-text-muted);
+}
+.ae-mm-tip-row strong {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ae-mm-dotkey {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ae-viz-bar-key);
+}
+.ae-mm-dotkey--online {
+  background: var(--ae-viz-online);
+}
+.ae-mm-dotkey--offline {
+  background: var(--ae-viz-offline);
+}
+.ae-mm-tip-flags,
+.ae-mm-tip-empty {
+  margin-top: 4px;
+  color: var(--ae-text-muted);
+}
+.ae-mm-tip-empty {
+  margin-top: 0;
+}
+.ae-mm-tip-flags--alert {
+  font-weight: 600;
+  color: var(--ae-danger-text);
+}
+.ae-mm-tablewrap .ae-table {
+  width: 100%;
+}
+.ae-mm-datecell {
+  white-space: nowrap;
+}
+.ae-mm-tablewrap {
+  flex: 1;
+  min-height: 240px;
+  max-height: 360px;
+  margin-top: 14px;
+  overflow: auto;
+}
+/* Touch screens: the Chart/Table toggle is a real tap target, not a 24px sliver. */
+@media (pointer: coarse) {
+  .ae-mm-view-btn {
+    min-height: 36px;
+    padding: 6px 14px;
+  }
+}
+/* Phones: fit the whole range on screen instead of scrolling it sideways. The
+   card's side padding, the axis gutter and the air between columns all give up
+   a few pixels so twelve months get ~24px each. (A range with many points -
+   Daily Out over 16+ days - keeps its own inline minimum width and scrolls.) */
+@media (max-width: 520px) {
+  .ae-mm-heading {
+    padding: 12px 12px 0;
+  }
+  .ae-mm-body {
+    padding: 8px 12px 10px;
+  }
+  .ae-mm-chart:not(.ae-mm-chart--dense) {
+    min-width: 0;
+    grid-template-columns: 30px 1fr;
+    column-gap: 6px;
+  }
+  .ae-mm-chart:not(.ae-mm-chart--dense) .ae-mm-col {
+    padding: 0 2px;
+  }
+  .ae-mm-xlabel {
+    font-size: calc(10px * var(--ae-fs, 1));
+  }
+  .ae-mm-tablewrap .ae-table th,
+  .ae-mm-tablewrap .ae-table td {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .ae-mm-tip {
+    min-width: 168px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-mm-tip {
+    animation: none;
+  }
+}
+
+/* ---- Interaction baseline ------------------------------------------------
+   Three rules every control inherits, so a new one is correct by default
+   instead of by remembering to copy them. All use :where(), which has no
+   specificity, so any component's own, more specific style still wins.
+
+   1. Focus. One visible gold ring on keyboard focus (not on mouse click) for
+      every interactive element that has no ring of its own. Components with a
+      designed focus state (tabs, toolbar buttons, grid cells...) keep theirs.
+   2. Touch. `touch-action: manipulation` removes the browser's tap delay and
+      double-tap-to-zoom on controls, so a tap responds at once; and the grey
+      flash a tap leaves is replaced by a faint gold one that matches the
+      press feedback.
+   3. Reduced motion. For anyone who asks the system to reduce motion, every
+      transition ends at once and smooth scrolling is off - including ones
+      added later. Entrance animations each switch themselves off in their own
+      reduced-motion rule; loaders and the toast countdown deliberately keep
+      running because they carry information. */
+:where(a, button, [role="tab"], [role="switch"], summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--ae-focus-ring);
+  outline-offset: 2px;
+}
+/* Text fields glow softly instead of showing the thick ring. */
+:where(input:not([type="checkbox"], [type="radio"], [type="range"]), select, textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
+}
+:where(a, button, [role="tab"], [role="switch"], label, summary, select) {
+  touch-action: manipulation;
+}
+:root {
+  -webkit-tap-highlight-color: rgba(245, 192, 0, 0.18);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---- Category expand / collapse: a light fade -----------------------------
+   Table rows cannot animate their height like ordinary blocks, and animating a
+   whole table's layout every frame would be the heavy way to fake it. So only
+   opacity moves, only on the rows of the category that was clicked
+   (hooks/useCategoryReveal.ts adds and removes these classes):
+   - opening: rows appear, then fade in;
+   - closing: rows fade out for ~140ms, then the hook collapses them.
+   Opacity goes on the cells, not the row, so the sticky SKU/name columns (which
+   have their own opaque backgrounds) fade with their row instead of tearing. */
+@keyframes ae-row-reveal {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ae-row-hide {
+  to {
+    opacity: 0;
+  }
+}
+.ae-cat-row.ae-row-opening > td {
+  animation: ae-row-reveal var(--ae-dur-enter) ease-out;
+}
+.ae-cat-row.ae-row-closing > td {
+  animation: ae-row-hide 140ms ease-in forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-cat-row.ae-row-opening > td,
+  .ae-cat-row.ae-row-closing > td {
+    animation: none;
+  }
+}
+
+/* ---- Toolbar filters: no boxes -----------------------------------------------
+   Category, Rows, source, shift and date controls in the page toolbar carry no
+   border at rest, on hover, when open or when focused - the shared .ae-input /
+   .ae-select-trigger rules would otherwise put a yellow border and glow on them.
+   Hover is a soft background; open or keyboard-focused adds the accent underline
+   (the same cue an active filter uses), so a state is never shown by colour alone. */
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select),
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select):is(:hover, :focus, :focus-visible, [aria-expanded="true"]) {
+  border: 0;
+  box-shadow: none;
+}
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger):hover:not(:disabled) {
+  background: var(--ae-tb-field-bg-hover);
+}
+.ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger):is(:focus-visible, [aria-expanded="true"]) {
+  background: var(--ae-tb-field-bg-hover);
+  outline: none;
+  box-shadow: inset 0 -2px 0 var(--ae-glass-accent);
+}
+
+/* ---- Stock flow chart (FlowLineChart) and channel donut (ShareDonut) -------- */
+.ae-fl-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 4px 0 10px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-fl-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ae-fl-key {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.ae-fl-chart {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-rows: minmax(200px, 1fr) 22px;
+  min-height: 240px;
+}
+.ae-fl-yaxis {
+  position: relative;
+  grid-row: 1;
+}
+.ae-fl-yaxis span {
+  position: absolute;
+  right: 8px;
+  transform: translateY(50%);
+  font-size: calc(11px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-fl-plot {
+  position: relative;
+  grid-row: 1;
+  grid-column: 2;
+}
+.ae-fl-grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 1px solid color-mix(in srgb, var(--ae-text) 9%, transparent);
+  pointer-events: none;
+}
+.ae-fl-grid--base {
+  border-top-color: color-mix(in srgb, var(--ae-text) 24%, transparent);
+}
+.ae-fl-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.ae-fl-line {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ae-fl-cols {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.ae-fl-col {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+.ae-fl-cross {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: color-mix(in srgb, var(--ae-text) 40%, transparent);
+  pointer-events: none;
+}
+.ae-fl-dot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--ae-surface);
+  box-sizing: border-box;
+  transform: translate(-50%, 50%);
+  pointer-events: none;
+}
+.ae-fl-dot--sm {
+  width: 8px;
+  height: 8px;
+  border-width: 1.5px;
+}
+.ae-fl-tip {
+  position: absolute;
+  top: 8px;
+  z-index: 3;
+  min-width: 160px;
+  padding: 8px 10px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text);
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  pointer-events: none;
+}
+.ae-fl-tip-title {
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+.ae-fl-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ae-fl-tip-row strong {
+  margin-left: auto;
+  padding-left: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.ae-fl-tip-empty {
+  color: var(--ae-text-muted);
+}
+.ae-fl-xaxis {
+  display: flex;
+  grid-row: 2;
+  grid-column: 2;
+}
+.ae-fl-xlabel {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-top: 6px;
+  overflow: visible;
+  font-size: calc(11px * var(--ae-fs, 1));
+  text-align: center;
+  white-space: nowrap;
+  color: var(--ae-text-muted);
+}
+.ae-fl-xlabel--current {
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-fl-split {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--ae-text) 9%, transparent);
+}
+.ae-fl-split-title {
+  margin: 0 0 10px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 700;
+}
+.ae-fl-split-title span {
+  margin-left: 6px;
+  font-size: calc(11px * var(--ae-fs, 1));
+  font-weight: 400;
+  color: var(--ae-text-muted);
+}
+.ae-donut {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px 28px;
+}
+.ae-donut-ring {
+  position: relative;
+  flex: none;
+  width: 132px;
+  height: 132px;
+}
+.ae-donut-ring svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.ae-donut-track,
+.ae-donut-arc {
+  fill: none;
+  stroke-width: 13;
+}
+.ae-donut-track {
+  stroke: color-mix(in srgb, var(--ae-text) 8%, transparent);
+}
+.ae-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
+}
+.ae-donut-center strong {
+  font-size: calc(18px * var(--ae-fs, 1));
+}
+.ae-donut-center span {
+  font-size: calc(11px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-donut-legend {
+  flex: 1 1 200px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: calc(13px * var(--ae-fs, 1));
+}
+.ae-donut-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+}
+.ae-donut-name {
+  flex: 1;
+}
+.ae-donut-legend strong {
+  font-variant-numeric: tabular-nums;
+}
+.ae-donut-pct {
+  min-width: 46px;
+  text-align: right;
+  color: var(--ae-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ae-fl-tip {
+    animation: ae-mm-tip-in var(--ae-dur-micro) var(--ae-ease-out);
+  }
+}
+

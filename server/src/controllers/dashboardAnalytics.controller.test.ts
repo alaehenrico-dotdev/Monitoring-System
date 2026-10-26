@@ -35,7 +35,9 @@ describe("getMonthlyOverviewHandler - the `year` query default", () => {
     vi.setSystemTime(new Date("2027-01-02T00:00:00.000Z"));
     await getMonthlyOverviewHandler({ query: {} } as unknown as Request, mockRes());
     expect(vi.mocked(getMonthlyOverview)).toHaveBeenLastCalledWith(2027);
-  });
+    // The first dynamic import is a cold module load (~1.5s alone, far more
+    // under a parallel full run), so it gets more than vitest's 5s default.
+  }, 30_000);
 
   it("still rejects a year more than one year in the future, using the CURRENT current year as the ceiling", async () => {
     vi.useFakeTimers();

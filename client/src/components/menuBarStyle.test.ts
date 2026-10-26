@@ -1,11 +1,12 @@
 import { readFileSync } from "node:fs";
+import { readAllCss } from "../test-utils/css";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // The menu-bar toolbar's style rules live in CSS, which jsdom does not apply, so
 // these guard the stylesheet and the components' source: the spec's rules about
 // tokens, targets and tiers must stay true as the code changes.
-const css = readFileSync(join(__dirname, "../index.css"), "utf8");
+const css = readAllCss(join(__dirname, "../index.css"));
 // Ends where the Classic Plus theme begins: later theme blocks restyle these
 // controls on purpose and are not part of the menu bar's own spec.
 const blockStart = css.indexOf("Menu-bar toolbar (components/EntryToolbar.tsx");

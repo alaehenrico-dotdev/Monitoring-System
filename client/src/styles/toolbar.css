@@ -1,0 +1,1591 @@
+/* =========================================================================
+   Toolbar
+   =========================================================================
+   Toolbar.tsx picks ONE tier (full / compact / circle) by measuring hidden
+   clones; this file only says what each tier looks like.
+
+   - full:    labeled controls.
+   - compact: labels disappear, controls tighten (.ae-toolbar--compact).
+   - circle:  smallest form, round icon buttons (.ae-toolbar--compact
+              .ae-toolbar--circle - both classes are present, circle rules
+              come last so they win).
+
+   Full and compact stay on one line. The circle tier (the smallest) wraps
+   onto a second row - filters first, actions below - rather than scrolling
+   sideways out of sight; see "Toolbar: steady resize, wrapping floor tier" at
+   the end of this file.
+
+   Layout is two groups on one row: the filter cluster (search / category /
+   date / shift) stays packed to its own content width on the LEFT, and the
+   action group (Save / Clear / PDF / Report / Import / History / Zoom) is
+   pushed to the opposite end via `margin-left: auto` on
+   .ae-toolbar-controls, so the two never drift together and the toolbar
+   reads as "inputs here, actions there" at a glance. Fixed widths are used
+   where a stable control size is needed, while the compact and circle
+   tiers still shrink and scroll when necessary.
+
+   Every width that matters for measuring is set with `!important` so a
+   page's inline width can't make the real row and the hidden measuring
+   clones disagree.
+
+   The border is a plain, static 1px gold line (no gradient overlay and no
+   hover state on it) so it is always visible in light and dark mode. The
+   only decoration.
+   ========================================================================= */
+
+.ae-toolbar {
+  --ae-toolbar-gap: 8px;
+
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: nowrap;
+  gap: var(--ae-toolbar-gap);
+  /* Professional command-bar look: a rounded rectangle (not a pill). Every
+     Toolbar lives inside the glass .ae-page-header, so its control colors
+     follow the light/dark glass tokens (--ae-tb-* in :root above). */
+  --tb-h: 34px;
+  --tb-radius: 4px;
+  --tb-field-bg: var(--ae-tb-field-bg);
+  --tb-field-bg-hover: var(--ae-tb-field-bg-hover);
+  --tb-hairline: var(--ae-tb-hairline);
+  --tb-text: var(--ae-tb-text);
+  --tb-text-muted: var(--ae-tb-text-muted);
+  padding: 3px 5px;
+  /* Pulls the strip 8px past the page padding on each side at every screen
+     size (the small-screen rules below used to widen this to -12/-16px). */
+  margin: 0 -8px 3px;
+  background: var(--ae-surface);
+  /* No outer border: it rendered as a gold line running the full width of
+     the row, under every filter and button alike. The nav-tab redesign
+     already marks each control individually (the underline on hover/focus
+     for filters and buttons, the hairline on search) - the container itself
+     stays borderless so it doesn't double up on that. */
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(12, 12, 12, 0.06);
+  position: relative;
+
+  /* Never let the page's column layout squash the toolbar. Pages render as
+     `.ae-main > div { display: flex; flex-direction: column; min-height: 0 }`,
+     so when the content below is taller than the viewport (a loaded Daily
+     Report) the column has negative free space and
+     shrinks whatever it can. Anything with overflow other than `visible`
+     (this row) is allowed to shrink to 0 height, so the toolbar collapsed and
+     clipped its controls. It must always keep its natural height. */
+  flex-shrink: 0;
+
+  /* Never wrap. Full and compact are measured to fit, so they simply clip;
+     only the floor tier can be genuinely too wide, and it scrolls (see
+     .ae-toolbar--circle). The scrollbar itself is always hidden: a 1px
+     overflow used to pop a scrollbar in and out, which changed the row's
+     height and made the whole toolbar glitch. */
+  overflow-x: hidden;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  transition:
+    gap 180ms ease,
+    padding 180ms ease;
+}
+.ae-toolbar--compact {
+  --ae-toolbar-gap: 6px;
+}
+.ae-toolbar--circle {
+  --ae-toolbar-gap: 4px;
+  /* Smaller floor-tier height applies to EVERY control (inputs, selects,
+     dates, buttons) so they stay the same size as each other. */
+  --tb-h: 30px;
+  /* Only tier that can be wider than the viewport. */
+  overflow-x: auto;
+}
+.ae-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Filter cluster (first child of the toolbar). It stays fitted to its
+   contents so the filters sit directly beside each other on the left end
+   of the row, leaving the action group (below) free to claim everything
+   else and sit flush against the right end. The :not() keeps this from
+   matching on a page whose first child is ToolbarControls. */
+.ae-toolbar > div:first-child:not(.ae-toolbar-controls) {
+  display: flex;
+  align-items: center;
+  gap: var(--ae-toolbar-gap);
+  /*
+     Keep the filter group sized to its actual contents.
+     The old `flex: 1` made this group consume every remaining pixel,
+     which created a large empty area between the last filter and the
+     action buttons. The controls now stay packed together, and the
+     leftover space is claimed by .ae-toolbar-controls' own auto margin
+     instead (see below).
+  */
+  flex: 0 1 auto;
+  min-width: 0;
+  width: fit-content;
+  max-width: 100%;
+  transition: gap 180ms ease;
+}
+/* Floor tier: keep the filter group at its content width so the toolbar
+   remains compact and can scroll naturally when the row is too wide. */
+.ae-toolbar--circle > div:first-child:not(.ae-toolbar-controls) {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: none;
+}
+
+/* ---- Filter cluster: packed together like the top nav tabs, not spaced
+   out as separate boxed fields. Tighter than the generic --ae-toolbar-gap
+   (which is shared with the button group, which still wants room), with a
+   thin "|" between each item instead of bare whitespace - the same
+   treatment .ae-header-tabs-divider gives its own groups. `:first-child`
+   (not `div:first-child`) also covers a page whose filter cluster is a
+   <form> (VarianceReportPage) rather than a <div>. */
+.ae-toolbar > :first-child:not(.ae-toolbar-controls) {
+  gap: 2px !important;
+}
+.ae-toolbar
+  > :first-child:not(.ae-toolbar-controls)
+  > *:not(:first-child)::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+  flex-shrink: 0;
+  background: var(--ae-glass-divider);
+}
+
+/* Action group (CSV / PDF / zoom ...): never shrinks, and is pushed to the
+   far right of the row by its own auto left-margin - this is the single
+   change that moves Save -> 100% to the right end of the toolbar instead
+   of trailing immediately after the last filter. */
+.ae-toolbar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--ae-toolbar-gap);
+  flex: 0 0 auto;
+  min-width: 0;
+  margin-left: auto;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  transition: gap 180ms ease;
+}
+
+/* Hairline between two control groups. */
+.ae-toolbar .ae-toolbar-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  min-width: 1px;
+  height: 22px;
+  background: var(--tb-hairline);
+}
+
+/* ---- Filters: nav-style - plain text, like the top nav tabs
+   (.ae-header-tab in this same file), instead of a boxed field. No fill,
+   no border, no chevron/lead icon on the trigger-style controls - the
+   label IS the control. Scoped to .ae-toolbar only: the same .ae-input /
+   .ae-select-trigger / .ae-date-trigger classes are still full boxed
+   fields everywhere else (modals, forms). The "essential" actions -
+   CSV/PDF/Import, Save, History, Clear/Undo - are .ae-btn / .ae-segment-btn,
+   untouched below, so they keep looking like real buttons.
+
+   Search, category, date and shift (the .ae-input / .ae-select-trigger /
+   .ae-date-trigger controls) are fully borderless here, at rest and on
+   hover/focus alike - no line is ever drawn beneath them, so they read as
+   plain nav-style labels with nothing under them. */
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  height: var(--tb-h);
+  padding: 0 10px;
+  border: none;
+  border-bottom: none;
+  border-radius: 0;
+  background-color: transparent;
+  /* Plain nav-label color (same token .ae-header-tab text uses) - NOT the
+     toolbar's themed gold .tb-text, which would make every filter look
+     "active" all the time. */
+  color: var(--ae-text);
+  font-size: calc(13.5px * var(--ae-fs, 1));
+  font-weight: 500;
+  box-shadow: none !important;
+  transition: color 150ms ease;
+}
+.ae-toolbar .ae-input:disabled {
+  background-color: transparent;
+  color: var(--ae-text-muted);
+  opacity: 0.55;
+}
+.ae-toolbar .ae-input::placeholder {
+  color: var(--ae-text-muted);
+}
+
+/* Leading icon inside a filter trigger (Dropdown's `icon` prop): only in
+   the full tier - the narrower tiers give the text every pixel. */
+.ae-select-trigger-lead {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-right: 7px;
+  color: var(--tb-text-muted, #a3a3a3);
+}
+.ae-select-trigger-lead svg {
+  width: 14px;
+  height: 14px;
+}
+.ae-select-trigger:has(.ae-select-trigger-lead) {
+  justify-content: flex-start;
+}
+.ae-select-trigger:has(.ae-select-trigger-lead) .ae-select-trigger-text {
+  flex: 1 1 auto;
+}
+/* Pure text, like a nav tab: inside the toolbar the search icon, every
+   dropdown's leading icon and the date icon are dropped so the control reads
+   as a label, not a field. The dropdown chevron stays (it is the only cue
+   that a label opens a list - without it the trigger looks like text with
+   blank space after it); only the smallest tier drops it, for room. */
+.ae-toolbar .ae-select-trigger-lead,
+.ae-toolbar .ae-date-trigger-icon {
+  display: none !important;
+}
+
+/* ---- Search: an icon until opened (SearchInput.tsx) ---------------------
+   The toggle is a plain icon button; the input behind it is zero-width while
+   closed (not display:none, so a click can still focus it) and takes the
+   tier's width below once .ae-search--open is on. */
+.ae-search {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.ae-search-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--tb-h, 34px);
+  height: var(--tb-h, 34px);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ae-text);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.ae-search-toggle:hover,
+.ae-search--open .ae-search-toggle {
+  color: var(--ae-glass-accent);
+}
+.ae-search-toggle:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: -2px;
+}
+.ae-search:not(.ae-search--open) input[type="search"] {
+  flex: 0 0 0 !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0;
+}
+.ae-search--open input[type="search"] {
+  animation: ae-search-open 160ms ease-out;
+}
+@keyframes ae-search-open {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-search--open input[type="search"] {
+    animation: none;
+  }
+}
+
+/* ---- Filters: sizing per tier ------------------------------------------ */
+/* full */
+.ae-toolbar .ae-search--open input[type="search"] {
+  flex: 0 1 280px;
+  width: 280px !important;
+  /* The search box is the elastic part of the full tier: it may shrink from
+     280px down to this before the toolbar drops to icons. The hidden
+     measuring clone (.ae-toolbar--sizer, below) sizes it at this same
+     minimum - measuring it at 280px made the toolbar demand room the
+     search box never actually needs, so labels turned into icons while
+     there was still plenty of space. */
+  min-width: 140px;
+}
+.ae-toolbar--sizer:not(.ae-toolbar--compact)
+  .ae-search--open
+  input[type="search"] {
+  flex-basis: 140px;
+  width: 140px !important;
+}
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger {
+  flex: 0 1 auto;
+}
+/* Tight controls: small gap between a label and its icon/chevron, and no
+   base min-width padding the dropdown/date triggers out with dead space
+   (full tier only - the compact/circle tiers set their own !important
+   min-widths below). */
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger {
+  gap: 4px;
+}
+.ae-toolbar .ae-select-trigger-lead {
+  margin-right: 4px;
+}
+.ae-toolbar:not(.ae-toolbar--compact) .ae-select-trigger,
+.ae-toolbar:not(.ae-toolbar--compact) .ae-date-trigger {
+  min-width: 0;
+}
+/* Search icon is hidden in the toolbar (nav-style, text-only) - override
+   the input's own inline padding-left (30px) that made room for it. */
+.ae-toolbar .ae-search--open input[type="search"] {
+  padding-left: 10px !important;
+}
+
+/* compact
+   flex / min-width / max-width are !important too: a page (or ZoomControl)
+   that sets them inline would otherwise make the real row and the hidden
+   measuring clone size the same control differently, and the row would end
+   up wider than what was measured. */
+.ae-toolbar--compact .ae-search--open input[type="search"] {
+  flex: 3 1 110px !important;
+  width: 110px !important;
+  min-width: 72px;
+}
+.ae-toolbar--compact .ae-select,
+.ae-toolbar--compact .ae-select-trigger {
+  flex: 1 1 88px !important;
+  width: 88px !important;
+  min-width: 64px !important;
+  max-width: 160px !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-toolbar--compact .ae-date-trigger {
+  flex: 1 1 110px !important;
+  width: 110px !important;
+  min-width: 96px !important;
+  max-width: 160px !important;
+}
+
+/* Content-sized dropdown (className "ae-fit"): a row of filters whose labels
+   are all short reads better packed to their text than stretched by the tier
+   rules above (which give every select a growable 88-160px box, leaving
+   blank space after the label and chevron). The extra class out-specifies
+   every tier rule, so it holds in full, compact and circle alike. */
+.ae-toolbar .ae-select-trigger.ae-fit,
+.ae-toolbar .ae-date-trigger.ae-fit {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  /* The divider line that follows is drawn by the next item's ::before, so
+     trimming this side's right padding is what pulls the line in towards
+     the arrow (it then has the item's full left padding as air before the
+     next label). */
+  padding-right: 3px !important;
+}
+
+/* circle */
+.ae-toolbar--circle .ae-search--open input[type="search"] {
+  flex: 3 1 72px !important;
+  width: 72px !important;
+  min-width: 56px;
+}
+.ae-toolbar--circle .ae-select,
+.ae-toolbar--circle .ae-select-trigger {
+  flex: 1 1 64px !important;
+  width: 64px !important;
+  min-width: 48px !important;
+  max-width: 120px !important;
+}
+.ae-toolbar--circle .ae-select-trigger-icon {
+  display: none;
+}
+.ae-toolbar--circle .ae-date-trigger {
+  flex: 1 1 84px !important;
+  width: 84px !important;
+  min-width: 68px !important;
+  max-width: 130px !important;
+}
+
+/* Zoom select (ZoomControl.tsx, className "ae-zoom-control").
+   It lives in ToolbarControls, which never shrinks, so it is sized to its
+   content (text plus the dropdown chevron) within a min/max band per tier
+   so it doesn't visibly jump as the text changes length (50% vs 200%). The
+   circle tier hides the chevron, hence its narrower band. These rules come
+   after the elastic filter selects with equal specificity, so they win in
+   every tier (circle last, so it beats compact). */
+.ae-toolbar .ae-zoom-control {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 68px !important;
+  max-width: 96px !important;
+}
+.ae-toolbar--compact .ae-zoom-control {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 60px !important;
+  max-width: 80px !important;
+}
+.ae-toolbar--circle .ae-zoom-control {
+  flex: 0 0 auto !important;
+  width: auto !important;
+  min-width: 44px !important;
+  max-width: 62px !important;
+}
+
+/* ---- Buttons: neutral by default, one yellow primary ------------------- */
+/* Every toolbar action is a quiet, icon-led button (dark fill, hairline
+   border) so the row reads as a tidy command bar instead of a strip of
+   yellow pills. The single most important action gets solid yellow:
+   .ae-toolbar-primary (Save) or a default-variant .ae-btn-primary
+   (Generate / Run report). Danger buttons keep their own look. */
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-group {
+  flex: 0 0 auto;
+}
+.ae-toolbar .ae-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: var(--tb-h);
+  padding: 0 var(--tb-pad-x);
+  border-radius: var(--tb-radius);
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ae-toolbar .ae-btn:not(.ae-btn-danger),
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-btn {
+  background: var(--tb-field-bg);
+  color: var(--tb-text);
+}
+.ae-toolbar .ae-btn:not(.ae-btn-danger),
+.ae-toolbar .ae-toolbar-save {
+  border-color: var(--tb-hairline);
+}
+.ae-toolbar .ae-btn:not(.ae-btn-danger):hover:not(:disabled),
+.ae-toolbar .ae-toolbar-save:hover:not(:disabled),
+.ae-toolbar .ae-segment-btn:hover:not(:disabled) {
+  /* No button-box hover effect. The label below gets the nav-style underline. */
+  background: transparent;
+  border-color: var(--tb-hairline);
+}
+.ae-toolbar .ae-btn:not(.ae-btn-danger):active:not(:disabled),
+.ae-toolbar .ae-toolbar-save:active:not(:disabled),
+.ae-toolbar .ae-segment-btn:active:not(:disabled) {
+  background: transparent;
+}
+.ae-toolbar .ae-btn:disabled,
+.ae-toolbar .ae-segment-btn:disabled {
+  opacity: 0.4;
+}
+.ae-toolbar .ae-btn:focus-visible,
+.ae-toolbar .ae-segment-btn:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: 2px;
+}
+
+/* Primary action: solid yellow. */
+.ae-toolbar .ae-toolbar-primary,
+.ae-toolbar .ae-btn-primary {
+  background: var(--ae-btn-yellow);
+  border-color: var(--ae-btn-yellow-active);
+  color: var(--ae-btn-yellow-text);
+}
+.ae-toolbar .ae-toolbar-primary:hover:not(:disabled),
+.ae-toolbar .ae-btn-primary:hover:not(:disabled) {
+  background: var(--ae-btn-yellow);
+  border-color: var(--ae-btn-yellow-active);
+}
+.ae-toolbar .ae-toolbar-primary:active:not(:disabled),
+.ae-toolbar .ae-btn-primary:active:not(:disabled) {
+  background: var(--ae-btn-yellow);
+}
+.ae-toolbar .ae-toolbar-primary:disabled {
+  opacity: 0.45;
+}
+
+/* Segmented group (e.g. Import | Export): one bordered control with hairline
+   dividers. Selector is .ae-toolbar-prefixed so it beats the generic
+   .ae-segment-group further down the file. */
+.ae-toolbar .ae-segment-group {
+  height: var(--tb-h);
+  background: var(--tb-field-bg);
+  border: 1px solid var(--tb-hairline);
+  border-radius: var(--tb-radius);
+  transition: gap 220ms ease;
+}
+.ae-toolbar .ae-segment-divider {
+  background: var(--tb-hairline);
+}
+.ae-toolbar .ae-segment-btn {
+  background: transparent;
+  padding: 0 var(--tb-pad-x);
+  gap: 4px;
+  font-weight: 600;
+}
+.ae-toolbar .ae-segment-btn:hover:not(:disabled) {
+  border-color: transparent;
+}
+
+/* Nav-tab-style toolbar hover: underline the TEXT only.
+   This matches the Offline Entry tab treatment: no filled hover box and no
+   yellow border around the whole button. The label itself gets a short
+   animated underline beneath its text. */
+.ae-toolbar .ae-toolbar-btn-label,
+.ae-toolbar .ae-segment-label {
+  position: relative;
+}
+
+.ae-toolbar .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-segment-label::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.2s ease;
+}
+
+/* Hover/focus comes from the parent button, while the line belongs only to
+   the text label. */
+.ae-toolbar .ae-btn:not(:disabled):hover .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-btn:not(:disabled):focus-visible .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-toolbar-save:not(:disabled):hover .ae-toolbar-btn-label::after,
+.ae-toolbar
+  .ae-toolbar-save:not(:disabled):focus-visible
+  .ae-toolbar-btn-label::after,
+.ae-toolbar .ae-segment-btn:not(:disabled):hover .ae-segment-label::after,
+.ae-toolbar
+  .ae-segment-btn:not(:disabled):focus-visible
+  .ae-segment-label::after {
+  transform: scaleX(1);
+}
+
+/* Button labels follow the toolbar tier (Toolbar.tsx): shown in the full tier
+   - a wide screen - and collapsed in the compact/circle tiers, where the
+   toolbar actions (Undo, Save, Clear, PDF, Report, Import, ...) are icon-only.
+   The title attribute on each button supplies the hover tooltip either way.
+   Which tier applies is measured, not a fixed breakpoint, so a label is only
+   shown when there is room for every one of them. */
+.ae-segment-label,
+.ae-toolbar-btn-label {
+  display: inline-block;
+  max-width: 160px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    max-width 220ms ease,
+    opacity 160ms ease;
+}
+.ae-toolbar--compact .ae-segment-label,
+.ae-toolbar--compact .ae-toolbar-btn-label {
+  max-width: 0;
+  opacity: 0;
+}
+
+/* Yellow on hover: every text-style control in the toolbar (category, row
+   filter, date, shift, the other filters and the plain text buttons) turns
+   the theme's gold accent while hovered, keyboard-focused or - for the
+   dropdown/date triggers - open. Solid-yellow primary buttons (Save) and
+   danger buttons keep their own look. The extra :not()s only raise
+   specificity above the base colors set earlier in this section. */
+.ae-toolbar .ae-select-trigger:hover:not(:disabled),
+.ae-toolbar .ae-select-trigger:focus-visible,
+.ae-toolbar .ae-select-trigger[aria-expanded="true"],
+.ae-toolbar .ae-date-trigger:hover:not(:disabled),
+.ae-toolbar .ae-date-trigger:focus-visible,
+.ae-toolbar .ae-date-trigger[aria-expanded="true"],
+.ae-toolbar
+  .ae-btn:not(.ae-btn-danger):not(.ae-btn-primary):not(.ae-toolbar-primary):not(
+    :disabled
+  ):hover,
+.ae-toolbar
+  .ae-btn:not(.ae-btn-danger):not(.ae-btn-primary):not(
+    .ae-toolbar-primary
+  ):focus-visible,
+.ae-toolbar .ae-toolbar-save:not(.ae-toolbar-primary):not(:disabled):hover,
+.ae-toolbar .ae-toolbar-save:not(.ae-toolbar-primary):focus-visible,
+.ae-toolbar .ae-segment-btn:not(:disabled):hover,
+.ae-toolbar .ae-segment-btn:focus-visible {
+  color: var(--ae-glass-accent);
+}
+
+/* ---- Icon-only buttons (every tier) ---------------------------------------- */
+.ae-toolbar .ae-segment-group {
+  background: transparent;
+  border-color: transparent;
+  gap: 4px;
+}
+.ae-toolbar .ae-segment-divider {
+  display: none;
+}
+.ae-toolbar .ae-segment-btn {
+  width: var(--tb-h);
+  height: var(--tb-h);
+  min-width: var(--tb-h);
+  padding: 0;
+  gap: 0;
+  border-radius: var(--tb-radius);
+  border: none;
+  background: var(--tb-field-bg);
+}
+.ae-toolbar .ae-btn {
+  min-width: var(--tb-h);
+  height: var(--tb-h);
+  padding: 0 var(--tb-pad-x);
+}
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+}
+.ae-toolbar .ae-toolbar-save {
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  height: var(--tb-h);
+  padding: 0;
+  border-radius: var(--tb-radius);
+}
+/* The gap: 0 above exists so an icon whose label collapsed to nothing stays
+   centered. A button whose text is NOT in a label span (e.g. "[icon] PDF")
+   keeps its text, so it needs its normal icon/text spacing back. */
+.ae-toolbar .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
+  gap: 4px;
+}
+
+/* ---- Circle: floor tier, fixed-size compact buttons ------------------- */
+.ae-toolbar--circle .ae-segment-group {
+  gap: 3px;
+}
+.ae-toolbar--circle .ae-segment-btn,
+.ae-toolbar--circle .ae-btn,
+.ae-toolbar--circle .ae-toolbar-save {
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  max-width: var(--tb-h);
+  height: var(--tb-h);
+  min-height: var(--tb-h);
+  max-height: var(--tb-h);
+  padding: 0;
+  border-radius: var(--tb-radius);
+  flex: 0 0 var(--tb-h);
+}
+
+/* A button with no collapsible label (plain text like "Generate", "Export
+   CSV", "Daily History", or "[icon] PDF" written without a
+   .ae-toolbar-btn-label span) has nothing to hide, so squeezing it into a
+   28px circle just clips its text. It stays a pill and only gets tighter.
+   Separate rule on purpose: a browser without :has() drops just this rule
+   and keeps the old behavior. */
+.ae-toolbar--circle
+  .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  height: var(--tb-h);
+  min-height: var(--tb-h);
+  max-height: var(--tb-h);
+  padding: 0 var(--tb-pad-x);
+  border-radius: var(--tb-radius);
+  flex: 0 0 auto;
+}
+
+/* ---- Consistency pass: every toolbar item shares one size system --------
+   Height, corner radius, border weight, font size, horizontal padding and
+   icon size all come from the same few values, in every tier, so search
+   boxes, dropdowns, date pickers, buttons, segmented groups and the zoom
+   select line up as one row instead of each carrying its own numbers.
+   (--tb-h is 34px, or 30px in the circle tier - see above.) Placed after
+   the tier rules on purpose so it wins over their older per-control
+   values. */
+.ae-toolbar {
+  --tb-pad-x: 8px;
+  --tb-font: 12.5px;
+  --tb-icon: 15px;
+}
+.ae-toolbar--circle {
+  --tb-pad-x: 7px;
+}
+.ae-toolbar .ae-input,
+.ae-toolbar .ae-select,
+.ae-toolbar .ae-select-trigger,
+.ae-toolbar .ae-date-trigger,
+.ae-toolbar .ae-btn,
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-group,
+.ae-toolbar .ae-segment-btn {
+  box-sizing: border-box;
+  height: var(--tb-h);
+  min-height: var(--tb-h);
+  max-height: var(--tb-h);
+  border-radius: var(--tb-radius);
+  font-family: inherit;
+  font-size: var(--tb-font);
+  line-height: 1;
+}
+/* Same 1px hairline border on every bordered control - buttons only. The
+   nav-style filters (.ae-input / .ae-select / .ae-select-trigger /
+   .ae-date-trigger, restyled above) deliberately use their own underline
+   treatment instead of a full border/radius box, so they're excluded here
+   on purpose (the segmented group's own border is dropped in
+   compact/circle, where each button carries one). */
+.ae-toolbar
+  .ae-btn:not(.ae-btn-danger):not(.ae-toolbar-primary):not(.ae-btn-primary):not(
+    :has(.ae-toolbar-btn-label)
+  ),
+.ae-toolbar
+  .ae-toolbar-save:not(.ae-toolbar-primary):not(:has(.ae-toolbar-btn-label)) {
+  border-width: 1px;
+  border-style: solid;
+}
+/* A button whose text carries the nav-tab-style underline (::after on
+   .ae-toolbar-btn-label) reads as a plain label, not a boxed control - no
+   border at all, same treatment as the dropdown/date filters above. Higher
+   specificity than the border-color rule further up, so it wins regardless
+   of source order. */
+.ae-toolbar .ae-btn:not(.ae-btn-danger):has(.ae-toolbar-btn-label),
+.ae-toolbar .ae-toolbar-save:has(.ae-toolbar-btn-label) {
+  border: none;
+}
+.ae-toolbar .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save),
+.ae-toolbar .ae-segment-btn {
+  padding-left: var(--tb-pad-x);
+  padding-right: var(--tb-pad-x);
+}
+/* Icon-only buttons (label collapsed away) are perfect squares. */
+.ae-toolbar .ae-btn:has(.ae-toolbar-btn-label),
+.ae-toolbar .ae-toolbar-save,
+.ae-toolbar .ae-segment-btn {
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  max-width: var(--tb-h);
+  padding-left: 0;
+  padding-right: 0;
+}
+/* A button that is only an icon (e.g. Undo) is a square at every tier. */
+.ae-toolbar .ae-btn.ae-toolbar-icon-btn {
+  width: var(--tb-h);
+  min-width: var(--tb-h);
+  max-width: var(--tb-h);
+  padding-left: 0;
+  padding-right: 0;
+  flex: 0 0 var(--tb-h);
+}
+/* Expand/collapse-all categories and Arrange product order: a bare icon, no border or box. */
+.ae-toolbar .ae-btn.ae-toolbar-collapse-btn,
+.ae-toolbar .ae-btn.ae-toolbar-collapse-btn:hover:not(:disabled),
+.ae-toolbar .ae-btn.ae-toolbar-collapse-btn:active:not(:disabled) {
+  /* !important: the generic "1px solid on every icon-only toolbar button"
+     rule above uses stacked :not()/:has() selectors that out-rank this one. */
+  border: none !important;
+  box-shadow: none;
+  background: transparent;
+}
+/* One icon size across buttons and dropdown/date leading icons. */
+.ae-toolbar .ae-btn svg,
+.ae-toolbar .ae-toolbar-save svg,
+.ae-toolbar .ae-segment-btn svg,
+.ae-toolbar .ae-select-trigger-lead svg,
+.ae-toolbar .ae-date-trigger-icon svg {
+  width: var(--tb-icon);
+  height: var(--tb-icon);
+  flex-shrink: 0;
+}
+/* Zoom select follows the same height as everything else. */
+.ae-toolbar .ae-zoom-control {
+  height: var(--tb-h) !important;
+}
+
+/* Toolbar entries always remain a single horizontal strip. */
+.ae-toolbar-entry {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.ae-toolbar-entry::-webkit-scrollbar {
+  display: none;
+}
+.ae-toolbar-entry .ae-toolbar-controls {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.ae-sidebar-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ae-sidebar-nav::-webkit-scrollbar {
+  display: none;
+}
+/* Header tab row (HeaderTabs.tsx) - Office-style text tabs in a strip on
+   top of the header card, outside it, sitting directly on the page
+   background (so text uses the page text color, not the glass card's).
+   Side/top margins mirror .ae-page-header's so the strip spans the same
+   width; the card below loses its own top margin (sibling rule below).
+   Plain text, no boxes and no hover/active background: the
+   label color never changes, only a thin gold line under the tab shows the
+   active page (and hover/keyboard focus). Overflows sideways (scrollbar
+   hidden) instead of wrapping. */
+.ae-header-tabs {
+  position: relative;
+  display: flex;
+  /* Pages are column flex containers (.ae-main > div) with min-height: 0,
+     and this strip clips its overflow, so without this it gets squeezed
+     whenever the page content is taller than the viewport (Dashboard). */
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  /* Top margin cancels .ae-main's whole top padding (24px; 16px / 12px at the
+     breakpoints below) so the strip sits flush with the top edge. */
+  margin: -24px -18px -5px;
+  /* Breathing room above and below the tab labels. Top: 8px + the tab's own 3px
+     = 11px from the screen edge. Bottom: 10px + the tab's own 6px, minus the 5px
+     the card tucks up under the strip (see the margin above) = 11px to the
+     card, so the labels sit evenly between the two. */
+  padding: 8px 14px 10px 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ae-header-tabs::-webkit-scrollbar {
+  display: none;
+}
+.ae-header-tabs-group {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 2px;
+}
+.ae-header-tabs-divider {
+  width: 1px;
+  height: 14px;
+  margin: 0 4px;
+  background: var(--ae-glass-divider);
+  flex-shrink: 0;
+}
+.ae-header-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 3px 10px 6px;
+  text-decoration: none;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: calc(13.5px * var(--ae-fs, 1));
+  font-weight: 500;
+  color: var(--ae-text);
+  background: none;
+  outline: none;
+}
+/* The gold line under a tab - the only state indicator. */
+.ae-header-tab::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  transform: scaleX(0);
+  transition: transform 0.2s ease;
+}
+/* Card directly under the strip: the strip already took the negative top
+   margin that pulls the pair to the page's top edge. */
+.ae-header-tabs + .ae-page-header {
+  margin-top: 0;
+}
+.ae-header-tab:hover::after,
+.ae-header-tab:focus-visible::after {
+  transform: scaleX(1);
+}
+/* The active tab's line is the sliding .ae-header-tabs-bar (HeaderTabs.tsx),
+   so the per-tab line is off there to avoid drawing two on top of each other. */
+.ae-header-tab[aria-current="page"]::after {
+  display: none;
+}
+/* The elastic active-tab underline: positioned (translateX + width) by
+   HeaderTabs.tsx with springs on each edge independently. */
+.ae-header-tabs-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 2px;
+  width: 0;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  /* A soft yellow glow - two faint layers, so it reads as a lit line rather than
+     a neon tube. (.ae-header-tabs keeps spare padding below for it: that strip
+     clips vertical overflow.) */
+  box-shadow:
+    0 0 5px rgba(245, 192, 0, 0.5),
+    0 0 12px rgba(245, 192, 0, 0.22);
+  opacity: 0;
+  pointer-events: none;
+  will-change: transform, width;
+}
+
+.ae-segment-group {
+  display: flex;
+  align-items: stretch;
+  height: 32px;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 6px;
+  background: var(--ae-surface);
+  overflow: hidden;
+}
+.ae-segment-divider {
+  width: 1px;
+  background: var(--ae-border);
+}
+.ae-segment-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  color: var(--ae-text);
+  font-family: inherit;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  padding: 0 12px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    gap 220ms ease,
+    width 220ms ease,
+    height 220ms ease,
+    padding 220ms ease,
+    border-radius 220ms ease;
+}
+.ae-segment-btn:hover:not(:disabled) {
+  background: var(--ae-surface-hover);
+}
+.ae-segment-btn:active:not(:disabled) {
+  background: var(--ae-border);
+}
+.ae-segment-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* App-wide default background: the page color with the Glossy Black Ala Eh!
+   emblem (public/Glossy Black Ala Eh! Emblem.png) as a large, centered, fixed
+   watermark. It is a pseudo-element behind everything (the cards, tables and
+   inputs are opaque and simply cover it, so it only shows in the gaps between
+   them and through the glass header/nav drawer) - it never affects layout or
+   clicks.
+   The source picture is an opaque black square, so it is NOT drawn as-is. Two
+   transparent copies are made from it (src/assets/emblem-wm-*.webp: brightness
+   turned into transparency, the black backdrop removed): a pale one for dark mode
+   and an ink one for light mode. The watermark is then a plain image at low
+   opacity. (It used mix-blend-mode and a filter instead, but a blend layer under
+   the header's backdrop-filter glass left a hard, flickering seam across the
+   header in Chromium.) The opacity is tuned per theme. */
+.app-shell {
+  position: relative;
+  background: var(--ae-bg);
+  --ae-watermark-opacity: 0.12;
+  --ae-watermark-size: min(78vmin, 760px);
+}
+:root[data-theme="dark"] .app-shell {
+  --ae-watermark-opacity: 0.3;
+}
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: url("./assets/emblem-wm-ink.webp") center / var(--ae-watermark-size) no-repeat;
+  opacity: var(--ae-watermark-opacity);
+}
+:root[data-theme="dark"] .app-shell::before {
+  background-image: url("./assets/emblem-wm-white.webp");
+}
+.ae-main {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  /* No top padding: the pinned header (.ae-sticky-head) sits flush with the
+     pane's top edge. A scroll container's padding is NOT part of where a sticky
+     child pins, so top padding here left a 24px gap above the header whenever
+     it was stuck. */
+  padding: 0 24px 24px;
+  display: flex;
+  flex-direction: column;
+}
+.ae-main h2 {
+  margin: -8px 0 0;
+}
+.ae-main p {
+  margin: 0 0 8px;
+}
+.ae-main > div,
+.ae-grid-fill {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* A page whose body is not a bounded scroller (a direct .ae-table-scroll or
+   .ae-grid-fill child) - admin pages, reports, settings, forms - scrolls
+   .ae-main itself. Its root must then be as tall as its content; otherwise the
+   sticky header below is only "stuck" within a box one screen tall, and
+   scrolls away with that box. Table pages keep the bounded height above: their
+   .ae-table-scroll does the scrolling, so their header never moves. */
+.ae-main > div:not(:has(> .ae-table-scroll, > .ae-grid-fill)) {
+  flex: 1 0 auto;
+}
+
+/* Tab strip + header card, pinned to the top of the scrolling pane on every
+   page. The pane has no top padding, so the pair sits flush with the top edge
+   at rest and pins at top: 0 with no jump or gap. The side margins (-18px,
+   -10px, -6px) eat most of the pane's side padding; they live here rather
+   than on the two children so the pair moves as one. */
+.ae-sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  /* The page root is a column flex box; never let the pair be squeezed. */
+  flex-shrink: 0;
+  margin: 0 -18px 8px;
+}
+.ae-sticky-head > .ae-header-tabs {
+  /* -5px: the room under the strip for the active line's glow, given back so
+     the card sits where it always did. */
+  margin: 0 0 -5px;
+  /* Page content scrolls underneath, so the strip needs a body of its own. */
+  background: color-mix(in srgb, var(--ae-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+.ae-sticky-head > .ae-page-header {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------------
+   Page header card - bundles the h2/p intro and the Toolbar into one
+   fixed-black, gold-bordered card, matching the design mockup, instead of
+   plain page-background text sitting above a separately-bordered toolbar
+   strip. Fixed black rather than theme-following, same as the nav drawer -
+   see theme.ts's note on brand surfaces staying constant across the
+   light/dark toggle. Now also the app's main container for controls and
+   navigation - the sidebar itself is just this card's floating nav drawer
+   (Sidebar.tsx), opened via the logo button below.
+
+   Pulled close against .ae-main's own 24px padding (negative margin eating
+   most of it) on the top/left/right, down to a narrow 6px gap - just
+   enough that the border/rounded corners still read as a card instead of
+   sitting flush against the viewport edges. `position: relative` anchors
+   HeaderExtras (the clock/theme toggle), which every page now renders as
+   this card's own top-right corner ornament instead of a toolbar control.
+   ------------------------------------------------------------------------ */
+.ae-page-header {
+  position: relative;
+  /* Glass, same recipe as the nav drawer (Sidebar.tsx): translucent tinted
+     fill + blur, themed via --ae-glass-* so light mode is frosted cream
+     instead of a dark slab. The diagonal sheen is a background layer (not
+     an overlay) so it never washes out the text. */
+  background: var(--ae-glass-sheen), var(--ae-glass-bg);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+  color: var(--ae-glass-text);
+  border: none;
+  border-radius: 6px;
+  /* The bottom padding is the collapse ribbon's own strip (it is 18px tall and
+     sits on the bottom edge), so it never covers the toolbar's buttons. */
+  padding: 9px 14px 10px;
+  /* One duration + one curve for everything that moves when the header
+     collapses/expands (height, padding, logo size, title spacing, fades), so
+     the pieces read as a single motion. Ease-out with a long tail: fast
+     start, gentle settle - much less abrupt than the default `ease`. */
+  --ae-collapse-dur: 200ms;
+  --ae-collapse-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  transition:
+    padding var(--ae-collapse-dur) var(--ae-collapse-ease),
+    box-shadow 250ms ease;
+  margin: -18px -18px 8px;
+  /* Same all-around gold glow as the sidebar's own collapsed-icon state
+     (Sidebar.tsx's boxShadow) - a soft drop shadow plus two rings of the
+     brand yellow bleeding outward, so the card reads as the same kind of
+     glowing chrome instead of a flat bordered box. */
+  box-shadow: var(--ae-glass-shadow);
+}
+/* Server unreachable / Wi-Fi down (see useServerReachable): the header's
+   border turns red until the connection comes back. */
+.ae-page-header.ae-page-header--offline {
+  border-color: var(--ae-danger-text);
+  box-shadow:
+    var(--ae-glass-shadow),
+    0 0 0 1px var(--ae-danger-text);
+}
+/* Classic only: a faint gold wash that fades across the header, strongest at
+   the logo end. It is one extra layer on top of the glass fill and sheen, so
+   the blur, glow and text colors are untouched, and every other UI style
+   (which sets its own header background) never matches. The strength is a
+   token because the same alpha reads far stronger on the cream header than on
+   the charcoal one. */
+:root[data-ui="classic"] {
+  --ae-header-wash: rgba(212, 160, 0, 0.14);
+}
+:root[data-ui="classic"][data-theme="dark"] {
+  --ae-header-wash: rgba(245, 192, 0, 0.1);
+}
+:root[data-ui="classic"] .ae-page-header {
+  background:
+    linear-gradient(105deg, var(--ae-header-wash), transparent 62%),
+    var(--ae-glass-sheen),
+    var(--ae-glass-bg);
+}
+/* Nothing sits below the title once collapsed - drop its own bottom
+   margin, since the toolbar row (still present for the collapse button
+   alone) already carries its own top spacing. */
+.ae-page-header--collapsed h2 {
+  margin-bottom: 0;
+}
+/* Simple grid-rows trick for animating to/from an unknown content height:
+   the wrapper's single track eases between 1fr (natural height) and 0fr,
+   and the inner element clips to whatever that track resolves to each
+   frame. Opacity fades alongside so the subtitle/toolbar don't just get
+   sheared off mid-collapse. */
+.ae-page-header-collapsible {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--ae-collapse-dur) var(--ae-collapse-ease);
+}
+.ae-page-header--collapsed .ae-page-header-collapsible {
+  grid-template-rows: 0fr;
+}
+.ae-page-header-collapsible-inner {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 1;
+  /* Expanding: wait a beat so the space has started opening, then fade in.
+     Collapsing (rule below): fade out fast, before the row squeezes away, so
+     text is never seen being crushed. */
+  transition: opacity 160ms ease-out;
+}
+.ae-page-header--collapsed .ae-page-header-collapsible-inner {
+  opacity: 0;
+  transition: opacity 100ms ease-out;
+}
+/* The toolbar sits in the titles column, directly under the h2 (where the
+   subtitle used to be) and beside the logo. The side margin lives on this
+   wrapper, not the toolbar, because the inner element clips (overflow:
+   hidden) and would cut off a toolbar that overhangs it. */
+.ae-page-header-collapsible--toolbar {
+  /* -7px left: the first menu (Sheet/File) carries 7px of left inset (see the
+     .ae-mb-trigger rule: 6px padding + 1px border), so its box starts 7px left
+     of the h2 and its first LETTER lands exactly under the h2's first letter. The
+     strip's own left padding is dropped below so it stops at the logo's gap
+     instead of running behind the logo. */
+  margin: 0 -8px 0 -7px;
+}
+/* Beats `.ae-page-header .ae-toolbar` (padding: 2px 5px) further down. */
+.ae-page-header .ae-page-header-toolbar-slot .ae-toolbar {
+  padding-left: 0;
+}
+.ae-page-header-toolbar-slot {
+  min-width: 0;
+  /* Padding (not a margin) so it collapses away with the row. */
+  padding-top: 0;
+}
+/* Bottom-center collapse ribbon - a bare white chevron sitting just above
+   the header's bottom edge (no circle, no fill, no glow). Hidden until the
+   header itself is hovered, then fades and nudges into view; stays
+   reachable by keyboard (button :focus-visible) even without a pointer.
+   Rendered as a direct child of .ae-page-header (not the toolbar row) so it
+   always has a fixed spot regardless of collapsed state - the collapsed
+   header (title row alone) can still be hovered to bring it back, since
+   there'd otherwise be no way to expand again. */
+.ae-page-header-collapse-btn {
+  position: absolute;
+  /* --ae-ribbon-x is set by PageHeader's mousemove handler so the ribbon
+     tracks the cursor; falls back to center (e.g. keyboard focus). */
+  left: var(--ae-ribbon-x, 50%);
+  bottom: 0;
+  transform: translate(-50%, 3px);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease,
+    left 80ms ease-out,
+    color 120ms ease;
+}
+/* Hover only (plus keyboard focus on the button itself). No :focus-within on
+   the card: clicking the button, the logo, or typing in a toolbar field kept
+   focus inside the header and pinned the button visible after the mouse left. */
+.ae-page-header:hover .ae-page-header-collapse-btn,
+.ae-page-header-collapse-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+  z-index: 2;
+}
+.ae-page-header-collapse-btn:hover {
+  color: #f5c000;
+}
+.ae-page-header-collapse-btn:focus-visible {
+  outline: 1px solid #f5c000;
+  outline-offset: -1px;
+}
+.ae-page-header-collapse-btn svg {
+  width: 20px;
+  height: 20px;
+  transform: rotate(180deg);
+  transition: transform var(--ae-collapse-dur) var(--ae-collapse-ease);
+}
+.ae-page-header--collapsed .ae-page-header-collapse-btn svg {
+  transform: rotate(0deg);
+}
+/* Top row: the clickable brand logo (opens the floating nav drawer - see
+   PageHeader.tsx/NavDrawerContext) beside the title/subtitle column,
+   instead of the logo living in the sidebar itself - the header is the
+   main container for controls/navigation now, the sidebar is purely the
+   drawer's own content. `align-items: flex-start` keeps the logo pinned
+   to the title line rather than centered against the whole column when a
+   Toolbar underneath makes it tall. */
+.ae-page-header-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.ae-page-header-titles {
+  min-width: 0;
+  flex: 1;
+  /* Stretches to the top row's height and centers its content in it. While
+     expanded the column is as tall as the row, so this changes nothing; once
+     the subtitle has collapsed and the logo is the taller item, the title
+     sits centered against it. Doing the centering here (instead of flipping
+     the row's `align-items` from flex-start to center on collapse) means the
+     title glides there continuously as the sizes change, rather than
+     snapping a couple of pixels on the first frame. */
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  /* Top-aligned when expanded so the header lays out exactly as it always
+     has (a one-line subtitle on a narrow screen leaves this column a hair
+     shorter than the logo, and centering would nudge the title down).
+     Switching to `center` when collapsing happens while the column still
+     fills the row, so it's invisible; only the title's final resting spot
+     against the smaller logo is different. */
+  justify-content: flex-start;
+}
+.ae-page-header--collapsed .ae-page-header-titles {
+  justify-content: center;
+}
+
+.ae-page-header-logo {
+  flex-shrink: 0;
+  display: flex;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+/* Same hover scale + glow the logo had inside the sidebar itself. */
+.ae-page-header-logo .ae-logo-mark {
+  display: block;
+  overflow: visible;
+  transition:
+    transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.25s ease,
+    width var(--ae-collapse-dur) var(--ae-collapse-ease),
+    height var(--ae-collapse-dur) var(--ae-collapse-ease);
+}
+.ae-page-header-logo:hover .ae-logo-mark,
+.ae-page-header-logo:focus-visible .ae-logo-mark {
+  transform: scale(1.06);
+  filter: drop-shadow(0 0 6px rgba(201, 154, 46, 0.6));
+}
+.ae-page-header-logo:active .ae-logo-mark {
+  transform: scale(0.93);
+}
+.ae-page-header h2 {
+  margin: 0 0 3px;
+  transition: margin var(--ae-collapse-dur) var(--ae-collapse-ease);
+  color: var(--ae-glass-text);
+  font-family: var(--ae-font-body);
+}
+/* Collapsed: the logo is smaller, so center the title against it and trim
+   the card's vertical padding. (Compound selector so it beats the plain
+   `.ae-page-header h2` margin above.) */
+.ae-page-header.ae-page-header--collapsed {
+  padding-top: 8px;
+  /* Still holds the ribbon's strip, so the toggle never sits on the title. */
+  padding-bottom: 10px;
+}
+.ae-page-header.ae-page-header--collapsed h2 {
+  margin: 0;
+}
+/* A header with no toolbar has nothing to collapse, so it starts out as the
+   compact card (the collapsed rules apply to it too) and drops the toggle
+   and the strip under the title that held it. Title a touch smaller. */
+.ae-page-header.ae-page-header--bare {
+  padding-bottom: 8px;
+}
+.ae-page-header--bare .ae-page-header-collapse-btn {
+  display: none;
+}
+.ae-page-header.ae-page-header--bare h2 {
+  font-size: clamp(0.95rem, 0.75rem + 0.9vw, 1.25rem);
+}
+/* Title row: h2 on the left, clock + theme toggle on the right, both
+   vertically centered on the same line. The h2's 3px bottom margin moves
+   to the row so it doesn't skew the centering. The extras' negative block
+   margin keeps a toggle taller than the h2 from pushing the subtitle down. */
+.ae-page-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 3px;
+  transition: margin var(--ae-collapse-dur) var(--ae-collapse-ease);
+}
+.ae-page-header .ae-page-header-title-row h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.ae-page-header-title-row .ae-page-header-extras {
+  margin-block: -6px;
+}
+.ae-page-header.ae-page-header--collapsed .ae-page-header-title-row {
+  margin-bottom: 0;
+}
+.ae-page-header p {
+  margin: 0 0 2px;
+  color: var(--ae-glass-text-muted);
+  font-family: var(--ae-font-body);
+}
+/* The toolbar's own pill background/border/shadow would double up on the
+   card's - strip them so its controls sit directly on the card instead.
+   Padding/gap trimmed further than the pill's own default so the row
+   reads as fitted to the card rather than floating with its usual
+   free-standing breathing room. */
+.ae-page-header .ae-toolbar {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  margin: 0;
+  padding: 2px 5px;
+  --ae-toolbar-gap: 8px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-page-header {
+    --ae-collapse-dur: 1ms;
+  }
+  .ae-page-header-collapsible-inner,
+  .ae-page-header--collapsed .ae-page-header-collapsible-inner {
+    transition-duration: 1ms;
+    transition-delay: 0ms;
+  }
+}
+/* Small screens only adjust page padding / edge-to-edge margins. Toolbar
+   gap, padding and control sizes are owned by the tier classes above - the
+   old per-breakpoint overrides here (a fixed 72px search box, a 10px gap)
+   were what left blank space on narrow widths. */
+@media (max-width: 900px) {
+  .ae-main {
+    padding: 0 16px 16px;
+  }
+  .ae-table-scroll {
+    margin: 0 calc(-10px / var(--ae-zoom, 1)) calc(-10px / var(--ae-zoom, 1));
+  }
+  /* .ae-page-header's own -18px margin assumes .ae-main's default 24px
+     padding (see its own comment) - rescale to this breakpoint's 16px so
+     the card keeps the same narrow 6px gap instead of overshooting past
+     the viewport edge. */
+  .ae-page-header {
+    margin: -10px -10px 8px;
+  }
+  .ae-header-tabs {
+    margin: -16px -10px -5px;
+  }
+  .ae-sticky-head {
+    margin: 0 -10px 8px;
+  }
+  .ae-header-tabs + .ae-page-header {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 520px) {
+  .ae-main {
+    padding: 0 12px 12px;
+  }
+  .ae-table-scroll {
+    margin: 0 calc(-6px / var(--ae-zoom, 1)) calc(-6px / var(--ae-zoom, 1));
+  }
+  .ae-page-header {
+    margin: -6px -6px 8px;
+  }
+  .ae-header-tabs {
+    margin: -12px -6px -5px;
+  }
+  .ae-sticky-head {
+    margin: 0 -6px 8px;
+  }
+  .ae-header-tabs + .ae-page-header {
+    margin-top: 0;
+  }
+}
+
+/* ------------------------------------------------------------------------
+   Mobile tier - phone-width layout/sizing tweaks (the nav drawer itself
+   already behaves identically at every width, see Sidebar.tsx).
+   ------------------------------------------------------------------------ */
+@media (max-width: 768px) {
+  /* The live clock is a nice-to-have on a desk monitor, not on a phone
+     screen already short on width - the theme toggle alone is enough
+     persistent chrome there. */
+  .ae-live-clock {
+    display: none;
+  }
+
+  /* Page titles and subtitles: every page follows the same <h2>/<p> intro
+     pattern (see DashboardPage, etc.), so sizing them down here covers all
+     of them at once rather than per-page. */
+  .ae-main h2 {
+    font-size: calc(19px * var(--ae-fs, 1));
+    line-height: 1.25;
+  }
+  .ae-main p {
+    font-size: calc(13px * var(--ae-fs, 1));
+    line-height: 1.4;
+  }
+
+  /* Dashboard stat tiles: the 2x2 grid still happily fits 2 narrow tiles
+     per row down to ~420px, which on a phone reads as cramped half-width
+     cards with truncated labels - one full-width column reads far better
+     at this size. */
+  .ae-dash-stat-value {
+    font-size: calc(26px * var(--ae-fs, 1));
+  }
+}
+
+/* A collapsed category (StockGrid, TotalStocksTable, ManualCountPage) hides
+   its product rows on
+   screen but should still print/PDF in full - a printed grid missing
+   whatever happened to be collapsed at the time would be a silent data gap,
+   not just a display convenience. See the print override below.
+
+   `visibility: collapse`, not `display: none` - both remove the row from
+   view and from the tab order, but `display: none` also removes it from
+   the table's own column-width calculation, so collapsing a category could
+   change which cell is now the widest in a column and visibly shift every
+   header (and every other column's numbers) sideways. `visibility: collapse`
+   still counts a hidden row's content toward that calculation, so column
+   widths always match how the table looks fully expanded, collapsed or not.
+
+   Collapsing a category just removes its rows from the table layout - no
+   transition, no per-row animation delay. */
+.ae-cat-row.ae-row-collapsed {
+  visibility: collapse;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  /* A collapsed category should still print/PDF in full - a printed grid
+     missing whatever happened to be collapsed on screen at the time would be
+     a silent data gap, not just a display convenience. */
+  .ae-cat-row.ae-row-collapsed {
+    visibility: visible !important;
+  }
+
+  /* Sticky identity columns are a screen-scrolling affordance; on paper they
+     would only paint a frosted panel over the printed grid. */
+  .ae-table--sticky-id .ae-sticky-sku,
+  .ae-table--sticky-id .ae-sticky-name,
+  .ae-table--sticky-id .ae-sticky-subtotal {
+    position: static !important;
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  body,
+  main {
+    background: #fff !important;
+  }
+
+  .app-shell::before {
+    display: none !important;
+  }
+
+  .app-shell {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  main {
+    height: auto !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .table-scroll,
+  .ae-table-wrap {
+    overflow: visible !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+  }
+}
+

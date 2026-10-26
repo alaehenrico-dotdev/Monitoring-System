@@ -1,10 +1,10 @@
-import { readFileSync } from "node:fs";
+import { readAllCss } from "./test-utils/css";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // The interaction baseline lives in CSS, which jsdom does not apply, so this is a
 // guard on the stylesheet itself: the rules every control inherits must stay.
-const css = readFileSync(join(__dirname, "index.css"), "utf8");
+const css = readAllCss(join(__dirname, "index.css"));
 const block = css.slice(css.indexOf("Interaction baseline"));
 
 describe("interaction baseline (index.css)", () => {

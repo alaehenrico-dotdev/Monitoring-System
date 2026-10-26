@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { ApiError } from "../api/http";
 import { downloadDatabaseBackup, restoreDatabaseBackup, validateBackupFile, type BackupReport } from "../api/backup";
 import { verifyResetPasscode } from "../api/dataReset";
@@ -59,6 +59,26 @@ export function DatabaseRestoreCard() {
     | null
   >(null);
   const checkId = useRef(0);
+  // After a restore finishes (either way) the controls fade out, then the
+  // card resets to its initial locked state and fades back in.
+  const [leaving, setLeaving] = useState(false);
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach(window.clearTimeout), []);
+  function returnToInitial() {
+    timers.current.forEach(window.clearTimeout);
+    timers.current = [
+      window.setTimeout(() => setLeaving(true), 1200),
+      window.setTimeout(() => {
+        checkId.current++;
+        setFile(null);
+        setCheck(null);
+        setResetToken(null);
+        setPasscode("");
+        setPasscodeError(null);
+        setLeaving(false);
+      }, 1600),
+    ];
+  }
   const fileOk = check?.state === "done" && check.report.ok;
 
   function chooseFile(next: File | null) {
@@ -123,6 +143,7 @@ export function DatabaseRestoreCard() {
       // Browser-local cache of pre-restore staged edits (see DataResetPage).
       clearAllPendingEntryState();
       setStatus("done");
+      returnToInitial();
     } catch (err) {
       if (err instanceof ApiError && (err.status === 401 || err.status === 403))
         setResetToken(null);
@@ -130,8 +151,11 @@ export function DatabaseRestoreCard() {
         err instanceof Error ? err.message : "Failed to restore backup.",
       );
       setStatus("error");
+      returnToInitial();
     }
   }
+
+  const stage = !resetToken ? "lock" : file ? "restore" : "choose";
 
   return (
     <div style={{ padding: "14px 18px" }}>
@@ -157,6 +181,11 @@ export function DatabaseRestoreCard() {
 
         {/* One slot, one control at a time: passcode field (Enter to
             unlock) -> Choose file -> Restore. All three share one size. */}
+        <div
+          key={stage}
+          className={leaving ? "ae-fade-out" : "ae-fade-in"}
+          style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}
+        >
         {!resetToken ? (
           <form onSubmit={handleUnlock} style={{ display: "flex" }}>
             <input
@@ -228,8 +257,10 @@ export function DatabaseRestoreCard() {
             )}
           </>
         )}
+        </div>
       </div>
 
+      <div className={leaving ? "ae-fade-out" : undefined}>
       {resetToken && file && (
         <div
           title="Click to choose a different file"
@@ -284,6 +315,7 @@ export function DatabaseRestoreCard() {
           )}
         </div>
       )}
+      </div>
       {!resetToken && passcodeError && (
         <div style={{ marginTop: 8, fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.danger }}>
           {passcodeError}

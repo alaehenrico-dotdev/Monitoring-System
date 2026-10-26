@@ -1,0 +1,155 @@
+/* =========================================================================
+   Glassmorphism theme (Settings > Appearance > Theme). Frosted translucent
+   panes floating over a vivid, blurred background of brand gold, red and green
+   light. Panels, the header, tabs, buttons, fields and dialogs are all
+   semi-transparent with a backdrop blur, a bright hairline edge and a soft
+   shadow. Grid cells stay opaque (sticky columns must hide what scrolls under
+   them), so the frosting is on the frames around them. Scoped to
+   :root[data-ui="glass"].
+   ========================================================================= */
+:root[data-ui="glass"] {
+  --ae-glass-blur: blur(20px) saturate(160%);
+  --ae-gl-edge: rgba(255, 255, 255, 0.65);
+  --ae-gl-shadow: 0 8px 32px rgba(90, 60, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+:root[data-ui="glass"]:not([data-theme="dark"]) {
+  --ae-bg: #f3e9cf;
+  --ae-surface-glass: rgba(255, 255, 255, 0.55);
+  --ae-header-glass: rgba(255, 250, 235, 0.62);
+  --ae-glass-bg: rgba(255, 255, 255, 0.42);
+  --ae-border: rgba(120, 90, 20, 0.22);
+  --ae-border-soft: rgba(120, 90, 20, 0.12);
+  --ae-col-a: #fffaf0;
+  --ae-col-b: #f9f0d9;
+}
+:root[data-ui="glass"][data-theme="dark"] {
+  --ae-bg: #0f0d0a;
+  --ae-surface-glass: rgba(255, 255, 255, 0.07);
+  --ae-header-glass: rgba(255, 255, 255, 0.1);
+  --ae-glass-bg: rgba(255, 255, 255, 0.07);
+  --ae-gl-edge: rgba(255, 255, 255, 0.16);
+  --ae-gl-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  --ae-border: rgba(255, 255, 255, 0.16);
+  --ae-border-soft: rgba(255, 255, 255, 0.08);
+  --ae-col-a: #211d17;
+  --ae-col-b: #191611;
+}
+:root[data-ui="glass"] .app-shell {
+  background:
+    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.55), transparent 60%),
+    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.38), transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.32), transparent 60%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.03;
+}
+:root[data-ui="glass"][data-theme="dark"] .app-shell {
+  background:
+    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.3), transparent 60%),
+    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.34), transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.3), transparent 60%),
+    var(--ae-bg);
+  background-attachment: fixed;
+  --ae-watermark-opacity: 0.3;
+}
+:root[data-ui="glass"] .ae-page-header {
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 20px;
+  box-shadow: var(--ae-gl-shadow);
+}
+:root[data-ui="glass"] .ae-sticky-head > .ae-header-tabs {
+  background: transparent;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+:root[data-ui="glass"] .ae-header-tabs-bar,
+:root[data-ui="glass"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="glass"] .ae-header-tab {
+  border-radius: 999px;
+  font-weight: 600;
+}
+:root[data-ui="glass"] .ae-header-tab:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+:root[data-ui="glass"] .ae-header-tab[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: inset 0 0 0 1px var(--ae-gl-edge), 0 4px 14px rgba(90, 60, 0, 0.18);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-header-tab[aria-current="page"] {
+  background: rgba(255, 255, 255, 0.14);
+}
+:root[data-ui="glass"] .ae-panel,
+:root[data-ui="glass"] .ae-dash-stat,
+:root[data-ui="glass"] .ae-table-scroll,
+:root[data-ui="glass"] .ae-table-wrap {
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 18px;
+  box-shadow: var(--ae-gl-shadow);
+}
+:root[data-ui="glass"] .ae-table thead th {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.1));
+}
+:root[data-ui="glass"] .ae-btn {
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+:root[data-ui="glass"] .ae-btn-primary {
+  background: rgba(193, 39, 45, 0.84);
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(193, 39, 45, 0.35);
+}
+:root[data-ui="glass"] .ae-btn-secondary {
+  background: rgba(245, 192, 0, 0.82);
+  color: #0c0c0c;
+  box-shadow: 0 4px 14px rgba(200, 150, 0, 0.3);
+}
+:root[data-ui="glass"] .ae-btn-primary:hover:not(:disabled) {
+  background: rgba(209, 47, 54, 0.92);
+}
+:root[data-ui="glass"] .ae-btn-secondary:hover:not(:disabled) {
+  background: rgba(253, 208, 35, 0.92);
+}
+:root[data-ui="glass"] .ae-input:not(.ae-input-cell),
+:root[data-ui="glass"] .ae-select {
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 12px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-input:not(.ae-input-cell),
+:root[data-ui="glass"][data-theme="dark"] .ae-select {
+  background: rgba(255, 255, 255, 0.08);
+}
+:root[data-ui="glass"] .ae-modal-panel {
+  background: rgba(255, 255, 255, 0.78);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  backdrop-filter: blur(26px) saturate(170%);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 22px;
+  box-shadow: 0 20px 60px rgba(60, 40, 0, 0.35);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-modal-panel {
+  background: rgba(30, 28, 24, 0.8);
+}
+:root[data-ui="glass"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="glass"] .ae-modal-header {
+  background: rgba(245, 192, 0, 0.3);
+  color: var(--ae-text);
+  border-bottom: 1px solid var(--ae-gl-edge) !important;
+}
+:root[data-ui="glass"] .ae-modal-header h3,
+:root[data-ui="glass"] .ae-modal-header button {
+  color: var(--ae-text) !important;
+}
+

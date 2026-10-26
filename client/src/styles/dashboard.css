@@ -1,0 +1,680 @@
+/* =========================================================================
+   Dashboard (pages/DashboardPage.tsx)
+   =========================================================================
+   Uses the same surfaces as the rest of the app - theme tokens, the
+   toolbar's gold hairline on summary tiles, .ae-table for the activity
+   list - so it follows the light/dark toggle. */
+/* Page subtitle: larger than the 13px used on other pages, and full-contrast
+   (pure white in dark mode; the normal ink color in light mode, where white
+   would disappear against the paper background). */
+.ae-dash-subtitle {
+  margin: 0 0 8px;
+  font-size: calc(16px * var(--ae-fs, 1));
+  line-height: 1.4;
+  color: var(--ae-text);
+}
+:root[data-theme="dark"] .ae-dash-subtitle {
+  color: #ffffff;
+}
+/* Hero row: two columns. LEFT (.ae-dash-hero-left): the monitoring stat
+   cards in one 3-up row, with Recent Activity stacked directly underneath on
+   the same grid and width, at a reduced size. RIGHT (.ae-dash-hero-chart):
+   the Monthly Monitoring graph, the largest card - it takes all the
+   remaining width and is stretched to the full height of the left column. */
+.ae-dash-hero-row {
+  display: grid;
+  /* Proportional columns (5fr : 7fr) instead of a fixed 460px cap, so on a
+     wide desktop the stat cards and the chart both grow with the window
+     rather than the chart taking all the extra width. */
+  grid-template-columns: minmax(340px, 5fr) minmax(0, 7fr);
+  gap: 14px;
+  margin: 12px 0 24px;
+  align-items: stretch;
+  /* Fill whatever height the viewport has left under the header on a tall
+     desktop screen (the page root is a column flex container), instead of
+     stopping at the content's natural height with a blank band below. */
+  flex: 1 1 auto;
+  /* Never squash below the content (the page root has min-height: 0). */
+  min-height: min-content;
+}
+/* Large desktops: give the chart a bit more of the row and let the gaps
+   breathe. Both "row-level" gaps (hero row's two columns, the left
+   column's own vertical stack) step up together, and both "item-level"
+   gaps (stat cards, quick-access tiles) step up together - previously
+   only the hero row and the quick-access grid got the bump, so the stat
+   cards and the left column's own stacking stayed at their base spacing
+   while their neighbors visibly opened up around them. */
+@media (min-width: 1500px) {
+  .ae-dash-hero-row,
+  .ae-dash-hero-left {
+    gap: 18px;
+  }
+  .ae-dash-hero-row {
+    grid-template-columns: minmax(380px, 4fr) minmax(0, 7fr);
+  }
+  .ae-dash-stats,
+  .ae-dash-quicklinks {
+    gap: 14px;
+  }
+}
+/* Mid-size windows: stats get a touch less width so the chart keeps room. */
+@media (max-width: 1180px) {
+  .ae-dash-hero-row {
+    grid-template-columns: minmax(320px, 4fr) minmax(0, 6fr);
+  }
+}
+/* Stacked (tablet / phone): stat cards on top, activity under them, then the
+   chart. The chart no longer stretches beside the left column, so it needs
+   its own height. */
+@media (max-width: 900px) {
+  .ae-dash-hero-row {
+    grid-template-columns: 1fr;
+    flex: 0 0 auto;
+  }
+  .ae-dash-hero-chart {
+    min-height: 320px;
+  }
+}
+/* Recent Activity fetches 8 rows; a short window shows 5, a tall one all 8
+   (the card stretches with the row, so extra height is used, not wasted). */
+@media (max-height: 860px) {
+  .ae-dash-hero-activity .ae-table tbody tr:nth-child(n + 6) {
+    display: none;
+  }
+}
+.ae-dash-hero-left {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.ae-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 520px) {
+  .ae-dash-stats {
+    grid-template-columns: 1fr;
+  }
+}
+/* Without this, a 1fr grid item defaults to min-width: auto (its content's
+   natural width), which would let the chart's own 12-month row force this
+   whole column wider than its 1fr share instead of scrolling inside it. */
+.ae-dash-hero-chart {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ae-dash-hero-chart > .ae-dash-section {
+  flex: 1;
+}
+.ae-dash-hero-chart .ae-dash-section,
+.ae-dash-hero-activity {
+  height: 100%;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ae-dash-hero-chart .ae-dash-card,
+.ae-dash-hero-activity .ae-dash-card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Left column: the activity block takes the space under the stat cards. */
+.ae-dash-hero-left .ae-dash-hero-activity {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+}
+.ae-dash-hero-activity .ae-dash-table-scroll {
+  flex: 1;
+  overflow-y: auto;
+}
+/* Reduced size: smaller heading + table type and tighter cells than the
+   full-size cards (and than the Change Log page this links to). */
+.ae-dash-hero-activity .ae-dash-heading {
+  margin-bottom: 6px;
+  font-size: calc(13px * var(--ae-fs, 1));
+}
+.ae-dash-hero-activity .ae-dash-link {
+  font-size: calc(11px * var(--ae-fs, 1));
+}
+.ae-dash-hero-activity .ae-dash-card .ae-table {
+  font-size: 12px;
+}
+.ae-dash-hero-activity .ae-dash-card .ae-table th,
+.ae-dash-hero-activity .ae-dash-card .ae-table td {
+  padding: 6px 10px;
+}
+/* Compact stat tiles - three across the left column. */
+.ae-dash-hero-left .ae-dash-stat {
+  gap: 8px;
+  padding: 14px 12px;
+}
+.ae-dash-hero-left .ae-dash-stat-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+.ae-dash-hero-left .ae-dash-stat-icon svg {
+  width: 16px;
+  height: 16px;
+}
+.ae-dash-hero-left .ae-dash-stat-value {
+  font-size: clamp(22px, 2.4vw, 34px);
+}
+.ae-dash-hero-left .ae-dash-stat-label {
+  font-size: calc(11px * var(--ae-fs, 1));
+  line-height: 1.25;
+}
+@media (min-width: 1500px) {
+  .ae-dash-hero-left .ae-dash-stat {
+    padding: 20px 16px;
+    gap: 10px;
+  }
+  .ae-dash-hero-left .ae-dash-stat-label {
+    font-size: calc(12px * var(--ae-fs, 1));
+  }
+  .ae-dash-hero-activity .ae-dash-card .ae-table {
+    font-size: 13px;
+  }
+  .ae-dash-hero-activity .ae-dash-card .ae-table th,
+  .ae-dash-hero-activity .ae-dash-card .ae-table td {
+    padding: 8px 12px;
+  }
+}
+.ae-dash-stat {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px 22px;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 0.3px solid var(--ae-hairline);
+  /* Same 8px radius as .ae-page-header - every card on this page reads as
+     the same family of "rounded brand chrome" instead of the old sharp-
+     cornered boxes. */
+  border-radius: 6px;
+  box-shadow:
+    0 1px 2px rgba(12, 12, 12, 0.04),
+    0 4px 10px rgba(12, 12, 12, 0.06);
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.ae-dash-stat:hover {
+  box-shadow:
+    0 2px 4px rgba(12, 12, 12, 0.06),
+    0 8px 20px rgba(12, 12, 12, 0.1);
+  transform: translateY(-1px);
+}
+.ae-dash-stat--alert {
+  border-color: var(--ae-danger-text);
+}
+/* Icon badge - the small rounded chip each stat card leads with, CRM-tile
+   style, tinted brand gold (or danger red for the alert variant). */
+.ae-dash-stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #d4a000 14%, transparent);
+  color: #d4a000;
+}
+.ae-dash-stat--alert .ae-dash-stat-icon {
+  background: color-mix(in srgb, var(--ae-danger-text) 14%, transparent);
+  color: var(--ae-danger-text);
+}
+.ae-dash-stat-value {
+  position: relative;
+  font-size: clamp(26px, 5vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ae-text);
+}
+.ae-dash-stat-label {
+  position: relative;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+.ae-dash-stat--alert .ae-dash-stat-value,
+.ae-dash-stat--alert .ae-dash-stat-label {
+  color: var(--ae-danger-text);
+}
+/* Dashboard "Quick Access" - one-click shortcuts to the app's major
+   Data Entry pages, so a supervisor lands here and can jump straight to
+   the page they actually need instead of opening the nav drawer first. */
+.ae-dash-quicklinks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  /* Flex items don't collapse margins, so this bottom margin used to stack
+     with .ae-dash-hero-row's own 12px top margin for a 36px gap below the
+     quick-access row - almost twice the 20px gap above it (the subtitle's
+     8px bottom margin + this row's own 12px top margin). Matched to 8px so
+     the two sides land on the same 20px total. */
+  margin: 12px 0 8px;
+  flex-shrink: 0;
+}
+.ae-dash-quicklink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: none;
+  border-radius: 6px;
+  color: var(--ae-text);
+  text-decoration: none;
+  font-size: calc(13.5px * var(--ae-fs, 1));
+  font-weight: 700;
+  box-shadow:
+    0 1px 2px rgba(12, 12, 12, 0.04),
+    0 4px 10px rgba(12, 12, 12, 0.06);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.ae-dash-quicklink-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  background: color-mix(in srgb, #d4a000 14%, transparent);
+  color: #d4a000;
+}
+.ae-dash-quicklink-label {
+  flex: 1;
+  min-width: 0;
+}
+.ae-dash-quicklink:hover {
+  border-color: #f5c000;
+  box-shadow: 0 4px 14px rgba(212, 160, 0, 0.22);
+  transform: translateY(-1px);
+}
+.ae-dash-quicklink-arrow {
+  flex-shrink: 0;
+  color: var(--ae-text-muted);
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+}
+.ae-dash-quicklink:hover .ae-dash-quicklink-arrow {
+  color: #d4a000;
+  transform: translateX(2px);
+}
+
+.ae-dash-section {
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+.ae-dash-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 8px;
+  font-size: calc(14px * var(--ae-fs, 1));
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-dash-link {
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-warning-text);
+  text-decoration: none;
+}
+.ae-dash-link:hover {
+  text-decoration: underline;
+}
+.ae-dash-card {
+  overflow: hidden;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 6px;
+  box-shadow:
+    0 1px 2px rgba(12, 12, 12, 0.04),
+    0 4px 10px rgba(12, 12, 12, 0.06);
+}
+
+.ae-dash-table-scroll {
+  overflow-x: auto;
+}
+.ae-dash-card .ae-table th,
+.ae-dash-card .ae-table td {
+  padding: 8px 12px;
+}
+.ae-dash-card .ae-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.ae-dash-cell-link {
+  color: var(--ae-text);
+  text-decoration: none;
+}
+.ae-dash-cell-link:hover {
+  text-decoration: underline;
+}
+.ae-dash-cell-link:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
+
+/* ---- Dashboard additions: insights row, linked/delta stat tiles, pools ---- */
+
+/* Stat tiles that are links (Active SKUs, remaining stock, Variance flags). */
+.ae-dash-stat--link {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.ae-dash-stat--link:focus-visible,
+.ae-dash-entry:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
+.ae-dash-stats-error {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  color: var(--ae-danger-text);
+  background: var(--ae-surface-glass);
+  border: 0.3px solid var(--ae-danger-text);
+  border-radius: 6px;
+}
+.ae-dash-inline-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ae-warning-text);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* "vs prev day" change under a figure (neutral - stock has no good/bad direction). */
+.ae-dash-stat-delta {
+  position: relative;
+  font-size: calc(10.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ae-text-muted);
+}
+
+/* Top-align the content of every tile in the stat row so the icons line up
+   (a tile without a "vs prev day" line, like Active SKUs, used to sit lower
+   than its neighbours because the content was vertically centred). */
+.ae-dash-hero-left .ae-dash-stat {
+  justify-content: flex-start;
+}
+
+/* Insights row: Entry status / Top variances / Low & negative stock / Lowest
+   days left (4 across on wide screens; Needs restock wraps to the next row). */
+.ae-dash-insights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* Wide column gap: each panel's heading carries a link on its right ("Variance
+     report ->"), and with a narrow gap it ran straight into the next panel's
+     heading and read as one line. */
+  gap: 10px 22px;
+  margin: 12px 0 0;
+  flex-shrink: 0;
+}
+@media (min-width: 1280px) {
+  .ae-dash-insights {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1500px) {
+  .ae-dash-insights {
+    gap: 14px 26px;
+  }
+}
+@media (max-width: 1100px) {
+  .ae-dash-insights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 700px) {
+  .ae-dash-insights {
+    grid-template-columns: 1fr;
+  }
+}
+.ae-dash-insight {
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Same heading height on all three cards (Entry status carries a toggle
+   that is taller than a link), so the cards below start on one line. */
+.ae-dash-insight .ae-dash-heading {
+  align-items: center;
+  min-height: 24px;
+  margin-bottom: 6px;
+  font-size: calc(13px * var(--ae-fs, 1));
+}
+.ae-dash-insight .ae-dash-link {
+  font-size: calc(11px * var(--ae-fs, 1));
+}
+.ae-dash-insight .ae-dash-card {
+  flex: 1;
+}
+.ae-dash-empty {
+  padding: 16px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+/* "All clear" state: centred in the (row-stretched) card with a check mark,
+   instead of a line of text stranded in the top-left of a mostly blank box. */
+.ae-dash-empty--ok {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--ae-success-text);
+}
+.ae-dash-empty--ok svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* Ranked lists (top variances, low stock). */
+.ae-dash-list {
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+}
+.ae-dash-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  border-bottom: 0.3px solid var(--ae-border);
+}
+.ae-dash-list-item:last-child {
+  border-bottom: none;
+}
+.ae-dash-list-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ae-dash-list-name,
+.ae-dash-list-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-dash-list-name {
+  font-weight: 600;
+  color: var(--ae-text);
+}
+.ae-dash-list-sub {
+  font-size: calc(11px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-dash-list-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--ae-text);
+}
+.ae-dash-list-value--neg {
+  color: var(--ae-danger-text);
+}
+.ae-dash-list-more {
+  padding: 4px 12px 8px;
+}
+
+/* Small status pills (entry progress, stock alerts). */
+.ae-dash-chip {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: calc(10.5px * var(--ae-fs, 1));
+  font-weight: 700;
+  line-height: 1.5;
+  border-radius: 4px;
+  white-space: nowrap;
+  background: color-mix(in srgb, currentColor 14%, transparent);
+}
+.ae-dash-chip--done {
+  color: var(--ae-success-text);
+}
+.ae-dash-chip--progress {
+  color: var(--ae-warning-text);
+}
+.ae-dash-chip--idle {
+  color: var(--ae-text-muted);
+}
+.ae-dash-chip--bad {
+  color: var(--ae-danger-text);
+}
+
+/* Entry status rows: label + chip + count over a progress bar. */
+.ae-dash-entry {
+  display: block;
+  padding: 7px 12px 8px;
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 0.3px solid var(--ae-border);
+}
+.ae-dash-entry:last-child {
+  border-bottom: none;
+}
+.ae-dash-entry:hover {
+  background: color-mix(in srgb, #d4a000 8%, transparent);
+}
+.ae-dash-entry-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-dash-entry-count {
+  margin-left: auto;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ae-text-muted);
+}
+.ae-dash-progress {
+  display: block;
+  height: 4px;
+  margin-top: 5px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--ae-border);
+}
+.ae-dash-progress > span {
+  display: block;
+  height: 100%;
+  background: #d4a000;
+  transition: width 0.3s ease;
+}
+.ae-dash-progress--done > span {
+  background: var(--ae-success-text);
+}
+
+/* Morning / Night toggle in the Entry status heading. */
+.ae-dash-seg {
+  display: inline-flex;
+  overflow: hidden;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 4px;
+}
+.ae-dash-seg button {
+  padding: 2px 9px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: calc(11px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text-muted);
+  cursor: pointer;
+}
+.ae-dash-seg button.ae-dash-seg-btn--active {
+  color: var(--ae-text);
+  background: color-mix(in srgb, #d4a000 20%, transparent);
+}
+.ae-dash-seg button:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: -2px;
+}
+
+/* Slimmer quick-access tiles - the row sits above the new insights row, so
+   every pixel of height here pushes the stat cards and chart down. */
+.ae-dash-quicklink {
+  padding: 10px 14px;
+}
+.ae-dash-quicklink-icon {
+  width: 28px;
+  height: 28px;
+}
+
+/* Recent Activity: record name truncates, "by <name>" sits underneath. */
+.ae-dash-cell-record {
+  display: block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ae-dash-cell-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: calc(11px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+

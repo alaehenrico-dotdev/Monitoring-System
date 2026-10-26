@@ -1,0 +1,296 @@
+/* =========================================================================
+   Logo seal animation (components/LogoMark.tsx, hover wiring in Sidebar.tsx)
+   =========================================================================
+   The seal turns one full revolution per hover (its `rotate()` is set from
+   LogoMark's `spin` prop). Keep the 1.1s / 1100ms in step with
+   LOGO_SPIN_MS in Sidebar.tsx. (Previously also crossed the seal with a
+   light-streak glint - that depended on an SVG gradient/clip-path only the
+   old hand-drawn recreation had; dropped along with it now that LogoMark
+   renders the real logo photo instead.) */
+.ae-logo-ring {
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.35, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-logo-ring {
+    transition: none;
+  }
+}
+
+/* =========================================================================
+   Loading system - skeleton shimmer (components/Skeleton.tsx) and the determinate
+   top-of-viewport progress bar (components/TopProgressBar.tsx,
+   hooks/useTopProgress.tsx). Every animated property here is `transform`,
+   `opacity`, or `background-position` on its own compositor layer - none of
+   it triggers layout, so it stays smooth even while a slow/unstable fetch
+   is busy on the network (not main-thread) thread.
+   ========================================================================= */
+.ae-skeleton {
+  display: block;
+  background-image: linear-gradient(
+    100deg,
+    var(--ae-bg-alt) 38%,
+    var(--ae-border-soft) 50%,
+    var(--ae-bg-alt) 62%
+  );
+  background-size: 250% 100%;
+  background-position: 200% 0;
+  animation: ae-skeleton-shimmer 1.8s ease-in-out infinite;
+}
+@keyframes ae-skeleton-shimmer {
+  to {
+    background-position: -50% 0;
+  }
+}
+
+/* Loading indicator: the Ala Eh! logo (used untouched) with a gold arc and a
+   bright head orbiting just outside it. --lp is the logo's pixel size (set
+   inline) and --ring the arc colour. The arc is a conic gradient (transparent
+   tail -> solid head) cut into a ring by a mask; the head dot sits outside
+   the mask, on the ring's centre line, and the whole thing rotates. The
+   orbit extends beyond the logo's own box without affecting layout. */
+.ae-logo-pulse {
+  --ring: #f5c000;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  vertical-align: middle;
+}
+.ae-logo-pulse-img {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  pointer-events: none;
+}
+.ae-logo-orbit {
+  --t: max(2px, calc(var(--lp) * 0.03));
+  position: absolute;
+  inset: calc(var(--lp) * -0.08);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: ae-logo-orbit 1.3s linear infinite;
+  will-change: transform;
+}
+.ae-logo-orbit-arc {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 200deg,
+    color-mix(in srgb, var(--ring) 18%, transparent) 235deg,
+    var(--ring) 360deg
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--t)),
+    #000 calc(100% - var(--t) + 0.5px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--t)),
+    #000 calc(100% - var(--t) + 0.5px)
+  );
+}
+.ae-logo-orbit-dot {
+  position: absolute;
+  top: calc(var(--t) / 2);
+  left: 50%;
+  width: calc(var(--t) * 2.6);
+  height: calc(var(--t) * 2.6);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #fff 0 45%,
+    #fff3c4 70%,
+    var(--ring) 100%
+  );
+  box-shadow:
+    0 0 calc(var(--t) * 2) color-mix(in srgb, var(--ring) 85%, transparent),
+    0 0 calc(var(--t) * 5) color-mix(in srgb, var(--ring) 40%, transparent);
+}
+@keyframes ae-logo-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+/* Reduced motion: the arc is held still, so it still reads as "busy". */
+@media (prefers-reduced-motion: reduce) {
+  .ae-logo-orbit {
+    animation: none;
+    transform: rotate(-35deg);
+  }
+}
+
+.ae-top-progress-track {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 1100; /* above Sidebar (50) and TopBar's clock/toggle (1000) */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.ae-top-progress-track.is-visible {
+  opacity: 1;
+}
+.ae-top-progress-bar {
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  box-shadow:
+    0 0 6px 1px color-mix(in srgb, currentColor 80%, transparent),
+    0 0 16px 3px color-mix(in srgb, currentColor 45%, transparent);
+}
+
+/* Backup download line (pages/DatabaseBackupPage.tsx): glows like the top
+   loading line, and while the download is running a bright band sweeps along
+   the fill so a slow download never looks stuck. */
+.ae-dl-bar {
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 0 6px 1px color-mix(in srgb, currentColor 80%, transparent);
+}
+.ae-dl-track {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, #F5C000 70%, transparent));
+}
+.ae-dl-bar.is-busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 50%, transparent) no-repeat;
+  background-size: 35% 100%;
+  background-position: -50% 0;
+  animation: ae-dl-sweep 1.3s ease-in-out infinite;
+}
+@keyframes ae-dl-sweep {
+  to {
+    background-position: 150% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-dl-bar.is-busy::after {
+    animation: none;
+    display: none;
+  }
+}
+
+.ae-dl-track {
+  transition: opacity 0.6s ease;
+}
+.ae-dl-track.is-fading {
+  opacity: 0;
+}
+
+/* Soft state swaps (backup button icon, restore card controls). */
+.ae-fade-in {
+  animation: ae-fade-in 0.35s ease both;
+}
+.ae-fade-out {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+@keyframes ae-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px) scale(0.97);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-fade-in {
+    animation: none;
+  }
+  .ae-fade-out,
+  .ae-dl-track {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ae-skeleton {
+    animation: none;
+    background-image: none;
+    background-color: var(--ae-bg-alt);
+  }
+  .ae-top-progress-track {
+    transition: none;
+  }
+  .ae-top-progress-bar {
+    transition: none !important;
+  }
+}
+
+/* Phones: three stat tiles per row get too narrow - stack them. */
+@media (max-width: 520px) {
+  .ae-dash-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Report History pages (components/ReportHistoryPage.tsx) ------------
+   Glass cards grouped under day headings, in a responsive grid. Cards reuse
+   the page glass tokens so the seal watermark shows through. */
+.ae-hist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.ae-hist-count {
+  margin: 0 0 4px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text-muted, var(--ae-text));
+  opacity: 0.75;
+}
+.ae-hist-none {
+  margin-top: 16px;
+  opacity: 0.75;
+}
+.ae-hist-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 460px;
+  margin: 40px auto;
+  padding: 32px 28px;
+  text-align: center;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: none;
+  border-radius: 6px;
+}
+.ae-hist-empty h3 {
+  margin: 6px 0 0;
+  font-size: calc(16px * var(--ae-fs, 1));
+  color: var(--ae-text);
+}
+.ae-hist-empty p {
+  margin: 0 0 12px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  opacity: 0.75;
+}
+.ae-hist-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 6px;
+  background: #f5c000;
+  color: #0c0c0c;
+}
+.ae-hist-empty-icon svg {
+  width: 22px;
+  height: 22px;
+}
+

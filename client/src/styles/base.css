@@ -1,0 +1,1632 @@
+* {
+  box-sizing: border-box;
+}
+
+/* Dark-mode toggle (ThemeToggle.tsx): the browser's own cross-fade between the
+   old and new theme, kept short and ease-out so the switch is smooth without
+   making anyone wait for it. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+  animation-timing-function: ease-out;
+}
+
+/* Present on <html> only while a theme switch is in flight (ThemeToggle.tsx).
+   The theme change repaints everything at once, so per-element color/background
+   transitions starting on top of it (and inside the View Transition snapshot)
+   just add style work and show half-blended colors under the ripple. Nothing
+   visible is lost: the ripple / instant swap is the theme animation, and every
+   transition is back the moment the switch finishes. Animations (keyframes,
+   spinners, motion) are unaffected - this only stops CSS transitions. */
+:root.ae-theme-switching *,
+:root.ae-theme-switching *::before,
+:root.ae-theme-switching *::after {
+  transition: none !important;
+}
+
+/* Light/dark theme tokens (see ThemeContext.tsx, which toggles the
+   data-theme attribute on <html>, and theme.ts's `colors` object, whose
+   paper/ink/subtleInk/border/warningBg/warningText re-export these same
+   vars so every page's inline styles pick up the theme automatically
+   instead of needing per-page dark-mode overrides). Brand colors (black,
+   gold, yellow, cream, red...) are intentionally NOT theme tokens - they
+   stay fixed on the sidebar, dashboard, login screen, and table headers,
+   which are permanently dark by design in both modes. */
+:root {
+  /* Native controls (date/number spinners, selects, scrollbars, autofill) follow
+     the app theme instead of the OS, so they never render light on a dark page. */
+  color-scheme: light;
+  /* The 0.3px outline every card, field and table shares - one value, both themes. */
+  --ae-hairline: #525252;
+  /* Corner radius of every data table container, whatever the UI style. */
+  --ae-table-radius: 4px;
+  /* Monthly Monitoring series, validated against the card surface (scripts/validate_palette.js):
+     gold + blue clear every CVD and normal-vision check; the dark steps sit in the dark lightness band. */
+  --ae-viz-online: #b8860b;
+  --ae-viz-offline: #2a78d6;
+  --ae-viz-produced: #2f9e8f;
+  --ae-viz-now: #d4a000;
+  --ae-viz-bar: color-mix(in srgb, var(--ae-text) 16%, transparent);
+  --ae-viz-bar-active: color-mix(in srgb, var(--ae-text) 26%, transparent);
+  --ae-viz-bar-key: #8f8a7c;
+  /* Viewport height that follows mobile browser bars. 100vh is the tallest the
+     viewport gets (bars hidden), so full-height shells overflowed and their
+     bottoms were cut off on phones; dvh tracks the bars. Falls back to vh. */
+  --ae-vh: 100vh;
+  /* ---- Motion -----------------------------------------------------------
+     One vocabulary for interaction timing. These durations were already in
+     the file as ad-hoc 100/120/150/180/220/240ms values picked per rule;
+     naming the three that actually carry meaning is what stops a hover here
+     and a hover there drifting a frame apart.
+
+       --ae-dur-micro  a state change on something already under the pointer
+                       (hover, press, focus). Has to land before the eye
+                       settles on it, or the control feels laggy.
+       --ae-dur-enter  something arriving or leaving (menu, popover, row).
+       --ae-dur-move   something travelling across the layout.
+
+     One decelerating curve throughout - the same one .ae-col-menu-in and the
+     header chevron already use. Interface elements should arrive quickly and
+     settle, never accelerate away from the pointer that summoned them.
+     Everything timed with these animates transform/opacity/colour only, so
+     none of it touches layout mid-interaction. */
+  --ae-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ae-dur-micro: 120ms;
+  --ae-dur-enter: 160ms;
+  --ae-dur-move: 240ms;
+
+  --ae-bg: #fffcf5;
+  --ae-bg-alt: #f3ecd8;
+  --ae-surface: #ffffff;
+  --ae-surface-hover: #f3ecd8;
+  --ae-text: #241d14;
+  --ae-text-muted: #6b6255;
+  --ae-border: #e7dfc9;
+  --ae-border-soft: #f1ebd8;
+  --ae-row-hover: rgba(12, 12, 12, 0.035);
+  /* Alternating column fills for every table: odd columns / even columns. Light
+     theme keeps two quiet paper shades; dark theme is charcoal and black. */
+  --ae-col-a: #ffffff;
+  --ae-col-b: #f6f0de;
+  --ae-colh-a: #ece3c8; /* column headers: a step deeper than the body */
+  --ae-colh-b: #ddd2b0;
+  /* The focused row (RowGlowScroll's .ae-row-focus overlay) - same gold
+     family as --ae-toolbar-border/the ring sweep, at an alpha that tints a
+     row clearly against --ae-row-hover without hiding the numbers/inputs
+     it's drawn on top of. */
+  --ae-row-focus-bg: rgba(245, 192, 0, 0.16);
+  --ae-warning-bg: #f7e7c2;
+  --ae-warning-text: #8a6800;
+  --ae-header-bg: #e7dfc9;
+  --ae-header-rule: #0c0c0c;
+  --ae-num-text: var(--ae-text);
+  --ae-danger-text: #c1272d;
+  /* Low Stock row tint (TotalStocksTable) - same relationship to
+     --ae-danger-text as --ae-warning-bg has to --ae-warning-text. */
+  --ae-danger-bg: #f7d9da;
+  --ae-success-text: #2f6b3c;
+  /* Category group-header bar inside data tables (StockGrid,
+     TotalStocksTable, ManualCountPage) - warm espresso ink in every theme.
+     Green is already the edited-cell colour, gold marks the grand total and
+     the bar's own left edge, red is an error, so the bar takes the neutral
+     left. White label text on it is about 12:1. */
+  --ae-category-bg: #3a3226;
+  /* Editable grid-cell number inputs (.ae-input-cell) - lighter in light
+     mode to match the airier table; dark mode keeps the original
+     near-black fill since it already suits that surface. */
+  --ae-input-cell-bg: #fff8e0;
+  --ae-input-cell-text: #241d14;
+  --ae-input-cell-text-muted: #6b6255;
+  --ae-input-cell-border: #d4a000;
+  --ae-input-cell-focus-ring: rgba(212, 160, 0, 0.35);
+  /* The up/down stepper triangles on grid number inputs - darker gold reads
+     against the new light cream fill; dark mode keeps the original bright
+     yellow, which needs the near-black fill to stay legible. */
+  --ae-input-cell-spin: #d4a000;
+  --ae-input-cell-spin-hover-bg: rgba(212, 160, 0, 0.18);
+  /* Edited (staged, not yet saved) grid cells - green. */
+  --ae-input-cell-edited-bg: #c6ebcf;
+  --ae-input-cell-edited-text: #0c3b1a;
+  --ae-input-cell-edited-border: #2f6b3c;
+  --ae-input-cell-edited-ring: rgba(47, 107, 60, 0.35);
+
+  /* Toolbar tokens - brand colors, identical in light and dark mode so the
+     toolbar border and its action buttons are always visible. */
+  --ae-toolbar-border: #d4a000;
+  --ae-btn-yellow: #f5c000;
+  --ae-btn-yellow-hover: #fdd023;
+  --ae-btn-yellow-active: #d4a000;
+  --ae-btn-yellow-text: #0c0c0c;
+  /* Keyboard focus ring. The brand gold (#d4a000) is only ~2.3:1 against white,
+     under the 3:1 a focus indicator needs, so light mode uses the darker
+     text-safe gold; dark mode can use the bright one. */
+  --ae-focus-ring: #8a6800;
+
+  /* Glass chrome (page header card + nav drawer) - one set of tokens so the
+     two always match. Light mode is frosted cream glass with dark text, so
+     the chrome is no longer a dark slab on the light page. */
+  --ae-glass-bg: rgba(255, 252, 245, 0.5);
+  --ae-glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.6),
+    rgba(255, 255, 255, 0) 45%
+  );
+  --ae-glass-text: #241d14;
+  --ae-glass-text-muted: #6b6255;
+  /* Text-safe gold: #d4a000 is too faint on cream. */
+  --ae-glass-accent: #8a6800;
+  --ae-glass-divider: rgba(36, 29, 20, 0.14);
+  --ae-glass-solid: #fffcf5;
+  --ae-glass-shadow:
+    0 8px 24px rgba(60, 45, 10, 0.16), 0 0 14px rgba(245, 192, 0, 0.22),
+    0 0 28px rgba(245, 192, 0, 0.1);
+  --ae-glass-panel-shadow:
+    0 16px 40px rgba(60, 45, 10, 0.22), 0 2px 8px rgba(60, 45, 10, 0.12);
+
+  /* Toolbar controls that sit on the glass header. */
+  --ae-tb-bg: rgba(255, 255, 255, 0.4);
+  --ae-tb-border: rgba(36, 29, 20, 0.16);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.6);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.9);
+  --ae-tb-field-bg-active: rgba(212, 160, 0, 0.22);
+  --ae-tb-hairline: rgba(36, 29, 20, 0.18);
+  --ae-tb-text: #241d14;
+  --ae-tb-text-muted: rgba(36, 29, 20, 0.6);
+
+  /* Glass page surfaces (cards, stat tiles, table panes): translucent +
+     blurred so the Ala Eh! seal watermark behind the app (.app-shell::before)
+     shows through them. Form fields, dropdown panels and dialogs stay solid
+     for legibility. The sticky table header is more opaque than the panes so
+     rows scrolling under it don't clash with its labels. */
+  --ae-surface-glass: rgba(255, 255, 255, 0.4);
+  --ae-header-glass: rgba(231, 223, 201, 0.7);
+  --ae-glass-blur: blur(14px) saturate(140%);
+}
+@supports (height: 100dvh) {
+  :root {
+    --ae-vh: 100dvh;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ae-viz-online: #c98500;
+  --ae-viz-offline: #3987e5;
+  --ae-viz-produced: #4fb8a8;
+  --ae-viz-bar-key: #8f8f8f;
+  --ae-focus-ring: #f5c000;
+  /* Charcoal black instead of near-pure black (#070707) - easier on the
+     eyes for long sessions. Steps go lightest-on-top: page < tinted rows <
+     cards/modals < hover, header, editable cells. */
+  --ae-bg: #1a1a1a;
+  --ae-bg-alt: #222222;
+  --ae-surface: #262626;
+  --ae-surface-hover: #2e2e2e;
+  --ae-text: #ffffff;
+  --ae-text-muted: #a3a3a3;
+  /* ink-500, one step lighter than the old ink-600 (#2E2E2E) - a hairline
+     border at ink-600 all but disappears against the ink-950/900 surfaces
+     it usually sits on; this is the thinnest weight that still reads as a
+     visible edge rather than just a rendering artifact. --ae-border-soft
+     stays at ink-700 for the rarer case (internal, low-emphasis dividers)
+     that's supposed to stay closer to invisible. */
+  --ae-border: #3d3d3d;
+  --ae-border-soft: #2e2e2e;
+  --ae-row-hover: rgba(255, 255, 255, 0.045);
+  --ae-col-a: #262626; /* charcoal */
+  --ae-col-b: #131313; /* black */
+  --ae-colh-a: #333333; /* column headers: charcoal / black, a touch stronger */
+  --ae-colh-b: #0a0a0a;
+  /* More opaque than the light-theme value - the same alpha reads noticeably
+     fainter against these dark surfaces. */
+  --ae-row-focus-bg: rgba(245, 192, 0, 0.22);
+  --ae-warning-bg: #2b2306;
+  --ae-warning-text: #fdd023;
+  --ae-header-bg: #2a2a2a;
+  --ae-header-rule: #d4a000;
+  --ae-num-text: #fff;
+  /* The brand red (#c1272d) is a dark, low-luminance red - readable on the
+     light paper background but too close to the near-black dark-mode
+     background (charcoal #1A1A1A) to read as error text. Same pattern as
+     --ae-warning-text above: a lighter tint of the same hue for dark mode. */
+  --ae-danger-text: #e5626a;
+  /* Same reasoning as --ae-danger-bg (light mode) - a low-luminance tint of
+     the dark-mode danger hue rather than light mode's tint verbatim. */
+  --ae-danger-bg: #3a1518;
+  --ae-success-text: #79c987;
+  /* One step lighter than the charcoal rows: an ink as dark as the light-mode
+     value would vanish against the near-black page. */
+  --ae-category-bg: #35302a;
+  --ae-input-cell-bg: #262626;
+  --ae-input-cell-text: #fff;
+  --ae-input-cell-text-muted: rgba(255, 255, 255, 0.55);
+  --ae-input-cell-border: #f5c000;
+  --ae-input-cell-focus-ring: rgba(255, 255, 255, 0.45);
+  --ae-input-cell-spin: #f5c000;
+  --ae-input-cell-spin-hover-bg: rgba(245, 192, 0, 0.18);
+  --ae-input-cell-edited-bg: #1f5a2f;
+  --ae-input-cell-edited-text: #fff;
+  --ae-input-cell-edited-border: #4caf68;
+  --ae-input-cell-edited-ring: rgba(76, 175, 104, 0.45);
+
+  /* Dark glass - same look the nav drawer always had. */
+  --ae-glass-bg: rgba(35, 35, 35, 0.55);
+  --ae-glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.12),
+    rgba(255, 255, 255, 0) 45%
+  );
+  --ae-glass-text: #e5e5e5;
+  --ae-glass-text-muted: #a3a3a3;
+  --ae-glass-accent: #d4a000;
+  --ae-glass-divider: rgba(229, 229, 229, 0.18);
+  --ae-glass-solid: #232323;
+  --ae-glass-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(245, 192, 0, 0.28),
+    0 0 28px rgba(245, 192, 0, 0.12);
+  --ae-glass-panel-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  --ae-tb-bg: rgba(255, 255, 255, 0.035);
+  --ae-tb-border: rgba(255, 255, 255, 0.09);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.06);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.11);
+  --ae-tb-field-bg-active: rgba(255, 255, 255, 0.17);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.14);
+  /* Toolbar item text/icons are brand yellow in dark mode (the solid-yellow
+     primary buttons keep their own dark text). */
+  --ae-tb-text: #f5c000;
+  --ae-tb-text-muted: rgba(245, 192, 0, 0.65);
+
+  --ae-surface-glass: rgba(38, 38, 38, 0.4);
+  --ae-header-glass: rgba(42, 42, 42, 0.74);
+}
+
+/* No backdrop-filter support: a translucent surface without blur would let
+   the watermark fight the text, so fall back to the old solid surfaces. */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  :root,
+  :root[data-theme="dark"] {
+    --ae-surface-glass: var(--ae-surface);
+    --ae-header-glass: var(--ae-header-bg);
+  }
+}
+
+/* ---- Font settings (Settings > Appearance > Font) ---------------------------
+   Typeface and text size are chosen per browser and set on <html> as
+   data-font / data-fs (ThemeContext). The wordmark keeps its own brand face.
+   --ae-fs multiplies every interface font size (the px sizes below are written
+   as calc(Npx * var(--ae-fs, 1))) and html's own size, so rem text and anything
+   without a size of its own follow too. The data tables are left out on purpose:
+   they have their own View > Zoom, and their row and header heights are fixed. */
+:root {
+  --ae-font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ae-fs: 1;
+}
+:root[data-font="hyperlegible"] {
+  --ae-font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+:root[data-font="plex"] {
+  --ae-font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+:root[data-font="system"] {
+  --ae-font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+:root[data-font="serif"] {
+  --ae-font-body: Georgia, Cambria, "Times New Roman", serif;
+}
+:root[data-font="mono"] {
+  --ae-font-body: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
+}
+:root[data-fs="sm"] {
+  --ae-fs: 0.92;
+}
+:root[data-fs="lg"] {
+  --ae-fs: 1.1;
+}
+:root[data-fs="xl"] {
+  --ae-fs: 1.2;
+}
+html {
+  font-size: calc(100% * var(--ae-fs, 1));
+}
+/* Width of the number boxes in the entry and count grids. A fixed 64px box sat in
+   a column of 200-300px on a 22-24 inch screen; it grows in steps with the screen
+   (and stays 64px on anything smaller). */
+:root {
+  --ae-cell-w: 64px;
+}
+@media (min-width: 1500px) {
+  :root {
+    --ae-cell-w: 84px;
+  }
+}
+@media (min-width: 2200px) {
+  :root {
+    --ae-cell-w: 100px;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: var(--ae-font-body);
+  color: var(--ae-text);
+  background: var(--ae-bg);
+}
+
+table input[type="number"] {
+  font-family: inherit;
+}
+
+@media (pointer: coarse) {
+  .ae-tap-target {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+::selection {
+  background: #f5c000;
+  color: #0c0c0c;
+}
+
+.ae-table {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+/* Header row: small uppercase labels, a hairline underneath (an inset
+   shadow, so it adds no height - HEADER_ROW_HEIGHT in the grids assumes the
+   row is 26px: 5px + 19px line + 2px) and a faint drop shadow so the sticky
+   header still lifts off the rows as they scroll under it. */
+.ae-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  padding: 5px 6px 2px;
+  line-height: 19px;
+  background: var(--ae-header-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  color: var(--ae-text);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border),
+    0 6px 8px -6px rgba(0, 0, 0, 0.35);
+}
+/* Body cells: a soft hairline between rows instead of bare stacked fills. */
+.ae-table td {
+  text-align: center;
+  padding: 3px 6px;
+  box-shadow: inset 0 -1px 0
+    color-mix(in srgb, var(--ae-border) 55%, transparent);
+  transition: background-color 120ms ease;
+}
+.ae-table:not(.ae-table--left) td {
+  color: var(--ae-num-text);
+}
+.ae-table tbody tr:hover td {
+  background-color: var(--ae-row-hover);
+}
+/* Alternating columns - body cells AND column headers - on every table: two shades, odd and even. Written with
+   :where() so the rules that already colour a cell - subtotal and grand-total
+   rows, selected rows, the sticky identity cells, the category bar - keep winning.
+   Column tints (a translucent background-image) and cell highlights still draw on
+   top; hover lightens the stripe instead of replacing it. */
+:where(.ae-table tbody td):nth-child(odd) {
+  background-color: var(--ae-col-a);
+}
+:where(.ae-table tbody td):nth-child(even) {
+  background-color: var(--ae-col-b);
+}
+.ae-table thead th:not(.ae-sticky-sku):not(.ae-sticky-name):not(.ae-sticky-subtotal):nth-child(odd) {
+  background: var(--ae-colh-a);
+}
+.ae-table thead th:not(.ae-sticky-sku):not(.ae-sticky-name):not(.ae-sticky-subtotal):nth-child(even) {
+  background: var(--ae-colh-b);
+}
+.ae-table tbody tr:hover:not(.ae-row-selected):not(.ae-row-grand):not(.ae-row-subtotal):not(.ae-cat-row) td:nth-child(odd) {
+  background-color: color-mix(in srgb, var(--ae-col-a) 88%, var(--ae-text));
+}
+.ae-table tbody tr:hover:not(.ae-row-selected):not(.ae-row-grand):not(.ae-row-subtotal):not(.ae-cat-row) td:nth-child(even) {
+  background-color: color-mix(in srgb, var(--ae-col-b) 88%, var(--ae-text));
+}
+.ae-table--left td {
+  text-align: left;
+}
+/* SKU / Product cells (StockGrid, TotalStocksTable, ManualCountPage). The
+   SKU uses the theme's gold accent - the brand yellow washed out on the
+   light theme's paper background. */
+.ae-table td.ae-cell-sku {
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ae-glass-accent);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.ae-table td.ae-cell-name {
+  text-align: left;
+  white-space: nowrap;
+  color: var(--ae-text);
+}
+/* Category bar: the warm espresso --ae-category-bg, with light
+   uppercase label text, a slim gold accent edge and no loud fill flash. */
+.ae-cat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 5px 8px;
+  border: none;
+  border-left: 3px solid #f5c000;
+  background: var(--ae-category-bg);
+  color: #ffffff;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+.ae-cat-toggle:hover {
+  filter: brightness(1.12);
+}
+/* The bar spans the table's full width, so when the table is scrolled
+   sideways its label would slide away with it. Pinning the label (chevron +
+   category name) to the left edge of the scroll area keeps it readable; the
+   3px offset is the bar's own gold edge, so nothing jumps at scroll 0. */
+.ae-cat-toggle > .ae-cat-label {
+  position: sticky;
+  left: 3px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ae-cat-toggle:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: -2px;
+}
+/* Subtotal and grand total rows. (The old 2px grand-total border was set on
+   the <tr>, which does nothing in a border-collapse: separate table - the
+   rule is drawn on the cells here.) */
+.ae-table tr.ae-row-subtotal td {
+  background-color: var(--ae-bg-alt);
+  font-weight: 600;
+  box-shadow:
+    inset 0 1px 0 var(--ae-border),
+    inset 0 -1px 0 var(--ae-border);
+}
+.ae-table tr.ae-row-subtotal td:first-child {
+  color: var(--ae-text-muted);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+.ae-table tr.ae-row-grand td {
+  background-color: #f5c000;
+  /* Solid brand yellow across the whole row - flattens the per-column tints. */
+  background-image: none !important;
+  color: #0c0c0c;
+  font-weight: 700;
+  box-shadow:
+    inset 0 1px 0 #d4a000,
+    inset 0 -1px 0 #d4a000;
+}
+/* Hover must not replace the yellow: the generic row-hover rule above would
+   otherwise win on specificity and tint the whole total row. */
+.ae-table tbody tr.ae-row-grand:hover td {
+  background-color: #f5c000;
+  background-image: none !important;
+  color: #0c0c0c;
+}
+.ae-table tr.ae-row-grand td:first-child {
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+/* Row selection (StockGrid): click / Shift+click / Ctrl+click / drag on the
+   SKU or Product cell. The selected tint is opaque (the surface with gold mixed
+   in) so the frosted sticky identity cells stay solid while the table scrolls
+   sideways behind them. Declared after the generic row-hover rule, with the
+   same specificity, so a selected row keeps its colour under the pointer. */
+:root {
+  --ae-row-selected-bg: color-mix(in srgb, #f5c000 20%, var(--ae-surface));
+}
+.ae-table td.ae-row-pick {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+/* A Shift+click or a drag would otherwise also start the browser's own text
+   highlight, which paints across everything between the two points - the
+   category bars, subtotals and totals included - although only product rows are
+   ever part of a selection. Text in these tables is copied with the selection's
+   Copy button instead; the count/stock inputs stay selectable. */
+.ae-table--pickable {
+  user-select: none;
+  -webkit-user-select: none;
+}
+.ae-table--pickable input {
+  user-select: text;
+  -webkit-user-select: text;
+}
+.ae-table tbody tr.ae-row-selected td {
+  background-color: var(--ae-row-selected-bg);
+}
+.ae-table tbody tr.ae-row-selected td.ae-cell-sku {
+  box-shadow: inset 3px 0 0 #f5c000;
+}
+.ae-table tfoot tr.ae-row-selected-total td {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  background-color: var(--ae-row-selected-bg);
+  font-weight: 700;
+  box-shadow: inset 0 2px 0 #f5c000;
+}
+.ae-table tfoot tr.ae-row-selected-total td.ae-sticky-subtotal {
+  z-index: 3;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+}
+.ae-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  border: 1px solid var(--ae-border);
+  border-left: 3px solid #f5c000;
+  border-radius: 6px;
+  background: var(--ae-row-selected-bg);
+}
+.ae-selection-count {
+  margin-right: 4px;
+}
+.ae-selection-fill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media print {
+  .ae-table tbody tr.ae-row-selected td {
+    background-color: transparent;
+  }
+}
+
+/* Spare input columns after Delivery (Out) (StockGrid's `expandable`
+   columns): vertical grid lines on every cell of them, from the header
+   down through the subtotal/grand total rows. Drawn with a border, in a
+   line color derived from the theme text so it shows on the pink tint in
+   both light and dark mode. */
+.ae-table .ae-extra-col {
+  border-right: 1px solid color-mix(in srgb, var(--ae-text) 30%, transparent);
+}
+.ae-table .ae-extra-col--first {
+  border-left: 1px solid color-mix(in srgb, var(--ae-text) 30%, transparent);
+}
+/* Text input filling a spare column's whole header cell (StockGrid). No box
+   of its own - the pink header shows through, so it reads as the header
+   itself being editable; a dark inset ring marks focus. */
+.ae-extra-head-input {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 28px;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 5px 6px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #000;
+  font: inherit;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+}
+.ae-extra-head-input::placeholder {
+  color: rgba(0, 0, 0, 0.5);
+  font-weight: 500;
+}
+.ae-extra-head-input:focus {
+  box-shadow: inset 0 0 0 2px #000;
+}
+:root[data-theme="dark"] .ae-extra-head-input {
+  color: #fff;
+}
+:root[data-theme="dark"] .ae-extra-head-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+:root[data-theme="dark"] .ae-extra-head-input:focus {
+  box-shadow: inset 0 0 0 2px #fff;
+}
+/* Manual Count and Total Stocks grids: header labels centered over their
+   column instead of stuck flush-left, regardless of how that column's own
+   cells are aligned (left for SKU/Product, right for numeric columns). */
+.ae-table--center-head th {
+  text-align: center;
+}
+/* Compact variant (Total Stocks and Manual Count/Audit tables): columns size
+   to their content instead of stretching to fill the whole pane, and use
+   tighter horizontal padding, so the table reads thinner. Vertical padding
+   is left as-is on purpose - the sticky category bars offset from the header
+   row's height (HEADER_ROW_HEIGHT), so it must not change. */
+.ae-table--compact {
+  width: auto;
+}
+/* View > Fit table to width: the compact table stretches to the pane, and the
+   browser shares the extra width out in proportion to each column's content. */
+.ae-table--compact.ae-table--fit {
+  width: 100%;
+}
+.ae-table--compact th,
+.ae-table--compact td {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.ae-row-ring {
+  position: absolute;
+  z-index: 0;
+  height: 0.4px;
+  pointer-events: none;
+  background-color: #d4a000;
+}
+
+/* Full-box version of .ae-row-ring, for the shared Modal panel (Modal.tsx):
+   the same still gold line, 1px, traced around all four edges instead of
+   top/bottom bars only, so every dialog built on Modal - AlertDialog,
+   ConfirmDialog, and page-level Preview dialogs alike - gets the same thin
+   gold border. */
+.ae-modal-border-sweep {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1px;
+  background-color: #d4a000;
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* The row last clicked or focused (RowGlowScroll) - a full outline plus a
+   translucent fill, so the currently-encoded row reads as distinctly
+   "pinned" instead of just currently hovered, and stays that obvious even
+   while scrolled away from the pointer or after switching tabs and back
+   (RowGlowScroll restores it from sessionStorage). Sits just inside the
+   row's edges (box-sizing: border-box + inset 0) so the border doesn't add
+   to the row's footprint or nudge the column widths of an adjacent cell.
+   The fill is translucent, not opaque - this div paints on top of the whole
+   static table underneath it (an absolutely-positioned sibling always
+   paints after static in-flow content, regardless of z-index), so an opaque
+   fill would hide the row's own numbers/inputs rather than just tint them.
+   pointer-events: none carries that same requirement - a click or keystroke
+   must still reach the actual cell underneath, not this overlay. */
+.ae-row-focus {
+  position: absolute;
+  /* Same z-index as .ae-row-ring (not the sticky header's 1) - stays under
+     the header rather than painting over it if a focused row ever scrolls
+     to sit right at the header's edge. */
+  z-index: 0;
+  box-sizing: border-box;
+  background-color: var(--ae-row-focus-bg);
+  border: 1px solid var(--ae-toolbar-border);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.ae-table-scroll {
+  position: relative;
+  min-width: 0;
+  overflow-x: auto;
+  /* No hard edge around the table - a soft white glass glow (not the
+     brand-gold --ae-glass-shadow the page header card uses), so the whole
+     pane reads as floating rather than boxed in. Side/bottom margins still
+     match .ae-page-header's -18px (a 6px gap to the viewport edge) instead
+     of bleeding off-screen, so the glow has room to be visible. */
+  border: 0.3px solid var(--ae-hairline);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(255, 255, 255, 0.22),
+    0 0 32px rgba(255, 255, 255, 0.12);
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border-radius: 6px;
+  flex: 1;
+  min-height: 0;
+  margin: 0 calc(-18px / var(--ae-zoom, 1)) calc(-18px / var(--ae-zoom, 1));
+}
+
+.ae-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* A content pane with the same surface as the entry tables (.ae-table-scroll):
+   the translucent glass fill WITH its backdrop blur, hairline edge and soft
+   glow. Without the blur the fill reads far more see-through than the entries
+   do, so every list/card page uses this instead of restating the fill. */
+/* Pager step buttons («  ‹  ›): no border and no fill at rest - just the glyph,
+   with a soft tint on hover/focus - so the pager reads as text controls, not a
+   row of boxes. */
+/* The pager's "Rows per page" box: no outline at rest, like the step buttons
+   beside it (the focus ring still shows, for keyboard users). */
+.ae-pager .ae-select {
+  border-color: transparent;
+}
+.ae-pager .ae-select:hover:not(:disabled):not(:focus) {
+  border-color: transparent;
+  background: var(--ae-row-hover);
+}
+.ae-pager .ae-select:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ae-pager-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ae-text);
+  font: inherit;
+  font-size: calc(18px * var(--ae-fs, 1));
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ae-pager-btn:hover:not(:disabled),
+.ae-pager-btn:focus-visible {
+  background: var(--ae-row-hover);
+  outline: none;
+}
+.ae-pager-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--ae-glass-accent);
+}
+.ae-pager-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ae-panel {
+  position: relative;
+  overflow: hidden;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 6px;
+  background: var(--ae-surface-glass);
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 16px rgba(255, 255, 255, 0.22),
+    0 0 32px rgba(255, 255, 255, 0.12);
+}
+
+/* Themed scrollbars for table containers, modal bodies, and the main content
+   pane - a thin, pill-shaped thumb (same border-radius: 999px as
+   .ae-input/.ae-select) that turns brand gold on hover, instead of the
+   OS-default bar clashing with the dark/paper theme. Toolbar and
+   sidebar-nav scrollbars stay hidden (see their own ::-webkit-scrollbar
+   rules) - those are intentionally invisible, unlike these, which need to
+   stay visible/grabbable. .ae-modal-body covers every Modal-based dialog's
+   own scroll area (e.g. the Review Import modal's Unmatched list, which
+   also gets .table-scroll directly - see CsvTools.tsx) for free. */
+.ae-table-scroll,
+.ae-table-wrap,
+.table-scroll,
+.ae-main,
+.ae-modal-body,
+.ae-vh-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #f5c000 var(--ae-bg-alt);
+}
+.ae-table-scroll::-webkit-scrollbar,
+.ae-table-wrap::-webkit-scrollbar,
+.table-scroll::-webkit-scrollbar,
+.ae-main::-webkit-scrollbar,
+.ae-modal-body::-webkit-scrollbar,
+.ae-vh-scroll::-webkit-scrollbar {
+  /* Divided by the page zoom (see zoomStyle in ZoomControl.tsx) so the bar
+     stays a constant, grabbable 10px on screen at 50%-200%. */
+  width: calc(10px / var(--ae-zoom, 1));
+  height: calc(10px / var(--ae-zoom, 1));
+}
+.ae-table-scroll::-webkit-scrollbar-track,
+.ae-table-wrap::-webkit-scrollbar-track,
+.table-scroll::-webkit-scrollbar-track,
+.ae-main::-webkit-scrollbar-track,
+.ae-modal-body::-webkit-scrollbar-track,
+.ae-vh-scroll::-webkit-scrollbar-track {
+  background: var(--ae-bg-alt);
+}
+.ae-table-scroll::-webkit-scrollbar-thumb,
+.ae-table-wrap::-webkit-scrollbar-thumb,
+.table-scroll::-webkit-scrollbar-thumb,
+.ae-main::-webkit-scrollbar-thumb,
+.ae-modal-body::-webkit-scrollbar-thumb,
+.ae-vh-scroll::-webkit-scrollbar-thumb {
+  background-color: #f5c000;
+  border-radius: 6px;
+  border: 2px solid var(--ae-bg-alt);
+}
+.ae-table-scroll::-webkit-scrollbar-thumb:hover,
+.ae-table-wrap::-webkit-scrollbar-thumb:hover,
+.table-scroll::-webkit-scrollbar-thumb:hover,
+.ae-main::-webkit-scrollbar-thumb:hover,
+.ae-modal-body::-webkit-scrollbar-thumb:hover,
+.ae-vh-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #d4a000;
+}
+.ae-table-scroll::-webkit-scrollbar-corner,
+.table-scroll::-webkit-scrollbar-corner,
+.ae-modal-body::-webkit-scrollbar-corner,
+.ae-vh-scroll::-webkit-scrollbar-corner {
+  background: var(--ae-bg-alt);
+}
+/* Version history panel: its two scroll areas sit on the panel's own paper/
+   surface colours, not --ae-bg-alt, so the track is transparent and the thumb's
+   inset is a transparent border (clipped to the padding box) rather than a
+   border painted in a background colour that would not match. */
+.ae-vh-scroll {
+  scrollbar-color: #f5c000 transparent;
+}
+.ae-vh-scroll::-webkit-scrollbar-track,
+.ae-vh-scroll::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.ae-vh-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Main table container: it has rounded corners now, and a full-length
+   scrollbar track ran straight over them. Chromium ignores the ::-webkit-
+   scrollbar rules whenever the standard scrollbar-width/-color above are
+   set, so hand those back to the webkit rules for this container only, then
+   inset the track's ends by the corner radius so the bar stops short of the
+   corners (Firefox keeps the thin standard bar). */
+@supports selector(::-webkit-scrollbar) {
+  .ae-table-scroll {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .ae-table-scroll::-webkit-scrollbar-track:vertical {
+    margin-block: 8px;
+  }
+  .ae-table-scroll::-webkit-scrollbar-track:horizontal {
+    margin-inline: 8px;
+  }
+  .ae-table-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .ae-table-scroll::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+.ae-input,
+.ae-select {
+  font-family: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  padding: 7px 10px;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 6px;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+.ae-input:hover:not(:disabled):not(:focus),
+.ae-select:hover:not(:disabled):not(:focus) {
+  border-color: #d4a000;
+}
+.ae-input:focus,
+.ae-select:focus {
+  outline: none;
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
+}
+/* The :focus rule above removes the outline, leaving only a hairline border and
+   a faint glow. This is the visible indicator. Grid cells (.ae-input-cell) have
+   their own focus design and are left alone. */
+.ae-input:not(.ae-input-cell):focus-visible,
+.ae-select:focus-visible {
+  outline: none;
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
+}
+.ae-input:disabled,
+.ae-select:disabled {
+  background: var(--ae-surface-hover);
+  color: var(--ae-text-muted);
+  cursor: not-allowed;
+}
+
+.ae-input-cell {
+  /* Square corners: an editable grid cell sits flush in its table cell. */
+  border-radius: 0;
+  padding: 2px 5px;
+  background: var(--ae-input-cell-bg);
+  color: var(--ae-input-cell-text);
+  border-width: 1px;
+  border-color: var(--ae-input-cell-border);
+}
+.ae-input-cell:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-input-cell-border);
+}
+/* Clicking into a cell shows no border or ring - the caret and the cell's own
+   fill are the only cue. */
+.ae-input-cell:focus {
+  border-color: transparent;
+  box-shadow: none;
+}
+.ae-input-cell:disabled {
+  background: var(--ae-input-cell-bg);
+  color: var(--ae-input-cell-text-muted);
+}
+
+/* Edited cell: a value staged in the grid but not saved yet (see StockGrid's
+   `pending` prop). Goes back to normal once saved, discarded or reverted. */
+.ae-input-cell.ae-input-cell--edited,
+.ae-input-cell.ae-input-cell--edited:hover:not(:disabled):not(:focus) {
+  background: var(--ae-input-cell-edited-bg);
+  color: var(--ae-input-cell-edited-text);
+  border-color: var(--ae-input-cell-edited-border);
+}
+.ae-input-cell.ae-input-cell--edited:focus {
+  background: var(--ae-input-cell-edited-bg);
+  color: var(--ae-input-cell-edited-text);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.ae-number-cell {
+  position: relative;
+  display: inline-flex;
+}
+.ae-number-cell .ae-input-cell {
+  flex: 1;
+  min-width: 0;
+  padding-right: 18px;
+}
+.ae-number-cell input[type="number"]::-webkit-inner-spin-button,
+.ae-number-cell input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.ae-number-cell input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+.ae-number-cell-spin {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  bottom: 3px;
+  width: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 100ms ease;
+}
+.ae-number-cell:hover .ae-number-cell-spin,
+.ae-number-cell:focus-within .ae-number-cell-spin {
+  opacity: 1;
+  pointer-events: auto;
+}
+.ae-number-cell-spin button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+}
+.ae-number-cell-spin button:hover {
+  background: var(--ae-input-cell-spin-hover-bg);
+}
+.ae-number-cell-spin button::before {
+  content: "";
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+.ae-number-cell-spin-up::before {
+  border-bottom: 5px solid var(--ae-input-cell-spin);
+}
+.ae-number-cell-spin-down::before {
+  border-top: 5px solid var(--ae-input-cell-spin);
+}
+
+/* ---- Date picker (components/DatePicker.tsx) ---------------------------
+   The trigger is a <button> styled as an .ae-input; the calendar dialog is
+   portaled to <body>, so its rules key off .ae-datepicker rather than any
+   ancestor. The header band is always brand-black (like the table headers),
+   and the selected day is brand-yellow, in both themes. */
+.ae-date-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 136px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ae-date-trigger.ae-input:hover:not(:disabled):not(:focus):not([aria-expanded="true"]) {
+  /* No hover border on a date picker: keep the resting one. */
+  border-color: var(--ae-hairline);
+}
+.ae-date-trigger[aria-expanded="true"] {
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
+}
+.ae-date-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ae-date-trigger-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: #d4a000;
+  transition: color 120ms ease;
+}
+.ae-date-trigger:hover:not(:disabled) .ae-date-trigger-icon,
+.ae-date-trigger[aria-expanded="true"] .ae-date-trigger-icon {
+  color: #d4a000;
+}
+:root[data-theme="dark"] .ae-date-trigger-icon {
+  color: #f5c000;
+}
+/* Compact and circle toolbar tiers squeeze the field to ~100px / ~84px, so
+   they swap to the numeric "9/19/26" form (circle also drops the icon). The
+   circle tier's class list includes .ae-toolbar--compact, so the first two
+   rules cover both. */
+.ae-date-short {
+  display: none;
+}
+.ae-toolbar--compact .ae-date-long {
+  display: none;
+}
+.ae-toolbar--compact .ae-date-short {
+  display: inline;
+}
+.ae-toolbar--circle .ae-date-trigger-icon {
+  display: none;
+}
+
+.ae-datepicker {
+  position: fixed;
+  z-index: 300; /* above Modal (200) so a picker inside a dialog still shows */
+  overflow: hidden;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  /* Thin edge, matching the dialogs' 0.5px border (Modal.tsx). */
+  border: 0.3px solid var(--ae-hairline);
+  /* Same 8px radius as .ae-page-header/.ae-modal-panel - every floating
+     panel in the app reads as the same family of rounded brand chrome. */
+  border-radius: 6px;
+  box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
+  font-size: calc(13px * var(--ae-fs, 1));
+  user-select: none;
+  outline: none;
+}
+.ae-datepicker button {
+  font-family: inherit;
+}
+.ae-datepicker-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  background: #232323;
+  color: #e5e5e5;
+}
+.ae-datepicker-title {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: calc(14px * var(--ae-fs, 1));
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ae-datepicker-title:hover {
+  background: rgba(245, 192, 0, 0.14);
+}
+.ae-datepicker-nav {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: #f5c000;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+.ae-datepicker-nav:hover {
+  background: rgba(245, 192, 0, 0.16);
+  border-color: rgba(245, 192, 0, 0.5);
+}
+.ae-datepicker-title:focus-visible,
+.ae-datepicker-nav:focus-visible {
+  outline: 2px solid #f5c000;
+  outline-offset: 1px;
+}
+.ae-datepicker-body {
+  min-height: 262px; /* days view height, so switching to months doesn't shrink the dialog */
+  padding: 10px 12px 6px;
+}
+.ae-datepicker-weekdays,
+.ae-datepicker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.ae-datepicker-weekday {
+  padding: 4px 0 6px;
+  text-align: center;
+  font-size: calc(10.5px * var(--ae-fs, 1));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ae-text-muted);
+}
+.ae-datepicker-day {
+  width: 34px;
+  height: 34px;
+  margin: 1px auto;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.ae-datepicker-day:hover {
+  background: var(--ae-surface-hover);
+}
+.ae-datepicker-day--outside {
+  color: var(--ae-text-muted);
+  opacity: 0.55;
+}
+.ae-datepicker-day--today {
+  border-color: #d4a000;
+  font-weight: 700;
+}
+.ae-datepicker-day--selected,
+.ae-datepicker-day--selected:hover {
+  background: #f5c000;
+  border-color: #f5c000;
+  color: #0c0c0c;
+  font-weight: 800;
+  opacity: 1;
+}
+.ae-datepicker-day:focus-visible,
+.ae-datepicker-month:focus-visible,
+.ae-datepicker-today:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 1px;
+}
+.ae-datepicker-months {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 6px 0;
+}
+.ae-datepicker-month {
+  padding: 14px 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.ae-datepicker-month:hover {
+  background: var(--ae-surface-hover);
+}
+.ae-datepicker-month--selected,
+.ae-datepicker-month--selected:hover {
+  background: #f5c000;
+  border-color: #f5c000;
+  color: #0c0c0c;
+  font-weight: 800;
+}
+.ae-datepicker-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  border-top: 0.3px solid var(--ae-hairline);
+}
+.ae-datepicker-foot-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-datepicker-today {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid #d4a000;
+  border-radius: 6px;
+  background: transparent;
+  color: #d4a000;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.ae-datepicker-today:hover {
+  background: rgba(212, 160, 0, 0.14);
+}
+/* DateRangePicker: preset row above the calendar, the days between the two
+   ends, and a non-interactive month title between the arrows. */
+.ae-datepicker-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 10px 0;
+}
+.ae-datepicker-presets .ae-datepicker-today {
+  padding: 3px 9px;
+}
+.ae-datepicker-head > span.ae-datepicker-title {
+  text-align: center;
+  cursor: default;
+}
+.ae-datepicker-head > span.ae-datepicker-title:hover {
+  background: transparent;
+}
+.ae-datepicker-day--inrange,
+.ae-datepicker-day--inrange:hover {
+  background: rgba(245, 192, 0, 0.22);
+  border-radius: 6px;
+}
+.ae-date-range-trigger {
+  min-width: 190px;
+}
+@media print {
+  .ae-datepicker {
+    display: none !important;
+  }
+}
+
+/* ---- Dropdown (components/Dropdown.tsx) ---------------------------------
+   Themed replacement for a bare <select>, used by every toolbar dropdown
+   (CategoryFilter, ShiftFilter, ZoomControl, and the page-level filter
+   selects). Same trigger-plus-portaled-panel shape as the date picker
+   above, and deliberately styled to match it: same .ae-input trigger, same
+   8px radius, dark-shadowed panel, same brand-yellow selected state. */
+.ae-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 96px;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.ae-select-trigger[aria-expanded="true"] {
+  border-color: rgba(212, 160, 0, 0.5);
+  box-shadow: 0 0 6px rgba(212, 160, 0, 0.35);
+}
+.ae-select-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ae-select-trigger-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: #d4a000;
+  transition:
+    color 120ms ease,
+    transform 120ms ease;
+}
+.ae-select-trigger:hover:not(:disabled) .ae-select-trigger-icon,
+.ae-select-trigger[aria-expanded="true"] .ae-select-trigger-icon {
+  color: #d4a000;
+}
+.ae-select-trigger[aria-expanded="true"] .ae-select-trigger-icon {
+  transform: rotate(180deg);
+}
+:root[data-theme="dark"] .ae-select-trigger-icon {
+  color: #f5c000;
+}
+.ae-select-trigger:disabled {
+  cursor: not-allowed;
+}
+
+.ae-dropdown {
+  position: fixed;
+  z-index: 300; /* above Modal (200), same as .ae-datepicker */
+  overflow: hidden;
+  background: var(--ae-surface);
+  color: var(--ae-text);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
+  font-size: calc(13px * var(--ae-fs, 1));
+  outline: none;
+}
+.ae-dropdown-list {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 4px 0;
+  /* Scroll is still fully usable (wheel/touch/keyboard) - the bar itself is
+     just hidden, matching the plainer look asked for here (unlike the
+     table/main-pane scrollbars, which stay visible - see .ae-table-scroll
+     above). */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ae-dropdown-list::-webkit-scrollbar {
+  display: none;
+}
+.ae-dropdown button {
+  font-family: inherit;
+}
+.ae-dropdown-option {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.ae-dropdown-option:hover {
+  background: var(--ae-surface-hover);
+}
+.ae-dropdown-option--selected,
+.ae-dropdown-option--selected:hover {
+  background: #f5c000;
+  color: #0c0c0c;
+  font-weight: 800;
+}
+.ae-dropdown-option:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: -2px;
+}
+@media print {
+  .ae-dropdown {
+    display: none !important;
+  }
+}
+
+.ae-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 30px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%238B6A1E' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 11px;
+}
+.ae-select:disabled {
+  cursor: not-allowed;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%238a8272' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+.ae-btn {
+  font-family: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition:
+    background-color var(--ae-dur-micro) ease-out,
+    border-color var(--ae-dur-micro) ease-out,
+    color var(--ae-dur-micro) ease-out,
+    filter var(--ae-dur-micro) ease-out,
+    opacity var(--ae-dur-micro) ease-out,
+    transform 90ms ease-out;
+}
+.ae-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.ae-btn:active:not(:disabled) {
+  filter: brightness(0.94);
+  /* A light press, replacing the bouncy scale the button used to animate. */
+  transform: scale(0.985);
+}
+.ae-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ae-btn-sm {
+  padding: 5px 10px;
+  font-size: calc(12px * var(--ae-fs, 1));
+}
+.ae-btn-primary {
+  background: #c1272d;
+  border-color: #c1272d;
+  color: #e5e5e5;
+}
+.ae-btn-secondary {
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+  color: var(--ae-btn-yellow-text);
+}
+/* Solid brand-yellow button - same fill as the toolbar's primary action, with
+   no border. Used where a secondary action should read as a button rather
+   than an outlined box (Settings). Declared after .ae-btn-secondary so it wins
+   when both classes are present. */
+.ae-btn-secondary:hover:not(:disabled),
+.ae-btn-ghost:hover:not(:disabled) {
+  background: var(--ae-btn-yellow-hover);
+  filter: none;
+}
+.ae-btn-solid {
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+  color: var(--ae-btn-yellow-text);
+}
+.ae-btn-solid:hover:not(:disabled) {
+  background: var(--ae-btn-yellow-hover);
+  filter: none;
+}
+.ae-btn-solid:active:not(:disabled) {
+  background: var(--ae-btn-yellow-active);
+  filter: none;
+}
+
+/* Sub-page switcher (Settings, Admin queue, Corrections): the same text tabs
+   and gold underline as the main nav strip (.ae-header-tab in toolbar.css) -
+   a 2px rounded line that grows in on hover and stays, glowing, under the
+   current tab. */
+.ae-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 24px;
+  padding-bottom: 6px; /* room for the glow */
+  border-bottom: 1px solid var(--ae-glass-divider);
+}
+.ae-subtab {
+  position: relative;
+  font-family: inherit;
+  font-size: calc(13.5px * var(--ae-fs, 1));
+  font-weight: 500;
+  line-height: 1.2;
+  padding: 3px 10px 6px;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  color: var(--ae-text);
+  background: none;
+  outline: none;
+}
+.ae-subtab::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ae-glass-accent);
+  transform: scaleX(0);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.ae-subtab:hover::after,
+.ae-subtab:focus-visible::after {
+  transform: scaleX(1);
+}
+.ae-subtab[aria-selected="true"]::after {
+  transform: scaleX(1);
+  /* Same two-layer glow as the top loading line (.ae-top-progress-bar). */
+  box-shadow:
+    0 0 6px 1px rgba(245, 192, 0, 0.8),
+    0 0 16px 3px rgba(245, 192, 0, 0.45);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-subtab::after {
+    transition: none;
+  }
+}
+
+.ae-btn-ghost {
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+  color: var(--ae-btn-yellow-text);
+}
+.ae-btn-danger {
+  background: transparent;
+  border-color: var(--ae-danger-text);
+  color: var(--ae-danger-text);
+}
+
+/* The "..." button at the end of a table row (opens that row's action menu). */
+.ae-row-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ae-text-muted);
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+.ae-row-menu-btn:hover:not(:disabled),
+.ae-row-menu-btn[aria-expanded="true"] {
+  background: var(--ae-row-hover);
+  color: var(--ae-text);
+}
+.ae-row-menu-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

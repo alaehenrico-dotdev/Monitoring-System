@@ -1,0 +1,658 @@
+/* =========================================================================
+   Menu-bar toolbar (components/EntryToolbar.tsx, MenuBar.tsx, SplitButton.tsx).
+
+   Calm and compact: borderless buttons with a subtle hover, one radius, one
+   border weight, no shadow except on an open menu. Gray for normal text and
+   icons; the accent colour is only for the primary action, an active filter and
+   keyboard focus. Every colour, radius and size is a token below, each with a
+   light and a dark value, so nothing in the components names a colour.
+   ========================================================================= */
+:root {
+  --ae-mb-radius: 4px;
+  --ae-mb-gap: 6px;
+  --ae-mb-h: 28px; /* control height; never under 28px */
+  --ae-mb-line-w: 1px; /* the one border weight */
+  /* Open menus (portaled to <body>, so these live on :root, not on the bar). */
+  --ae-mb-menu-bg: var(--ae-surface);
+  --ae-mb-menu-text: var(--ae-text);
+  --ae-mb-menu-muted: var(--ae-text-muted);
+  --ae-mb-menu-line: var(--ae-border);
+  --ae-mb-menu-hover: var(--ae-surface-hover);
+  --ae-mb-menu-focus: var(--ae-focus-ring);
+  --ae-mb-menu-danger: var(--ae-danger-text);
+  --ae-mb-menu-shadow: 0 8px 24px rgba(12, 12, 12, 0.18);
+}
+:root[data-theme="dark"] {
+  --ae-mb-menu-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+/* The bar itself sits inside the page header, so its text and hover colours come
+   from that card's own tokens and follow it in light, dark and Enterprise. */
+.ae-mb {
+  --ae-mb-text: var(--ae-glass-text);
+  --ae-mb-muted: var(--ae-glass-text-muted);
+  --ae-mb-hover: var(--ae-tb-field-bg-hover);
+  --ae-mb-line: var(--ae-tb-hairline);
+  --ae-mb-accent: var(--ae-glass-accent);
+  --ae-mb-primary-bg: var(--ae-btn-yellow);
+  --ae-mb-primary-text: var(--ae-btn-yellow-text);
+  --ae-mb-warn: #8a4b00; /* amber, dark enough on the light header */
+  container-type: inline-size;
+  container-name: ae-mb;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: var(--ae-mb-gap);
+  flex-wrap: nowrap;
+  /* The shared .ae-toolbar clips its overflow; focus rings must not be clipped. */
+  overflow: visible;
+}
+:root[data-theme="dark"] .ae-mb,
+:root[data-ui="enterprise"] .ae-mb {
+  --ae-mb-warn: #fbbf24; /* the dark and Enterprise headers are dark */
+}
+@media (pointer: coarse) {
+  .ae-mb {
+    --ae-mb-h: 40px;
+  }
+}
+
+.ae-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---- Layout ----------------------------------------------------------------- */
+.ae-mb-menus,
+.ae-mb-filters,
+.ae-mb-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ae-mb-gap);
+}
+.ae-mb-menus {
+  flex: 0 0 auto;
+}
+.ae-mb-filters {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.ae-mb-actions {
+  flex: 0 0 auto;
+}
+.ae-mb-spacer {
+  flex: 1 1 0;
+  min-width: 8px;
+}
+.ae-mb-divider {
+  flex: 0 0 var(--ae-mb-line-w);
+  width: var(--ae-mb-line-w);
+  height: 22px;
+  background: var(--ae-mb-line);
+}
+.ae-mb-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.ae-mb-optional {
+  display: contents;
+}
+.ae-mb .ae-unsaved-badge {
+  align-self: center;
+}
+.ae-mb-overflow {
+  display: none;
+}
+
+/* ---- Buttons and menu triggers ---------------------------------------------- */
+.ae-mb-btn,
+.ae-mb-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  height: var(--ae-mb-h);
+  padding: 0 6px;
+  border: var(--ae-mb-line-w) solid transparent;
+  border-radius: var(--ae-mb-radius);
+  background: transparent;
+  color: var(--ae-mb-text);
+  font: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--ae-dur-micro) ease-out,
+    border-color var(--ae-dur-micro) ease-out,
+    color var(--ae-dur-micro) ease-out;
+}
+.ae-mb-btn:hover,
+.ae-mb-trigger:hover,
+.ae-mb-trigger--open {
+  background: var(--ae-mb-hover);
+}
+.ae-mb-btn:focus-visible,
+.ae-mb-trigger:focus-visible,
+.ae-savestatus-retry:focus-visible {
+  outline: 2px solid var(--ae-mb-accent);
+  outline-offset: 1px;
+}
+.ae-mb-trigger svg {
+  opacity: 0.7;
+}
+.ae-mb-trigger--icon {
+  width: var(--ae-mb-h);
+  padding: 0;
+  justify-content: center;
+}
+.ae-mb-btn--icon {
+  width: var(--ae-mb-h);
+  padding: 0;
+  justify-content: center;
+}
+/* Unavailable: dimmed AND dashed, so it never depends on colour alone. The
+   reason is its tooltip and its accessible description. */
+.ae-mb-btn[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-style: dashed;
+  border-color: var(--ae-mb-line);
+}
+.ae-mb-btn[aria-disabled="true"]:hover {
+  background: transparent;
+}
+
+/* The one filled button on the bar. */
+.ae-mb-btn--primary {
+  background: var(--ae-mb-primary-bg);
+  color: var(--ae-mb-primary-text);
+}
+.ae-mb-btn--primary:hover {
+  background: var(--ae-mb-primary-bg);
+  filter: brightness(1.06);
+}
+.ae-mb-btn--primary[aria-disabled="true"]:hover {
+  background: var(--ae-mb-primary-bg);
+  filter: none;
+}
+
+/* Finish: outlined amber, a distinct consequential action. */
+.ae-split {
+  display: inline-flex;
+  align-items: stretch;
+  height: var(--ae-mb-h);
+  border: 0;
+  border-radius: var(--ae-mb-radius);
+  background: var(--ae-btn-yellow);
+  color: var(--ae-btn-yellow-text);
+  margin-left: 6px;
+}
+.ae-split .ae-mb-btn {
+  height: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  color: inherit;
+}
+.ae-split .ae-mb-btn:hover {
+  background: var(--ae-btn-yellow-hover);
+}
+.ae-split .ae-split-main {
+  border-top-left-radius: calc(var(--ae-mb-radius) - 1px);
+  border-bottom-left-radius: calc(var(--ae-mb-radius) - 1px);
+}
+.ae-split .ae-split-chevron {
+  padding: 0 6px;
+  border-left: 0;
+  border-top-right-radius: calc(var(--ae-mb-radius) - 1px);
+  border-bottom-right-radius: calc(var(--ae-mb-radius) - 1px);
+}
+.ae-split:has(.ae-split-main[aria-disabled="true"]) {
+  opacity: 0.6;
+}
+.ae-split .ae-mb-btn[aria-disabled="true"] {
+  border: 0;
+  opacity: 1;
+}
+/* "Ready": a tint and heavier text - a state you can read, not a pulse. */
+.ae-split--attention {
+  background: var(--ae-btn-yellow-hover);
+  font-weight: 700;
+}
+
+/* ---- Save status ------------------------------------------------------------- */
+.ae-savestatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  color: var(--ae-mb-muted);
+  white-space: nowrap;
+}
+.ae-savestatus--failed {
+  color: var(--ae-mb-warn);
+  font-weight: 600;
+}
+.ae-savestatus-retry {
+  min-height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---- Date control and filters ------------------------------------------------- */
+.ae-datestep {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.ae-datestep-today {
+  padding: 0 8px;
+}
+.ae-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+/* An active filter: an accent underline AND a dot (a shape), plus words for a
+   screen reader (FilterSlot) - never just a colour. */
+.ae-filter--active {
+  box-shadow: inset 0 calc(-2 * var(--ae-mb-line-w)) 0 var(--ae-mb-accent);
+}
+.ae-filter-dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ae-mb-accent);
+  pointer-events: none;
+}
+.ae-select-trigger-prefix {
+  color: var(--ae-mb-muted);
+  font-weight: 500;
+}
+/* The shared trigger text has line-height: 1 and overflow: hidden, which clips
+   the tails of g, y and p ("Category"). */
+.ae-mb .ae-select-trigger-text {
+  line-height: 1.35;
+}
+.ae-mb-optional .ae-select-trigger-prefix {
+  color: var(--ae-mb-muted);
+}
+
+/* ---- Open menus ---------------------------------------------------------------- */
+.ae-mb-menu {
+  position: fixed;
+  z-index: 300; /* above dialogs (200), like the other floating panels */
+  min-width: 220px;
+  max-width: min(340px, calc(100vw - 16px));
+  max-height: calc(var(--ae-vh) - 24px);
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--ae-mb-menu-bg);
+  color: var(--ae-mb-menu-text);
+  border: var(--ae-mb-line-w) solid var(--ae-mb-menu-line);
+  border-radius: var(--ae-mb-radius);
+  box-shadow: var(--ae-mb-menu-shadow); /* the only shadow in the system */
+  font-size: calc(13px * var(--ae-fs, 1));
+}
+.ae-mb-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: calc(var(--ae-mb-radius) - 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.ae-mb-item:hover,
+.ae-mb-item--active {
+  background: var(--ae-mb-menu-hover);
+}
+.ae-mb-item:focus-visible {
+  outline: 2px solid var(--ae-mb-menu-focus);
+  outline-offset: -2px;
+}
+.ae-mb-item--disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+.ae-mb-item--danger .ae-mb-item-label {
+  color: var(--ae-mb-menu-danger);
+}
+.ae-mb-item-icon {
+  display: inline-flex;
+  flex: none;
+  width: 16px;
+  justify-content: center;
+}
+.ae-mb-item-label {
+  flex: 1 1 auto;
+}
+.ae-mb-shortcut {
+  margin-left: 24px;
+  font: inherit;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-mb-menu-muted);
+}
+.ae-mb-item-flag {
+  display: inline-flex;
+  margin-left: 24px;
+  color: var(--ae-mb-menu-muted);
+}
+.ae-mb-sep {
+  height: var(--ae-mb-line-w);
+  margin: 4px 2px;
+  background: var(--ae-mb-menu-line);
+}
+.ae-mb-heading {
+  padding: 6px 10px 2px;
+  font-size: calc(11px * var(--ae-fs, 1));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ae-mb-menu-muted);
+}
+
+/* ---- Responsive: three steps, by the bar's own width -----------------------------
+   The page header's width, not the window's, decides - the same toolbar can be
+   wide on one page and squeezed on another.
+   wide    everything.
+   medium  the filters become compact chips; "Clear filters" is an icon; the zoom
+           dropdown (also in the View menu) and the unsaved-cells badge (Save
+           shows the count) step aside. Menus, Save and Finish keep their text.
+   narrow  search, the date and Save stay; everything else is in the "..." menu. */
+@container ae-mb (max-width: 1700px) {
+  .ae-mb-filters .ae-mb-optional .ae-select-trigger {
+    border: var(--ae-mb-line-w) solid var(--ae-mb-line);
+    border-radius: var(--ae-mb-radius);
+    padding: 0 8px;
+    max-width: 150px;
+    font-size: calc(12.5px * var(--ae-fs, 1));
+  }
+  .ae-mb-zoom,
+  .ae-mb-actions .ae-unsaved-badge {
+    display: none;
+  }
+  .ae-clear-filters span {
+    display: none;
+  }
+  .ae-clear-filters {
+    width: var(--ae-mb-h);
+    padding: 0;
+    justify-content: center;
+  }
+  .ae-mb-trigger {
+    padding: 0 6px;
+  }
+  /* Compact: a 14-inch laptop gives the bar only ~1200-1400px once the logo
+     and card padding are taken off, so tighten the spacing, label size and
+     chips (the text stays; only the air around it goes). */
+  .ae-mb {
+    --ae-mb-gap: 3px;
+  }
+  .ae-mb-btn,
+  .ae-mb-trigger {
+    font-size: calc(12.5px * var(--ae-fs, 1));
+    gap: 4px;
+  }
+  .ae-mb-btn {
+    padding: 0 5px;
+  }
+  .ae-mb-filters .ae-mb-optional .ae-select-trigger {
+    padding: 0 6px;
+    max-width: 128px;
+  }
+  .ae-datestep-today {
+    padding: 0 6px;
+  }
+  .ae-split {
+    margin-left: 3px;
+  }
+}
+@container ae-mb (max-width: 1100px) {
+  /* !important: the shared ".ae-toolbar > div:first-child" rule gives a toolbar's
+     first child display:flex, with higher specificity than a plain class. */
+  .ae-mb-menus {
+    display: none !important;
+  }
+  .ae-mb-divider,
+  .ae-mb-optional,
+  .ae-mb-finish {
+    display: none;
+  }
+  .ae-mb-overflow {
+    display: inline-flex;
+  }
+}
+/* Very narrow (a phone): search, the date and Save still have to fit side by
+   side. "Today" is in the ... menu (Sheet > Jump to the current shift) and the
+   save status keeps its icon and stays in the accessibility tree, but loses its
+   words on screen. */
+@container ae-mb (max-width: 660px) {
+  .ae-datestep-today {
+    display: none;
+  }
+  .ae-savestatus--saved span,
+  .ae-savestatus--saving span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/* ---- Pages other than the entry sheets (components/PageToolbar.tsx) ---------
+   The same bar. These pages have more, and more varied, filters than the entry
+   sheets, so the filters wrap onto a second row when the bar is too narrow
+   instead of disappearing, and every filter is a compact chip at every width. */
+.ae-mb--page {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.ae-mb--page .ae-mb-filters {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.ae-mb--page .ae-mb-filters .ae-select-trigger,
+.ae-mb--page .ae-mb-filters .ae-date-trigger {
+  border: var(--ae-mb-line-w) solid var(--ae-mb-line);
+  border-radius: var(--ae-mb-radius);
+  padding: 0 8px;
+  /* Never cut a filter label short: a minimum width, and room to grow. */
+  min-width: 96px;
+  max-width: 360px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+}
+.ae-mb--page .ae-mb-filters .ae-select-trigger-text {
+  line-height: 1.35;
+}
+.ae-mb-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ae-mb-gap);
+  margin: 0;
+}
+.ae-mb-flagged {
+  color: var(--ae-mb-warn);
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* The open search box: a hairline at half the bar's one border weight. The
+   closed search is just an icon, so this is only drawn while it is in use. */
+.ae-mb .ae-search--open input[type="search"] {
+  border: calc(var(--ae-mb-line-w) * 0.5) solid var(--ae-mb-line);
+  border-radius: var(--ae-mb-radius);
+}
+
+/* Data tables: one corner radius in every UI style. The style blocks above round
+   panels, stat cards and tables together, so this sits last and matches their
+   specificity (:root[data-ui="x"] .cls) to take the tables back out of that. */
+.ae-table-scroll,
+.ae-table-wrap,
+.table-scroll,
+:root[data-ui] .ae-table-scroll,
+:root[data-ui] .ae-table-wrap,
+:root[data-ui] .table-scroll {
+  border-radius: var(--ae-table-radius);
+}
+
+/* ---- Pinned header + tab strip: frosted glass in EVERY theme ---------------
+   The pair stays pinned while a page scrolls underneath it, so each theme's
+   surface is made translucent here and blurred (glassmorphism) instead of
+   solid or fully clear. Kept last in the file, at the same specificity as the
+   per-theme rules above, so it wins them without !important. The themes keep
+   their own colours - only the opacity changes - and "glass"/"classic" already
+   were frosted, so they only pick up the shared blur. */
+:root:root[data-ui] .ae-page-header {
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(150%);
+}
+:root:root[data-ui] .ae-sticky-head > .ae-header-tabs {
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(150%);
+}
+:root:root[data-ui="enterprise"] .ae-page-header {
+  background: rgba(12, 12, 12, 0.7);
+}
+:root:root[data-ui="brutal"] .ae-page-header {
+  background: color-mix(in srgb, var(--ae-nb-gold) 70%, transparent);
+}
+:root:root[data-ui="brutal"] .ae-page-header.ae-page-header--offline {
+  background: color-mix(in srgb, var(--ae-nb-red) 75%, transparent);
+}
+:root:root[data-ui="flat"] .ae-page-header {
+  background: rgba(245, 192, 0, 0.7);
+}
+:root:root[data-ui="flat"] .ae-page-header.ae-page-header--offline {
+  background: rgba(193, 39, 45, 0.78);
+}
+:root:root[data-ui="minimal"] .ae-page-header {
+  background: color-mix(in srgb, var(--ae-bg) 55%, transparent);
+}
+:root:root[data-ui="skeuo"] .ae-page-header {
+  background: linear-gradient(180deg, rgba(74, 56, 38, 0.76), rgba(51, 38, 26, 0.76));
+}
+:root:root[data-ui="aurora"] .ae-page-header {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
+    linear-gradient(120deg, rgba(79, 70, 229, 0.88), rgba(124, 58, 237, 0.88) 55%, rgba(192, 38, 211, 0.88));
+}
+:root:root[data-ui="enterprise"] .ae-sticky-head > .ae-header-tabs,
+:root:root[data-ui="brutal"] .ae-sticky-head > .ae-header-tabs,
+:root:root[data-ui="aurora"] .ae-sticky-head > .ae-header-tabs {
+  background: color-mix(in srgb, var(--ae-surface) 62%, transparent);
+}
+:root:root[data-ui="flat"] .ae-sticky-head > .ae-header-tabs,
+:root:root[data-ui="minimal"] .ae-sticky-head > .ae-header-tabs,
+:root:root[data-ui="glass"] .ae-sticky-head > .ae-header-tabs {
+  background: color-mix(in srgb, var(--ae-bg) 45%, transparent);
+}
+:root:root[data-ui="skeuo"] .ae-sticky-head > .ae-header-tabs {
+  background: linear-gradient(180deg, rgba(230, 217, 184, 0.68), rgba(211, 196, 156, 0.68));
+}
+:root:root[data-ui="skeuo"][data-theme="dark"] .ae-sticky-head > .ae-header-tabs {
+  background: linear-gradient(180deg, rgba(58, 48, 34, 0.7), rgba(42, 34, 24, 0.7));
+}
+
+
+/* ---- Responsive polish: header title, finish area, request-unlock ------------
+   The title was a fixed 1.5em: on a phone "Daily Offline Stock Monitoring - October
+   20, 2026 - Daily Sheet" took four lines. It is fluid now (about 17px on a
+   phone, 24px on a desk), balanced across lines, and breaks a long word rather
+   than pushing the clock off screen. */
+.ae-page-header h2 {
+  font-size: clamp(1.05rem, 0.8rem + 1.1vw, 1.5rem);
+  line-height: 1.2;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+
+/* The finish area holds up to two controls (Request unlock, Finish day / Finish
+   pending days): keep them on one line with the bar's own gap, and let the
+   container steps below hide the whole group in favour of the "..." menu. */
+.ae-mb-finish {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ae-mb-gap);
+  min-width: 0;
+}
+/* Request unlock: outlined amber like the Finish family, so it reads as a
+   related, consequential action without competing with the solid Finish button. */
+.ae-mb-btn--warn {
+  border-color: var(--ae-mb-warn);
+  color: var(--ae-mb-warn);
+}
+.ae-mb-btn--warn:hover:not(:disabled) {
+  background: var(--ae-mb-hover);
+}
+.ae-mb-btn--warn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+/* Mid-width bars: the icon alone carries it (the title and the "..." menu
+   spell it out) so Finish keeps its room. */
+@container ae-mb (max-width: 1350px) {
+  .ae-mb-btn--warn > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+/* Dialogs: the request box (and any textarea in a modal) is a comfortable touch
+   target on a phone, and 16px so iOS does not zoom the page on focus. */
+@media (pointer: coarse), (max-width: 520px) {
+  .ae-modal-panel textarea.ae-input {
+    font-size: calc(16px * var(--ae-fs, 1));
+    min-height: 96px;
+  }
+}
+@media (max-width: 520px) {
+  .ae-modal-panel .ae-btn {
+    flex: 1 1 auto;
+    min-height: 40px;
+    justify-content: center;
+  }
+}
+
+/* Admin Queue summary chips already wrap; make the Unlock requests chip (and the
+   rest) a tidy two-up grid on a phone instead of a ragged line. */
+@media (max-width: 520px) {
+  .ae-dash-chip {
+    flex: 1 1 calc(50% - 8px);
+    text-align: center;
+  }
+}
+

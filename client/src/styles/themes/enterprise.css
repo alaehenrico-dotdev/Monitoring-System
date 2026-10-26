@@ -1,0 +1,166 @@
+/* =========================================================================
+   Enterprise theme (Settings > Appearance > Theme). A pure restyle: the
+   structure, navigation and behavior are the classic layout's, untouched. It
+   only changes how things are drawn - an ink-black header bar with a gold rule
+   instead of the floating glass card, flat ruled tables, squarer controls,
+   ink dialog headers, and warm opaque neutrals instead of the translucent
+   surfaces and the seal watermark. Everything is scoped to
+   :root[data-ui="enterprise"] (ThemeContext sets it), so classic is unchanged.
+
+   Palette comes from the logo: ink black (#0c0c0c), brand gold (#f5c000 /
+   #d4a000) as the one accent, cream neutrals, banner red (#c1272d) for errors.
+   Light tokens are scoped :not([data-theme="dark"]) so they never override the
+   dark color mode's tokens (same specificity, later in the file).
+   ========================================================================= */
+:root[data-ui="enterprise"]:not([data-theme="dark"]) {
+  --ae-bg: #f4f2ec;
+  --ae-bg-alt: #ebe7dc;
+  --ae-surface-hover: #ece6d4;
+  --ae-border: #d6cfbb;
+  --ae-border-soft: #e6e1d1;
+  --ae-border-strong: #b9b19a;
+  --ae-header-bg: #ece6d4;
+  --ae-header-glass: #ece6d4;
+  --ae-surface-glass: #ffffff;
+  --ae-row-hover: rgba(12, 12, 12, 0.04);
+  --ae-glass-blur: none;
+}
+:root[data-ui="enterprise"][data-theme="dark"] {
+  --ae-bg: #161616;
+  --ae-border-strong: #5a5a5a;
+  --ae-header-glass: #2a2a2a;
+  --ae-surface-glass: #262626;
+  --ae-glass-blur: none;
+}
+
+/* A flat page: the seal watermark is a classic flourish. */
+:root[data-ui="enterprise"] .app-shell::before {
+  display: none;
+}
+
+/* ---- Page header: the same card, drawn as an ink bar with a gold rule ---- */
+:root[data-ui="enterprise"] .ae-page-header {
+  /* The card now sits on ink in BOTH color modes, so everything inside reads
+     from the light-on-dark glass values (the dark mode ones). */
+  --ae-glass-text: #f1ecde;
+  --ae-glass-text-muted: #b9b19c;
+  --ae-glass-accent: #f5c000;
+  --ae-glass-divider: rgba(241, 236, 222, 0.2);
+  --ae-tb-bg: rgba(255, 255, 255, 0.04);
+  --ae-tb-border: rgba(255, 255, 255, 0.12);
+  --ae-tb-field-bg: rgba(255, 255, 255, 0.07);
+  --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.13);
+  --ae-tb-field-bg-active: rgba(245, 192, 0, 0.25);
+  --ae-tb-hairline: rgba(255, 255, 255, 0.16);
+  --ae-tb-text: #f5c000;
+  --ae-tb-text-muted: rgba(245, 192, 0, 0.7);
+  background: #0c0c0c;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #f1ecde;
+  border-radius: 0;
+  border-bottom: 3px solid #f5c000;
+  box-shadow: none;
+}
+:root[data-ui="enterprise"] .ae-page-header.ae-page-header--offline {
+  border-bottom-color: var(--ae-danger-text);
+  box-shadow: none;
+}
+:root[data-ui="enterprise"] .ae-page-header h2 {
+  color: #f1ecde;
+}
+:root[data-ui="enterprise"] .ae-page-header p {
+  color: #b9b19c;
+}
+
+/* ---- Tab strip: a ruled band, a solid gold underline ---------------------- */
+:root[data-ui="enterprise"] .ae-sticky-head > .ae-header-tabs {
+  background: var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 1px solid var(--ae-border);
+}
+:root[data-ui="enterprise"] .ae-header-tab {
+  font-weight: 600;
+}
+:root[data-ui="enterprise"] .ae-header-tabs-bar {
+  /* The sliding active-tab line: solid, no neon glow. */
+  background: #d4a000;
+  box-shadow: none;
+  border-radius: 0;
+  height: 3px;
+}
+:root[data-ui="enterprise"] .ae-header-tab::after {
+  background: #d4a000;
+  border-radius: 0;
+}
+
+/* ---- Tables: flat, ruled, opaque ---------------------------------------- */
+:root[data-ui="enterprise"] .ae-table th {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 12.5px;
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border),
+    inset -1px 0 0 var(--ae-border);
+}
+:root[data-ui="enterprise"] .ae-table td {
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border),
+    inset -1px 0 0 var(--ae-border-soft);
+}
+:root[data-ui="enterprise"] .ae-table-scroll,
+:root[data-ui="enterprise"] .ae-table-wrap,
+:root[data-ui="enterprise"] .ae-panel {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 3px;
+}
+
+/* ---- Controls: squarer, with a visible edge ----------------------------- */
+:root[data-ui="enterprise"] .ae-input,
+:root[data-ui="enterprise"] .ae-select {
+  border: 1px solid var(--ae-border-strong);
+  border-radius: 3px;
+}
+:root[data-ui="enterprise"] .ae-input-cell {
+  border-radius: 2px;
+}
+:root[data-ui="enterprise"] .ae-btn {
+  border-radius: 3px;
+}
+:root[data-ui="enterprise"] .ae-btn-primary {
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+  color: var(--ae-btn-yellow-text);
+}
+:root[data-ui="enterprise"] .ae-btn-secondary {
+  background: var(--ae-btn-yellow);
+  border-color: transparent;
+}
+:root[data-ui="enterprise"] .ae-btn-secondary:hover:not(:disabled) {
+  background: var(--ae-btn-yellow-hover);
+  filter: none;
+}
+
+/* ---- Dialogs: ink header bar -------------------------- */
+:root[data-ui="enterprise"] .ae-modal-panel {
+  border-radius: 3px;
+}
+:root[data-ui="enterprise"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="enterprise"] .ae-modal-header {
+  background: #0c0c0c;
+  color: #f1ecde;
+  border-bottom: 1px solid var(--ae-border) !important;
+}
+:root[data-ui="enterprise"] .ae-modal-header h3 {
+  color: #f1ecde;
+}
+:root[data-ui="enterprise"] .ae-modal-header button {
+  color: #f1ecde !important;
+}
+

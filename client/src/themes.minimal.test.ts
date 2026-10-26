@@ -1,11 +1,11 @@
-import { readFileSync } from "node:fs";
+import { readAllCss } from "./test-utils/css";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Guards on the stylesheet itself (jsdom applies no CSS): the Minimalism theme's
 // promises - readable in both colour modes, nothing decorative - and that the
 // retired Card theme left nothing behind.
-const css = readFileSync(join(__dirname, "index.css"), "utf8");
+const css = readAllCss(join(__dirname, "index.css"));
 
 const START = "Minimalism theme (Settings > Appearance > Theme)";
 const startAt = css.indexOf(START);

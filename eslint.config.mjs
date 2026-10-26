@@ -53,6 +53,44 @@ export default tseslint.config(
     languageOptions: { globals: globals.node },
   },
   {
+    // Server layering (see server/ARCHITECTURE.md). Only the boundaries the
+    // code already honours are enforced, so this adds no warnings today and
+    // catches regressions. Services may use Prisma directly; controllers and
+    // routes may not, and neither may repositories reach upward.
+    files: ["server/src/{controllers,routes}/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["**/lib/prisma", "**/repositories/*"], message: "Controllers/routes call services only; data access belongs in services/repositories." },
+        ],
+      }],
+    },
+  },
+  {
+    files: ["server/src/repositories/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["**/services/*", "**/controllers/*", "**/routes/*", "express"], message: "Repositories are the bottom layer: no upward imports." },
+        ],
+      }],
+    },
+  },
+  {
+    files: ["server/src/services/**/*.ts"],
+    ignores: ["**/*.test.ts", "server/src/services/backup.service.ts"],
+    rules: {
+      "no-restricted-imports": ["error", {
+        patterns: [
+          { group: ["**/controllers/*", "**/routes/*"], message: "Services must not depend on the HTTP layer." },
+        ],
+        paths: [{ name: "express", message: "Services must not use Express types; parse in the controller." }],
+      }],
+    },
+  },
+  {
     files: ["scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },
   },

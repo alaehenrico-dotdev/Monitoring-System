@@ -12,10 +12,10 @@
 |---|---|---|---|---|---|---|---|
 | Critical | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | High | 0 | 0 | 0 | 2 | 0 | 0 | 0 |
-| Medium | 0 | 0 | 1 | 6 | 1 | 0 | 0 |
-| Low | 1 | 0 | 0 | 4 | 3 | 0 | 0 |
+| Medium | 0 | 0 | 1 | 7 | 1 | 0 | 0 |
+| Low | 1 | 0 | 0 | 5 | 3 | 0 | 0 |
 
-Eighteen findings: 12 fixed and verified, 1 fixed with a manual follow-up (F-009), 4 accepted with reasons, 1 open decision (F-017). The code itself was already well hardened (no SQL-injection surface, complete route authorization, token versioning, required secrets, allowlisted file paths, no shell in process spawning), so the real gaps were in the layers around it: dependencies, the Docker image contents, ignore files, login brute-force coverage, unbounded anonymous-input storage and the dev server's network exposure. The most important remaining item is F-009: this PC's `server/.env` still connects to MySQL as `root`.
+Twenty findings: 14 fixed and verified, 1 fixed with a manual follow-up (F-009), 4 accepted with reasons, 1 open decision (F-017). The code itself was already well hardened (no SQL-injection surface, complete route authorization, token versioning, required secrets, allowlisted file paths, no shell in process spawning), so the real gaps were in the layers around it: dependencies, the Docker image contents, ignore files, login brute-force coverage, unbounded anonymous-input storage and the dev server's network exposure. The most important remaining item is F-009: this PC's `server/.env` still connects to MySQL as `root`.
 
 ## Scope and coverage
 
@@ -480,6 +480,56 @@ Not applicable.
 **Remaining risk**
 Any local process on the host that knows the root password can use it. Decision: Accept; use `alaeh_app` for Workbench if root access is not needed.
 
+### F-019: Drive backup could emit an unhandled stream error after its temp file was deleted
+
+- **Severity:** Medium (why: an `error` event on a stream with no listener is an uncaught exception, which can take the API down; it needs a failed or early-aborted Drive upload to trigger).
+- **Area:** reliability / backups
+- **Source:** full test run (an `Unhandled Errors: ENOENT` on `ala-eh-drive-*.sql.gz`, intermittent)
+- **Status:** Fixed (verified)
+- **Location:** `server/src/services/drive.service.ts` (`doBackup`)
+
+**Reproduction and evidence**
+Intermittent failure of the full server suite: `ENOENT: no such file or directory, open '...ala-eh-drive-<pid>-<ts>.sql.gz'` reported as an unhandled error.
+
+**Root cause**
+`createReadStream(tmp)` opens its file lazily. When the upload threw or never consumed the body, the `finally` block ran `rm(tmp)` first, and the stream then tried to open the deleted file and emitted an unhandled `error`.
+
+**Fix**
+Keep a reference to the stream and `destroy()` it in the `finally`, before `rm(tmp)`.
+
+**Verification**
+- Command run: `npx vitest run` in `server/`, twice.
+- Result: 76 files, 758 tests pass both times, no unhandled errors; `tsc --noEmit` clean.
+- Regression test: none added (the race depends on stream timing); the existing `drive.service.test.ts` backup-failure cases exercise the path.
+- Date verified: 2026-10-26
+
+**Remaining risk**
+None known.
+
+### F-020: `dashboardAnalytics.controller` test times out under a parallel full run
+
+- **Severity:** Low (why: test-only flake; production code was correct).
+- **Area:** testing
+- **Source:** full test run
+- **Status:** Fixed (verified)
+- **Location:** `server/src/controllers/dashboardAnalytics.controller.test.ts`
+
+**Reproduction and evidence**
+Passes alone (first test ~1.4s, a cold dynamic import) but failed once in the full run, where it exceeded vitest's 5s default.
+
+**Root cause**
+Slow cold module load under parallel load vs. the default timeout.
+
+**Fix**
+Per-test timeout of 30s on the test that performs the cold import.
+
+**Verification**
+- Command run: `npx vitest run` in `server/`, twice. Result: all pass.
+- Date verified: 2026-10-26
+
+**Remaining risk**
+None.
+
 ## Remaining risks
 
 | ID | Risk | Severity | Owner | Decision | Deadline |
@@ -510,3 +560,4 @@ Any local process on the host that knows the root password can use it. Decision:
 | Date | Change |
 |---|---|
 | 2026-10-24 | Report created. 18 findings recorded; 12 fixed and verified, 1 fixed pending a manual follow-up, 4 accepted, 1 open. |
+| 2026-10-26 | Added F-019 (Drive backup stream destroyed before temp file removal) and F-020 (slow-import test timeout); both fixed and verified. |

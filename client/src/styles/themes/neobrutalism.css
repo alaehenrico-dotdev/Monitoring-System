@@ -1,0 +1,227 @@
+/* =========================================================================
+   Neobrutalism theme (Settings > Appearance > Theme). Loud, flat and graphic:
+   thick ink outlines, hard offset shadows with no blur, square corners, heavy
+   type, and NO gradients or glass. The colours stay the app's own - the
+   original cream page (and charcoal in dark mode) are left exactly as they are;
+   brand gold fills the header, tabs and table headers, banner red is the
+   primary action, and ink black is the line. The "line" colour flips to cream
+   in dark mode so outlines and shadows still show. Only colours, borders and
+   shadows change - never padding, heights or font sizes - so grids lay out as
+   in Classic (outlines are drawn with box-shadow rings, not extra border
+   width). Every rule is scoped to :root[data-ui="brutal"].
+   ========================================================================= */
+:root[data-ui="brutal"] {
+  --ae-nb-line: #0c0c0c;
+  --ae-nb-gold: #f5c000;
+  --ae-nb-red: #c1272d;
+  --ae-glass-blur: none;
+}
+:root[data-ui="brutal"]:not([data-theme="dark"]) {
+  --ae-border: #b9b19a;
+  --ae-border-soft: #dcd4bc;
+  --ae-surface-glass: #ffffff;
+  --ae-header-glass: #f3ecd8;
+  --ae-row-hover: rgba(245, 192, 0, 0.18);
+}
+:root[data-ui="brutal"][data-theme="dark"] {
+  --ae-nb-line: #f1ecde;
+  --ae-border: #5f5a4a;
+  --ae-border-soft: #3a372e;
+  --ae-surface-glass: #262626;
+  --ae-header-glass: #2a2a2a;
+  --ae-row-hover: rgba(245, 192, 0, 0.12);
+}
+
+/* ---- Page: flat. The seal watermark is a soft flourish, so it goes -------- */
+:root[data-ui="brutal"] .app-shell::before {
+  display: none;
+}
+
+/* ---- Page header: a flat gold slab, thick outline, hard shadow ------------ */
+:root[data-ui="brutal"] .ae-page-header {
+  --ae-glass-text: #0c0c0c;
+  --ae-glass-text-muted: #3a3426;
+  --ae-glass-accent: #7a1216;
+  --ae-glass-divider: rgba(12, 12, 12, 0.45);
+  --ae-tb-bg: rgba(12, 12, 12, 0.06);
+  --ae-tb-border: #0c0c0c;
+  --ae-tb-field-bg: #fffcf5;
+  --ae-tb-field-bg-hover: #ffffff;
+  --ae-tb-field-bg-active: #ffe066;
+  --ae-tb-hairline: rgba(12, 12, 12, 0.5);
+  --ae-tb-text: #0c0c0c;
+  --ae-tb-text-muted: #3a3426;
+  background: var(--ae-nb-gold);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: #0c0c0c;
+  border: 0;
+  border-radius: 0;
+  box-shadow: 0 4px 0 #0c0c0c;
+  border-bottom: 3px solid #0c0c0c;
+}
+:root[data-ui="brutal"][data-theme="dark"] .ae-page-header {
+  box-shadow: 0 4px 0 var(--ae-nb-line);
+  border-bottom-color: var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-page-header.ae-page-header--offline {
+  background: var(--ae-nb-red);
+  --ae-glass-text: #ffffff;
+  --ae-glass-text-muted: #ffe9e9;
+  color: #ffffff;
+}
+:root[data-ui="brutal"] .ae-page-header h2 {
+  color: inherit;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+:root[data-ui="brutal"] .ae-page-header p {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* ---- Tab strip: ruled band; the active tab is a gold block ---------------- */
+:root[data-ui="brutal"] .ae-sticky-head > .ae-header-tabs {
+  background: var(--ae-surface);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-bottom: 3px solid var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-header-tabs-bar,
+:root[data-ui="brutal"] .ae-header-tab::after {
+  display: none;
+}
+:root[data-ui="brutal"] .ae-header-tab {
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 0;
+}
+:root[data-ui="brutal"] .ae-header-tab:hover {
+  background: rgba(245, 192, 0, 0.35);
+}
+:root[data-ui="brutal"] .ae-header-tab[aria-current="page"] {
+  background: var(--ae-nb-gold);
+  color: #0c0c0c;
+  box-shadow:
+    inset 0 0 0 2px var(--ae-nb-line),
+    3px 3px 0 var(--ae-nb-line);
+}
+
+/* ---- Cards and tables: outlined, square, hard shadow ---------------------- */
+:root[data-ui="brutal"] .ae-panel,
+:root[data-ui="brutal"] .ae-dash-stat {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 2px solid var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-dash-stat--alert {
+  box-shadow: 5px 5px 0 var(--ae-nb-red);
+}
+:root[data-ui="brutal"] .ae-table-scroll,
+:root[data-ui="brutal"] .ae-table-wrap {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-radius: 0;
+  box-shadow:
+    0 0 0 2px var(--ae-nb-line),
+    6px 6px 0 2px var(--ae-nb-line);
+}
+/* Headers: flat gold laid over the column fills (an image layer, so the sticky
+   headers keep their opaque colour underneath) with a thick ink rule. */
+:root[data-ui="brutal"] .ae-table thead th {
+  background-image: linear-gradient(var(--ae-nb-gold), var(--ae-nb-gold));
+  color: #0c0c0c;
+  font-weight: 800;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  box-shadow:
+    inset 0 -3px 0 var(--ae-nb-line),
+    inset -1px 0 0 rgba(12, 12, 12, 0.5);
+}
+:root[data-ui="brutal"] .ae-table td {
+  box-shadow:
+    inset 0 -1px 0 var(--ae-border),
+    inset -1px 0 0 var(--ae-border-soft);
+}
+
+/* ---- Buttons: outlined blocks that press into their shadow ---------------- */
+:root[data-ui="brutal"] .ae-btn {
+  border-radius: 0;
+  border-color: var(--ae-nb-line);
+  font-weight: 800;
+  box-shadow:
+    inset 0 0 0 1px var(--ae-nb-line),
+    3px 3px 0 var(--ae-nb-line);
+  transition:
+    transform 90ms ease-out,
+    box-shadow 90ms ease-out,
+    background-color var(--ae-dur-micro) ease-out;
+}
+:root[data-ui="brutal"] .ae-btn-primary {
+  background: var(--ae-nb-red);
+  color: #ffffff;
+}
+:root[data-ui="brutal"] .ae-btn-secondary {
+  background: var(--ae-nb-gold);
+  color: #0c0c0c;
+}
+:root[data-ui="brutal"] .ae-btn:hover:not(:disabled) {
+  filter: none;
+  transform: translate(-1px, -1px);
+  box-shadow:
+    inset 0 0 0 1px var(--ae-nb-line),
+    4px 4px 0 var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-btn-primary:hover:not(:disabled) {
+  background: #d02f35;
+}
+:root[data-ui="brutal"] .ae-btn-secondary:hover:not(:disabled) {
+  background: #ffd22e;
+}
+:root[data-ui="brutal"] .ae-btn:active:not(:disabled) {
+  filter: none;
+  transform: translate(3px, 3px);
+  box-shadow: inset 0 0 0 1px var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-btn:disabled {
+  box-shadow: inset 0 0 0 1px var(--ae-nb-line);
+}
+
+/* ---- Fields: square, outlined --------------------------------------------- */
+:root[data-ui="brutal"] .ae-input:not(.ae-input-cell),
+:root[data-ui="brutal"] .ae-select {
+  border-color: var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-input-cell {
+  border-radius: 0;
+}
+
+/* ---- Dialogs: thick frame, hard shadow, gold header ----------------------- */
+:root[data-ui="brutal"] .ae-modal-panel {
+  border: 3px solid var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: 8px 8px 0 var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="brutal"] .ae-modal-header {
+  background: var(--ae-nb-gold);
+  color: #0c0c0c;
+  border-bottom: 3px solid var(--ae-nb-line) !important;
+}
+:root[data-ui="brutal"] .ae-modal-header h3 {
+  color: #0c0c0c;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+:root[data-ui="brutal"] .ae-modal-header button {
+  color: #0c0c0c !important;
+}
+

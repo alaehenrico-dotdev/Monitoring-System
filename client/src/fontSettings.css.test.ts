@@ -1,11 +1,11 @@
-import { readFileSync } from "node:fs";
+import { readAllCss } from "./test-utils/css";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Guards on the stylesheet itself (jsdom applies no CSS): the font settings
 // promise that the text size scales the interface but never the data tables,
 // whose header and row heights are fixed numbers elsewhere in the code.
-const css = readFileSync(join(__dirname, "index.css"), "utf8");
+const css = readAllCss(join(__dirname, "index.css"));
 const rule = (selector: string): string => {
   const at = css.indexOf(selector + " {");
   if (at < 0) throw new Error(`rule not found: ${selector}`);
