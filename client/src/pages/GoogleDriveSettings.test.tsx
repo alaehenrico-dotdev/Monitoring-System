@@ -32,7 +32,7 @@ const connected = (over: Partial<DriveStatus> = {}): DriveStatus => ({
   ...base,
   connected: true,
   accountEmail: "owner@gmail.com",
-  settings: { autoBackup: true, backupHourUtc: 18, keepBackups: 14, saveExports: true },
+  settings: { autoBackup: true, backupWeekday: 5, backupHourUtc: 18, keepBackups: 14, saveExports: true },
   ...over,
 });
 
@@ -131,14 +131,36 @@ describe("once connected", () => {
     await waitFor(() => expect(api.updateDriveSettings).toHaveBeenCalledWith({ backupHourUtc: 19 }));
   });
 
+  it("defaults to Saturday on the person's own clock (stored as Friday 18:00 UTC)", async () => {
+    await show(connected());
+    expect(screen.getByLabelText("Day of the weekly backup")).toHaveDisplayValue("Saturday");
+    expect(screen.getByLabelText("Time of the weekly backup")).toHaveDisplayValue("2:00 AM");
+  });
+
+  it("saves a new day as the UTC day the server stores", async () => {
+    api.updateDriveSettings.mockResolvedValue(connected());
+    await show(connected());
+    fireEvent.change(screen.getByLabelText("Day of the weekly backup"), { target: { value: "3" } }); // Wednesday
+    await waitFor(() => expect(api.updateDriveSettings).toHaveBeenCalledWith({ backupWeekday: 2 })); // Tuesday 18:00 UTC
+  });
+
+  it("changes the stored day too when a new hour crosses midnight in UTC", async () => {
+    api.updateDriveSettings.mockResolvedValue(connected());
+    await show(connected());
+    // Saturday 8:00 AM in Manila is Saturday 00:00 UTC: both the day and the hour move.
+    fireEvent.change(screen.getByLabelText("Time of the weekly backup"), { target: { value: "8" } });
+    await waitFor(() => expect(api.updateDriveSettings).toHaveBeenCalledWith({ backupWeekday: 6, backupHourUtc: 0 }));
+  });
+
   it("falls back to plain UTC hours in a half-hour time zone instead of guessing", async () => {
     vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(-330);
     await show(connected());
     expect(screen.getByLabelText("Time of the weekly backup")).toHaveDisplayValue("18:00 UTC");
+    expect(screen.getByLabelText("Day of the weekly backup")).toHaveDisplayValue("Friday");
   });
 
   it("hides the time picker while the daily backup is off", async () => {
-    await show(connected({ settings: { autoBackup: false, backupHourUtc: 18, keepBackups: 14, saveExports: true } }));
+    await show(connected({ settings: { autoBackup: false, backupWeekday: 5, backupHourUtc: 18, keepBackups: 14, saveExports: true } }));
     expect(screen.queryByLabelText("Time of the weekly backup")).toBeNull();
   });
 
@@ -234,7 +256,7 @@ describe("once connected", () => {
   });
 
   it("shows no next-backup time while the weekly backup is off", async () => {
-    await show(connected({ nextBackupAt: null, settings: { autoBackup: false, backupHourUtc: 18, keepBackups: 14, saveExports: true } }));
+    await show(connected({ nextBackupAt: null, settings: { autoBackup: false, backupWeekday: 5, backupHourUtc: 18, keepBackups: 14, saveExports: true } }));
     expect(screen.queryByText(/Next backup/)).toBeNull();
   });
 
@@ -254,7 +276,7 @@ describe("once connected", () => {
   });
 
   it("marks the backup and export cards Off when their switches are off", async () => {
-    await show(connected({ settings: { autoBackup: false, backupHourUtc: 18, keepBackups: 14, saveExports: false } }));
+    await show(connected({ settings: { autoBackup: false, backupWeekday: 5, backupHourUtc: 18, keepBackups: 14, saveExports: false } }));
     expect(within(screen.getByRole("region", { name: "Database backup" })).getByText("Off")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Export copies" })).getByText("Off")).toBeInTheDocument();
   });

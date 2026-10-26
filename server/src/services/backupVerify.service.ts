@@ -218,7 +218,7 @@ export async function listBackupHistory(limit = 50) {
 }
 
 /// How long a weekly backup may go before it counts as overdue: a week plus a
-/// couple of days, so the Sunday one is not flagged the moment it is a day late.
+/// couple of days, so the scheduled one is not flagged the moment it is a day late.
 const WEEKLY_OVERDUE_HOURS = 9 * 24;
 
 /// When the last good backup was taken, from history and the backup folder,

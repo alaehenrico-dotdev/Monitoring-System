@@ -2,8 +2,9 @@
 
 Settings > **Google Drive** connects the system to one Google account. Once connected:
 
-- **Database backups** are taken automatically **every week** (on Sunday, at the hour you
-  set - 18:00 UTC by default, just after Sunday's Night shift closes; and on demand with *Back up now*), gzipped, and uploaded to a
+- **Database backups** are taken automatically **every week** (on the day and hour you
+  choose in Settings - **Saturday** by default, 2:00 AM Philippine time, just after Friday's Night shift closes; and on demand
+  with *Back up now*), gzipped, and uploaded to a
   Drive folder called **Ala Eh Stock Monitoring - Backups**. The newest *N* are kept (default 14); older ones go to
   the Drive trash. Each one also appears in the existing Backup history, and a failed one raises the same
   "backup failed / overdue" warnings as any other.
@@ -85,7 +86,7 @@ on Settings showing the account.
 - **Settings > Google Drive** shows the account and one card for each thing saved automatically - *Daily
   reports* (when the last one landed; nothing to switch), *Database backup* and *Export copies* - then a
   *Recent activity* list you can filter by Reports, Backups or Exports (failures are counted and show their
-  reason). The switches: weekly backup on/off and its time, how many backups to keep,
+  reason). The switches: weekly backup on/off and its day and time, how many backups to keep,
   and whether to save export copies.
 - **Disconnect** revokes the token at Google and forgets it here. Files already in Drive stay.
 - If you remove the app at <https://myaccount.google.com/permissions>, or Google expires the grant, the page

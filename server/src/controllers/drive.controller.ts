@@ -63,6 +63,7 @@ export async function getDriveCallback(req: Request, res: Response) {
 const settingsSchema = z
   .object({
     autoBackup: z.boolean(),
+    backupWeekday: z.number().int().min(0).max(6),
     backupHourUtc: z.number().int().min(0).max(23),
     keepBackups: z.number().int().min(1).max(365),
     saveExports: z.boolean(),

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Choose the day of the weekly Google Drive backup** (Settings > Google Drive > Database backup). A day picker sits next to the time picker, both on your own clock. **Saturday is the default** (2:00 AM Philippine time, just after Friday's Night shift closes); existing connections move from Sunday to Saturday when the update is applied, and can be changed back in the picker. Includes a migration (`drive_backup_weekday`, a new column with a default - no existing data is changed).
+
 ## 2.4.2 - 2026-10-26
 
 Also includes everything that shipped as 2.4.1.

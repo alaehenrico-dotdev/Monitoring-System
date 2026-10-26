@@ -101,6 +101,9 @@ describe("patchDriveSettings", () => {
   it.each([
     ["an hour past 23", { backupHourUtc: 24 }],
     ["a negative hour", { backupHourUtc: -1 }],
+    ["a weekday past 6", { backupWeekday: 7 }],
+    ["a negative weekday", { backupWeekday: -1 }],
+    ["a fractional weekday", { backupWeekday: 2.5 }],
     ["a fractional hour", { backupHourUtc: 2.5 }],
     ["keeping zero backups", { keepBackups: 0 }],
     ["keeping more than a year of daily copies", { keepBackups: 366 }],

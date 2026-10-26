@@ -784,9 +784,13 @@ model DriveConnection {
   refreshTokenEnc String   @db.Text
   backupFolderId String    @db.VarChar(100)
   exportFolderId String    @db.VarChar(100)
-  /// Take a database backup to Drive once a week (Sunday).
+  /// Take a database backup to Drive once a week.
   autoBackup     Boolean   @default(true)
-  /// The UTC hour (0-23) the weekly backup becomes due on Sunday.
+  /// The UTC day of the week (0 = Sunday ... 6 = Saturday) the weekly backup is
+  /// due on. 5 (Friday) at the default 18:00 UTC is Saturday 2:00 AM in the
+  /// Philippines, just after Friday's Night shift closes - "every Saturday".
+  backupWeekday  Int       @default(5)
+  /// The UTC hour (0-23) the weekly backup becomes due on that day.
   backupHourUtc  Int       @default(18)
   /// How many backups to keep in the Drive folder; older ones are trashed.
   keepBackups    Int       @default(14)

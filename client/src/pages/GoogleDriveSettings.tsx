@@ -13,7 +13,7 @@ import { Button } from "../components/ui";
 import { InlineLoading } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { resetDriveCopyConfig } from "../utils/driveCopy";
-import { formatHour, localHourToUtc, utcHourToLocal, wholeHourOffset } from "../utils/driveTime";
+import { formatHour, localSlotToUtc, utcSlotToLocal, WEEKDAYS, wholeHourOffset } from "../utils/driveTime";
 import { goTo } from "../utils/navigate";
 import { colors } from "../theme";
 
@@ -104,6 +104,8 @@ export function GoogleDriveSettings() {
   const [error, setError] = useState<string | null>(outcome?.error ? outcome.message : null);
   const [notice, setNotice] = useState<string | null>(outcome && !outcome.error ? outcome.message : null);
   const [busy, setBusy] = useState<Busy>(null);
+  // Closing the "backing up" toast only hides it; the backup carries on.
+  const [backupToastClosed, setBackupToastClosed] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [keepText, setKeepText] = useState("");
   const [filter, setFilter] = useState<KindFilter>("all");
@@ -154,11 +156,13 @@ export function GoogleDriveSettings() {
 
   const change = (patch: Partial<DriveSettings>) => run("save", () => updateDriveSettings(patch), apply);
 
-  const backupNow = () =>
-    run("backup", backupToDriveNow, (result) => {
+  const backupNow = () => {
+    setBackupToastClosed(false);
+    return run("backup", backupToDriveNow, (result) => {
       apply(result.status);
       setNotice(`Backed up to Google Drive: ${result.fileName} (${formatBytes(result.sizeBytes)}).`);
     });
+  };
 
   function commitKeep() {
     if (!status?.settings) return;
@@ -178,6 +182,22 @@ export function GoogleDriveSettings() {
   const cell = { padding: "6px 10px", fontSize: "calc(12.5px * var(--ae-fs, 1))", textAlign: "left" as const, borderBottom: `1px solid ${colors.border}` };
   const settings = status?.settings;
   const hourOptions = Array.from({ length: 24 }, (_, h) => h);
+  // The weekly slot as this browser's clock shows it (plain UTC in a half-hour zone).
+  const slot = settings
+    ? offset === null
+      ? { day: settings.backupWeekday, hour: settings.backupHourUtc }
+      : utcSlotToLocal({ day: settings.backupWeekday, hour: settings.backupHourUtc }, offset)
+    : { day: 0, hour: 0 };
+  // Saves a day/hour picked on that clock as the UTC pair the server stores,
+  // sending only what actually changed.
+  function changeSlot(next: { day: number; hour: number }) {
+    if (!settings) return;
+    const utc = offset === null ? next : localSlotToUtc(next, offset);
+    const patch: Partial<DriveSettings> = {};
+    if (utc.day !== settings.backupWeekday) patch.backupWeekday = utc.day;
+    if (utc.hour !== settings.backupHourUtc) patch.backupHourUtc = utc.hour;
+    if (Object.keys(patch).length > 0) void change(patch);
+  }
 
   return (
     <div className="ae-panel" style={{ maxWidth: 720, padding: "14px 18px" }}>
@@ -287,16 +307,27 @@ export function GoogleDriveSettings() {
                     </label>
                     {settings.autoBackup && (
                       <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        on
+                        <select
+                          className="ae-select"
+                          aria-label="Day of the weekly backup"
+                          disabled={busy !== null}
+                          value={slot.day}
+                          onChange={(e) => void changeSlot({ day: Number(e.target.value), hour: slot.hour })}
+                        >
+                          {WEEKDAYS.map((name, d) => (
+                            <option key={name} value={d}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
                         at
                         <select
                           className="ae-select"
                           aria-label="Time of the weekly backup"
                           disabled={busy !== null}
-                          value={offset === null ? settings.backupHourUtc : utcHourToLocal(settings.backupHourUtc, offset)}
-                          onChange={(e) => {
-                            const chosen = Number(e.target.value);
-                            void change({ backupHourUtc: offset === null ? chosen : localHourToUtc(chosen, offset) });
-                          }}
+                          value={slot.hour}
+                          onChange={(e) => void changeSlot({ day: slot.day, hour: Number(e.target.value) })}
                         >
                           {hourOptions.map((h) => (
                             <option key={h} value={h}>
@@ -426,6 +457,13 @@ export function GoogleDriveSettings() {
         </div>
       )}
 
+      <Toast
+        id="drive-backup-running"
+        message={busy === "backup" && !backupToastClosed ? <InlineLoading size="sm" label="Backing up to Google Drive…" /> : null}
+        onDismiss={() => setBackupToastClosed(true)}
+        variant="info"
+        duration={null}
+      />
       <Toast message={notice} onDismiss={() => setNotice(null)} variant="success" />
       <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />
     </div>

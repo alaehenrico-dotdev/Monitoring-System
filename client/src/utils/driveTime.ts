@@ -17,6 +17,24 @@ const wrap = (h: number) => ((h % 24) + 24) % 24;
 export const utcHourToLocal = (utcHour: number, offset: number) => wrap(utcHour + offset);
 export const localHourToUtc = (localHour: number, offset: number) => wrap(localHour - offset);
 
+export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
+/// A weekly slot is a day (0 = Sunday ... 6 = Saturday) and an hour. Moving it
+/// between UTC and the local clock can cross midnight, which changes the day too
+/// (UTC Friday 18:00 is Saturday 2:00 AM in Manila), so the two move together.
+export interface Slot {
+  day: number;
+  hour: number;
+}
+
+function shiftSlot(slot: Slot, hours: number): Slot {
+  const total = slot.day * 24 + slot.hour + hours;
+  return { day: (((Math.floor(total / 24) % 7) + 7) % 7), hour: wrap(total) };
+}
+
+export const utcSlotToLocal = (utc: Slot, offset: number): Slot => shiftSlot(utc, offset);
+export const localSlotToUtc = (local: Slot, offset: number): Slot => shiftSlot(local, -offset);
+
 /// 0 -> "12:00 AM", 14 -> "2:00 PM".
 export function formatHour(hour: number): string {
   const h12 = hour % 12 === 0 ? 12 : hour % 12;

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatHour, localHourToUtc, utcHourToLocal, wholeHourOffset } from "./driveTime";
+import { formatHour, localHourToUtc, localSlotToUtc, utcHourToLocal, utcSlotToLocal, wholeHourOffset } from "./driveTime";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -54,5 +54,33 @@ describe("formatHour", () => {
     expect(formatHour(12)).toBe("12:00 PM");
     expect(formatHour(13)).toBe("1:00 PM");
     expect(formatHour(23)).toBe("11:00 PM");
+  });
+});
+
+describe("weekly slots (day + hour)", () => {
+  it("the default, Friday 18:00 UTC, is Saturday 2:00 AM in Manila", () => {
+    expect(utcSlotToLocal({ day: 5, hour: 18 }, 8)).toEqual({ day: 6, hour: 2 });
+  });
+
+  it("wraps from Saturday into Sunday and from Sunday back into Saturday", () => {
+    expect(utcSlotToLocal({ day: 6, hour: 20 }, 8)).toEqual({ day: 0, hour: 4 });
+    expect(utcSlotToLocal({ day: 0, hour: 2 }, -5)).toEqual({ day: 6, hour: 21 });
+  });
+
+  it("is reversible for every day, hour and whole-hour zone", () => {
+    for (const offset of [-12, -5, 0, 5, 8, 14]) {
+      for (let day = 0; day < 7; day++) {
+        for (let hour = 0; hour < 24; hour++) {
+          expect(localSlotToUtc(utcSlotToLocal({ day, hour }, offset), offset)).toEqual({ day, hour });
+        }
+      }
+    }
+  });
+
+  it("agrees with the hour-only helpers", () => {
+    for (let hour = 0; hour < 24; hour++) {
+      expect(utcSlotToLocal({ day: 3, hour }, 8).hour).toBe(utcHourToLocal(hour, 8));
+      expect(localSlotToUtc({ day: 3, hour }, 8).hour).toBe(localHourToUtc(hour, 8));
+    }
   });
 });

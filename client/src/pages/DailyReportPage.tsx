@@ -19,6 +19,7 @@ import { zoomSection } from "../utils/zoomMenu";
 import { fitWidthItem } from "../utils/fitWidthMenu";
 import { useFitWidth } from "../hooks/useFitWidth";
 import { Toast } from "../components/Toast";
+import { InlineLoading } from "../components/Spinner";
 import { CategoryFilter } from "../components/CategoryFilter";
 import {
   columnsWithExtras,
@@ -132,6 +133,8 @@ export function DailyReportPage() {
   // than blocking the rest of the report.
   const [dailyOut, setDailyOut] = useState<DailyOutEntry | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The date whose report is being saved to Google Drive right now (null = none).
+  const [driveSaving, setDriveSaving] = useState<string | null>(null);
   // Names typed into added-column headers on the shown date's sheets.
   const [extraNames, setExtraNames] = useState<DayExtraNames>({
     ONLINE: {},
@@ -224,11 +227,18 @@ export function DailyReportPage() {
   /// changed file, already up to date, or the reason it failed. Not connected is
   /// silent - the report still generated, there is just no Drive to save it to.
   async function saveToDriveAndTell(day: string) {
+    // A live "saving" toast, but only if the save is not instant (so a person
+    // without Drive connected never sees it flash).
+    const showTimer = window.setTimeout(() => setDriveSaving(day), 400);
     try {
       const { status } = await saveDailyReportToDrive(day);
+      window.clearTimeout(showTimer);
+      setDriveSaving(null);
       if (status === "saved") notify({ level: "success", message: `Daily Report for ${day} saved to Google Drive.` });
       else if (status === "unchanged") notify({ level: "info", message: `Daily Report for ${day} is already up to date in Google Drive.` });
     } catch (e) {
+      window.clearTimeout(showTimer);
+      setDriveSaving(null);
       notify({ level: "error", message: `Could not save the ${day} Daily Report to Google Drive: ${e instanceof Error ? e.message : "unknown error"}` });
     }
   }
@@ -613,6 +623,13 @@ export function DailyReportPage() {
         message={error}
         onDismiss={() => setError(null)}
         variant="error"
+        duration={null}
+      />
+      <Toast
+        id="drive-report-saving"
+        message={driveSaving ? <InlineLoading size="sm" label={`Saving the ${driveSaving} Daily Report to Google Drive…`} /> : null}
+        onDismiss={() => setDriveSaving(null)}
+        variant="info"
         duration={null}
       />
 

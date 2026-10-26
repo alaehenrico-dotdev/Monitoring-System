@@ -123,7 +123,7 @@ beforeEach(async () => {
   await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
   vi.mocked(google.createFolder).mockReset();
   // The columns the real database fills in from the schema defaults.
-  Object.assign(db.conn!, { autoBackup: true, backupHourUtc: 18, keepBackups: 3, saveExports: true, lastBackupAt: null });
+  Object.assign(db.conn!, { autoBackup: true, backupWeekday: 0, backupHourUtc: 18, keepBackups: 3, saveExports: true, lastBackupAt: null });
 });
 
 describe("connecting", () => {
@@ -268,7 +268,7 @@ async function disconnectAndReconnect() {
   vi.mocked(google.createFolder).mockResolvedValueOnce("backups-folder").mockResolvedValueOnce("exports-folder");
   await disconnect(7);
   await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
-  Object.assign(db.conn!, { autoBackup: true, backupHourUtc: 18, keepBackups: 3, saveExports: true, lastBackupAt: null });
+  Object.assign(db.conn!, { autoBackup: true, backupWeekday: 0, backupHourUtc: 18, keepBackups: 3, saveExports: true, lastBackupAt: null });
   vi.mocked(google.createFolder).mockReset();
   vi.mocked(google.refreshAccessToken).mockRejectedValueOnce(new google.DriveAuthError("Google no longer accepts this connection - reconnect Google Drive."));
 }
@@ -873,10 +873,11 @@ describe("toasts for what the server saves to Drive on its own", () => {
   });
 });
 
-describe("isBackupDue (weekly, on Sunday)", () => {
+describe("isBackupDue (weekly, Sunday cases)", () => {
   const at = (iso: string) => new Date(iso);
-  const conn = (lastBackupAt: string | null, backupHourUtc = 18, autoBackup = true) => ({
+  const conn = (lastBackupAt: string | null, backupHourUtc = 18, autoBackup = true, backupWeekday = 0) => ({
     autoBackup,
+    backupWeekday,
     backupHourUtc,
     lastBackupAt: lastBackupAt ? at(lastBackupAt) : null,
   });
@@ -929,17 +930,17 @@ describe("isBackupDue (weekly, on Sunday)", () => {
 });
 
 describe("nextBackupAt", () => {
-  it("is this Sunday at the hour, or next Sunday's once that has passed", () => {
-    expect(nextBackupAt(18, new Date("2026-10-22T09:00:00Z")).toISOString()).toBe("2026-10-25T18:00:00.000Z");
-    expect(nextBackupAt(18, new Date("2026-10-25T17:59:00Z")).toISOString()).toBe("2026-10-25T18:00:00.000Z");
-    expect(nextBackupAt(18, new Date("2026-10-25T18:00:00Z")).toISOString()).toBe("2026-11-01T18:00:00.000Z");
-    expect(nextBackupAt(18, new Date("2026-12-30T19:00:00Z")).toISOString()).toBe("2027-01-03T18:00:00.000Z");
-    expect(nextBackupAt(2, new Date("2028-02-24T00:00:00Z")).toISOString()).toBe("2028-02-27T02:00:00.000Z");
+  it("on Sunday: is this Sunday at the hour, or next Sunday's once that has passed", () => {
+    expect(nextBackupAt(18, new Date("2026-10-22T09:00:00Z"), 0).toISOString()).toBe("2026-10-25T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-10-25T17:59:00Z"), 0).toISOString()).toBe("2026-10-25T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-10-25T18:00:00Z"), 0).toISOString()).toBe("2026-11-01T18:00:00.000Z");
+    expect(nextBackupAt(18, new Date("2026-12-30T19:00:00Z"), 0).toISOString()).toBe("2027-01-03T18:00:00.000Z");
+    expect(nextBackupAt(2, new Date("2028-02-24T00:00:00Z"), 0).toISOString()).toBe("2028-02-27T02:00:00.000Z");
   });
 
   it("is always a Sunday", () => {
     for (const day of [20, 21, 22, 23, 24, 25, 26, 27]) {
-      expect(nextBackupAt(18, new Date(`2026-10-${day}T05:00:00Z`)).getUTCDay()).toBe(0);
+      expect(nextBackupAt(18, new Date(`2026-10-${day}T05:00:00Z`), 0).getUTCDay()).toBe(0);
     }
   });
 });
@@ -966,5 +967,49 @@ describe("runScheduledBackupIfDue", () => {
   it("does nothing when Drive is not connected", async () => {
     db.conn = null;
     expect(await runScheduledBackupIfDue(new Date("2026-10-22T19:00:00Z"))).toBe(false);
+  });
+});
+
+describe("the weekly backup day", () => {
+  const at = (iso: string) => new Date(iso);
+  const conn = (lastBackupAt: string | null, backupWeekday: number) => ({
+    autoBackup: true,
+    backupWeekday,
+    backupHourUtc: 18,
+    lastBackupAt: lastBackupAt ? at(lastBackupAt) : null,
+  });
+  // 2026-10-24 is a Saturday, 2026-10-23 a Friday.
+
+  it("runs on Saturday when Saturday is chosen, and not on the days before it", () => {
+    expect(isBackupDue(conn("2026-10-17T18:05:00Z", 6), at("2026-10-24T17:59:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-17T18:05:00Z", 6), at("2026-10-24T18:00:00Z"))).toBe(true);
+    expect(isBackupDue(conn("2026-10-17T18:05:00Z", 6), at("2026-10-22T20:00:00Z"))).toBe(false);
+  });
+
+  it("once Saturday's backup is done it stays done until the next Saturday", () => {
+    expect(isBackupDue(conn("2026-10-24T18:05:00Z", 6), at("2026-10-30T23:00:00Z"))).toBe(false);
+    expect(isBackupDue(conn("2026-10-24T18:05:00Z", 6), at("2026-10-31T18:00:00Z"))).toBe(true);
+  });
+
+  it("catches up after downtime: a missed Saturday is still due on the following Tuesday", () => {
+    expect(isBackupDue(conn("2026-10-17T18:05:00Z", 6), at("2026-10-27T09:00:00Z"))).toBe(true);
+  });
+
+  it("the default (Friday 18:00 UTC) lands on Saturday 2:00 AM in the Philippines", () => {
+    const next = nextBackupAt(18, at("2026-10-20T00:00:00Z"), 5);
+    expect(next.toISOString()).toBe("2026-10-23T18:00:00.000Z");
+    expect(new Date(next.getTime() + 8 * 3600_000).getUTCDay()).toBe(6);
+  });
+
+  it("nextBackupAt is always on the chosen day, for every day of the week", () => {
+    for (let weekday = 0; weekday < 7; weekday++) {
+      for (const day of [20, 21, 22, 23, 24, 25, 26, 27]) {
+        expect(nextBackupAt(18, at(`2026-10-${day}T05:00:00Z`), weekday).getUTCDay()).toBe(weekday);
+      }
+    }
+  });
+
+  it("works across a month and year boundary", () => {
+    expect(nextBackupAt(18, at("2026-12-30T00:00:00Z"), 6).toISOString()).toBe("2027-01-02T18:00:00.000Z");
   });
 });

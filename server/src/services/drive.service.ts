@@ -205,6 +205,8 @@ async function noteError(message: string | null): Promise<void> {
 
 export interface DriveSettings {
   autoBackup: boolean;
+  /// UTC day of the week the weekly backup runs: 0 = Sunday ... 6 = Saturday.
+  backupWeekday: number;
   backupHourUtc: number;
   keepBackups: number;
   saveExports: boolean;
@@ -227,10 +229,10 @@ export async function getStatus() {
     connectedAt: conn?.connectedAt ?? null,
     lastBackupAt: conn?.lastBackupAt ?? null,
     lastReportAt: lastReport?.createdAt ?? null,
-    nextBackupAt: conn && conn.autoBackup ? nextBackupAt(conn.backupHourUtc, new Date()) : null,
+    nextBackupAt: conn && conn.autoBackup ? nextBackupAt(conn.backupHourUtc, new Date(), conn.backupWeekday) : null,
     lastError: conn?.lastError ?? null,
     settings: conn
-      ? ({ autoBackup: conn.autoBackup, backupHourUtc: conn.backupHourUtc, keepBackups: conn.keepBackups, saveExports: conn.saveExports } satisfies DriveSettings)
+      ? ({ autoBackup: conn.autoBackup, backupWeekday: conn.backupWeekday, backupHourUtc: conn.backupHourUtc, keepBackups: conn.keepBackups, saveExports: conn.saveExports } satisfies DriveSettings)
       : null,
     recent: recent.map((u) => ({
       id: u.id,
@@ -664,42 +666,44 @@ setReportSavedHandler((date) => void queueDailyReportUpload(date));
 
 // --- Schedule -----------------------------------------------------------------
 
-/// The scheduled backup is weekly: every Sunday at `hourUtc` (by the UTC
-/// calendar, which is what the server runs on). With the default 18:00 that is
-/// right after Sunday's Night shift closes (1am Monday in the Philippines), so
-/// the copy holds the whole week. `Date.UTC` rolls a day-of-month below 1 into
-/// the month before, so no month length is spelled out anywhere.
+/// The scheduled backup is weekly: on `weekday` (0 = Sunday ... 6 = Saturday) at
+/// `hourUtc`, by the UTC calendar, which is what the server runs on. The default
+/// is Friday 18:00 UTC = Saturday 2:00 AM in the Philippines, right after the
+/// Night shift closes, so the copy holds the whole week. `Date.UTC` rolls a
+/// day-of-month below 1 into the month before, so no month length is spelled
+/// out anywhere.
 const WEEK_MS = 7 * 24 * HOUR_MS;
 
-/// This week's Sunday slot (the Sunday on or before `now`'s UTC date).
-function sundaySlot(now: Date, hourUtc: number): number {
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - now.getUTCDay(), hourUtc);
+/// This week's slot: the `weekday` on or before `now`'s UTC date, at `hourUtc`.
+function weeklySlot(now: Date, hourUtc: number, weekday: number): number {
+  const daysSince = (now.getUTCDay() - weekday + 7) % 7;
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSince, hourUtc);
 }
 
 /// The most recent scheduled time that is not in the future.
-function latestBackupSlot(hourUtc: number, now: Date): number {
-  const thisWeek = sundaySlot(now, hourUtc);
+function latestBackupSlot(hourUtc: number, now: Date, weekday: number): number {
+  const thisWeek = weeklySlot(now, hourUtc, weekday);
   return now.getTime() >= thisWeek ? thisWeek : thisWeek - WEEK_MS;
 }
 
 /// The next scheduled time after `now`.
-export function nextBackupAt(hourUtc: number, now: Date): Date {
-  const thisWeek = sundaySlot(now, hourUtc);
+export function nextBackupAt(hourUtc: number, now: Date, weekday: number): Date {
+  const thisWeek = weeklySlot(now, hourUtc, weekday);
   return new Date(now.getTime() < thisWeek ? thisWeek : thisWeek + WEEK_MS);
 }
 
-/// A backup is due when the most recent Sunday slot has passed with no backup
+/// A backup is due when the most recent scheduled slot has passed with no backup
 /// since. "A week since the last one" would instead drift (and fire early
 /// whenever the hour is changed); a slot also catches up by itself after
 /// downtime, and a manual "Back up now" mid-week does not bring it forward.
 /// A connection that has never been backed up is due straight away, so there is
-/// a first copy without waiting for Sunday.
+/// a first copy without waiting for the scheduled day.
 export function isBackupDue(
-  conn: { autoBackup: boolean; backupHourUtc: number; lastBackupAt: Date | null },
+  conn: { autoBackup: boolean; backupWeekday: number; backupHourUtc: number; lastBackupAt: Date | null },
   now: Date,
 ): boolean {
   if (!conn.autoBackup) return false;
-  return !conn.lastBackupAt || conn.lastBackupAt.getTime() < latestBackupSlot(conn.backupHourUtc, now);
+  return !conn.lastBackupAt || conn.lastBackupAt.getTime() < latestBackupSlot(conn.backupHourUtc, now, conn.backupWeekday);
 }
 
 /// After a failed attempt, wait this long before trying again, so a Drive
