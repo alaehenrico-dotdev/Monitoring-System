@@ -154,6 +154,11 @@
   padding: 0;
   justify-content: center;
 }
+/* A menu that is only an icon (the "..." overflow menu) is exactly square, so a circle
+   fits it. Repeated class: it must out-rank the global 4px button radius. */
+.ae-mb-trigger--icon.ae-mb-trigger--icon.ae-mb-trigger--icon.ae-mb-trigger--icon {
+  border-radius: 50% !important;
+}
 .ae-mb-btn--icon {
   width: var(--ae-mb-h);
   padding: 0;
@@ -402,6 +407,10 @@
     width: var(--ae-mb-h);
     padding: 0;
     justify-content: center;
+  }
+  /* Icon-only in the compact layout: square, so a circle fits (see .ae-mb-trigger--icon). */
+  .ae-clear-filters.ae-clear-filters.ae-clear-filters.ae-clear-filters {
+    border-radius: 50% !important;
   }
   .ae-mb-trigger {
     padding: 0 6px;

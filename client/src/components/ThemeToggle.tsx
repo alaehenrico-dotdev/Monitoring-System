@@ -82,7 +82,7 @@ export function ThemeToggle() {
       onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
       aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      className="ae-tap-target"
+      className="ae-tap-target ae-round"
       style={{
         position: "relative",
         width: 36,

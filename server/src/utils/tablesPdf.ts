@@ -62,7 +62,10 @@ export function pdfText(value: string): string {
 
 const num = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
+/// Sideways padding in a cell. Top and bottom are tighter (0.8 mm): on the real
+/// reports that is a whole page less (8 -> 7, 6 -> 5) and still easy to read.
 const CELL_PAD = 1.2;
+const CELL_PAD_Y = 0.8;
 const MIN_FONT_SIZE = 6;
 
 /// Body text size to start from: fewer columns leave room for bigger numbers.
@@ -159,7 +162,7 @@ export function renderTablesPdf(spec: { title: string; subtitle?: string; tables
       head: [columns.map((c) => pdfText(c))],
       body: body.length ? body : [[{ content: "Nothing recorded.", colSpan: Math.max(columns.length, 1), styles: { halign: "left", fontStyle: "italic" } }]],
       theme: "grid",
-      styles: { font: "helvetica", fontSize, cellPadding: CELL_PAD, lineColor: [200, 200, 200], lineWidth: 0.1, textColor: INK, overflow: "linebreak", valign: "middle" },
+      styles: { font: "helvetica", fontSize, cellPadding: { top: CELL_PAD_Y, bottom: CELL_PAD_Y, left: CELL_PAD, right: CELL_PAD }, lineColor: [200, 200, 200], lineWidth: 0.1, textColor: INK, overflow: "linebreak", valign: "middle" },
       headStyles: { fillColor: BLACK, textColor: CREAM, fontStyle: "bold", lineColor: BLACK },
       columnStyles: Object.fromEntries(
         columns.map((_, i) => [i, { halign: isNumeric(table, i + offset) ? ("right" as const) : ("left" as const) }]),

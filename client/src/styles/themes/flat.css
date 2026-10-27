@@ -92,9 +92,6 @@
   border-radius: 4px;
   box-shadow: none;
 }
-:root[data-ui="flat"] .ae-dash-stat--alert {
-  background-color: var(--ae-danger-bg);
-}
 :root[data-ui="flat"] .ae-table thead th {
   background-image: linear-gradient(#0c0c0c, #0c0c0c);
   color: #f5c000;

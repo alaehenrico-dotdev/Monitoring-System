@@ -18,6 +18,8 @@ import { CollapseAllIcon, ExpandAllIcon, SyncIcon } from "../components/icons";
 import { zoomSection } from "../utils/zoomMenu";
 import { fitWidthItem } from "../utils/fitWidthMenu";
 import { useFitWidth } from "../hooks/useFitWidth";
+import { useHideEmpty } from "../hooks/useHideEmpty";
+import { describeHiddenOnPage, viewStockSheet, viewTotalRows } from "../utils/hideEmptyReport";
 import { Toast } from "../components/Toast";
 import { InlineLoading } from "../components/Spinner";
 import { CategoryFilter } from "../components/CategoryFilter";
@@ -159,6 +161,8 @@ export function DailyReportPage() {
   const realtimeVersion = useRealtimeVersion();
   const [zoom, setZoom] = useZoom("daily-report");
   const [fit, setFit] = useFitWidth("daily-report");
+  // View > Hide empty rows / columns. Off by default; kept in this browser.
+  const hideEmpty = useHideEmpty("daily-report");
   // View > Expand/Collapse all categories: one command for every table on the
   // page; each table reports whether any of its categories is open.
   const [catCommand, setCatCommand] = useState<{ expanded: boolean; id: number } | null>(null);
@@ -319,12 +323,6 @@ export function DailyReportPage() {
         ),
       ).sort()
     : [];
-  const byCategory = <T extends { product: { category: string } }>(
-    rows: T[],
-  ): T[] =>
-    categoryFilter
-      ? rows.filter((r) => r.product.category === categoryFilter)
-      : rows;
 
   // Columns an encoder added to the live grids and saved individually come
   // back flattened onto these rows (server: utils/stockExtras.ts), so the
@@ -347,13 +345,47 @@ export function DailyReportPage() {
       ),
     [report],
   );
+  // One trimmed view of each table (rows and columns with nothing in them left
+  // out when View > Hide empty ... is on, and the Category filter applied) that
+  // the screen, the PDF and Excel all read, so they always agree.
+  type ViewRow = { product: { category: string }; entry: Record<string, unknown> };
+  const onlineView = useMemo(
+    () =>
+      viewStockSheet(
+        (report?.online ?? []) as unknown as ViewRow[],
+        onlineStockColumns,
+        onlineExtras,
+        { rows: hideEmpty.rows, columns: hideEmpty.columns },
+        categoryFilter,
+      ),
+    [report, onlineExtras, hideEmpty.rows, hideEmpty.columns, categoryFilter],
+  );
+  const offlineView = useMemo(
+    () =>
+      viewStockSheet(
+        (report?.offline ?? []) as unknown as ViewRow[],
+        offlineStockColumns,
+        offlineExtras,
+        { rows: hideEmpty.rows, columns: hideEmpty.columns },
+        categoryFilter,
+      ),
+    [report, offlineExtras, hideEmpty.rows, hideEmpty.columns, categoryFilter],
+  );
+  const totalView = useMemo(
+    () => viewTotalRows(report?.total ?? [], { rows: hideEmpty.rows, columns: hideEmpty.columns }, categoryFilter),
+    [report, hideEmpty.rows, hideEmpty.columns, categoryFilter],
+  );
+  const hiddenNote = describeHiddenOnPage({
+    rows: onlineView.hiddenRows + offlineView.hiddenRows + totalView.hiddenRows,
+    columns: onlineView.hiddenColumns + offlineView.hiddenColumns,
+  });
   const onlineColumns = useMemo(
-    () => columnsWithExtras(onlineStockColumns, onlineExtras, extraNames.ONLINE),
-    [onlineExtras, extraNames],
+    () => columnsWithExtras(onlineView.columns, onlineView.extras, extraNames.ONLINE),
+    [onlineView, extraNames],
   );
   const offlineColumns = useMemo(
-    () => columnsWithExtras(offlineStockColumns, offlineExtras, extraNames.OFFLINE),
-    [offlineExtras, extraNames],
+    () => columnsWithExtras(offlineView.columns, offlineView.extras, extraNames.OFFLINE),
+    [offlineView, extraNames],
   );
 
   // Report History records a report when it has actually been saved - the PDF
@@ -379,16 +411,16 @@ export function DailyReportPage() {
     const online = section(
       "ONLINE STOCK MONITORING",
       report.date,
-      byCategory(report.online) as unknown as CsvSectionRow[],
+      onlineView.rows as unknown as CsvSectionRow[],
       onlineColumns,
     );
     const offline = section(
       "OFFLINE STOCK MONITORING",
       report.date,
-      byCategory(report.offline) as unknown as CsvSectionRow[],
+      offlineView.rows as unknown as CsvSectionRow[],
       offlineColumns,
     );
-    const total = totalSection(report.date, byCategory(report.total));
+    const total = totalSection(report.date, totalView.rows);
     const out = dailyOutExcel(report.date, dailyOut);
     const audit = auditExcel(report.date, report.audit ?? []);
 
@@ -429,7 +461,7 @@ export function DailyReportPage() {
     if (reportSection === "all" || reportSection === "online") {
       sections.push(
         stockGridSection(
-          byCategory(report.online) as unknown as GridRow[],
+          onlineView.rows as unknown as GridRow[],
           onlineColumns,
           { title: `ONLINE STOCK MONITORING - ${report.date}` },
         ),
@@ -438,7 +470,7 @@ export function DailyReportPage() {
     if (reportSection === "all" || reportSection === "offline") {
       sections.push(
         stockGridSection(
-          byCategory(report.offline) as unknown as GridRow[],
+          offlineView.rows as unknown as GridRow[],
           offlineColumns,
           { title: `OFFLINE STOCK MONITORING - ${report.date}` },
         ),
@@ -446,7 +478,7 @@ export function DailyReportPage() {
     }
     if (reportSection === "all" || reportSection === "total") {
       sections.push(
-        totalStocksSection(byCategory(report.total), {
+        totalStocksSection(totalView.rows, {
           title: `CONSOLIDATED STOCKS - ${report.date}`,
         }),
       );
@@ -525,6 +557,18 @@ export function DailyReportPage() {
                       onSelect: () => setCatCommand({ expanded: !anyExpanded, id: Date.now() }),
                     },
                     fitWidthItem(fit, setFit),
+                    {
+                      id: "hide-empty-rows",
+                      label: "Hide products with no figures",
+                      checked: hideEmpty.rows,
+                      onSelect: hideEmpty.toggleRows,
+                    },
+                    {
+                      id: "hide-empty-columns",
+                      label: "Hide empty columns",
+                      checked: hideEmpty.columns,
+                      onSelect: hideEmpty.toggleColumns,
+                    },
                     {
                       id: "refresh",
                       label: "Refresh",
@@ -651,6 +695,12 @@ export function DailyReportPage() {
         </div>
       )}
 
+      {report && hiddenNote && (
+        <p role="status" style={{ margin: "0 0 12px", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
+          {hiddenNote} Turn it off in View to see everything.
+        </p>
+      )}
+
       {report && (
         <div style={zoomStyle(zoom)}>
           {(reportSection === "all" || reportSection === "online") && (
@@ -659,9 +709,9 @@ export function DailyReportPage() {
               <div style={{ marginBottom: 32 }}>
                 <StockGrid
                   key={`online-${reportVersion}`}
-                  rows={byCategory(report.online) as unknown as GridRow[]}
-                  columns={onlineStockColumns}
-                  extraColumns={onlineExtras}
+                  rows={onlineView.rows as unknown as GridRow[]}
+                  columns={onlineView.columns}
+                  extraColumns={onlineView.extras}
                   extraNames={extraNames.ONLINE}
                   onCommit={noop}
                   expandAllCommand={catCommand}
@@ -678,9 +728,9 @@ export function DailyReportPage() {
               <div style={{ marginBottom: 32 }}>
                 <StockGrid
                   key={`offline-${reportVersion}`}
-                  rows={byCategory(report.offline) as unknown as GridRow[]}
-                  columns={offlineStockColumns}
-                  extraColumns={offlineExtras}
+                  rows={offlineView.rows as unknown as GridRow[]}
+                  columns={offlineView.columns}
+                  extraColumns={offlineView.extras}
                   extraNames={extraNames.OFFLINE}
                   onCommit={noop}
                   expandAllCommand={catCommand}
@@ -696,7 +746,7 @@ export function DailyReportPage() {
               <h3 style={{ marginBottom: 8 }}>Consolidated — {report.date}</h3>
               <TotalStocksTable
                 key={`total-${reportVersion}`}
-                rows={byCategory(report.total)}
+                rows={totalView.rows}
                 expandAllCommand={catCommand}
                 onAnyExpandedChange={onTotalExpanded}
                 fit={fit}

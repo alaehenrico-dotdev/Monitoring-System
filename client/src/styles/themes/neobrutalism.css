@@ -115,9 +115,6 @@
   border-radius: 0;
   box-shadow: 5px 5px 0 var(--ae-nb-line);
 }
-:root[data-ui="brutal"] .ae-dash-stat--alert {
-  box-shadow: 5px 5px 0 var(--ae-nb-red);
-}
 :root[data-ui="brutal"] .ae-table-scroll,
 :root[data-ui="brutal"] .ae-table-wrap {
   -webkit-backdrop-filter: none;

@@ -327,3 +327,10 @@ input[type="reset"],
 .ae-toolbar .ae-toolbar-save {
   border-radius: 4px !important;
 }
+
+/* Round where round fits: a standalone icon-only button (the dark/light toggle, the
+   "..." menu) is a circle, not a 4px square. The repeated class is deliberate: it
+   out-ranks the rule above by specificity, whatever the stylesheet order. */
+.ae-round.ae-round.ae-round.ae-round {
+  border-radius: 50% !important;
+}

@@ -49,6 +49,46 @@ export async function getEntryRules(): Promise<EntryRules> {
   }
 }
 
+/**
+ * Settings > Google Drive > Daily Report PDF: what the PDF saved to Drive leaves
+ * out. Both are off unless an admin turns them on, so by default the report lists
+ * every product and every column, as it always has.
+ */
+export interface ReportOptions {
+  /// Leave out products whose every figure is zero that day.
+  hideEmptyRows: boolean;
+  /// Leave out columns that are zero for every product that day.
+  hideEmptyColumns: boolean;
+}
+
+export const REPORT_OPTION_DEFAULTS: ReportOptions = { hideEmptyRows: false, hideEmptyColumns: false };
+const REPORT_KEYS = { hideEmptyRows: "report.hideEmptyRows", hideEmptyColumns: "report.hideEmptyColumns" } as const;
+
+/// A failed read means "show everything" - the safe reading is the complete report.
+export async function getReportOptions(): Promise<ReportOptions> {
+  try {
+    const rows = await prisma.appSetting.findMany({ where: { key: { in: Object.values(REPORT_KEYS) } } });
+    const on = (key: string) => rows.find((r) => r.key === key)?.value === "true";
+    return { hideEmptyRows: on(REPORT_KEYS.hideEmptyRows), hideEmptyColumns: on(REPORT_KEYS.hideEmptyColumns) };
+  } catch (err) {
+    console.error(JSON.stringify({ level: "warn", event: "report-options-unreadable", message: err instanceof Error ? err.message : String(err) }));
+    return REPORT_OPTION_DEFAULTS;
+  }
+}
+
+export async function setReportOptions(patch: Partial<ReportOptions>, userId: number): Promise<ReportOptions> {
+  for (const name of Object.keys(patch) as (keyof ReportOptions)[]) {
+    const value = String(patch[name]);
+    await prisma.appSetting.upsert({
+      where: { key: REPORT_KEYS[name] },
+      create: { key: REPORT_KEYS[name], value, updatedById: userId },
+      update: { value, updatedById: userId },
+    });
+  }
+  await logSystemEvent("report_options", { ...patch }, userId, "UPDATE");
+  return getReportOptions();
+}
+
 export async function setEntryRules(patch: Partial<EntryRules>, userId: number): Promise<EntryRules> {
   for (const name of Object.keys(patch) as (keyof EntryRules)[]) {
     const value = String(patch[name]);

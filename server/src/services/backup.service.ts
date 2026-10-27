@@ -205,6 +205,37 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
   });
 }
 
+/// A dump from an older version brings back the older table layout and the
+/// older `_prisma_migrations` history, while the running API expects the current
+/// layout - so until `prisma migrate deploy` runs (it otherwise only runs when the
+/// container starts) queries naming a newer column fail. Run it right after a
+/// restore; it only applies the migrations the restored database is missing, and
+/// does nothing when the dump was already current.
+export function applyPendingMigrations(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const child = spawn("npx", ["--no-install", "prisma", "migrate", "deploy"], {
+      env: { ...process.env, DATABASE_URL: env.databaseUrl },
+      // npx is npx.cmd on Windows, which spawn only runs through a shell.
+      shell: process.platform === "win32",
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => { output += chunk.toString(); });
+    child.stderr.on("data", (chunk) => { output += chunk.toString(); });
+    const timeout = setTimeout(() => child.kill(), RESTORE_TIMEOUT_MS);
+    child.on("error", (err) => {
+      clearTimeout(timeout);
+      reject(err);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timeout);
+      invalidateAll();
+      broadcastRealtimeEvent();
+      if (code === 0) resolve();
+      else reject(new HttpError(500, `The backup was restored, but updating it to this version failed: ${output.trim().slice(-500)}`));
+    });
+  });
+}
+
 export interface DumpFileSummary {
   /// Size and SHA-256 of the .gz file as written - what is uploaded.
   sizeBytes: number;

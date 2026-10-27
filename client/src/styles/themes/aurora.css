@@ -463,7 +463,6 @@
       (.ae-toolbar--sizer), which must stay one nowrap line. */
 .ae-toolbar,
 .ae-toolbar > div:first-child:not(.ae-toolbar-controls),
-.ae-toolbar-controls,
 .ae-toolbar .ae-segment-group,
 .ae-toolbar .ae-toolbar-btn-label,
 .ae-toolbar .ae-segment-label {
@@ -483,49 +482,13 @@
     filter var(--ae-dur-micro) ease-out,
     transform 90ms ease-out;
 }
-.ae-toolbar--compact .ae-toolbar-btn-label,
-.ae-toolbar--compact .ae-segment-label {
-  display: none;
-}
-
-.ae-toolbar--circle:not(.ae-toolbar--sizer) {
-  flex-wrap: wrap;
-  row-gap: 6px;
-  /* No hidden sideways scroll any more: everything wraps into view. */
-  overflow-x: hidden;
-}
-.ae-toolbar--circle:not(.ae-toolbar--sizer) > div:first-child:not(.ae-toolbar-controls),
-.ae-toolbar--circle:not(.ae-toolbar--sizer) > :first-child:not(.ae-toolbar-controls) {
-  flex: 1 1 100%;
-  width: auto;
-  max-width: 100%;
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
 /* The thin "|" between filters is drawn by each item's ::before; once the
    filters can wrap it would end up stranded at the start of a row. */
-.ae-toolbar--circle:not(.ae-toolbar--sizer) > :first-child:not(.ae-toolbar-controls) > *:not(:first-child)::before {
-  display: none;
-}
-.ae-toolbar--circle:not(.ae-toolbar--sizer) .ae-toolbar-controls {
-  margin-left: 0;
-  flex: 1 1 100%;
-  flex-wrap: wrap;
-  row-gap: 4px;
-}
 /* A divider between control groups means nothing on its own row. */
-.ae-toolbar--circle:not(.ae-toolbar--sizer) .ae-toolbar-divider {
-  display: none;
-}
 
 /* Touch: the smallest tier's buttons are tapped, not clicked. 40px (the toolbar
    is denser than the rest of the app, which uses 44px). It applies to the
    measuring clone as well, so the tier decision stays consistent. */
-@media (pointer: coarse) {
-  .ae-toolbar--circle {
-    --tb-h: 40px;
-  }
-}
 
 /* ---- Dashboard > Monthly Monitoring --------------------------------------
    Grouped columns on one shared scale. Series colors are the --ae-viz-*
@@ -545,12 +508,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-.ae-mm-year-label {
-  min-width: 44px;
-  text-align: center;
-  font-size: calc(13px * var(--ae-fs, 1));
-  font-weight: 700;
 }
 .ae-mm-view {
   display: inline-flex;

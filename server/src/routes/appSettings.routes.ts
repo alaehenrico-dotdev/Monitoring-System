@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { getEntryRulesHandler, getShiftModeHandler, patchEntryRulesHandler } from "../controllers/appSettings.controller";
+import { getEntryRulesHandler, getReportOptionsHandler, getShiftModeHandler, patchEntryRulesHandler, patchReportOptionsHandler } from "../controllers/appSettings.controller";
 
 const router = Router();
 
@@ -13,5 +13,8 @@ const router = Router();
 router.get("/shift-mode", authenticate, asyncHandler(getShiftModeHandler));
 router.get("/entry-rules", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getEntryRulesHandler));
 router.patch("/entry-rules", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(patchEntryRulesHandler));
+// Settings > Google Drive > Daily Report PDF: what the Drive copy leaves out. Supervisor/Admin only.
+router.get("/report-options", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getReportOptionsHandler));
+router.patch("/report-options", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(patchReportOptionsHandler));
 
 export default router;

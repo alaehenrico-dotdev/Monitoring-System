@@ -192,8 +192,7 @@ export function DateRangePicker({ from, to, onChange, className = "", style, "ar
         aria-expanded={open}
         onClick={() => (open ? closePicker() : openPicker())}
       >
-        <span className="ae-date-trigger-text ae-date-long">{labels.long}</span>
-        <span className="ae-date-trigger-text ae-date-short">{labels.short}</span>
+        <span className="ae-date-trigger-text">{labels.long}</span>
         <span className="ae-date-trigger-icon" aria-hidden>
           <CalendarIcon />
         </span>

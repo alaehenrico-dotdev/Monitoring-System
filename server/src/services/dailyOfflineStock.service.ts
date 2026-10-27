@@ -99,7 +99,7 @@ function calculate(opening: number, input: OfflineFigures) {
 
 /// Same N+1 avoidance as getOnlineGrid - opening stocks for every row are
 /// fetched in one batched call instead of one query per product.
-export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { combineSplitDay?: boolean } = {}) {
+export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { combineSplitDay?: boolean | "always" } = {}) {
   const products = await productRepository.findActive();
   const rows = await dailyOfflineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
@@ -112,7 +112,7 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { comb
   const layout = layoutCells(layoutRows);
 
   // Whole-day mode on a day that was entered by shift: see getOnlineGrid.
-  const wholeDayView = opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts;
+  const wholeDayView = shift === "NIGHT" && (opts.combineSplitDay === "always" || (opts.combineSplitDay !== false && !(await getEntryRules()).useShifts));
   const morningRows = wholeDayView ? await dailyOfflineStockRepository.findAllForDate(entryDate, "MORNING") : [];
   const morningByProduct = new Map<number, DailyOfflineStock>(morningRows.map((r) => [r.productId, r]));
   // The Morning sheet's added columns, so the combined view keeps them.

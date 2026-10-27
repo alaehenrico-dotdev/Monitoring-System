@@ -1,8 +1,10 @@
 import { prisma } from "../lib/prisma";
 import { toDateOnlyString } from "../utils/date";
 import { extraCellKey, parseExtraCellKey } from "../utils/stockExtras";
+import { describeHidden, hideEmpty, SHOW_ALL, type HideOptions } from "../utils/hideEmpty";
 import { renderTablesPdf, type Cell, type PdfTable } from "../utils/tablesPdf";
 import { getDayExtraNames, type DayExtraNames } from "./extraColumnLabels.service";
+import { getReportOptions } from "./appSettings.service";
 import { getDailyOutflow } from "./dailyOutflow.service";
 import { getDailyReport } from "./reports.service";
 
@@ -136,19 +138,16 @@ export function dailyReportSheets(
   report: ReportInput,
   out: { onlineOut: number | null; offlineOut: number | null; totalOut: number | null } | null,
   extraNames?: DayExtraNames,
+  hide: HideOptions = SHOW_ALL,
 ): PdfTable[] {
   const total = report.total as TotalRow[];
   const audit = (report.audit ?? []) as AuditRow[];
-  const summary: Cell[][] = [
-    ["Report date", report.date ?? ""],
-    ["Status", report.snapshot ? "Finished - this is the report saved when the day was finished" : "Live - the day is not finished yet, so these figures can still change"],
-    ...(report.snapshot ? ([["Saved at", report.snapshot.savedAt], ["Saved by", report.snapshot.savedBy?.name ?? ""]] as Cell[][]) : []),
-    ["Audit counts", audit.length],
-  ];
-  return [
-    { name: "Summary", columns: ["Item", "Value"], rows: summary },
-    stockSheet("Online", report.online as GridRow[], ONLINE_COLUMNS, extraNames?.ONLINE),
-    stockSheet("Offline", report.offline as GridRow[], OFFLINE_COLUMNS, extraNames?.OFFLINE),
+  // Products and columns with nothing in them can be left out (Settings > Google
+  // Drive). The label columns Category / SKU / Product are never counted.
+  const FIRST_FIGURE = 3;
+  const online = hideEmpty(stockSheet("Online", report.online as GridRow[], ONLINE_COLUMNS, extraNames?.ONLINE), FIRST_FIGURE, hide);
+  const offline = hideEmpty(stockSheet("Offline", report.offline as GridRow[], OFFLINE_COLUMNS, extraNames?.OFFLINE), FIRST_FIGURE, hide);
+  const consolidated = hideEmpty(
     {
       name: "Consolidated",
       columns: ["Category", "SKU", "Product", "Online Remaining", "Offline Remaining", "Consolidated Remaining", "Manual Count", "Variance"],
@@ -161,6 +160,27 @@ export function dailyReportSheets(
         r.totalVariance ?? null,
       ]),
     },
+    FIRST_FIGURE,
+    hide,
+  );
+  const hidden = describeHidden([
+    { name: "Online", ...online },
+    { name: "Offline", ...offline },
+    { name: "Consolidated", ...consolidated },
+  ]);
+  const summary: Cell[][] = [
+    ["Report date", report.date ?? ""],
+    ["Status", report.snapshot ? "Finished - this is the report saved when the day was finished" : "Live - the day is not finished yet, so these figures can still change"],
+    ...(report.snapshot ? ([["Saved at", report.snapshot.savedAt], ["Saved by", report.snapshot.savedBy?.name ?? ""]] as Cell[][]) : []),
+    ["Audit counts", audit.length],
+    ...(hidden.rows ? ([["Products with no figures, not listed", hidden.rows]] as Cell[][]) : []),
+    ...(hidden.columns ? ([["Empty columns, not shown", hidden.columns]] as Cell[][]) : []),
+  ];
+  return [
+    { name: "Summary", columns: ["Item", "Value"], rows: summary },
+    online.table,
+    offline.table,
+    consolidated.table,
     {
       name: "Daily Out",
       columns: ["Online Out", "Offline Out", "Combined Out"],
@@ -200,8 +220,9 @@ export async function buildDailyReportPdf(date: Date): Promise<{ fileName: strin
   // Best effort, like the page: if the names cannot be read the added columns
   // still print, under their generic "+1" labels.
   const extraNames = await getDayExtraNames(date).catch(() => undefined);
+  const hide = await getReportOptions();
   const iso = toDateOnlyString(date);
-  const tables = dailyReportSheets({ ...report, date: iso }, out ?? null, extraNames);
+  const tables = dailyReportSheets({ ...report, date: iso }, out ?? null, extraNames, hide);
   return { fileName: dailyReportFileName(iso), data: renderTablesPdf({ title: "Daily Report", subtitle: iso, tables }) };
 }
 

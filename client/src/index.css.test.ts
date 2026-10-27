@@ -84,3 +84,60 @@ describe("every url() in the stylesheets points at a file that exists", () => {
     });
   }
 });
+
+describe("round buttons, the oval clock and the seal's loading beam", () => {
+  const rule = (selector: string) => {
+    const at = css.indexOf(selector + " {");
+    expect(at, `rule not found: ${selector}`).toBeGreaterThan(-1);
+    return css.slice(at, css.indexOf("}", at));
+  };
+
+  it("a .ae-round button is a circle, and the rule out-ranks the global 4px button radius", () => {
+    const body = rule(".ae-round.ae-round.ae-round.ae-round");
+    expect(body).toContain("border-radius: 50% !important");
+    // The 4px rule is !important too, so only specificity can beat it: four classes > its three :not()s plus a tag.
+    expect(css).toMatch(/button:not\(\.ae-page-header-logo\)[\s\S]*?border-radius: 4px !important/);
+  });
+
+  it("an icon-only menu (the ... menu) and the compact icon-only Clear filters button are circles", () => {
+    expect(rule(".ae-mb-trigger--icon.ae-mb-trigger--icon.ae-mb-trigger--icon.ae-mb-trigger--icon")).toContain("border-radius: 50% !important");
+    expect(rule(".ae-clear-filters.ae-clear-filters.ae-clear-filters.ae-clear-filters")).toContain("border-radius: 50% !important");
+  });
+
+  it("the date arrows stay square: they sit in a joined group, where a circle would not fit", () => {
+    expect(css).not.toMatch(/\.ae-mb-btn--icon\.ae-mb-btn--icon[^{]*\{[^}]*50%/);
+  });
+
+  it("the clock is an oval once the window is narrow enough for the compact toolbar, and only then", () => {
+    const at = css.indexOf("@media (max-width: 1800px) {\n  .ae-live-clock");
+    expect(at).toBeGreaterThan(-1);
+    const block = css.slice(at, css.indexOf("\n}\n", at));
+    expect(block).toContain("border-radius: 999px !important");
+    // Outside that media query the clock keeps its component's own rounded-rectangle shape.
+    const outside = css.slice(0, at) + css.slice(at + block.length);
+    expect(outside).not.toMatch(/\.ae-live-clock[^{]*\{[^}]*999px/);
+  });
+
+  it("the seal's beam is hidden and paused when idle, amber and slower when slow or reconnecting", () => {
+    expect(rule(".ae-seal-beam")).toContain("opacity: 0");
+    expect(rule(".ae-seal-beam.is-idle .ae-logo-orbit")).toContain("animation-play-state: paused");
+    expect(css).toMatch(/\.ae-seal-beam\.is-busy,\s*\.ae-seal-beam\.is-slow,\s*\.ae-seal-beam\.is-connecting\s*\{\s*opacity: 1/);
+    expect(css).toMatch(/\.ae-seal-beam\.is-slow,\s*\.ae-seal-beam\.is-connecting\s*\{\s*--ring: #f08a24/);
+    expect(css).toMatch(/\.ae-seal-beam\.is-slow \.ae-logo-orbit,\s*\.ae-seal-beam\.is-connecting \.ae-logo-orbit\s*\{\s*animation-duration: 2\.4s/);
+  });
+
+  it("the seal button is positioned, so the beam sits over it, and the beam is not printed", () => {
+    expect(rule(".ae-page-header-logo")).toContain("position: relative");
+    expect(css).toMatch(/@media print \{\s*\.ae-seal-beam \{\s*display: none/);
+  });
+});
+
+describe("keyboard focus stays visible on the sub-tabs", () => {
+  it("a focused sub-tab gets an outline ring, in addition to the underline", () => {
+    const at = css.indexOf(".ae-subtab:focus-visible {");
+    expect(at).toBeGreaterThan(-1);
+    const body = css.slice(at, css.indexOf("}", at));
+    expect(body).toMatch(/outline:\s*2px solid/);
+    expect(body).not.toMatch(/outline:\s*none/);
+  });
+});

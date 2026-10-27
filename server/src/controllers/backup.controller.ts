@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { restoreDatabaseFromStream, streamDatabaseBackup } from "../services/backup.service";
+import { applyPendingMigrations, restoreDatabaseFromStream, streamDatabaseBackup } from "../services/backup.service";
 import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveResetToken } from "../services/dataReset.service";
 import { logSystemEvent } from "../services/changeLog.service";
 import { keepDriveConnectionAcross } from "../services/drive.service";
@@ -73,7 +73,11 @@ export async function postRestore(req: Request, res: Response) {
     // The file replaces every table, the Drive connection included; keep this
     // server's own so a stale or foreign token in the file cannot replace it.
     await keepDriveConnectionAcross(() => restoreDatabaseFromStream(req));
+    // The tables are replaced now, so the passcode is spent even if the
+    // update below fails - a retry would restore the file all over again.
     consumeResetToken(tokenId);
+    // An older backup has an older table layout; bring it up to this version.
+    await applyPendingMigrations();
     // Written into the restored database, so it is the first line of its history.
     await logSystemEvent("backup_restore", {}, req.user?.id, "UPDATE");
     res.json({ success: true });

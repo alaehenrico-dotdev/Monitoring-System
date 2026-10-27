@@ -679,14 +679,6 @@ table input[type="number"] {
   padding-right: 4px;
 }
 
-.ae-row-ring {
-  position: absolute;
-  z-index: 0;
-  height: 0.4px;
-  pointer-events: none;
-  background-color: #d4a000;
-}
-
 /* Full-box version of .ae-row-ring, for the shared Modal panel (Modal.tsx):
    the same still gold line, 1px, traced around all four edges instead of
    top/bottom bars only, so every dialog built on Modal - AlertDialog,
@@ -1109,23 +1101,6 @@ table input[type="number"] {
 :root[data-theme="dark"] .ae-date-trigger-icon {
   color: #f5c000;
 }
-/* Compact and circle toolbar tiers squeeze the field to ~100px / ~84px, so
-   they swap to the numeric "9/19/26" form (circle also drops the icon). The
-   circle tier's class list includes .ae-toolbar--compact, so the first two
-   rules cover both. */
-.ae-date-short {
-  display: none;
-}
-.ae-toolbar--compact .ae-date-long {
-  display: none;
-}
-.ae-toolbar--compact .ae-date-short {
-  display: inline;
-}
-.ae-toolbar--circle .ae-date-trigger-icon {
-  display: none;
-}
-
 .ae-datepicker {
   position: fixed;
   z-index: 300; /* above Modal (200) so a picker inside a dialog still shows */
@@ -1580,6 +1555,13 @@ table input[type="number"] {
 .ae-subtab:hover::after,
 .ae-subtab:focus-visible::after {
   transform: scaleX(1);
+}
+/* Keyboard focus gets a real ring, not just the underline (which looks the same as hover
+   and as the current tab): it must be obvious which tab the keyboard is on. */
+.ae-subtab:focus-visible {
+  outline: 2px solid var(--ae-btn-yellow);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 .ae-subtab[aria-selected="true"]::after {
   transform: scaleX(1);

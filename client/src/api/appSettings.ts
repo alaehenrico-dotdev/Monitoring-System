@@ -16,3 +16,15 @@ export const getShiftMode = () => http.get<{ useShifts: boolean }>("/app-setting
 
 export const getEntryRules = () => http.get<EntryRules>("/app-settings/entry-rules");
 export const updateEntryRules = (patch: Partial<EntryRules>) => http.patch<EntryRules>("/app-settings/entry-rules", patch);
+
+/// What the Daily Report PDF saved to Google Drive leaves out (Settings > Google Drive).
+/// Both are off until an admin turns them on, so the report lists everything by default.
+export interface ReportOptions {
+  /// Leave out products whose every figure is zero that day.
+  hideEmptyRows: boolean;
+  /// Leave out columns that are zero for every product that day.
+  hideEmptyColumns: boolean;
+}
+
+export const getReportOptions = () => http.get<ReportOptions>("/app-settings/report-options");
+export const updateReportOptions = (patch: Partial<ReportOptions>) => http.patch<ReportOptions>("/app-settings/report-options", patch);

@@ -9,11 +9,6 @@ import { recordChange } from "./changeLog.service";
  * without importing each other.
  */
 
-export interface SnapshotMeta {
-  savedAt: Date;
-  savedBy: { id: number; name: string } | null;
-}
-
 export async function saveSnapshot(entryDate: Date, report: unknown, userId: number | undefined, db: Db) {
   // Round-tripped through JSON so what is stored is exactly what the API
   // would have sent (Decimals as strings, dates as ISO strings), and what a

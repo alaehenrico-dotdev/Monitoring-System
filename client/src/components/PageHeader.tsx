@@ -7,6 +7,7 @@ import {
 import { HeaderExtras } from "./HeaderExtras";
 import { HeaderTabs } from "./HeaderTabs";
 import { ChevronIcon } from "./icons";
+import { ActivityBeam } from "./ActivityBeam";
 import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
@@ -133,6 +134,8 @@ export function PageHeader({
               size={compact ? LOGO_SIZE_COLLAPSED : LOGO_SIZE}
               spin={logoSpin}
             />
+            {/* A gold beam circles the seal while the system saves, loads or connects. */}
+            <ActivityBeam size={compact ? LOGO_SIZE_COLLAPSED : LOGO_SIZE} />
           </button>
           <div className="ae-page-header-titles">
             <div className="ae-page-header-title-row">

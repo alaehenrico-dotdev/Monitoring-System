@@ -168,9 +168,6 @@
   box-shadow: none;
   transform: none;
 }
-:root[data-ui="minimal"] .ae-dash-stat--alert {
-  border-color: var(--ae-danger-text);
-}
 
 /* ---- Dashboard: tiles lose their fill and shadow, icons their gold wash --- */
 :root[data-ui="minimal"] .ae-dash-quicklink {
@@ -194,10 +191,6 @@
 :root[data-ui="minimal"] .ae-dash-quicklink-icon {
   background: transparent;
   color: var(--ae-text-muted);
-}
-:root[data-ui="minimal"] .ae-dash-stat--alert .ae-dash-stat-icon {
-  background: transparent;
-  color: var(--ae-danger-text);
 }
 :root[data-ui="minimal"] .ae-dash-seg {
   border-color: var(--ae-border-strong);

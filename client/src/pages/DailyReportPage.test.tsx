@@ -215,3 +215,103 @@ describe("the report's own exports stay out of the Exports folder in Drive", () 
     expect(spec.sections.map((s: { title?: string }) => s.title)).toContain(`AUDIT - ${DATE}`);
   });
 });
+
+describe("View > Hide products with no figures / Hide empty columns", () => {
+  const alpha = { product: { id: 1, category: "Class A", sku: "A1", name: "Alpha" }, isSaved: true, entry: { openingStock: 10, onlineStock: 10, remainingStock: 10, rts: 0 } };
+  const beta = { product: { id: 2, category: "Class A", sku: "B2", name: "Betamax" }, isSaved: true, entry: { openingStock: 0, onlineStock: 0, remainingStock: 0, rts: 0 } };
+  const totalRow = (p: typeof alpha.product, remaining: number) => ({ product: p, onlineRemainingStock: remaining, offlineRemainingStock: 0, totalRemainingStock: remaining, totalManualCount: null, totalVariance: null });
+
+  beforeEach(() => {
+    localStorage.clear();
+    api.getDailyReport.mockResolvedValue(report({ online: [alpha, beta], offline: [], total: [totalRow(alpha.product, 10), totalRow(beta.product, 0)] } as unknown as Partial<DailyReport>));
+  });
+
+  async function generated() {
+    open();
+    generate();
+    confirm();
+    await screen.findByText(/Audit —/);
+  }
+  const choose = async (menuName: string, itemName: RegExp) => {
+    fireEvent.click(screen.getByRole("menuitem", { name: menuName }));
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: itemName }));
+  };
+  const downloadPdf = async () => {
+    fireEvent.click(screen.getByRole("menuitem", { name: "Export" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Download PDF/ }));
+    await waitFor(() => expect(api.downloadTablePdf).toHaveBeenCalled());
+    return api.downloadTablePdf.mock.calls.at(-1)![0] as { sections: { title?: string; columns: { header: string }[]; rows: { cells: string[] }[] }[] };
+  };
+  const section = (spec: Awaited<ReturnType<typeof downloadPdf>>, start: string) => spec.sections.find((x) => x.title?.startsWith(start))!;
+  const names = (sec: ReturnType<typeof section>) => sec.rows.flatMap((r) => r.cells).join("|");
+
+  it("lists every product and column by default - nothing is hidden until it is switched on", async () => {
+    await generated();
+    const spec = await downloadPdf();
+    expect(names(section(spec, "ONLINE"))).toContain("Betamax");
+    expect(section(spec, "ONLINE").columns.map((c) => c.header)).toContain("RTS");
+    expect(screen.queryByText(/Not shown:/)).toBeNull();
+  });
+
+  it("hides a product with no figures from the PDF and says so on the page", async () => {
+    await generated();
+    await choose("View", /Hide products with no figures/);
+    expect(await screen.findByText(/Not shown: 2 products with no figures/)).toBeInTheDocument(); // Online and Consolidated
+    const spec = await downloadPdf();
+    expect(names(section(spec, "ONLINE"))).toContain("Alpha");
+    expect(names(section(spec, "ONLINE"))).not.toContain("Betamax");
+    expect(names(section(spec, "CONSOLIDATED"))).not.toContain("Betamax");
+    expect(section(spec, "ONLINE").columns.map((c) => c.header)).toContain("RTS"); // columns are a separate switch
+  });
+
+  it("hides an empty column from the PDF, and the product rows stay", async () => {
+    await generated();
+    await choose("View", /Hide empty columns/);
+    const spec = await downloadPdf();
+    const headers = section(spec, "ONLINE").columns.map((c) => c.header);
+    expect(headers).not.toContain("RTS");
+    expect(headers).toContain("Remaining Stocks");
+    expect(names(section(spec, "ONLINE"))).toContain("Betamax"); // rows are a separate switch
+    // Everything nobody used that day (stock in/out, production, fulfillment, RTS) is counted.
+    expect(await screen.findByText(/Not shown: 5 empty columns/)).toBeInTheDocument();
+  });
+
+  it("leaves Excel out the same products, so the screen, the PDF and Excel agree", async () => {
+    await generated();
+    await choose("View", /Hide products with no figures/);
+    fireEvent.click(screen.getByRole("menuitem", { name: "Export" }));
+    fireEvent.click(await screen.findByRole("menuitem", { name: /Export Excel/ }));
+    await waitFor(() => expect(api.downloadExcel).toHaveBeenCalled());
+    const html = api.downloadExcel.mock.calls.at(-1)![1] as string;
+    expect(html).toContain("Alpha");
+    expect(html).not.toContain("Betamax");
+  });
+
+  it("turning it off again shows everything and removes the note", async () => {
+    await generated();
+    await choose("View", /Hide products with no figures/);
+    await screen.findByText(/Not shown:/);
+    await choose("View", /Hide products with no figures/);
+    await waitFor(() => expect(screen.queryByText(/Not shown:/)).toBeNull());
+    expect(names(section(await downloadPdf(), "ONLINE"))).toContain("Betamax");
+  });
+
+  it("remembers the choice in this browser", async () => {
+    await generated();
+    await choose("View", /Hide products with no figures/);
+    await choose("View", /Hide empty columns/);
+    await waitFor(() => expect(localStorage.getItem("ala-eh-hide-empty-rows:daily-report")).toBe("1"));
+    expect(localStorage.getItem("ala-eh-hide-empty-columns:daily-report")).toBe("1");
+  });
+
+  it("shows the current state in the menu with a check", async () => {
+    await generated();
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    const rowsItem = await screen.findByRole("menuitemradio", { name: /Hide products with no figures/ });
+    expect(rowsItem).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(rowsItem);
+    fireEvent.click(screen.getByRole("menuitem", { name: "View" }));
+    expect(await screen.findByRole("menuitemradio", { name: /Hide products with no figures/ })).toHaveAttribute("aria-checked", "true");
+  });
+});
+

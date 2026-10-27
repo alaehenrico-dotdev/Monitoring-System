@@ -215,9 +215,6 @@
     0 8px 20px rgba(12, 12, 12, 0.1);
   transform: translateY(-1px);
 }
-.ae-dash-stat--alert {
-  border-color: var(--ae-danger-text);
-}
 /* Icon badge - the small rounded chip each stat card leads with, CRM-tile
    style, tinted brand gold (or danger red for the alert variant). */
 .ae-dash-stat-icon {
@@ -229,10 +226,6 @@
   border-radius: 6px;
   background: color-mix(in srgb, #d4a000 14%, transparent);
   color: #d4a000;
-}
-.ae-dash-stat--alert .ae-dash-stat-icon {
-  background: color-mix(in srgb, var(--ae-danger-text) 14%, transparent);
-  color: var(--ae-danger-text);
 }
 .ae-dash-stat-value {
   position: relative;
@@ -248,10 +241,6 @@
   font-size: calc(12px * var(--ae-fs, 1));
   font-weight: 600;
   color: var(--ae-text-muted);
-}
-.ae-dash-stat--alert .ae-dash-stat-value,
-.ae-dash-stat--alert .ae-dash-stat-label {
-  color: var(--ae-danger-text);
 }
 /* Dashboard "Quick Access" - one-click shortcuts to the app's major
    Data Entry pages, so a supervisor lands here and can jump straight to

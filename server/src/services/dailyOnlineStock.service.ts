@@ -86,14 +86,16 @@ function calculate(opening: number, input: OnlineFigures) {
 /// master list).
 ///
 /// `combineSplitDay: false` returns the sheet's own rows even in whole-day mode.
-/// The Daily Report and its frozen snapshot pass it: they describe what was
-/// entered, and must come out the same whichever mode is on.
+/// `combineSplitDay: "always"` adds a day's Morning and Night sheets together
+/// (the Night sheet as one row per product) whichever mode is on - what the
+/// Daily Report and its frozen snapshot use, so the day's figures are the whole
+/// day's and come out the same whether shifts are on or off.
 ///
 /// Opening stocks for every missing row are fetched in one batched call
 /// rather than one query per product - on a fresh shift, most/all of the
 /// ~60 products in the master list won't have a row yet, so the naive
 /// per-product await turned every grid load into an N+1 query storm.
-export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combineSplitDay?: boolean } = {}) {
+export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combineSplitDay?: boolean | "always" } = {}) {
   const products = await productRepository.findActive();
   const rows = await dailyOnlineStockRepository.findAllForDate(entryDate, shift);
   const rowByProduct = new Map(rows.map((r) => [r.productId, r]));
@@ -109,7 +111,7 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combi
 
   // Whole-day mode on a day that was entered by shift: the Night sheet shows the
   // two sheets added together, as one read-only row per product.
-  const wholeDayView = opts.combineSplitDay !== false && shift === "NIGHT" && !(await getEntryRules()).useShifts;
+  const wholeDayView = shift === "NIGHT" && (opts.combineSplitDay === "always" || (opts.combineSplitDay !== false && !(await getEntryRules()).useShifts));
   const morningRows = wholeDayView ? await dailyOnlineStockRepository.findAllForDate(entryDate, "MORNING") : [];
   const morningByProduct = new Map<number, DailyOnlineStock>(morningRows.map((r) => [r.productId, r]));
   // The Morning sheet's added columns, so the combined view keeps them.

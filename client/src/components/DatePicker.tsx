@@ -211,7 +211,6 @@ export function DatePicker({ value, onChange, className = "", style, disabled, t
   const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 
   const longLabel = selected ? selected.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Select date";
-  const shortLabel = selected ? selected.toLocaleDateString(undefined, { month: "numeric", day: "numeric", year: "2-digit" }) : "Select";
   const dialogLabel = ariaLabel ? `Choose ${ariaLabel.toLowerCase()}` : "Choose date";
 
   return (
@@ -227,8 +226,7 @@ export function DatePicker({ value, onChange, className = "", style, disabled, t
         aria-expanded={open}
         onClick={() => (open ? closePicker() : openPicker())}
       >
-        <span className="ae-date-trigger-text ae-date-long">{longLabel}</span>
-        <span className="ae-date-trigger-text ae-date-short">{shortLabel}</span>
+        <span className="ae-date-trigger-text">{longLabel}</span>
         <span className="ae-date-trigger-icon" aria-hidden>
           <CalendarIcon />
         </span>

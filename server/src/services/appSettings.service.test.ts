@@ -10,7 +10,7 @@ vi.mock("../lib/realtime", () => ({ broadcastRealtimeEvent: vi.fn() }));
 import { invalidateAll } from "../lib/cache";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { logSystemEvent } from "./changeLog.service";
-import { ENTRY_RULE_DEFAULTS, getEntryRules, setEntryRules } from "./appSettings.service";
+import { ENTRY_RULE_DEFAULTS, getEntryRules, getReportOptions, REPORT_OPTION_DEFAULTS, setEntryRules, setReportOptions } from "./appSettings.service";
 
 const KEY = "entry.requireEarlierDaysFinished";
 
@@ -102,5 +102,51 @@ describe("setEntryRules", () => {
     await setEntryRules({ requireEarlierDaysFinished: false }, 7);
     expect(logSystemEvent).toHaveBeenCalledWith("entry_rules", { requireEarlierDaysFinished: false }, 7, "UPDATE");
     expect(broadcastRealtimeEvent).toHaveBeenCalled();
+  });
+});
+
+describe("report options (what the Drive PDF leaves out)", () => {
+  it("are both OFF when nothing has been set, so the report lists everything as it always did", async () => {
+    expect(await getReportOptions()).toEqual({ hideEmptyRows: false, hideEmptyColumns: false });
+    expect(REPORT_OPTION_DEFAULTS).toEqual({ hideEmptyRows: false, hideEmptyColumns: false });
+  });
+
+  it("read an admin's choice to turn each on", async () => {
+    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "report.hideEmptyRows", value: "true" }]);
+    expect(await getReportOptions()).toEqual({ hideEmptyRows: true, hideEmptyColumns: false });
+    prismaMock.appSetting.findMany.mockResolvedValue([
+      { key: "report.hideEmptyRows", value: "true" },
+      { key: "report.hideEmptyColumns", value: "true" },
+    ]);
+    expect(await getReportOptions()).toEqual({ hideEmptyRows: true, hideEmptyColumns: true });
+  });
+
+  it("treat anything other than the word true as off, so a damaged row cannot start hiding data", async () => {
+    for (const value of ["false", "", "1", "yes", "TRUE "]) {
+      prismaMock.appSetting.findMany.mockResolvedValue([{ key: "report.hideEmptyRows", value }]);
+      expect((await getReportOptions()).hideEmptyRows).toBe(false);
+    }
+  });
+
+  it("fall back to showing everything when the database cannot be read", async () => {
+    prismaMock.appSetting.findMany.mockRejectedValue(new Error("db down"));
+    expect(await getReportOptions()).toEqual({ hideEmptyRows: false, hideEmptyColumns: false });
+  });
+
+  it("are saved one row per switch, as the admin who changed them, and logged", async () => {
+    await setReportOptions({ hideEmptyRows: true }, 7);
+    expect(prismaMock.appSetting.upsert).toHaveBeenCalledTimes(1);
+    expect(prismaMock.appSetting.upsert.mock.calls[0][0]).toMatchObject({
+      where: { key: "report.hideEmptyRows" },
+      create: { key: "report.hideEmptyRows", value: "true", updatedById: 7 },
+      update: { value: "true", updatedById: 7 },
+    });
+    expect(logSystemEvent).toHaveBeenCalledWith("report_options", { hideEmptyRows: true }, 7, "UPDATE");
+  });
+
+  it("changing one switch leaves the other alone", async () => {
+    await setReportOptions({ hideEmptyColumns: false }, 7);
+    expect(prismaMock.appSetting.upsert).toHaveBeenCalledTimes(1);
+    expect(prismaMock.appSetting.upsert.mock.calls[0][0].where.key).toBe("report.hideEmptyColumns");
   });
 });

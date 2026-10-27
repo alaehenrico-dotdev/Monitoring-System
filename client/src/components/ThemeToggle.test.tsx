@@ -90,3 +90,13 @@ describe("ThemeToggle", () => {
     expect(root.classList.contains("ae-theme-switching")).toBe(false);
   });
 });
+
+describe("ThemeToggle shape", () => {
+  it("is marked round and drawn as a circle, so no theme's button radius can square it off", () => {
+    renderToggle();
+    const button = screen.getByRole("button", { name: /Switch to dark mode/ });
+    expect(button).toHaveClass("ae-round");
+    expect(button.style.borderRadius).toBe("50%");
+    expect(button.style.width).toBe(button.style.height); // a circle needs equal sides
+  });
+});

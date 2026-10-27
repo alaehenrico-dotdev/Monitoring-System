@@ -1,32 +1,22 @@
 /* =========================================================================
    Toolbar
    =========================================================================
-   Toolbar.tsx picks ONE tier (full / compact / circle) by measuring hidden
-   clones; this file only says what each tier looks like.
+   The page toolbar is the menu bar now (menu-bar.css, `.ae-mb`), which fits its
+   container by itself with container queries. What is left here styles the
+   controls the menu bar still contains (filters, Save / Finish buttons, the date
+   and category pickers) and the `.ae-toolbar` wrapper they sit in.
 
-   - full:    labeled controls.
-   - compact: labels disappear, controls tighten (.ae-toolbar--compact).
-   - circle:  smallest form, round icon buttons (.ae-toolbar--compact
-              .ae-toolbar--circle - both classes are present, circle rules
-              come last so they win).
-
-   Full and compact stay on one line. The circle tier (the smallest) wraps
-   onto a second row - filters first, actions below - rather than scrolling
-   sideways out of sight; see "Toolbar: steady resize, wrapping floor tier" at
-   the end of this file.
+   The old three-tier system - `.ae-toolbar--compact`, `.ae-toolbar--circle` and the
+   hidden measuring clone `.ae-toolbar--sizer`, chosen by JS - is gone: nothing sets
+   those classes any more, and their rules were removed. A few selectors below still
+   read `:not(.ae-toolbar--compact)`; that condition is always true now, and it is kept
+   only for the specificity those rules were written to have.
 
    Layout is two groups on one row: the filter cluster (search / category /
    date / shift) stays packed to its own content width on the LEFT, and the
    action group (Save / Clear / PDF / Report / Import / History / Zoom) is
-   pushed to the opposite end via `margin-left: auto` on
-   .ae-toolbar-controls, so the two never drift together and the toolbar
-   reads as "inputs here, actions there" at a glance. Fixed widths are used
-   where a stable control size is needed, while the compact and circle
-   tiers still shrink and scroll when necessary.
-
-   Every width that matters for measuring is set with `!important` so a
-   page's inline width can't make the real row and the hidden measuring
-   clones disagree.
+   pushed to the opposite end, so the two never drift together and the toolbar
+   reads as "inputs here, actions there" at a glance.
 
    The border is a plain, static 1px gold line (no gradient overlay and no
    hover state on it) so it is always visible in light and dark mode. The
@@ -75,9 +65,8 @@
      clipped its controls. It must always keep its natural height. */
   flex-shrink: 0;
 
-  /* Never wrap. Full and compact are measured to fit, so they simply clip;
-     only the floor tier can be genuinely too wide, and it scrolls (see
-     .ae-toolbar--circle). The scrollbar itself is always hidden: a 1px
+  /* Never wrap: the row clips instead (the menu bar moves items into its "..." menu
+     before they run out of room). The scrollbar itself is always hidden: a 1px
      overflow used to pop a scrollbar in and out, which changed the row's
      height and made the whole toolbar glitch. */
   overflow-x: hidden;
@@ -88,17 +77,6 @@
   transition:
     gap 180ms ease,
     padding 180ms ease;
-}
-.ae-toolbar--compact {
-  --ae-toolbar-gap: 6px;
-}
-.ae-toolbar--circle {
-  --ae-toolbar-gap: 4px;
-  /* Smaller floor-tier height applies to EVERY control (inputs, selects,
-     dates, buttons) so they stay the same size as each other. */
-  --tb-h: 30px;
-  /* Only tier that can be wider than the viewport. */
-  overflow-x: auto;
 }
 .ae-toolbar::-webkit-scrollbar {
   display: none;
@@ -129,11 +107,6 @@
 }
 /* Floor tier: keep the filter group at its content width so the toolbar
    remains compact and can scroll naturally when the row is too wide. */
-.ae-toolbar--circle > div:first-child:not(.ae-toolbar-controls) {
-  flex: 0 0 auto;
-  width: max-content;
-  max-width: none;
-}
 
 /* ---- Filter cluster: packed together like the top nav tabs, not spaced
    out as separate boxed fields. Tighter than the generic --ae-toolbar-gap
@@ -162,26 +135,8 @@
    far right of the row by its own auto left-margin - this is the single
    change that moves Save -> 100% to the right end of the toolbar instead
    of trailing immediately after the last filter. */
-.ae-toolbar-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--ae-toolbar-gap);
-  flex: 0 0 auto;
-  min-width: 0;
-  margin-left: auto;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-  transition: gap 180ms ease;
-}
 
 /* Hairline between two control groups. */
-.ae-toolbar .ae-toolbar-divider {
-  flex: 0 0 1px;
-  width: 1px;
-  min-width: 1px;
-  height: 22px;
-  background: var(--tb-hairline);
-}
 
 /* ---- Filters: nav-style - plain text, like the top nav tabs
    (.ae-header-tab in this same file), instead of a boxed field. No fill,
@@ -322,12 +277,6 @@
      there was still plenty of space. */
   min-width: 140px;
 }
-.ae-toolbar--sizer:not(.ae-toolbar--compact)
-  .ae-search--open
-  input[type="search"] {
-  flex-basis: 140px;
-  width: 140px !important;
-}
 .ae-toolbar .ae-select,
 .ae-toolbar .ae-select-trigger,
 .ae-toolbar .ae-date-trigger {
@@ -335,8 +284,7 @@
 }
 /* Tight controls: small gap between a label and its icon/chevron, and no
    base min-width padding the dropdown/date triggers out with dead space
-   (full tier only - the compact/circle tiers set their own !important
-   min-widths below). */
+   below. */
 .ae-toolbar .ae-select-trigger,
 .ae-toolbar .ae-date-trigger {
   gap: 4px;
@@ -359,27 +307,6 @@
    that sets them inline would otherwise make the real row and the hidden
    measuring clone size the same control differently, and the row would end
    up wider than what was measured. */
-.ae-toolbar--compact .ae-search--open input[type="search"] {
-  flex: 3 1 110px !important;
-  width: 110px !important;
-  min-width: 72px;
-}
-.ae-toolbar--compact .ae-select,
-.ae-toolbar--compact .ae-select-trigger {
-  flex: 1 1 88px !important;
-  width: 88px !important;
-  min-width: 64px !important;
-  max-width: 160px !important;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ae-toolbar--compact .ae-date-trigger {
-  flex: 1 1 110px !important;
-  width: 110px !important;
-  min-width: 96px !important;
-  max-width: 160px !important;
-}
 
 /* Content-sized dropdown (className "ae-fit"): a row of filters whose labels
    are all short reads better packed to their text than stretched by the tier
@@ -400,27 +327,6 @@
 }
 
 /* circle */
-.ae-toolbar--circle .ae-search--open input[type="search"] {
-  flex: 3 1 72px !important;
-  width: 72px !important;
-  min-width: 56px;
-}
-.ae-toolbar--circle .ae-select,
-.ae-toolbar--circle .ae-select-trigger {
-  flex: 1 1 64px !important;
-  width: 64px !important;
-  min-width: 48px !important;
-  max-width: 120px !important;
-}
-.ae-toolbar--circle .ae-select-trigger-icon {
-  display: none;
-}
-.ae-toolbar--circle .ae-date-trigger {
-  flex: 1 1 84px !important;
-  width: 84px !important;
-  min-width: 68px !important;
-  max-width: 130px !important;
-}
 
 /* Zoom select (ZoomControl.tsx, className "ae-zoom-control").
    It lives in ToolbarControls, which never shrinks, so it is sized to its
@@ -434,18 +340,6 @@
   width: auto !important;
   min-width: 68px !important;
   max-width: 96px !important;
-}
-.ae-toolbar--compact .ae-zoom-control {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 60px !important;
-  max-width: 80px !important;
-}
-.ae-toolbar--circle .ae-zoom-control {
-  flex: 0 0 auto !important;
-  width: auto !important;
-  min-width: 44px !important;
-  max-width: 62px !important;
 }
 
 /* ---- Buttons: neutral by default, one yellow primary ------------------- */
@@ -506,23 +400,17 @@
 }
 
 /* Primary action: solid yellow. */
-.ae-toolbar .ae-toolbar-primary,
 .ae-toolbar .ae-btn-primary {
   background: var(--ae-btn-yellow);
   border-color: var(--ae-btn-yellow-active);
   color: var(--ae-btn-yellow-text);
 }
-.ae-toolbar .ae-toolbar-primary:hover:not(:disabled),
 .ae-toolbar .ae-btn-primary:hover:not(:disabled) {
   background: var(--ae-btn-yellow);
   border-color: var(--ae-btn-yellow-active);
 }
-.ae-toolbar .ae-toolbar-primary:active:not(:disabled),
 .ae-toolbar .ae-btn-primary:active:not(:disabled) {
   background: var(--ae-btn-yellow);
-}
-.ae-toolbar .ae-toolbar-primary:disabled {
-  opacity: 0.45;
 }
 
 /* Segmented group (e.g. Import | Export): one bordered control with hairline
@@ -603,11 +491,6 @@
     max-width 220ms ease,
     opacity 160ms ease;
 }
-.ae-toolbar--compact .ae-segment-label,
-.ae-toolbar--compact .ae-toolbar-btn-label {
-  max-width: 0;
-  opacity: 0;
-}
 
 /* Yellow on hover: every text-style control in the toolbar (category, row
    filter, date, shift, the other filters and the plain text buttons) turns
@@ -681,43 +564,6 @@
   gap: 4px;
 }
 
-/* ---- Circle: floor tier, fixed-size compact buttons ------------------- */
-.ae-toolbar--circle .ae-segment-group {
-  gap: 3px;
-}
-.ae-toolbar--circle .ae-segment-btn,
-.ae-toolbar--circle .ae-btn,
-.ae-toolbar--circle .ae-toolbar-save {
-  width: var(--tb-h);
-  min-width: var(--tb-h);
-  max-width: var(--tb-h);
-  height: var(--tb-h);
-  min-height: var(--tb-h);
-  max-height: var(--tb-h);
-  padding: 0;
-  border-radius: var(--tb-radius);
-  flex: 0 0 var(--tb-h);
-}
-
-/* A button with no collapsible label (plain text like "Generate", "Export
-   CSV", "Daily History", or "[icon] PDF" written without a
-   .ae-toolbar-btn-label span) has nothing to hide, so squeezing it into a
-   28px circle just clips its text. It stays a pill and only gets tighter.
-   Separate rule on purpose: a browser without :has() drops just this rule
-   and keeps the old behavior. */
-.ae-toolbar--circle
-  .ae-btn:not(:has(.ae-toolbar-btn-label)):not(.ae-toolbar-save) {
-  width: auto;
-  min-width: 0;
-  max-width: none;
-  height: var(--tb-h);
-  min-height: var(--tb-h);
-  max-height: var(--tb-h);
-  padding: 0 var(--tb-pad-x);
-  border-radius: var(--tb-radius);
-  flex: 0 0 auto;
-}
-
 /* ---- Consistency pass: every toolbar item shares one size system --------
    Height, corner radius, border weight, font size, horizontal padding and
    icon size all come from the same few values, in every tier, so search
@@ -730,9 +576,6 @@
   --tb-pad-x: 8px;
   --tb-font: 12.5px;
   --tb-icon: 15px;
-}
-.ae-toolbar--circle {
-  --tb-pad-x: 7px;
 }
 .ae-toolbar .ae-input,
 .ae-toolbar .ae-select,
@@ -825,19 +668,6 @@
 }
 
 /* Toolbar entries always remain a single horizontal strip. */
-.ae-toolbar-entry {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
-}
-.ae-toolbar-entry::-webkit-scrollbar {
-  display: none;
-}
-.ae-toolbar-entry .ae-toolbar-controls {
-  flex-wrap: nowrap;
-  min-width: 0;
-}
 
 .ae-sidebar-nav {
   scrollbar-width: none;
@@ -1325,6 +1155,7 @@
 }
 
 .ae-page-header-logo {
+  position: relative; /* the loading beam (.ae-seal-beam) sits over it */
   flex-shrink: 0;
   display: flex;
   padding: 0;
@@ -1483,6 +1314,17 @@
    Mobile tier - phone-width layout/sizing tweaks (the nav drawer itself
    already behaves identically at every width, see Sidebar.tsx).
    ------------------------------------------------------------------------ */
+/* The clock is an oval (a pill) once the toolbar is in its compact layout, to match the
+   round buttons beside it. The toolbar goes compact at 1700px of its own width, which is
+   a window of about 1800px or less (the bar is narrower than the window by the page
+   margins). Above that the clock keeps its rounded-rectangle shape. */
+@media (max-width: 1800px) {
+  .ae-live-clock {
+    border-radius: 999px !important;
+    padding: 8px 18px !important;
+  }
+}
+
 @media (max-width: 768px) {
   /* The live clock is a nice-to-have on a desk monitor, not on a phone
      screen already short on width - the theme toggle alone is enough

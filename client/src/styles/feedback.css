@@ -7,14 +7,6 @@
    light-streak glint - that depended on an SVG gradient/clip-path only the
    old hand-drawn recreation had; dropped along with it now that LogoMark
    renders the real logo photo instead.) */
-.ae-logo-ring {
-  transition: transform 1.1s cubic-bezier(0.65, 0, 0.35, 1);
-}
-@media (prefers-reduced-motion: reduce) {
-  .ae-logo-ring {
-    transition: none;
-  }
-}
 
 /* =========================================================================
    Loading system - skeleton shimmer (components/Skeleton.tsx) and the determinate
@@ -128,6 +120,40 @@
   .ae-logo-orbit {
     animation: none;
     transform: rotate(-35deg);
+  }
+}
+
+/* Loading beam around the header seal (components/ActivityBeam.tsx). It reuses the
+   spinner's orbiting arc above and fades in when the system is saving, loading or
+   connecting. Amber and slower for a slow connection or a reconnecting socket.
+   Hidden (and paused, so it costs nothing) when idle. */
+.ae-seal-beam {
+  --ring: #f5c000;
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.ae-seal-beam.is-busy,
+.ae-seal-beam.is-slow,
+.ae-seal-beam.is-connecting {
+  opacity: 1;
+}
+.ae-seal-beam.is-slow,
+.ae-seal-beam.is-connecting {
+  --ring: #f08a24;
+}
+.ae-seal-beam.is-slow .ae-logo-orbit,
+.ae-seal-beam.is-connecting .ae-logo-orbit {
+  animation-duration: 2.4s;
+}
+.ae-seal-beam.is-idle .ae-logo-orbit {
+  animation-play-state: paused;
+}
+@media print {
+  .ae-seal-beam {
+    display: none;
   }
 }
 

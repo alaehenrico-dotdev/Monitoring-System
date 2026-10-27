@@ -6,9 +6,11 @@ const mocks = vi.hoisted(() => ({
   // A plain function, not a spy: vitest tracks a spy's rejected promise without
   // handling it, which would report an "unhandled rejection" for a failure the
   // code under test does handle.
+  options: { value: { hideEmptyRows: false, hideEmptyColumns: false } },
   names: { impl: (async () => ({ ONLINE: {}, OFFLINE: {} })) as (date: Date) => Promise<unknown>, calls: [] as Date[] },
   prisma: { dailyOnlineStock: { aggregate: vi.fn() }, dailyOfflineStock: { aggregate: vi.fn() } },
 }));
+vi.mock("./appSettings.service", () => ({ getReportOptions: async () => mocks.options.value }));
 vi.mock("./extraColumnLabels.service", () => ({
   getDayExtraNames: (date: Date) => {
     mocks.names.calls.push(date);
@@ -200,5 +202,103 @@ describe("added columns on the Online and Offline sheets", () => {
     expect(named).not.toBeNull();
     expect(generic).not.toBeNull();
     expect(named!.data.equals(generic!.data)).toBe(false); // the typed name changes the file
+  });
+});
+
+describe("hiding empty rows and columns", () => {
+  const beta = { category: "Class A", sku: "B2", name: "Beta" };
+  // Alpha has figures. Beta has none at all. Nothing uses RTS, and Delivery's second added column is unused.
+  const day = {
+    ...report,
+    online: [
+      { product, isSaved: true, entry: { openingStock: 10, onlineStock: 10, productionIn: 5, fulfillmentOut: 3, rts: 0, remainingStock: 12 } },
+      { product: beta, isSaved: true, entry: { openingStock: 0, onlineStock: 0, remainingStock: 0 } },
+    ],
+    offline: [
+      { product, isSaved: true, entry: { openingStock: 4, offlineStock: 4, deliveryOut: 2, deliveryOut__x1: 2, deliveryOut__x2: 0, remainingStock: 2 } },
+      { product: beta, isSaved: true, entry: { openingStock: 0, offlineStock: 0, deliveryOut: 0, deliveryOut__x1: 0, deliveryOut__x2: 0, remainingStock: 0 } },
+    ],
+    total: [
+      { product, onlineRemainingStock: 12, offlineRemainingStock: 2, totalRemainingStock: 14, totalManualCount: null, totalVariance: null },
+      { product: beta, onlineRemainingStock: 0, offlineRemainingStock: 0, totalRemainingStock: 0, totalManualCount: null, totalVariance: null },
+    ],
+  };
+  const get = (hide?: { hideEmptyRows: boolean; hideEmptyColumns: boolean }) => dailyReportSheets(day, null, undefined, hide);
+  const sheet = (sheets: ReturnType<typeof dailyReportSheets>, name: string) => sheets.find((x) => x.name === name)!;
+  const summaryText = (sheets: ReturnType<typeof dailyReportSheets>) => JSON.stringify(sheet(sheets, "Summary").rows);
+
+  it("shows everything by default - nothing is hidden unless an option is on", () => {
+    const sheets = get();
+    expect(sheet(sheets, "Online").rows).toHaveLength(2);
+    expect(sheet(sheets, "Online").columns).toContain("RTS");
+    expect(sheet(sheets, "Offline").columns).toContain("Delivery (Out) +2");
+    expect(summaryText(sheets)).not.toMatch(/not listed|not shown/);
+  });
+
+  it("hide empty rows: leaves out a product with no figures, on every sheet that lists products", () => {
+    const sheets = get({ hideEmptyRows: true, hideEmptyColumns: false });
+    for (const name of ["Online", "Offline", "Consolidated"]) {
+      expect(sheet(sheets, name).rows.map((r) => r[2])).toEqual(["Alpha"]);
+    }
+    expect(sheet(sheets, "Online").columns).toContain("RTS"); // columns untouched
+  });
+
+  it("hide empty columns: leaves out a column that is zero for every product, added columns included", () => {
+    const sheets = get({ hideEmptyRows: false, hideEmptyColumns: true });
+    expect(sheet(sheets, "Online").columns).not.toContain("RTS");
+    expect(sheet(sheets, "Offline").columns).not.toContain("Delivery (Out) +2"); // the unused added column
+    expect(sheet(sheets, "Offline").columns).toContain("Delivery (Out) +1"); // the used one stays
+    expect(sheet(sheets, "Consolidated").columns).not.toContain("Manual Count"); // nobody counted
+    expect(sheet(sheets, "Online").rows).toHaveLength(2); // rows untouched
+  });
+
+  it("every row stays exactly as wide as its header after columns are hidden", () => {
+    const sheets = get({ hideEmptyRows: true, hideEmptyColumns: true });
+    for (const name of ["Online", "Offline", "Consolidated"]) {
+      const t = sheet(sheets, name);
+      for (const row of t.rows) expect(row).toHaveLength(t.columns.length);
+    }
+  });
+
+  it("every figure that remains is the same figure it was, under the same heading", () => {
+    const full = sheet(get(), "Online");
+    const trimmed = sheet(get({ hideEmptyRows: true, hideEmptyColumns: true }), "Online");
+    expect(trimmed.columns.length).toBeLessThan(full.columns.length);
+    trimmed.columns.forEach((heading, i) => {
+      expect(trimmed.rows[0][i], heading).toEqual(full.rows[0][full.columns.indexOf(heading)]);
+    });
+    // Whatever was hidden was zero for every product: nothing with a figure is lost.
+    full.columns.forEach((heading, i) => {
+      if (!trimmed.columns.includes(heading)) expect(full.rows.every((r) => !r[i]), heading).toBe(true);
+    });
+  });
+
+  it("says in the Summary what was left out, so nobody wonders where a product went", () => {
+    const text = summaryText(get({ hideEmptyRows: true, hideEmptyColumns: true }));
+    expect(text).toContain("Products with no figures, not listed");
+    expect(text).toContain("Online 1, Offline 1, Consolidated 1");
+    expect(text).toContain("Empty columns, not shown");
+    expect(text).toContain("RTS");
+  });
+
+  it("leaves the Audit and Daily Out sheets alone", () => {
+    const before = get();
+    const after = get({ hideEmptyRows: true, hideEmptyColumns: true });
+    expect(sheet(after, "Audit")).toEqual(sheet(before, "Audit"));
+    expect(sheet(after, "Daily Out")).toEqual(sheet(before, "Daily Out"));
+  });
+
+  it("the saved PDF follows the Settings switches", async () => {
+    mocks.getDailyReport.mockResolvedValue({ ...day, snapshot: null });
+    mocks.getDailyOutflow.mockResolvedValue([]);
+    mocks.names.impl = async () => ({ ONLINE: {}, OFFLINE: {} });
+    mocks.options.value = { hideEmptyRows: false, hideEmptyColumns: false };
+    const full = await buildDailyReportPdf(d("2026-10-24"));
+    mocks.options.value = { hideEmptyRows: true, hideEmptyColumns: true };
+    const trimmed = await buildDailyReportPdf(d("2026-10-24"));
+    mocks.options.value = { hideEmptyRows: false, hideEmptyColumns: false };
+    expect(full).not.toBeNull();
+    expect(trimmed).not.toBeNull();
+    expect(trimmed!.data.equals(full!.data)).toBe(false);
   });
 });

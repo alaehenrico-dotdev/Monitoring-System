@@ -6,20 +6,6 @@ import { manualCountRepository } from "../repositories/manualCountRepository";
 import { toNum } from "../utils/stockMath";
 import { findFrozenSnapshot, snapshotMeta } from "./dailyReportSnapshot.service";
 
-/// Merges a date's Morning and Night grids down to one row per product for
-/// the Daily Report's printable view (Section 4.8) - the report itself
-/// isn't shift-scoped (no shift selector on that page), so each product
-/// shows whichever figure is most current for the day: the Night row once
-/// a Night entry has actually been saved (the day's closing numbers), the
-/// Morning row otherwise.
-function mergeShiftGrids<T extends { product: { id: number }; isSaved?: boolean }>(morning: T[], night: T[]): T[] {
-  const nightByProduct = new Map(night.map((r) => [r.product.id, r]));
-  return morning.map((m) => {
-    const n = nightByProduct.get(m.product.id);
-    return n?.isSaved ? n : m;
-  });
-}
-
 /// One audit (manual count) line of the report: what the system said, what was
 /// counted, and the gap - the same figures as the Audit page.
 export interface AuditReportRow {
@@ -61,24 +47,21 @@ export async function buildAudit(entryDate: Date): Promise<AuditReportRow[]> {
  * holds no stock-calculation logic of its own.
  */
 export async function buildDailyReport(entryDate: Date) {
-  const [onlineMorning, onlineNight, offlineMorning, offlineNight, total, audit] = await Promise.all([
-    // The sheets as entered, whatever the shift setting: a report (and the
-    // snapshot frozen from it) must not change when shifts are switched off.
-    getOnlineGrid(entryDate, "MORNING", { combineSplitDay: false }),
-    getOnlineGrid(entryDate, "NIGHT", { combineSplitDay: false }),
-    getOfflineGrid(entryDate, "MORNING", { combineSplitDay: false }),
-    getOfflineGrid(entryDate, "NIGHT", { combineSplitDay: false }),
+  const [online, offline, total, audit] = await Promise.all([
+    // The WHOLE day, one row per product: when a day has a Morning and a Night
+    // sheet they are added together - the opening from the Morning sheet, every
+    // movement and added column summed over both, the closing the Night sheet's
+    // - so the report agrees with Daily Out, which counts both shifts. A day
+    // with one sheet is that sheet. "always" (not the shifts setting) decides,
+    // so the report, and the copy frozen from it, come out the same whichever
+    // mode is on.
+    getOnlineGrid(entryDate, "NIGHT", { combineSplitDay: "always" }),
+    getOfflineGrid(entryDate, "NIGHT", { combineSplitDay: "always" }),
     getTotalStocksGrid(entryDate),
     buildAudit(entryDate),
   ]);
 
-  return {
-    date: toDateOnlyString(entryDate),
-    online: mergeShiftGrids(onlineMorning, onlineNight),
-    offline: mergeShiftGrids(offlineMorning, offlineNight),
-    total,
-    audit,
-  };
+  return { date: toDateOnlyString(entryDate), online, offline, total, audit };
 }
 
 /// What the Daily Report endpoint serves: the frozen snapshot once the day has

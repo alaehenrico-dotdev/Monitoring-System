@@ -11,6 +11,8 @@ const api = vi.hoisted(() => ({
   backupToDriveNow: vi.fn(),
 }));
 vi.mock("../api/drive", () => api);
+const opts = vi.hoisted(() => ({ getReportOptions: vi.fn(), updateReportOptions: vi.fn() }));
+vi.mock("../api/appSettings", () => opts);
 const nav = vi.hoisted(() => ({ goTo: vi.fn() }));
 vi.mock("../utils/navigate", () => nav);
 
@@ -38,6 +40,7 @@ const connected = (over: Partial<DriveStatus> = {}): DriveStatus => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  opts.getReportOptions.mockResolvedValue({ hideEmptyRows: false, hideEmptyColumns: false });
   window.history.replaceState(null, "", "/settings");
   // Manila: UTC+8, so the stored 18:00 UTC reads as 2:00 AM.
   vi.spyOn(Date.prototype, "getTimezoneOffset").mockReturnValue(-480);
@@ -266,8 +269,12 @@ describe("once connected", () => {
     expect(within(card).getByText("Automatic")).toBeInTheDocument();
     expect(within(card).getByText("Ala Eh Stock Monitoring - Reports / year / month")).toBeInTheDocument();
     expect(within(card).getByText(/Last saved/)).toBeInTheDocument();
-    // Nothing to switch: it is simply on.
-    expect(within(card).queryByRole("checkbox")).toBeNull();
+    // Saving itself cannot be switched off. The only switches are for what the PDF leaves out.
+    const boxes = await within(card).findAllByRole("checkbox");
+    expect(boxes.map((b) => b.closest("label")?.textContent)).toEqual([
+      "Leave out products with no figures that day",
+      "Leave out columns that are empty for every product",
+    ]);
   });
 
   it("says no report has been saved yet before the first one", async () => {
@@ -314,5 +321,48 @@ describe("once connected", () => {
     expect(screen.getAllByText("Drive is full").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Backups" }));
     expect(screen.getByText("Nothing of this kind in the recent activity.")).toBeInTheDocument();
+  });
+});
+
+describe("Daily Report PDF: leaving out empty rows and columns", () => {
+  it("shows both switches OFF by default, so the report lists everything", async () => {
+    await show(connected());
+    expect(screen.getByLabelText(/Leave out products with no figures/)).not.toBeChecked();
+    expect(screen.getByLabelText(/Leave out columns that are empty/)).not.toBeChecked();
+  });
+
+  it("shows a switch as on when the admin turned it on", async () => {
+    opts.getReportOptions.mockResolvedValue({ hideEmptyRows: true, hideEmptyColumns: false });
+    await show(connected());
+    await waitFor(() => expect(screen.getByLabelText(/Leave out products with no figures/)).toBeChecked());
+    expect(screen.getByLabelText(/Leave out columns that are empty/)).not.toBeChecked();
+  });
+
+  it("saves one switch at a time and shows the saved result", async () => {
+    opts.updateReportOptions.mockResolvedValue({ hideEmptyRows: true, hideEmptyColumns: false });
+    await show(connected());
+    fireEvent.click(await screen.findByLabelText(/Leave out products with no figures/));
+    await waitFor(() => expect(opts.updateReportOptions).toHaveBeenCalledWith({ hideEmptyRows: true }));
+    await waitFor(() => expect(screen.getByLabelText(/Leave out products with no figures/)).toBeChecked());
+    expect(screen.getByLabelText(/Leave out columns that are empty/)).not.toBeChecked();
+  });
+
+  it("saves the column switch on its own", async () => {
+    opts.updateReportOptions.mockResolvedValue({ hideEmptyRows: false, hideEmptyColumns: true });
+    await show(connected());
+    fireEvent.click(await screen.findByLabelText(/Leave out columns that are empty/));
+    await waitFor(() => expect(opts.updateReportOptions).toHaveBeenCalledWith({ hideEmptyColumns: true }));
+  });
+
+  it("says totals do not change, and that the Summary lists what was left out", async () => {
+    await show(connected());
+    expect(await screen.findByText(/totals do not change/i)).toBeInTheDocument();
+  });
+
+  it("leaves the switches out, without breaking the page, when the options cannot be read", async () => {
+    opts.getReportOptions.mockRejectedValue(new Error("nope"));
+    await show(connected());
+    expect(screen.getByText("Daily reports")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Leave out products with no figures/)).toBeNull();
   });
 });

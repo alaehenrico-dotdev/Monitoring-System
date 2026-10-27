@@ -2,8 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen } from "@testing-library/react";
 import { RealtimeProvider, useRealtimeVersion } from "./RealtimeContext";
 import { subscribeNotices, type AppNotice } from "../utils/notify";
+import { getActivitySnapshot, resetActivity } from "../utils/activity";
 
-vi.mock("./AuthContext", () => ({ useAuth: () => ({ user: { id: 1 } }) }));
+// One user object for every render, like the real AuthContext: a fresh object each time would
+// look like a new sign-in and make the provider reconnect whenever it re-renders.
+const auth = vi.hoisted(() => ({ user: { id: 1 } }));
+vi.mock("./AuthContext", () => ({ useAuth: () => ({ user: auth.user }) }));
 vi.mock("../api/http", () => ({ getToken: () => "t", getWsUrl: () => "ws://test/ws" }));
 
 const sockets: FakeSocket[] = [];
@@ -106,5 +110,46 @@ describe("RealtimeProvider - notices from the server", () => {
     send({ type: "notice", level: "weird", message: "Hello" });
     expect(seen).toEqual([{ level: "success", message: "Hello" }]);
     off();
+  });
+});
+
+describe("RealtimeProvider - the connecting signal for the header seal's beam", () => {
+  const mount = () =>
+    render(
+      <RealtimeProvider>
+        <Probe />
+      </RealtimeProvider>,
+    );
+  beforeEach(() => {
+    sockets.length = 0;
+    resetActivity();
+  });
+
+  it("is connecting from the moment it dials, and not any more once the socket is open", () => {
+    mount();
+    expect(getActivitySnapshot().connecting).toBe(true);
+    act(() => sockets[0].onopen?.());
+    expect(getActivitySnapshot().connecting).toBe(false);
+  });
+
+  it("is connecting again as soon as the connection drops, through the wait for the retry", () => {
+    mount();
+    act(() => sockets[0].onopen?.());
+    act(() => sockets[0].onclose?.());
+    expect(getActivitySnapshot().connecting).toBe(true); // the retry timer has not fired yet
+    act(() => void vi.advanceTimersByTime(1100)); // retry dials a new socket...
+    expect(sockets).toHaveLength(2);
+    act(() => sockets[1].onopen?.()); // ...which connects
+    expect(getActivitySnapshot().connecting).toBe(false);
+  });
+
+  it("stays connecting through repeated failures, and clears when the page is left", () => {
+    const { unmount } = mount();
+    act(() => sockets[0].onclose?.());
+    act(() => void vi.advanceTimersByTime(1100));
+    act(() => sockets[1].onclose?.());
+    expect(getActivitySnapshot().connecting).toBe(true);
+    unmount();
+    expect(getActivitySnapshot().connecting).toBe(false);
   });
 });

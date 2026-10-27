@@ -1,3 +1,5 @@
+import { beginActivity } from "../utils/activity";
+
 export const API_URL = import.meta.env.VITE_API_URL ?? "/api";
 
 export class ApiError extends Error {
@@ -60,7 +62,18 @@ function newKey(): string {
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+/// Every API call goes through here, so the header seal's loading beam (utils/activity.ts)
+/// knows when the system is saving or loading - and when a request is taking long.
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const end = beginActivity();
+  try {
+    return await send<T>(path, options);
+  } finally {
+    end();
+  }
+}
+
+async function send<T>(path: string, options: RequestInit): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

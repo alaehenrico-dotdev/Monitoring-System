@@ -37,18 +37,17 @@ export function sameDay(a: Date, b: Date): boolean {
 }
 
 const fmtLong = (d: Date, year: boolean) => d.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(year ? { year: "numeric" } : {}) });
-const fmtShort = (d: Date) => d.toLocaleDateString(undefined, { month: "numeric", day: "numeric", year: "2-digit" });
 
-/// Trigger text for the current range, long and compact forms.
-export function rangeLabels(from: string, to: string): { long: string; short: string } {
+/// Trigger text for the current range.
+export function rangeLabels(from: string, to: string): { long: string } {
   const a = parseISO(from);
   const b = parseISO(to);
-  if (!a && !b) return { long: "Any date", short: "Any date" };
-  if (a && b && sameDay(a, b)) return { long: fmtLong(a, true), short: fmtShort(a) };
+  if (!a && !b) return { long: "Any date" };
+  if (a && b && sameDay(a, b)) return { long: fmtLong(a, true) };
   if (a && b) {
     const sameYear = a.getFullYear() === b.getFullYear();
-    return { long: `${fmtLong(a, !sameYear)} – ${fmtLong(b, true)}`, short: `${fmtShort(a)} – ${fmtShort(b)}` };
+    return { long: `${fmtLong(a, !sameYear)} – ${fmtLong(b, true)}` };
   }
-  if (a) return { long: `From ${fmtLong(a, true)}`, short: `From ${fmtShort(a)}` };
-  return { long: `Until ${fmtLong(b!, true)}`, short: `Until ${fmtShort(b!)}` };
+  if (a) return { long: `From ${fmtLong(a, true)}` };
+  return { long: `Until ${fmtLong(b!, true)}` };
 }

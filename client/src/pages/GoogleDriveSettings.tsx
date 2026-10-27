@@ -9,6 +9,7 @@ import {
   type DriveStatus,
   type DriveUpload,
 } from "../api/drive";
+import { getReportOptions, updateReportOptions, type ReportOptions } from "../api/appSettings";
 import { Button } from "../components/ui";
 import { InlineLoading } from "../components/Spinner";
 import { Toast } from "../components/Toast";
@@ -108,6 +109,8 @@ export function GoogleDriveSettings() {
   const [backupToastClosed, setBackupToastClosed] = useState(false);
   const [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const [keepText, setKeepText] = useState("");
+  // What the Daily Report PDF leaves out; null until read (the switches then stay hidden).
+  const [reportOptions, setReportOptions] = useState<ReportOptions | null>(null);
   const [filter, setFilter] = useState<KindFilter>("all");
   const offset = wholeHourOffset();
 
@@ -122,6 +125,17 @@ export function GoogleDriveSettings() {
     // Shown once; refreshing the page should not show it again.
     if (outcome) window.history.replaceState(null, "", window.location.pathname);
   }, [outcome]);
+
+  // Best effort: if this cannot be read the two switches simply do not show.
+  useEffect(() => {
+    let cancelled = false;
+    getReportOptions()
+      .then((o) => !cancelled && setReportOptions(o))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -155,6 +169,7 @@ export function GoogleDriveSettings() {
     });
 
   const change = (patch: Partial<DriveSettings>) => run("save", () => updateDriveSettings(patch), apply);
+  const changeReportOptions = (patch: Partial<ReportOptions>) => run("save", () => updateReportOptions(patch), setReportOptions);
 
   const backupNow = () => {
     setBackupToastClosed(false);
@@ -276,6 +291,32 @@ export function GoogleDriveSettings() {
                   Each day's report is saved as a PDF the moment the day is finished, and again if a
                   correction changes it. There is one file per day; earlier days stay as an archive.
                 </div>
+                {reportOptions && (
+                  <div style={{ display: "grid", gap: 6, marginTop: 8, fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={reportOptions.hideEmptyRows}
+                        disabled={busy !== null}
+                        onChange={(e) => void changeReportOptions({ hideEmptyRows: e.target.checked })}
+                      />
+                      Leave out products with no figures that day
+                    </label>
+                    <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={reportOptions.hideEmptyColumns}
+                        disabled={busy !== null}
+                        onChange={(e) => void changeReportOptions({ hideEmptyColumns: e.target.checked })}
+                      />
+                      Leave out columns that are empty for every product
+                    </label>
+                    <span style={{ color: colors.subtleInk, fontSize: "calc(12px * var(--ae-fs, 1))" }}>
+                      Only products and columns where every figure is zero are left out, so totals do not change.
+                      The report's Summary says what was left out.
+                    </span>
+                  </div>
+                )}
               </AutoCard>
 
               <AutoCard

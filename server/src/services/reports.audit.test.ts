@@ -62,6 +62,27 @@ describe("buildAudit", () => {
   });
 });
 
+describe("buildDailyReport covers the whole day", () => {
+  it("asks both grids for the day's Night view with the two sheets combined, whatever the shifts setting", async () => {
+    await buildDailyReport(DAY);
+    expect(mocks.getOnlineGrid).toHaveBeenCalledTimes(1);
+    expect(mocks.getOnlineGrid).toHaveBeenCalledWith(DAY, "NIGHT", { combineSplitDay: "always" });
+    expect(mocks.getOfflineGrid).toHaveBeenCalledTimes(1);
+    expect(mocks.getOfflineGrid).toHaveBeenCalledWith(DAY, "NIGHT", { combineSplitDay: "always" });
+  });
+
+  it("passes the grids' rows straight through - one row per product, nothing picked or dropped", async () => {
+    const online = [{ product: { id: 1 }, isSaved: true, entry: { fulfillmentOut: 5, fulfillmentOut__x1: 3, fulfillmentOut__x2: 2 } }];
+    const offline = [{ product: { id: 1 }, isSaved: true, entry: { deliveryOut: 55, deliveryOut__x1: 15, deliveryOut__x2: 40 } }];
+    mocks.getOnlineGrid.mockResolvedValue(online as never);
+    mocks.getOfflineGrid.mockResolvedValue(offline as never);
+    const report = await buildDailyReport(DAY);
+    expect(report.online).toBe(online);
+    expect(report.offline).toBe(offline);
+    expect(report.date).toBe("2026-10-22");
+  });
+});
+
 describe("the report carries the audit", () => {
   it("a live report reads the day's counts", async () => {
     mocks.findAllForDateWithProduct.mockResolvedValue([count()]);

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { getToken, getWsUrl } from "../api/http";
 import { useAuth } from "./AuthContext";
 import { notify } from "../utils/notify";
+import { setConnecting } from "../utils/activity";
 
 const BASE_RECONNECT_MS = 1000;
 const MAX_RECONNECT_MS = 30000;
@@ -37,10 +38,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
     function connect() {
+      // The header seal shows a beam while the live connection is (re)connecting.
+      setConnecting(true);
       socket = new WebSocket(getWsUrl());
 
       socket.onopen = () => {
         if (closedByEffect) return;
+        setConnecting(false);
         reconnectDelay = BASE_RECONNECT_MS;
         socket?.send(JSON.stringify({ type: "auth", token: getToken() }));
         // A disconnect may have hidden server changes while the socket was
@@ -67,6 +71,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
       socket.onclose = () => {
         if (closedByEffect) return;
+        // Down until the next attempt succeeds: keep the beam on through the wait.
+        setConnecting(true);
         reconnectTimer = setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_MS);
       };
@@ -89,6 +95,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       closedByEffect = true;
+      setConnecting(false);
       clearTimeout(reconnectTimer);
       clearTimeout(debounceTimer);
       socket?.close();

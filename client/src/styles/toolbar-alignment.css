@@ -8,8 +8,7 @@
      its lower edge against the toolbar's overflow box.
    ========================================================================= */
 .ae-toolbar,
-.ae-toolbar > :first-child:not(.ae-toolbar-controls),
-.ae-toolbar-controls {
+.ae-toolbar > :first-child:not(.ae-toolbar-controls) {
   align-items: center;
 }
 
@@ -399,42 +398,6 @@
 }
 
 /* One row per affected column in the "Review and save changes" dialog. */
-.ae-extra-savemode {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 9px 0;
-  border-top: 1px solid var(--ae-border);
-}
-.ae-extra-savemode-switch {
-  display: inline-flex;
-  padding: 2px;
-  background: var(--ae-bg-alt);
-  border: 1px solid var(--ae-border);
-  border-radius: 8px;
-}
-.ae-extra-savemode-opt {
-  padding: 4px 10px;
-  font: inherit;
-  font-size: calc(11.5px * var(--ae-fs, 1));
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--ae-text-muted);
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-}
-.ae-extra-savemode-opt--on {
-  color: #0c0c0c;
-  background: #f5c000;
-}
-.ae-extra-savemode-opt:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
 
 /* ---------------------------------------------------------------------------
    Toast (components/Toast.tsx). One row: a coloured icon badge, the message,
@@ -1045,16 +1008,6 @@
   .ae-toolbar-btn-label {
   max-width: 80px;
   opacity: 1;
-}
-.ae-toolbar--compact .ae-btn.ae-toolbar-publish:not(.ae-btn-danger) {
-  gap: 0;
-}
-.ae-toolbar--circle .ae-btn.ae-toolbar-publish:not(.ae-btn-danger) {
-  width: var(--tb-h);
-  max-width: var(--tb-h);
-  padding: 0;
-  margin-left: 0;
-  flex: 0 0 var(--tb-h);
 }
 .ae-toolbar .ae-btn.ae-toolbar-publish--ready:not(.ae-btn-danger),
 .ae-toolbar
