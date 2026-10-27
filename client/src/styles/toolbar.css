@@ -1431,3 +1431,32 @@
   }
 }
 
+
+/* ---- Filter row (Category, Rows, Shift, the date, its arrows, Today) ---------
+   No borders and no resting fill, in every theme and state, so they read as
+   plain text rather than buttons. The border stays a transparent 1px so the
+   controls keep their size. Hover is a soft fill; keyboard focus and "open" show
+   as an underline. !important because each theme restyles these controls with
+   its own border, fill and glow. (Kept here, not in menu-bar.css, whose
+   style test allows no shadow except the open menu's.) */
+.ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select),
+.ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select):is(:hover, :focus, :focus-visible, [aria-expanded="true"]),
+.ae-datestep :is(.ae-mb-btn, .ae-date-trigger, .ae-input),
+.ae-datestep .ae-mb-btn[aria-disabled="true"] {
+  border-style: solid !important;
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  /* The glassmorphism UI blurs whatever is behind every input and button, which
+     leaves a frosted patch even with no fill and no border. */
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+.ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select):is(:hover, [aria-expanded="true"]):not(:disabled),
+.ae-datestep :is(.ae-mb-btn, .ae-date-trigger, .ae-input):hover:not([aria-disabled="true"]) {
+  background: var(--ae-tb-field-bg-hover) !important;
+}
+.ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select):is(:focus-visible, [aria-expanded="true"]),
+.ae-datestep :is(.ae-mb-btn, .ae-date-trigger, .ae-input):focus-visible {
+  box-shadow: inset 0 -2px 0 var(--ae-glass-accent, var(--ae-mb-accent)) !important;
+}

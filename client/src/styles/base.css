@@ -403,6 +403,14 @@ table input[type="number"] {
     inset 0 -1px 0 var(--ae-border),
     0 6px 8px -6px rgba(0, 0, 0, 0.35);
 }
+/* A vertical hairline between column headers only - the body cells stay
+   unruled. A border adds width, never height, so the 26px header row holds. */
+.ae-table thead th:not(:last-child) {
+  /* Mixed from the text colour, not --ae-border: that token is nearly the
+     header's own fill (a faint edge by design) and the line vanished. The text
+     colour flips with light/dark, so the line contrasts in both. */
+  border-right: 1px solid color-mix(in srgb, var(--ae-text) 38%, transparent);
+}
 /* Body cells: a soft hairline between rows instead of bare stacked fills. */
 .ae-table td {
   text-align: center;
@@ -417,28 +425,20 @@ table input[type="number"] {
 .ae-table tbody tr:hover td {
   background-color: var(--ae-row-hover);
 }
-/* Alternating columns - body cells AND column headers - on every table: two shades, odd and even. Written with
+/* One flat column colour - body cells AND column headers - on every table (the
+   alternating odd/even stripes were dropped: columns looked uneven). Written with
    :where() so the rules that already colour a cell - subtotal and grand-total
    rows, selected rows, the sticky identity cells, the category bar - keep winning.
    Column tints (a translucent background-image) and cell highlights still draw on
    top; hover lightens the stripe instead of replacing it. */
-:where(.ae-table tbody td):nth-child(odd) {
+:where(.ae-table tbody td) {
   background-color: var(--ae-col-a);
 }
-:where(.ae-table tbody td):nth-child(even) {
-  background-color: var(--ae-col-b);
-}
-.ae-table thead th:not(.ae-sticky-sku):not(.ae-sticky-name):not(.ae-sticky-subtotal):nth-child(odd) {
+.ae-table thead th:not(.ae-sticky-sku):not(.ae-sticky-name):not(.ae-sticky-subtotal) {
   background: var(--ae-colh-a);
 }
-.ae-table thead th:not(.ae-sticky-sku):not(.ae-sticky-name):not(.ae-sticky-subtotal):nth-child(even) {
-  background: var(--ae-colh-b);
-}
-.ae-table tbody tr:hover:not(.ae-row-selected):not(.ae-row-grand):not(.ae-row-subtotal):not(.ae-cat-row) td:nth-child(odd) {
+.ae-table tbody tr:hover:not(.ae-row-selected):not(.ae-row-grand):not(.ae-row-subtotal):not(.ae-cat-row) td {
   background-color: color-mix(in srgb, var(--ae-col-a) 88%, var(--ae-text));
-}
-.ae-table tbody tr:hover:not(.ae-row-selected):not(.ae-row-grand):not(.ae-row-subtotal):not(.ae-cat-row) td:nth-child(even) {
-  background-color: color-mix(in srgb, var(--ae-col-b) 88%, var(--ae-text));
 }
 .ae-table--left td {
   text-align: left;

@@ -56,7 +56,12 @@ export async function getDriveCallback(req: Request, res: Response) {
     await guarded(() => completeConnect(code, state));
     return back("connected");
   } catch (err) {
-    return back("error", err instanceof Error ? err.message : "Could not connect Google Drive.");
+    // Only this app's own, deliberately worded errors go into the URL (it lands in
+    // browser history and proxy logs). Anything else - a database or library
+    // error - is logged here and shown as a generic message.
+    if (err instanceof HttpError) return back("error", err.message);
+    console.error(JSON.stringify({ level: "error", event: "drive-connect-failed", message: err instanceof Error ? err.message : String(err) }));
+    return back("error", "Could not connect Google Drive. Try again, and check the server log if it keeps failing.");
   }
 }
 

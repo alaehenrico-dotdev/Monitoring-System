@@ -18,6 +18,7 @@ vi.mock("../services/drive.service", () => ({
 
 import { DriveApiError, DriveAuthError } from "../lib/googleDrive";
 import * as drive from "../services/drive.service";
+import { HttpError } from "../utils/HttpError";
 import {
   getDriveCallback,
   patchDriveSettings,
@@ -74,7 +75,7 @@ describe("getDriveCallback", () => {
   });
 
   it("turns a failed connect (bad state, no refresh token) into a readable message on Settings", async () => {
-    vi.mocked(drive.completeConnect).mockRejectedValue(new Error("This connect link has expired or is not valid."));
+    vi.mocked(drive.completeConnect).mockRejectedValue(HttpError.badRequest("This connect link has expired or is not valid."));
     const { res, done } = call(getDriveCallback, { query: { code: "c", state: "forged" } });
     await done;
     const url = redirectedTo(res);
@@ -82,8 +83,20 @@ describe("getDriveCallback", () => {
     expect(url.searchParams.get("reason")).toMatch(/expired or is not valid/);
   });
 
+  it("never puts an internal error (database, library) into the address", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.mocked(drive.completeConnect).mockRejectedValue(new Error("connect ECONNREFUSED 172.28.0.2:3306 user alaeh_app"));
+    const { res, done } = call(getDriveCallback, { query: { code: "c", state: "s" } });
+    await done;
+    const url = redirectedTo(res);
+    expect(url.searchParams.get("drive")).toBe("error");
+    expect(url.toString()).not.toMatch(/ECONNREFUSED|alaeh_app|172\.28/);
+    expect(log).toHaveBeenCalled(); // the real cause still reaches the server log
+    log.mockRestore();
+  });
+
   it("bounds the message it puts in the address", async () => {
-    vi.mocked(drive.completeConnect).mockRejectedValue(new Error("x".repeat(5000)));
+    vi.mocked(drive.completeConnect).mockRejectedValue(HttpError.badRequest("x".repeat(5000)));
     const { res, done } = call(getDriveCallback, { query: { code: "c", state: "s" } });
     await done;
     expect(redirectedTo(res).searchParams.get("reason")!.length).toBeLessThanOrEqual(200);

@@ -34,6 +34,11 @@ client/vite.config.d.ts
 id_rsa*
 id_ed25519*
 id_ecdsa*
+# Password-manager exports, and HAR captures from the browser's Network tab: a HAR
+# holds every request's Authorization header, cookies and bodies, login included.
+*.kdbx
+*.har
+.docker/config.json
 
 # Credential stores that tools drop in a working folder: package-registry tokens,
 # HTTP auth, cloud CLIs, and anything named as a secret.
@@ -95,10 +100,10 @@ caddy_data/
 caddy_config/
 
 # --- Local tooling and test output --------------------------------------------
-# Personal Claude Code settings (the shared agents/skills under .claude/ stay tracked).
+# Personal Claude Code settings (the shared agents/skills under .claude/ stay tracked,
+# so .claude/ itself is NOT ignored - a blanket rule would hide any new shared skill).
 .claude/settings.local.json
 .claude/**/*.local.*
-.claude/ 
 # Vite leaves these behind when its config fails to load.
 vite.config.*.timestamp-*
 # Test and process output.

@@ -95,7 +95,7 @@ export interface GridColumn {
   /**
    * Header color coding for stock movement columns: "in" (stocks in), "out"
    * (stocks out) and "delivery" (delivery / fulfillment out). Purely visual -
-   * see columnTintStyle below; unused by CSV/PDF/Excel exports.
+   * the header color only; unused by CSV/PDF/Excel exports.
    */
   tone?: "in" | "out" | "delivery";
 }
@@ -110,32 +110,23 @@ function extraCellClass(i: number): string {
   return i === 0 ? "ae-extra-col ae-extra-col--first" : "ae-extra-col";
 }
 
-// Base colors for the color-coded columns (pastel, theme-independent); the
-// body cells use them as a translucent tint (see columnTintStyle below).
+// Base colors for the color-coded column headers (pastel, theme-independent).
 const TONE_COLOR: Record<NonNullable<GridColumn["tone"]>, string> = {
   in: "#9DB0FF", // light blue / periwinkle
   out: "#F59A9A", // light red
   delivery: "#F7A8CC", // pink
 };
-// Body-cell tint for the same columns. Drawn as a translucent background-IMAGE
-// layer (not background-color), so the table's row-hover fill - which is a
+// Body-cell tint, drawn as a translucent background-IMAGE layer (not
+// background-color), so the table's row-hover fill - which is a
 // background-color - keeps showing through underneath and the hover effect is
-// unchanged.
-const columnTintStyle: Record<
-  NonNullable<GridColumn["tone"]>,
-  CSSProperties
-> = {
-  in: tintLayer(TONE_COLOR.in),
-  out: tintLayer(TONE_COLOR.out),
-  delivery: tintLayer(TONE_COLOR.delivery),
-};
+// unchanged. Only a colour the user picked tints a column body; the tone colors
+// above color the headers only.
 function tintLayer(color: string): CSSProperties {
   const tint = `color-mix(in srgb, ${color} 22%, transparent)`;
   return { backgroundImage: `linear-gradient(${tint}, ${tint})` };
 }
-function tintFor(col: GridColumn, custom?: string): CSSProperties | undefined {
-  if (custom) return tintLayer(custom);
-  return col.tone ? columnTintStyle[col.tone] : undefined;
+function tintFor(custom?: string): CSSProperties | undefined {
+  return custom ? tintLayer(custom) : undefined;
 }
 
 interface StockGridProps {
@@ -505,7 +496,7 @@ export function StockGrid({
     const c = colorOf(col);
     return c ? { background: c, color: inkFor(c) } : undefined;
   };
-  const tint = (col: GridColumn) => tintFor(col, getColor(col.key));
+  const tint = (col: GridColumn) => tintFor(getColor(col.key));
   // Category header rows get the same treatment from their own right-click
   // menu: a pick replaces the default bar color for that category.
   const { getColor: getCategoryColor, setColor: setCategoryColor } =
@@ -1570,8 +1561,8 @@ export function StockGrid({
   );
 }
 
+// No background of its own: read-only columns share the one flat column colour.
 const lockedStyle: CSSProperties = {
-  backgroundColor: colors.paperAlt,
   color: "var(--ae-num-text)",
 };
 // Border/radius/focus ring come from the shared .ae-input class - only the

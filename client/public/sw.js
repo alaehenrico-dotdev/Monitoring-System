@@ -10,7 +10,6 @@
 const VERSION = "__SW_VERSION__";
 const PRECACHE = self.__PRECACHE__ || [];
 const STATIC_CACHE = `ala-eh-static-${VERSION}`;
-const FONT_CACHE = "ala-eh-fonts-v1";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -31,7 +30,8 @@ self.addEventListener("activate", (event) => {
             .filter(
               (key) =>
                 (key.startsWith("ala-eh-static-") && key !== STATIC_CACHE) ||
-                key === "ala-eh-api-v1",
+                key === "ala-eh-api-v1" ||
+                key === "ala-eh-fonts-v1",
             )
             .map((k) => caches.delete(k)),
         ),
@@ -39,18 +39,6 @@ self.addEventListener("activate", (event) => {
       .then(() => self.clients.claim()),
   );
 });
-
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  const refresh = fetch(request)
-    .then((response) => {
-      if (response.ok || response.type === "opaque") cache.put(request, response.clone());
-      return response;
-    })
-    .catch(() => cached);
-  return cached || refresh;
-}
 
 self.addEventListener("fetch", (event) => {
   const request = event.request;
@@ -71,11 +59,9 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (url.hostname === "fonts.googleapis.com" || url.hostname === "fonts.gstatic.com") {
-    event.respondWith(staleWhileRevalidate(request, FONT_CACHE));
-    return;
-  }
-
+  // Cross-origin requests (Google Fonts) are left to the browser. A fetch made
+  // from here counts as connect-src, which the page's CSP does not open to
+  // them, so proxying them only turned working font loads into network errors.
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches
