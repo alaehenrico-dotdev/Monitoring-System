@@ -49,19 +49,6 @@ export const dailyOfflineStockRepository = {
     });
   },
 
-  /// Which of these products have any saved row on a LATER date than the
-  /// given one - one query, so a publish can skip the carry-forward walk for
-  /// every product that has nothing after it to re-derive.
-  async productIdsWithRowsAfterDate(productIds: number[], entryDate: Date, db: Db = prisma): Promise<Set<number>> {
-    if (!productIds.length) return new Set();
-    const rows = await db.dailyOfflineStock.findMany({
-      where: { productId: { in: productIds }, entryDate: { gt: entryDate } },
-      select: { productId: true },
-      distinct: ["productId"],
-    });
-    return new Set(rows.map((r) => r.productId));
-  },
-
   /// Section 4.6 - same shift-aware carry-forward principle as the Online
   /// table; see dailyOnlineStockRepository.getOpeningStock for the full
   /// reasoning on why the "immediately preceding shift" is always

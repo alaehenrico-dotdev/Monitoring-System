@@ -170,8 +170,12 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
   period's opening stock normally carries forward from the immediately preceding period's own
   Remaining Stock, but if that period also has a saved Online/Offline manual count (Section 4.4),
   the physical count supersedes it instead — the correction, not the pre-correction figure, is what
-  the next period actually starts from. Only ever the one period being carried forward from, never
-  retroactive: correcting a count later doesn't ripple into a later period already saved. A
+  the next period actually starts from. Only ever the one period being carried forward from. A
+  count published with "use as next day's opening" (a re-audit) DOES reach later days already
+  saved: their entries are kept and only their opening, and the remaining that follows, are
+  recalculated; a finished day is held for an admin's approval instead, and an imported opening
+  stays. Editing an already-applied count takes it back to unpublished, which puts later days
+  back on the carried-forward figure until it is published again. A
   combined Total-location count stays purely informational (Variance Report / Consolidated) since
   it can't be unambiguously split back between the two pools.
 - Auto-mirrored Online↔Offline transfer figures (Section 4.3), written once and reflected on both

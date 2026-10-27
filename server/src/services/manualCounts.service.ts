@@ -180,6 +180,11 @@ export interface PropagateOptions {
   /// A row an admin has just approved: written even though its period is
   /// finished. The walk past it is held again as usual.
   approvedRowId?: number;
+  /// Publishing a count (re-audit): it reaches later days that were saved BEFORE it
+  /// was published too, so their opening is re-derived from it. Without this a row
+  /// ignores a count published after it was first saved - the rule for ordinary
+  /// carry-forward walks, which must not move a chain an entry save didn't touch.
+  reachSaved?: boolean;
 }
 
 export type PropagateOutcome = "kept-manual" | "held-locked" | undefined;
@@ -227,7 +232,7 @@ export async function propagateOpeningStock(
       const next = await dailyOnlineStockRepository.findNext(productId, cursor.entryDate, cursor.shift, db);
       if (!next) return;
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
-      const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db, next.createdAt);
+      const openingStock = await dailyOnlineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db, opts.reachSaved ? undefined : next.createdAt);
       if (openingStock === toNum(next.openingStock)) return;
       // Already opening at what an applied audit gives it (an earlier publish set it
       // that way): that is a settled starting record, not a drift to undo.
@@ -266,7 +271,7 @@ export async function propagateOpeningStock(
       const next = await dailyOfflineStockRepository.findNext(productId, cursor.entryDate, cursor.shift, db);
       if (!next) return;
       nextPeriod = { entryDate: next.entryDate, shift: next.shift };
-      const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db, next.createdAt);
+      const openingStock = await dailyOfflineStockRepository.getOpeningStock(productId, next.entryDate, next.shift, db, opts.reachSaved ? undefined : next.createdAt);
       if (openingStock === toNum(next.openingStock)) return;
       // Already opening at what an applied audit gives it (an earlier publish set it
       // that way): that is a settled starting record, not a drift to undo.
@@ -469,9 +474,12 @@ export const MAX_REMARKS_LENGTH = 500;
  * audit only unless `applyToOpening` is set, in which case each ONLINE/OFFLINE
  * count becomes a fresh starting record: the first period entered after it
  * opens at the counted figure, and every period after that carries on from its
- * own remaining stock, until another count is applied. Periods that were
- * already saved when it is published keep their figures - nothing is rewritten
- * (`leftSaved` says how many products have saved days after the counted one).
+ * own remaining stock, until another count is applied. Days already saved after
+ * the counted one are re-derived from it too (a re-audit of an earlier date moves
+ * every later opening), keeping what was entered on them: only their opening, and
+ * the remaining stock that follows from it, change. A finished day is not
+ * rewritten - it is held for an admin's approval - and an opening set by an import
+ * stays; `leftSaved` says how many products had such a day.
  * Variance is untouched: it is still the count against the system's remaining
  * stock on the counted day. Each publish is logged against the count.
  */
@@ -482,14 +490,8 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
       if (pending.length === 0) throw HttpError.badRequest("There are no saved counts waiting to be published for this shift");
 
       const now = new Date();
-      const idsFor = (location: StockLocation) => pending.filter((c) => c.location === location).map((c) => c.productId);
-      // Only to report how many already have later days saved - they are left alone.
-      const [onlineHasLater, offlineHasLater] = applyToOpening
-        ? await Promise.all([
-            dailyOnlineStockRepository.productIdsWithRowsAfterDate(idsFor("ONLINE"), entryDate, tx),
-            dailyOfflineStockRepository.productIdsWithRowsAfterDate(idsFor("OFFLINE"), entryDate, tx),
-          ])
-        : [new Set<number>(), new Set<number>()];
+      // Later saved days the count could not reach: a finished day (held for an
+      // admin's approval) or one whose opening was set by an import.
       let leftSaved = 0;
       const releasedCounts: ManualCount[] = [];
       for (const count of pending) {
@@ -497,12 +499,13 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
         const apply = applyToOpening && count.location !== "TOTAL";
         const published = await manualCountRepository.markPublished(count.id, userId ?? null, now, apply, tx);
         releasedCounts.push(published);
-        await recordChange(
+        const changeId = await recordChange(
           { tableName: TABLE, recordId: count.id, action: "UPDATE", changedById: userId, oldValue: count, newValue: published },
           tx,
         );
-        const hasLater = count.location === "ONLINE" ? onlineHasLater : offlineHasLater;
-        if (apply && hasLater.has(count.productId)) leftSaved++;
+        // A re-audit: the count becomes the opening of the next day, and of every
+        // later saved day after it, until another count or an import stops the walk.
+        if (apply && (await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId, { reachSaved: true }))) leftSaved++;
       }
       // Every publish leaves a frozen copy and an Audit History entry, whether or
       // not the counts were applied to the next day's opening stock.

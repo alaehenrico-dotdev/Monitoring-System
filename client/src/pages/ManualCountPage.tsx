@@ -62,6 +62,8 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { VarianceDetails } from "../components/VarianceDetails";
 import { Dropdown } from "../components/Dropdown";
 import { Modal } from "../components/Modal";
+import { SaveSummary } from "../components/SaveSummary";
+import { saveNotices } from "../utils/saveReview";
 import { LoadingOverlay } from "../components/Spinner";
 import { matchesSearch } from "../utils/search";
 import { planCountPaste } from "../utils/manualCountPaste";
@@ -590,10 +592,11 @@ export function ManualCountPage() {
       const { published, leftSaved = 0 } = await publishManualCounts(date, shift, applyToOpening);
       setShowPublishConfirm(false);
       setApplyToOpening(false);
-      // Days already saved are never rewritten by a publish: say so, so a day that
-      // keeps its old opening is expected rather than mistaken for a miss.
+      // Later saved days are recalculated by an applied publish. Say when one could
+      // not be (a finished day goes to an admin; an imported opening stays), so a
+      // day that keeps its old opening is expected rather than mistaken for a miss.
       const left = leftSaved
-        ? ` · ${leftSaved} product${leftSaved === 1 ? "" : "s"} with later days saved ${leftSaved === 1 ? "was" : "were"} left unchanged`
+        ? ` · ${leftSaved} product${leftSaved === 1 ? "" : "s"} ${leftSaved === 1 ? "has" : "have"} a later day that could not be updated (finished and waiting for approval, or an imported opening)`
         : "";
       setNotice({
         message: `Published ${published} count${published === 1 ? "" : "s"} - ${
@@ -1876,9 +1879,11 @@ export function ManualCountPage() {
             <span>
               Also use these counts as the next day&apos;s opening stock
               <span style={{ display: "block", fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk }}>
-                Online and Offline counts only. The next day entered starts
-                from the counted figure and carries on from there. Days
-                already saved are left as they are.
+                Online and Offline counts only. The next day starts from the
+                counted figure and carries on from there - days already saved
+                after it are recalculated too (what was entered on them is kept;
+                only their opening and remaining change). A finished day waits
+                for an admin&apos;s approval instead.
               </span>
             </span>
           </label>
@@ -1897,9 +1902,23 @@ export function ManualCountPage() {
       )}
       {showConfirm && (
         <Modal
-          title="Confirm manual counts"
+          title="Review and save counts"
           onClose={() => setShowConfirm(false)}
         >
+          <SaveSummary
+            page="Manual Count / Audit"
+            date={date}
+            shift={shift}
+            changes={pendingChanges.length}
+            products={new Set(pendingChanges.map((c) => c.name)).size}
+            notices={[
+              ...saveNotices({ date, shift }),
+              {
+                tone: "info",
+                text: "Saved counts are not final until a supervisor publishes them. Saving a count that was already published takes it back to unpublished.",
+              },
+            ]}
+          />
           {pendingChanges.length === 0 ? (
             <p style={{ margin: 0, color: colors.subtleInk, fontSize: "calc(13px * var(--ae-fs, 1))" }}>
               No unsaved changes.

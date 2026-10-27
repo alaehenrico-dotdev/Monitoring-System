@@ -44,7 +44,6 @@ vi.mock("../repositories/dailyOnlineStockRepository", () => ({
     findNext: vi.fn(),
     getOpeningStock: vi.fn(),
     getOpeningStocksForProducts: vi.fn(),
-    productIdsWithRowsAfterDate: vi.fn(),
     upsert: vi.fn(),
   },
 }));
@@ -55,10 +54,10 @@ vi.mock("../repositories/dailyOfflineStockRepository", () => ({
     findNext: vi.fn(),
     getOpeningStock: vi.fn(),
     getOpeningStocksForProducts: vi.fn(),
-    productIdsWithRowsAfterDate: vi.fn(),
     upsert: vi.fn(),
   },
 }));
+vi.mock("./staleOpening.service", () => ({ holdStaleOpening: vi.fn() }));
 vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(), findActive: vi.fn() },
 }));
@@ -72,6 +71,8 @@ import { productRepository } from "../repositories/productRepository";
 import { changeLogRepository } from "../repositories/changeLogRepository";
 import { userRepository } from "../repositories/userRepository";
 import { recordChange } from "./changeLog.service";
+import { isLockedForCarry } from "./dayLock.service";
+import { holdStaleOpening } from "./staleOpening.service";
 import { getAuditSnapshot, getAuditSnapshotStates, revertAuditSnapshot, getManualCountGrid, getVarianceReport, getVarianceTrace, publishManualCounts, saveManualCount, setCountRemarks } from "./manualCounts.service";
 
 const PRODUCT_ID = 1;
@@ -407,34 +408,89 @@ describe("publishing counts", () => {
     );
   });
 
-  describe("with applyToOpening", () => {
+  describe("with applyToOpening (a re-audit)", () => {
+    // A later day that was entered BEFORE this publish: opens at 47, entries kept.
+    const laterRow = (over: object = {}) => ({
+      id: 9,
+      entryDate: new Date("2026-06-16T00:00:00.000Z"),
+      shift: "MORNING",
+      createdAt: new Date("2026-06-15T09:00:00.000Z"),
+      openingStock: 47,
+      openingManual: false,
+      stockInOffToOl: 0,
+      stockOutOlToOff: 0,
+      productionIn: 0,
+      fulfillmentOut: 24,
+      rts: 1,
+      ...over,
+    });
     beforeEach(() => {
       vi.mocked(manualCountRepository.markPublished).mockImplementation(((id: number) => Promise.resolve({ id, publishedAt: new Date() })) as never);
-      vi.mocked(dailyOnlineStockRepository.productIdsWithRowsAfterDate).mockResolvedValue(new Set([10]));
-      vi.mocked(dailyOfflineStockRepository.productIdsWithRowsAfterDate).mockResolvedValue(new Set());
       vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
+      vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValue(null);
+      vi.mocked(dailyOfflineStockRepository.findNext).mockResolvedValue(null);
+      vi.mocked(isLockedForCarry).mockResolvedValue(false);
+      // What the count gives the later day: 43, however long ago the day was saved.
+      vi.mocked(dailyOnlineStockRepository.getOpeningStock).mockResolvedValue(43);
     });
 
-    it("flags the counts as applied and rewrites no day that was already saved", async () => {
+    it("flags the counts as applied", async () => {
       vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE"), pending(2, 11, "OFFLINE")] as never);
 
       const out = await publishManualCounts(DATE, SHIFT, 7, true);
 
-      expect(out).toMatchObject({ published: 2, appliedToOpening: true });
+      expect(out).toMatchObject({ published: 2, appliedToOpening: true, leftSaved: 0 });
       expect(manualCountRepository.markPublished).toHaveBeenCalledWith(1, 7, expect.any(Date), true, expect.anything());
       expect(manualCountRepository.markPublished).toHaveBeenCalledWith(2, 7, expect.any(Date), true, expect.anything());
-      // Nothing after the counted day is touched: no walk, no row rewritten, no follow-on log lines.
-      expect(dailyOnlineStockRepository.findNext).not.toHaveBeenCalled();
-      expect(dailyOfflineStockRepository.findNext).not.toHaveBeenCalled();
-      expect(dailyOnlineStockRepository.upsert).not.toHaveBeenCalled();
-      expect(vi.mocked(recordChange).mock.calls.map((c) => c[0].tableName)).toEqual(["manual_counts", "manual_counts"]);
     });
 
-    it("reports how many counted products already have later days saved, which were left as they are", async () => {
-      vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE"), pending(2, 11, "OFFLINE")] as never);
+    it("re-derives a later day that was saved before the publish: opening follows the count, entries are kept", async () => {
+      vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+      vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValueOnce(laterRow() as never).mockResolvedValue(null);
+      vi.mocked(dailyOnlineStockRepository.upsert).mockResolvedValue({ id: 9 } as never);
+
+      await publishManualCounts(DATE, SHIFT, 7, true);
+
+      // Not gated by when the row was first saved: that is what lets a re-audit reach it.
+      expect(dailyOnlineStockRepository.getOpeningStock).toHaveBeenCalledWith(10, laterRow().entryDate, "MORNING", expect.anything(), undefined);
+      // 43 + 0 - 0 = 43 stock; 43 + 0 - 24 + 1 = 20 remaining. Nothing entered is changed.
+      expect(dailyOnlineStockRepository.upsert).toHaveBeenCalledWith(
+        9,
+        expect.objectContaining({ openingStock: 43, onlineStock: 43, fulfillmentOut: 24, rts: 1, remainingStock: 20 }),
+        expect.anything(),
+      );
+      expect(vi.mocked(recordChange).mock.calls.map((c) => c[0].tableName)).toEqual(["manual_counts", "daily_online_stock"]);
+    });
+
+    it("leaves a later day alone when it already opens at the count", async () => {
+      vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+      vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValueOnce(laterRow({ openingStock: 43 }) as never).mockResolvedValue(null);
 
       const out = await publishManualCounts(DATE, SHIFT, 7, true);
 
+      expect(dailyOnlineStockRepository.upsert).not.toHaveBeenCalled();
+      expect(out.leftSaved).toBe(0);
+    });
+
+    it("holds a finished later day for an admin instead of rewriting it, and reports it", async () => {
+      vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+      vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValueOnce(laterRow() as never).mockResolvedValue(null);
+      vi.mocked(isLockedForCarry).mockResolvedValue(true);
+
+      const out = await publishManualCounts(DATE, SHIFT, 7, true);
+
+      expect(dailyOnlineStockRepository.upsert).not.toHaveBeenCalled();
+      expect(holdStaleOpening).toHaveBeenCalledWith("ONLINE", expect.objectContaining({ id: 9 }), 43, 7, expect.anything(), undefined);
+      expect(out.leftSaved).toBe(1);
+    });
+
+    it("keeps an opening that an import set, and reports it", async () => {
+      vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+      vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValueOnce(laterRow({ openingManual: true }) as never).mockResolvedValue(null);
+
+      const out = await publishManualCounts(DATE, SHIFT, 7, true);
+
+      expect(dailyOnlineStockRepository.upsert).not.toHaveBeenCalled();
       expect(out.leftSaved).toBe(1);
     });
 
@@ -444,23 +500,17 @@ describe("publishing counts", () => {
       const out = await publishManualCounts(DATE, SHIFT, 7, true);
 
       expect(manualCountRepository.markPublished).toHaveBeenCalledWith(1, 7, expect.any(Date), false, expect.anything());
+      expect(dailyOnlineStockRepository.findNext).not.toHaveBeenCalled();
       expect(out.leftSaved).toBe(0);
     });
 
-    it("reports nothing left when the counted products have no later saved day", async () => {
-      vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 12, "ONLINE")] as never);
-
-      const out = await publishManualCounts(DATE, SHIFT, 7, true);
-
-      expect(out.leftSaved).toBe(0);
-    });
-
-    it("is an audit only without applyToOpening: nothing is reported as left", async () => {
+    it("is an audit only without applyToOpening: no later day is touched", async () => {
       vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
 
       const out = await publishManualCounts(DATE, SHIFT, 7, false);
 
       expect(manualCountRepository.markPublished).toHaveBeenCalledWith(1, 7, expect.any(Date), false, expect.anything());
+      expect(dailyOnlineStockRepository.findNext).not.toHaveBeenCalled();
       expect(out).toMatchObject({ appliedToOpening: false, leftSaved: 0 });
     });
   });

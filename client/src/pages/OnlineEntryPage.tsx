@@ -16,6 +16,9 @@ import { TableSkeleton } from "../components/Skeleton";
 import { LoadingOverlay } from "../components/Spinner";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
+import { useShiftWithSavedData } from "../hooks/useShiftWithSavedData";
+import { SaveSummary } from "../components/SaveSummary";
+import { rowsEndingNegative, saveNotices } from "../utils/saveReview";
 import { saveManualCount } from "../api/manualCounts";
 import {
   MANUAL_COUNT_KEY,
@@ -100,6 +103,9 @@ function computeOnlineFigures(
   );
   return { onlineStock, remainingStock };
 }
+
+/// Columns whose amounts are also written to the Offline table (a mirrored transfer).
+const TRANSFER_KEYS = ["stockInOffToOl", "stockOutOlToOff"];
 
 export function OnlineEntryPage() {
   const { user } = useAuth();
@@ -348,6 +354,9 @@ export function OnlineEntryPage() {
       cancelled = true;
     };
   }, [date, shift, realtimeVersion, reconnects]);
+  // A past date entered under the other shift opens on that shift, not on an
+  // empty-looking sheet (see the hook for when it does and doesn't act).
+  useShiftWithSavedData({ date, shift, rows, otherShiftSaved: otherShiftCount, hasPending: pendingCount > 0, setShift });
 
   // Warn before navigating/closing the tab with unsaved edits still staged -
   // easy to forget Save is a separate step now that cells no longer commit
@@ -606,6 +615,9 @@ export function OnlineEntryPage() {
     }
   }
 
+  // What the Save review dialog lists; only worked out while it is open.
+  const saveReviewItems = showPreview ? describePendingChanges(rows, pending, previewColumns) : [];
+
   const otherShiftWarning =
     otherShiftCount !== null && otherShiftCount > 0
       ? `${SHIFT_LABELS[otherShift(shift)]} already has ${otherShiftCount} saved entr${otherShiftCount === 1 ? "y" : "ies"} for ${date} - double-check you're on the right shift before entering data.`
@@ -771,10 +783,22 @@ export function OnlineEntryPage() {
         </p>
       )}
       {showPreview && (
-        <Modal title="Unsaved changes" onClose={() => setShowPreview(false)}>
-          <PendingChangesPreview
-            items={describePendingChanges(rows, pending, previewColumns)}
+        <Modal title="Review and save" onClose={() => setShowPreview(false)}>
+          <SaveSummary
+            page="Online Stocks"
+            date={date}
+            shift={shift}
+            changes={saveReviewItems.length}
+            products={new Set(saveReviewItems.map((i) => i.productId)).size}
+            notices={saveNotices({
+              date,
+              shift,
+              negatives: rowsEndingNegative(displayRows, pending),
+              otherShiftWarning,
+              alsoUpdates: Object.values(pending).some((p) => TRANSFER_KEYS.some((k) => k in p)) ? "Offline" : null,
+            })}
           />
+          <PendingChangesPreview items={saveReviewItems} />
           <div
             style={{
               display: "flex",

@@ -116,9 +116,11 @@ export function setCountRemarks(
 }
 
 /// Approves a sheet's saved counts (one date + shift, every location) as final.
-/// With `applyToOpening` they also start a new record: the next day entered
-/// opens at the counted figure and carries on from there. Days already saved
-/// are left as they are (`leftSaved` says how many counted products have some).
+/// With `applyToOpening` they also start a new record: the next day opens at the
+/// counted figure and carries on from there, and so does every later day already
+/// saved (its entries are kept, its opening and remaining are recalculated).
+/// `leftSaved` says how many counted products have a later day that could not be
+/// updated: a finished one (held for approval) or one with an imported opening.
 /// Supervisor/Admin only.
 export function publishManualCounts(date: string, shift: Shift, applyToOpening = false) {
   return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; leftSaved?: number; snapshotId?: number }>(

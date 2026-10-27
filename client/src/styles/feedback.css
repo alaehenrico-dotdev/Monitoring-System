@@ -61,7 +61,8 @@
 .ae-logo-orbit {
   --t: max(2px, calc(var(--lp) * 0.03));
   position: absolute;
-  inset: calc(var(--lp) * -0.08);
+  /* Hugs the logo: 2% of its size outside it. */
+  inset: calc(var(--lp) * -0.02);
   border-radius: 50%;
   pointer-events: none;
   animation: ae-logo-orbit 1.3s linear infinite;

@@ -171,6 +171,37 @@ describe("an audit published as the next day's opening", () => {
     expect(await dailyOnlineStockRepository.getOpeningStock(1, day("2026-06-11"), "NIGHT")).toBe(17);
   });
 
+  describe("a MORNING audit, with that day's Night sheet saved too (KNOWN GAP)", () => {
+    // Counted at the end of the Morning: 16 against a system figure of 20. The Night
+    // sheet then moves 4 out (Night opens at the count: 16 -> 12), so 12 is what the
+    // next day must open at - not the count again, which would forget the Night's 4.
+    //
+    // KNOWN GAP, not the intended behaviour: an applied count opens the next DATE, so a
+    // Morning count neither opens its own Night sheet nor lets the Night's movements
+    // reach the next day. Audits taken at the end of the day (the Night sheet, and
+    // whole-day mode) are unaffected. `it.fails` keeps this on record: when the lookup
+    // becomes shift-aware these start passing and vitest flags them to be switched to `it`.
+    const morning = (): Count => ({ ...applied(1, "2026-06-10", 16), shift: "MORNING" });
+    const rows = (): Row[] => [
+      { productId: 1, entryDate: day("2026-06-10"), shift: "MORNING", remainingStock: 20 },
+      { productId: 1, entryDate: day("2026-06-10"), shift: "NIGHT", remainingStock: 12 },
+    ];
+
+    it.fails("opens that same day's Night at the count", async () => {
+      db.online = rows();
+      db.counts = [morning()];
+
+      expect(await dailyOnlineStockRepository.getOpeningStock(1, day("2026-06-10"), "NIGHT")).toBe(16);
+    });
+
+    it.fails("opens the next day from the Night's remaining, not from the count again", async () => {
+      db.online = rows();
+      db.counts = [morning()];
+
+      expect(await dailyOnlineStockRepository.getOpeningStock(1, day("2026-06-11"), "MORNING")).toBe(12);
+    });
+  });
+
   it("an unpublished or audit-only count never opens anything", async () => {
     db.online = [{ productId: 1, entryDate: day("2026-06-10"), shift: "NIGHT", remainingStock: 20 }];
     db.counts = [{ ...applied(1, "2026-06-10", 16), appliedToOpening: false }, { ...applied(1, "2026-06-09", 3), publishedAt: null }];
