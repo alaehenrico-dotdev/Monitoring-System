@@ -114,6 +114,7 @@ describe("report options (what the Drive PDF leaves out)", () => {
   it("read an admin's choice to turn each on", async () => {
     prismaMock.appSetting.findMany.mockResolvedValue([{ key: "report.hideEmptyRows", value: "true" }]);
     expect(await getReportOptions()).toEqual({ hideEmptyRows: true, hideEmptyColumns: false });
+    invalidateAll();
     prismaMock.appSetting.findMany.mockResolvedValue([
       { key: "report.hideEmptyRows", value: "true" },
       { key: "report.hideEmptyColumns", value: "true" },
@@ -121,8 +122,18 @@ describe("report options (what the Drive PDF leaves out)", () => {
     expect(await getReportOptions()).toEqual({ hideEmptyRows: true, hideEmptyColumns: true });
   });
 
+  it("are read once, then served from the cache until an admin changes them", async () => {
+    await getReportOptions();
+    await getReportOptions();
+    expect(prismaMock.appSetting.findMany).toHaveBeenCalledTimes(1);
+    await setReportOptions({ hideEmptyRows: true }, 1);
+    await getReportOptions();
+    expect(prismaMock.appSetting.findMany).toHaveBeenCalledTimes(2);
+  });
+
   it("treat anything other than the word true as off, so a damaged row cannot start hiding data", async () => {
     for (const value of ["false", "", "1", "yes", "TRUE "]) {
+      invalidateAll();
       prismaMock.appSetting.findMany.mockResolvedValue([{ key: "report.hideEmptyRows", value }]);
       expect((await getReportOptions()).hideEmptyRows).toBe(false);
     }

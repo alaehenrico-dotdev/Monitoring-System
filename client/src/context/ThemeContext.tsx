@@ -16,9 +16,10 @@ export type UiStyle =
   | "minimal"
   | "skeuo"
   | "aurora"
-  | "plus";
+  | "plus"
+  | "halloween";
 
-const UI_STYLES: readonly UiStyle[] = ["classic", "enterprise", "brutal", "flat", "glass", "minimal", "skeuo", "aurora", "plus"];
+const UI_STYLES: readonly UiStyle[] = ["classic", "enterprise", "brutal", "flat", "glass", "minimal", "skeuo", "aurora", "plus", "halloween"];
 
 /// The interface typeface and text size (Settings > Appearance > Font). Like the
 /// theme they are a per-browser preference, applied as data attributes on <html>

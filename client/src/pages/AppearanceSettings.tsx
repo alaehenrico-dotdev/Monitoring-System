@@ -89,6 +89,12 @@ const THEMES: Choice<UiStyle>[] = [
     description: "Classic, refined: the same cream and charcoal with brand gold, but a clearer frosted header and soft layered shadows instead of glow. Same pages and shortcuts as Classic.",
     preview: <PlusPreview />,
   },
+  {
+    value: "halloween",
+    label: "Halloween",
+    description: "Spooky season: a pumpkin-orange header with a cobweb and dripping blood, a flickering title, drifting fog and the occasional distant lightning flash. Every effect stops with reduce motion. Same pages and shortcuts as Classic.",
+    preview: <HalloweenPreview />,
+  },
 ];
 
 
@@ -154,7 +160,7 @@ function FontSettings() {
 
 /**
  * Settings > Appearance: how the app looks on THIS browser. The color mode
- * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Aurora, Classic Plus) and the font are independent, remembered per
+ * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Aurora, Classic Plus, Halloween) and the font are independent, remembered per
  * browser (ThemeContext), apply immediately, and change only how things are
  * drawn - never the pages, the controls or the data - which is why every role can
  * reach them, unlike the other Settings tabs.
@@ -375,6 +381,18 @@ function PlusPreview() {
       />
       <span style={{ display: "block", ...bar("100%", 18, "#ffffff", { marginTop: 10, borderRadius: 6, border: "1px solid #e4dcc6", boxShadow: "0 3px 8px -2px rgba(31,26,18,0.14)" }) }} />
       <span style={{ display: "block", ...bar(34, 8, "#f5c000", { marginTop: 8, borderRadius: 4 }) }} />
+    </span>
+  );
+}
+
+function HalloweenPreview() {
+  return (
+    <span style={{ display: "block", background: "radial-gradient(90px 60px at 50% 0%, rgba(255,122,0,0.25), transparent 70%), #0b0710", height: 86, borderRadius: 6, padding: 8, overflow: "hidden" }}>
+      <span style={{ display: "block", position: "relative", height: 24, borderRadius: 6, background: "linear-gradient(120deg, #ff9a1f, #ff7a00 50%, #c24e00)", boxShadow: "0 0 14px -2px rgba(255,122,0,0.6)", overflow: "hidden" }}>
+        <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 9, background: "radial-gradient(3px 8px at 12% 0, #c8101c 98%, transparent), radial-gradient(3px 5px at 38% 0, #8a0b12 98%, transparent), radial-gradient(3px 9px at 66% 0, #c8101c 98%, transparent), radial-gradient(3px 6px at 88% 0, #8a0b12 98%, transparent)" }} />
+      </span>
+      <span style={{ display: "block", ...bar("100%", 20, "#170e20", { marginTop: 8, borderRadius: 6, border: "1px solid #4d2f69" }) }} />
+      <span style={{ display: "block", ...bar(34, 9, "#ff7a00", { marginTop: 8, borderRadius: 6 }) }} />
     </span>
   );
 }

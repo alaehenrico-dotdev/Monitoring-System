@@ -65,11 +65,18 @@ export const REPORT_OPTION_DEFAULTS: ReportOptions = { hideEmptyRows: false, hid
 const REPORT_KEYS = { hideEmptyRows: "report.hideEmptyRows", hideEmptyColumns: "report.hideEmptyColumns" } as const;
 
 /// A failed read means "show everything" - the safe reading is the complete report.
+const REPORT_CACHE_KEY = "app-settings:report-options";
+
+async function loadReportOptions(): Promise<ReportOptions> {
+  const rows = await prisma.appSetting.findMany({ where: { key: { in: Object.values(REPORT_KEYS) } } });
+  const on = (key: string) => rows.find((r) => r.key === key)?.value === "true";
+  return { hideEmptyRows: on(REPORT_KEYS.hideEmptyRows), hideEmptyColumns: on(REPORT_KEYS.hideEmptyColumns) };
+}
+
+/// Read for every report and export, so cached like the entry rules; a change drops it at once.
 export async function getReportOptions(): Promise<ReportOptions> {
   try {
-    const rows = await prisma.appSetting.findMany({ where: { key: { in: Object.values(REPORT_KEYS) } } });
-    const on = (key: string) => rows.find((r) => r.key === key)?.value === "true";
-    return { hideEmptyRows: on(REPORT_KEYS.hideEmptyRows), hideEmptyColumns: on(REPORT_KEYS.hideEmptyColumns) };
+    return await getOrSet(REPORT_CACHE_KEY, CACHE_TTL_MS, loadReportOptions);
   } catch (err) {
     console.error(JSON.stringify({ level: "warn", event: "report-options-unreadable", message: err instanceof Error ? err.message : String(err) }));
     return REPORT_OPTION_DEFAULTS;
@@ -85,6 +92,7 @@ export async function setReportOptions(patch: Partial<ReportOptions>, userId: nu
       update: { value, updatedById: userId },
     });
   }
+  invalidate(REPORT_CACHE_KEY);
   await logSystemEvent("report_options", { ...patch }, userId, "UPDATE");
   return getReportOptions();
 }

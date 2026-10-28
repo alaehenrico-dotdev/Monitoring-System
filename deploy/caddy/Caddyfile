@@ -96,10 +96,10 @@
 		@assets path /assets/*
 		# Unhashed images in /public (logo, icons): a day is long enough to skip
 		# re-downloads, short enough that a replaced logo shows up soon.
-		@static path *.png *.ico
+		@static path *.png *.ico *.jpg *.gif
 		@pages {
 			not path /assets/*
-			not path *.png *.ico
+			not path *.png *.ico *.jpg *.gif
 		}
 		header @pages Cache-Control "no-cache"
 		header @static Cache-Control "public, max-age=86400"

@@ -1,0 +1,350 @@
+/* =========================================================================
+   Halloween theme (Settings > Appearance > Theme). A haunted look: a pumpkin-
+   orange header dripping blood with a cobweb in its corner, a flickering
+   candle-lit title, drifting fog and the odd flash of distant lightning over a
+   near-black (dark) or aged-parchment (light) page. All the scares are CSS
+   only and move with transform/opacity, so they cost the GPU, not the page. The
+   lightning is a dim, slow, once-in-a-while flash (never more than one per
+   several seconds) and every animation stops under "reduce motion".
+   Scoped to :root[data-ui="halloween"].
+   ========================================================================= */
+:root[data-ui="halloween"] {
+  --ae-r: 6px;
+  --ae-glass-blur: blur(10px) saturate(130%);
+  --ae-hw-orange: #ff7a00;
+  --ae-hw-orange-deep: #c24e00;
+  --ae-hw-blood: #8a0b12;
+  --ae-hw-blood-bright: #c8101c;
+  --ae-hw-glow: rgba(255, 122, 0, 0.55);
+}
+:root[data-ui="halloween"]:not([data-theme="dark"]) {
+  --ae-bg: #efe2c8;
+  --ae-bg-alt: #e4d3b2;
+  --ae-surface: #fbf3e1;
+  --ae-surface-hover: #f5e8cc;
+  --ae-text: #241406;
+  --ae-text-muted: #6a4a2a;
+  --ae-border: #cdb68c;
+  --ae-border-soft: #dcc9a2;
+  --ae-hairline: #bfa578;
+  --ae-header-bg: #e4d3b2;
+  --ae-header-glass: rgba(228, 211, 178, 0.82);
+  --ae-surface-glass: rgba(251, 243, 225, 0.78);
+  --ae-row-hover: rgba(255, 122, 0, 0.1);
+  --ae-row-focus-bg: rgba(255, 122, 0, 0.2);
+  --ae-col-a: #fbf3e1;
+  --ae-col-b: #f4e8cd;
+  --ae-colh-a: #e4d3b2;
+  --ae-colh-b: #d8c49b;
+  --ae-focus-ring: #c24e00;
+  --ae-input-cell-bg: #fffaf0;
+  --ae-input-cell-text: #241406;
+  --ae-input-cell-text-muted: #6a4a2a;
+  --ae-input-cell-border: #bfa578;
+  --ae-input-cell-focus-ring: rgba(194, 78, 0, 0.35);
+  --ae-input-cell-spin: #c24e00;
+  --ae-input-cell-spin-hover-bg: rgba(255, 122, 0, 0.16);
+  --ae-glass-bg: rgba(251, 243, 225, 0.6);
+  --ae-glass-divider: rgba(36, 20, 6, 0.16);
+  --ae-glass-accent: #c24e00;
+}
+:root[data-ui="halloween"][data-theme="dark"] {
+  --ae-bg: #0b0710;
+  --ae-bg-alt: #130b1b;
+  --ae-surface: #170e20;
+  --ae-surface-hover: #22142f;
+  --ae-text: #f6e9d6;
+  --ae-text-muted: #b79f86;
+  --ae-border: #3a2350;
+  --ae-border-soft: #2a1a3b;
+  --ae-hairline: #4d2f69;
+  --ae-header-bg: #22142f;
+  --ae-header-glass: rgba(34, 20, 47, 0.84);
+  --ae-surface-glass: rgba(23, 14, 32, 0.76);
+  --ae-row-hover: rgba(255, 122, 0, 0.09);
+  --ae-row-focus-bg: rgba(255, 122, 0, 0.22);
+  --ae-col-a: #170e20;
+  --ae-col-b: #120a1a;
+  --ae-colh-a: #2a1a3b;
+  --ae-colh-b: #1f1230;
+  --ae-focus-ring: #ff7a00;
+  --ae-input-cell-bg: #170e20;
+  --ae-input-cell-text: #f6e9d6;
+  --ae-input-cell-text-muted: rgba(246, 233, 214, 0.55);
+  --ae-input-cell-border: #4d2f69;
+  --ae-input-cell-focus-ring: rgba(255, 122, 0, 0.45);
+  --ae-input-cell-spin: #ff7a00;
+  --ae-input-cell-spin-hover-bg: rgba(255, 122, 0, 0.2);
+  --ae-glass-bg: rgba(23, 14, 32, 0.6);
+  --ae-glass-divider: rgba(246, 233, 214, 0.16);
+  --ae-glass-accent: #ff7a00;
+}
+
+/* ---- Page: a dark vignette, so the corners fall into shadow ---------------- */
+:root[data-ui="halloween"] .app-shell {
+  background:
+    radial-gradient(900px 520px at 50% 0%, rgba(255, 122, 0, 0.12), transparent 70%),
+    radial-gradient(120% 90% at 50% 50%, transparent 55%, rgba(20, 6, 30, 0.35) 100%),
+    var(--ae-bg);
+}
+:root[data-ui="halloween"][data-theme="dark"] .app-shell {
+  background:
+    radial-gradient(900px 520px at 50% 0%, rgba(255, 122, 0, 0.16), transparent 70%),
+    radial-gradient(120% 90% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.65) 100%),
+    var(--ae-bg);
+}
+
+/* ---- Faces in the dark: scary.jpg and scary2.jpg each get their own fixed layer
+   (the company seal watermark stays as it is) and surface at random, on different
+   cycles so they rarely coincide. Brief, dim and never more than a couple of
+   changes a second. ------------------------------------------------------------ */
+:root[data-ui="halloween"]::after,
+:root[data-ui="halloween"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+:root[data-ui="halloween"]::after {
+  background: url("/scary.jpg") center top / auto 100% no-repeat;
+  filter: contrast(1.15) brightness(1.15);
+  animation: ae-hw-face-a 11s steps(1, end) infinite;
+}
+:root[data-ui="halloween"] body::after {
+  background: url("/scary2.jpg") center / contain no-repeat;
+  filter: contrast(1.1);
+  animation: ae-hw-face-b 17s steps(1, end) infinite;
+}
+:root[data-ui="halloween"]:not([data-theme="dark"])::after,
+:root[data-ui="halloween"]:not([data-theme="dark"]) body::after {
+  mix-blend-mode: multiply;
+}
+@keyframes ae-hw-face-a {
+  0%, 100% { opacity: 0; }
+  22% { opacity: 0.55; }
+  23% { opacity: 0.1; }
+  25% { opacity: 0.7; }
+  27% { opacity: 0; }
+  61% { opacity: 0.4; }
+  62% { opacity: 0; }
+  64% { opacity: 0.6; }
+  68% { opacity: 0; }
+}
+@keyframes ae-hw-face-b {
+  0%, 100% { opacity: 0; }
+  38% { opacity: 0.3; }
+  39% { opacity: 0; }
+  41% { opacity: 0.38; }
+  44% { opacity: 0; }
+  83% { opacity: 0.28; }
+  85% { opacity: 0; }
+}
+
+/* ---- Fog (under the content) and lightning (over it) ------------------------ */
+:root[data-ui="halloween"] .app-shell::after {
+  content: "";
+  position: fixed;
+  inset: -20% -50%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 18% at 20% 70%, rgba(190, 170, 210, 0.3), transparent 70%),
+    radial-gradient(45% 20% at 65% 85%, rgba(190, 170, 210, 0.26), transparent 70%),
+    radial-gradient(35% 16% at 90% 60%, rgba(190, 170, 210, 0.22), transparent 70%);
+  animation: ae-hw-fog 38s linear infinite alternate;
+  will-change: transform;
+}
+:root[data-ui="halloween"]:not([data-theme="dark"]) .app-shell::after {
+  opacity: 0.55;
+}
+:root[data-ui="halloween"] .ae-main::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  background: radial-gradient(80% 60% at 70% 0%, rgba(235, 225, 255, 0.55), rgba(180, 160, 255, 0.12) 60%, transparent 80%);
+  opacity: 0;
+  animation: ae-hw-lightning 13s ease-out infinite;
+}
+@keyframes ae-hw-fog {
+  from { transform: translate3d(-12%, 0, 0); }
+  to   { transform: translate3d(12%, -3%, 0); }
+}
+/* One dim double-flash every ~13s: well under three flashes a second, low contrast. */
+@keyframes ae-hw-lightning {
+  0%, 92%, 100% { opacity: 0; }
+  93% { opacity: 0.34; }
+  94% { opacity: 0.05; }
+  95% { opacity: 0.45; }
+  98% { opacity: 0; }
+}
+
+/* ---- Header: pumpkin gradient, a cobweb in the corner, blood dripping down --- */
+:root[data-ui="halloween"] .ae-page-header {
+  --ae-glass-text: #1a0a00;
+  --ae-glass-text-muted: rgba(26, 10, 0, 0.78);
+  --ae-glass-accent: #1a0a00;
+  --ae-glass-divider: rgba(26, 10, 0, 0.3);
+  --ae-tb-field-bg: rgba(26, 10, 0, 0.18);
+  --ae-tb-field-bg-hover: rgba(26, 10, 0, 0.3);
+  --ae-tb-hairline: rgba(26, 10, 0, 0.35);
+  --ae-tb-text: #1a0a00;
+  --ae-tb-text-muted: rgba(26, 10, 0, 0.78);
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(120deg, #ff9a1f 0%, #ff7a00 50%, #c24e00 100%);
+  color: #1a0a00;
+  border: 0;
+  box-shadow: 0 0 0 1px rgba(26, 10, 0, 0.5), 0 10px 34px -8px var(--ae-hw-glow);
+}
+:root:root[data-ui="halloween"] .ae-page-header {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(120deg, rgba(255, 154, 31, 0.92), rgba(255, 122, 0, 0.92) 50%, rgba(194, 78, 0, 0.92));
+}
+:root[data-ui="halloween"] .ae-page-header.ae-page-header--offline {
+  --ae-glass-text: #fff4e6;
+  --ae-glass-text-muted: rgba(255, 244, 230, 0.85);
+  color: #fff4e6;
+}
+:root:root[data-ui="halloween"] .ae-page-header.ae-page-header--offline {
+  background: linear-gradient(120deg, rgba(138, 11, 18, 0.94), rgba(200, 16, 28, 0.94));
+}
+:root[data-ui="halloween"] .ae-page-header h2,
+:root[data-ui="halloween"] .ae-page-header p {
+  color: inherit;
+}
+/* The cobweb: radial strands plus arcs, tucked into the top-right corner. */
+:root[data-ui="halloween"] .ae-page-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+  opacity: 0.7;
+  background:
+    repeating-radial-gradient(circle at 100% 0, transparent 0 22px, rgba(26, 10, 0, 0.7) 22px 23px),
+    conic-gradient(from 180deg at 100% 0, transparent 0 4deg, rgba(26, 10, 0, 0.7) 4deg 5deg, transparent 5deg 24deg, rgba(26, 10, 0, 0.7) 24deg 25deg, transparent 25deg 44deg, rgba(26, 10, 0, 0.7) 44deg 45deg, transparent 45deg 64deg, rgba(26, 10, 0, 0.7) 64deg 65deg, transparent 65deg 84deg, rgba(26, 10, 0, 0.7) 84deg 85deg, transparent 85deg 90deg);
+  -webkit-mask: radial-gradient(circle at 100% 0, #000 0 110px, transparent 111px);
+  mask: radial-gradient(circle at 100% 0, #000 0 110px, transparent 111px);
+}
+/* The drips: a repeating tile of blood drips hanging from the bottom edge, each a
+   different length, that slowly lengthen and shrink back. */
+:root[data-ui="halloween"] .ae-page-header::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 34px;
+  margin-top: -3px;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='34' viewBox='0 0 180 34'%3E%3Cpath fill='%238a0b12' d='M0 0h180v4H0z'/%3E%3Cpath fill='%23c8101c' d='M14 0h8v14a4 4 0 0 1-8 0z M70 0h10v26a5 5 0 0 1-10 0z M128 0h8v10a4 4 0 0 1-8 0z'/%3E%3Cpath fill='%238a0b12' d='M38 0h7v20a3.5 3.5 0 0 1-7 0z M98 0h9v32a4.5 4.5 0 0 1-9 0z M156 0h7v17a3.5 3.5 0 0 1-7 0z'/%3E%3Ccircle cx='19' cy='13' r='1.6' fill='%23ff6b73' opacity='.6'/%3E%3Ccircle cx='75' cy='24' r='1.8' fill='%23ff6b73' opacity='.6'/%3E%3C/svg%3E") repeat-x left top / 180px 34px;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+  transform-origin: top center;
+  animation: ae-hw-drip 7s ease-in-out infinite;
+}
+@keyframes ae-hw-drip {
+  0%, 100% { transform: scaleY(0.7); }
+  55% { transform: scaleY(1.1); }
+}
+
+/* Bats: a few cross the screen behind the toolbar every so often. */
+:root[data-ui="halloween"] .ae-main::before {
+  content: "";
+  position: fixed;
+  top: 14vh;
+  left: 0;
+  width: 760px;
+  height: 220px;
+  z-index: 39;
+  pointer-events: none;
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32' viewBox='0 0 64 32'%3E%3Cpath fill='%23120818' d='M32 8c2 0 3 2 4 4 3-5 9-8 16-8-3 3-4 6-4 9 4-1 8-3 12-6-1 7-5 14-12 16-3-3-6-2-8 3-1-2-2-4-4-4s-3 2-4 4c-2-5-5-6-8-3C13 23 9 16 8 9c4 3 8 5 12 6 0-3-1-6-4-9 7 0 13 3 16 8 1-2 2-4 4-4z'/%3E%3Ccircle cx='29' cy='13' r='1' fill='%23ff7a00'/%3E%3Ccircle cx='35' cy='13' r='1' fill='%23ff7a00'/%3E%3C/svg%3E") 0 24px / 56px 28px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32' viewBox='0 0 64 32'%3E%3Cpath fill='%23120818' d='M32 8c2 0 3 2 4 4 3-5 9-8 16-8-3 3-4 6-4 9 4-1 8-3 12-6-1 7-5 14-12 16-3-3-6-2-8 3-1-2-2-4-4-4s-3 2-4 4c-2-5-5-6-8-3C13 23 9 16 8 9c4 3 8 5 12 6 0-3-1-6-4-9 7 0 13 3 16 8 1-2 2-4 4-4z'/%3E%3Ccircle cx='29' cy='13' r='1' fill='%23ff7a00'/%3E%3Ccircle cx='35' cy='13' r='1' fill='%23ff7a00'/%3E%3C/svg%3E") 230px 120px / 44px 22px no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='32' viewBox='0 0 64 32'%3E%3Cpath fill='%23120818' d='M32 8c2 0 3 2 4 4 3-5 9-8 16-8-3 3-4 6-4 9 4-1 8-3 12-6-1 7-5 14-12 16-3-3-6-2-8 3-1-2-2-4-4-4s-3 2-4 4c-2-5-5-6-8-3C13 23 9 16 8 9c4 3 8 5 12 6 0-3-1-6-4-9 7 0 13 3 16 8 1-2 2-4 4-4z'/%3E%3Ccircle cx='29' cy='13' r='1' fill='%23ff7a00'/%3E%3Ccircle cx='35' cy='13' r='1' fill='%23ff7a00'/%3E%3C/svg%3E") 470px 60px / 64px 32px no-repeat;
+  filter: drop-shadow(0 0 6px rgba(255, 122, 0, 0.35));
+  transform: translate3d(-800px, 0, 0);
+  animation: ae-hw-bats 26s linear infinite;
+  will-change: transform;
+}
+@keyframes ae-hw-bats {
+  0% { transform: translate3d(-800px, 0, 0); }
+  8% { transform: translate3d(-800px, 0, 0); }
+  100% { transform: translate3d(calc(100vw + 40px), -60px, 0); }
+}
+
+/* ---- Title: a candle about to go out, with a blood-red glow on hover -------- */
+:root[data-ui="halloween"] .ae-page-header h2 {
+  text-shadow: 0 0 10px rgba(255, 220, 160, 0.55), 0 1px 0 rgba(255, 255, 255, 0.25);
+  animation: ae-hw-flicker 6s steps(1, end) infinite;
+}
+@keyframes ae-hw-flicker {
+  0%, 18%, 22%, 62%, 66%, 100% { opacity: 1; }
+  19%, 64% { opacity: 0.72; }
+  20%, 65% { opacity: 0.95; }
+  21% { opacity: 0.6; }
+}
+:root[data-ui="halloween"] .ae-glow-letter:hover {
+  color: #7a0008;
+  text-shadow: 0 0 6px rgba(200, 16, 28, 0.9), 0 0 16px rgba(200, 16, 28, 0.6);
+}
+
+/* ---- Tabs, cells and totals: a candle-lit orange where Classic uses gold ----- */
+:root[data-ui="halloween"] .ae-sticky-head > .ae-header-tabs {
+  background: color-mix(in srgb, var(--ae-surface) 62%, transparent);
+}
+:root[data-ui="halloween"] .ae-input-cell:hover:not(:disabled):not(:focus) {
+  border-color: var(--ae-hw-orange);
+  box-shadow: 0 0 8px -1px var(--ae-hw-glow);
+}
+:root[data-ui="halloween"] .ae-table tr.ae-row-grand td {
+  background-color: var(--ae-hw-orange);
+  box-shadow: inset 0 1px 0 var(--ae-hw-orange-deep), inset 0 -1px 0 var(--ae-hw-orange-deep);
+}
+
+/* ---- Jumpscare (components/JumpscareHost.tsx): full screen, above everything ----- */
+.ae-jumpscare {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  display: grid;
+  place-items: center;
+  background: #000;
+  cursor: pointer;
+}
+.ae-jumpscare img {
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="halloween"]::after,
+  :root[data-ui="halloween"] body::after,
+  :root[data-ui="halloween"] .app-shell::after,
+  :root[data-ui="halloween"] .ae-main::after,
+  :root[data-ui="halloween"] .ae-main::before,
+  :root[data-ui="halloween"] .ae-page-header::after,
+  :root[data-ui="halloween"] .ae-page-header h2 {
+    animation: none;
+  }
+}
+@media print {
+  :root[data-ui="halloween"]::after,
+  :root[data-ui="halloween"] body::after,
+  :root[data-ui="halloween"] .app-shell::after,
+  :root[data-ui="halloween"] .ae-main::after,
+  :root[data-ui="halloween"] .ae-main::before,
+  :root[data-ui="halloween"] .ae-page-header::before,
+  :root[data-ui="halloween"] .ae-page-header::after {
+    display: none;
+  }
+}
