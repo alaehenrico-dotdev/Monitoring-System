@@ -59,7 +59,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 /// Figures the system works out from the ones a person types. They move on
 /// every edit, so they are listed after the typed figure in a summary.
-const CALCULATED_FIELDS = new Set(["onlineStock", "offlineStock", "deliveryOut", "remainingStock", "variance", "systemRemainingStock"]);
+export const CALCULATED_FIELDS = new Set(["onlineStock", "offlineStock", "deliveryOut", "remainingStock", "variance", "systemRemainingStock"]);
 
 export function fieldLabel(key: string): string {
   if (FIELD_LABELS[key]) return FIELD_LABELS[key];

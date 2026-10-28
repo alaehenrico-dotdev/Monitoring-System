@@ -34,8 +34,8 @@ function formatBytes(bytes: number): string {
 /// Settings > Database Backup - lets a supervisor pull a full `mysqldump` of
 /// the live database straight from the browser, so an off-site copy can be
 /// kept without anyone needing shell access to the DB server. Read-only and
-/// non-destructive (unlike its sibling tab, Data Reset), so it sits behind
-/// the ordinary SUPERVISOR_ADMIN route guard rather than a second passcode.
+/// non-destructive (unlike its sibling tab, Data Reset), but a dump holds every
+/// record, so each download asks for the signed-in admin's password again.
 export function DatabaseBackupPage() {
   const [status, setStatus] = useState<Status>("idle");
   const [doneDismissed, setDoneDismissed] = useState(false);

@@ -54,20 +54,29 @@ export const dailyOfflineStockRepository = {
   /// reasoning on why the "immediately preceding shift" is always
   /// deterministic rather than a search across arbitrary shift values.
   ///
-  /// Section 4.4 - if that immediately preceding period also has a saved
-  /// Offline manual count, the physical count supersedes its own
-  /// system-computed Remaining Stock as the opening balance here: a manual
-  /// count exists specifically to correct the system figure (shrinkage,
-  /// miscounts, etc.), so the corrected number - not the pre-correction one -
-  /// is what the next period should actually start from. This only ever
-  /// looks at the ONE period being carried forward from, never re-derives
-  /// anything earlier, so it can't retroactively change an opening stock
-  /// some later, already-saved period already carried forward (matching
-  /// this table's existing "captured once, at save time" contract - see
-  /// carryForward.test.ts). A TOTAL-location count is deliberately not
-  /// consulted here - it can't be unambiguously split back into an
-  /// Online/Offline balance, so it stays purely informational (Variance
-  /// Report / Total Stocks) rather than ever overriding this table.
+  /// Section 4.4 - an Offline manual count that a supervisor PUBLISHED WITH "use
+  /// as next day's opening" (manualCount.appliedToOpening) is a fresh starting
+  /// record: it supersedes the system-computed Remaining Stock as the opening
+  /// balance, because a count exists specifically to correct the system figure
+  /// (shrinkage, miscounts, etc.) - the corrected number, not the
+  /// pre-correction one, is what the next period starts from. The latest such
+  /// count competes with the latest saved row and the later wins; from then on
+  /// each day carries on from its OWN remaining stock until the next applied
+  /// count. Unpublished or audit-only counts never open anything. A
+  /// TOTAL-location count is never consulted: it can't be unambiguously split
+  /// back into an Online/Offline balance, so it stays purely informational
+  /// (Variance Report / Total Stocks).
+  ///
+  /// Counts open the next DATE, whichever shift they were taken on (KNOWN GAP
+  /// for MORNING counts - see dailyOnlineStockRepository.getOpeningStock and the
+  /// it.fails cases in openingStock.test.ts before changing this).
+  ///
+  /// `rowCreatedAt` is only for the ordinary carry-forward walks (an entry save
+  /// must not move a chain it did not touch): a period first saved BEFORE a
+  /// count was published ignores that count. Publishing a count (a re-audit)
+  /// passes none - propagateOpeningStock's `reachSaved` - so the new count DOES
+  /// reach days already saved. Full policy: propagateOpeningStock in
+  /// manualCounts.service.ts.
   async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma, rowCreatedAt?: Date): Promise<number> {
     const prior = await db.dailyOfflineStock.findFirst({
       where: {
@@ -80,12 +89,10 @@ export const dailyOfflineStockRepository = {
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       select: { entryDate: true, shift: true, remainingStock: true },
     });
-    // Manual counts are an audit only: Opening is this carried-forward figure
-    // (or an import's). The one exception is a
-    // count a supervisor applied to opening stock when publishing it - a fresh
-    // starting record. The latest such count competes with the latest row, and
-    // the later wins. `rowCreatedAt` is for a period that already has a saved
-    // row: a count published after that row was first saved never reaches it.
+    // Opening is this carried-forward figure (or an import's), except when an
+    // APPLIED count is newer than the latest row (>= on the date: a count wins a
+    // tie). `rowCreatedAt`, when given, hides counts published after that row
+    // was first saved - see the doc comment above for who passes it and why.
     const count = await manualCountRepository.findLatestBefore(productId, entryDate, "OFFLINE", db, rowCreatedAt);
     if (count && (!prior || count.entryDate.getTime() >= prior.entryDate.getTime())) {
       return resolveOpeningStock(count.manualCount, 0);

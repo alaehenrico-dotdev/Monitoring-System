@@ -39,7 +39,9 @@
    inline) and --ring the arc colour. The arc is a conic gradient (transparent
    tail -> solid head) cut into a ring by a mask; the head dot sits outside
    the mask, on the ring's centre line, and the whole thing rotates. The
-   orbit extends beyond the logo's own box without affecting layout. */
+   orbit extends just beyond the logo's own box (2% of --lp, see .ae-logo-orbit
+   `inset`: it hugs the logo; it used to be 8%) without affecting layout. This one
+   rule sizes every beam: the loading spinner and the header seal's beam. */
 .ae-logo-pulse {
   --ring: #f5c000;
   position: relative;

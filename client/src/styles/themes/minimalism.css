@@ -28,8 +28,9 @@
   --ae-border-strong: #8a8a85;
   --ae-hairline: #e6e6e3;
   --ae-row-hover: rgba(26, 26, 26, 0.035);
-  /* Grid columns lose their alternating tint: one flat opaque colour (sticky
-     columns must still hide what scrolls under them). */
+  /* One flat opaque colour for the grid columns, "-a" and "-b" equal (every theme
+     is flat now - see base.css; here it also stays opaque because sticky columns
+     must still hide what scrolls under them). */
   --ae-col-a: #ffffff;
   --ae-col-b: #ffffff;
   --ae-colh-a: #ffffff;
@@ -85,11 +86,8 @@
   --ae-glass-text-muted: var(--ae-text-muted);
   --ae-glass-accent: var(--ae-text);
   --ae-glass-divider: var(--ae-border);
-  --ae-tb-bg: transparent;
-  --ae-tb-border: var(--ae-border);
   --ae-tb-field-bg: transparent;
   --ae-tb-field-bg-hover: var(--ae-mini-wash);
-  --ae-tb-field-bg-active: var(--ae-mini-wash-strong);
   --ae-tb-hairline: var(--ae-border);
   --ae-tb-text: var(--ae-text);
   --ae-tb-text-muted: var(--ae-text-muted);

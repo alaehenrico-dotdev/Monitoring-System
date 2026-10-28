@@ -8,6 +8,7 @@ import { Layout } from "./components/Layout";
 import { ShiftModeGate } from "./components/ShiftModeGate";
 import { TopProgressBar } from "./components/TopProgressBar";
 import { NoticeHost } from "./components/NoticeHost";
+import { PasswordPromptHost } from "./components/PasswordPromptHost";
 import { TopProgressProvider } from "./hooks/useTopProgress";
 import { LoadingBlock } from "./components/Spinner";
 import { LoginPage } from "./pages/LoginPage";
@@ -113,6 +114,7 @@ export default function App() {
           <TopProgressProvider>
             <TopProgressBar />
             <NoticeHost />
+            <PasswordPromptHost />
             <Suspense
               fallback={
                 <LoadingBlock label="" minHeight="var(--ae-vh)" size="xxl" />

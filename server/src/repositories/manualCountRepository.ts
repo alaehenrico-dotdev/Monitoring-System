@@ -44,10 +44,15 @@ export const manualCountRepository = {
   /// period turns out to be, it opens from this figure unless a saved row sits
   /// between the count and it (the caller compares the two).
   ///
-  /// `rowCreatedAt` is for a period that ALREADY has a saved row: only a count
-  /// published before that row was first saved can have opened it. A count
-  /// published afterwards leaves the row exactly as it was (days saved before
-  /// a publish are never rewritten by it).
+  /// `rowCreatedAt`, when given, hides every count published AFTER that row was
+  /// first saved. Only the ordinary carry-forward walk passes it (an entry save
+  /// must not move a chain it did not touch). Publishing a count (a re-audit)
+  /// passes nothing, so the new count reaches days already saved - the policy
+  /// lives in propagateOpeningStock (manualCounts.service.ts).
+  ///
+  /// Matches counts strictly before the target DATE, on either shift: a count
+  /// opens the next day (KNOWN GAP for MORNING counts - see
+  /// dailyOnlineStockRepository.getOpeningStock).
   findLatestBefore(productId: number, entryDate: Date, location: StockLocation, db: Db = prisma, rowCreatedAt?: Date) {
     return db.manualCount.findFirst({
       where: {

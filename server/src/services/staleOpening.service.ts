@@ -6,8 +6,9 @@ import { CORRECTIONS_TABLE_FOR } from "./heldTransfers.service";
 import type { EntryLocation } from "./dayLock.service";
 
 /**
- * A change to an earlier period moves every opening stock after it. When one of
- * those later periods is already finished, it must not be rewritten quietly:
+ * A change to an earlier period moves every opening stock after it - an entry
+ * save, or publishing an applied audit (a re-audit). When one of those later
+ * periods is already finished, it must not be rewritten quietly:
  * the carry-forward stops there and files a pending request for that row's
  * opening stock instead. An admin approves it (or not) per day, in order, and
  * each approval continues the walk to the next locked day.

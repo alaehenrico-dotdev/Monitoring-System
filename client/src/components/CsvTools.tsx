@@ -205,8 +205,8 @@ interface CsvToolsProps {
   /// Optional advisory pre-check, run once per matched row while building
   /// the Review modal (and again when a fuzzy suggestion is accepted) -
   /// returns a warning string if this row's changes would likely be
-  /// rejected server-side (e.g. the negative-stock guard), or undefined if
-  /// it looks fine. Purely informational: this can't see everything the
+  /// refused or flagged server-side (e.g. the result would end below zero
+  /// stock, which saves but blocks Finish Day), or undefined if it looks fine. Purely informational: this can't see everything the
   /// real save considers (a concurrent edit, the exact instant it runs), so
   /// it can under- or over-warn - it never blocks staging or Save, only
   /// surfaces the reason before Save is clicked instead of only after it

@@ -50,6 +50,7 @@ import {
   type PasteTargetColumn,
 } from "../utils/gridPaste";
 import { showToast } from "./Toast";
+import { getRecentCells } from "../api/changeLog";
 import { GridSelectionBar } from "./GridSelectionBar";
 import { useCategoryReveal } from "../hooks/useCategoryReveal";
 import {
@@ -293,6 +294,8 @@ interface DraftCellProps {
   raw: unknown;
   /** True while this cell holds a staged, not-yet-saved edit - shown green. */
   edited: boolean;
+  /** True once this cell's staged edit has been saved - shown glowing gold until it is edited again. */
+  savedGlow?: boolean;
   onCommit: (
     productId: number,
     key: string,
@@ -327,6 +330,7 @@ const DraftCell = memo(function DraftCell({
   colKey,
   raw,
   edited,
+  savedGlow,
   onCommit,
   onKeyDown,
   savedValue,
@@ -382,6 +386,7 @@ const DraftCell = memo(function DraftCell({
       className={
         [
           edited ? "ae-input-cell--edited" : "",
+          savedGlow && !edited ? "ae-input-cell--saved" : "",
           invalid ? "ae-input-cell--invalid" : "",
           suspicious ? "ae-input-cell--suspicious" : "",
         ]
@@ -460,6 +465,91 @@ export function StockGrid({
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
+  // Cells whose staged edit has been saved ("pid:key"), shown gold. A cell
+  // leaves `pending` when it is saved OR discarded; it only counts as saved
+  // once the row's own value has caught up to what was staged.
+  const [savedCells, setSavedCells] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const prevPending = useRef<Record<number, Record<string, number>>>({});
+  const awaitingSave = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    const now = pending ?? {};
+    for (const [pid, cols] of Object.entries(prevPending.current)) {
+      for (const [key, val] of Object.entries(cols)) {
+        if (now[Number(pid)]?.[key] === undefined) {
+          awaitingSave.current.set(`${pid}:${key}`, val);
+        }
+      }
+    }
+    prevPending.current = now;
+    const byId = new Map(rows.map((r) => [r.product.id, r]));
+    const confirmed: string[] = [];
+    const reEdited: string[] = [];
+    for (const [id, val] of awaitingSave.current) {
+      const [pid, key] = [Number(id.split(":")[0]), id.slice(id.indexOf(":") + 1)];
+      if (now[pid]?.[key] !== undefined) {
+        reEdited.push(id);
+        awaitingSave.current.delete(id);
+      } else if (Number(byId.get(pid)?.entry?.[key as never]) === val) {
+        confirmed.push(id);
+        awaitingSave.current.delete(id);
+      }
+    }
+    if (confirmed.length || reEdited.length) {
+      setSavedCells((prev) => {
+        const next = new Set(prev);
+        confirmed.forEach((id) => next.add(id));
+        reEdited.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+  }, [pending, rows]);
+  // Cells the latest save of each row changed (last 24h), from the change log,
+  // so a past date still shows what was edited last. Refetched whenever the
+  // rows change (a save replaces them), keyed "pid:key" like savedCells.
+  const [recentCells, setRecentCells] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const recentIds = useMemo(
+    () =>
+      rows
+        .map((r) => recordIdOf(r))
+        .filter((id): id is number => id !== undefined)
+        .join(","),
+    [rows],
+  );
+  useEffect(() => {
+    if (!historyTable || !recentIds) {
+      setRecentCells((prev) => (prev.size ? new Set() : prev));
+      return;
+    }
+    let cancelled = false;
+    const productByRecord = new Map(
+      rows.flatMap((r) => {
+        const id = recordIdOf(r);
+        return id === undefined ? [] : [[id, r.product.id] as const];
+      }),
+    );
+    getRecentCells(historyTable, recentIds.split(",").map(Number))
+      .then((byRecord) => {
+        if (cancelled) return;
+        const next = new Set<string>();
+        for (const [rid, keys] of Object.entries(byRecord)) {
+          const pid = productByRecord.get(Number(rid));
+          if (pid !== undefined) keys.forEach((k) => next.add(`${pid}:${k}`));
+        }
+        setRecentCells(next);
+      })
+      .catch(() => {
+        // Decoration only - a failed lookup just means no glow.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // `rows` is read for the id -> product map only; recentIds already changes
+    // whenever the set of records does, and a save replaces the records' values.
+  }, [historyTable, recentIds, rows]);
   // Fades a category's rows in and out when it is toggled (hooks/useCategoryReveal.ts).
   const reveal = useCategoryReveal();
   // Which header's right-click menu is open, if any (null = none). Held here
@@ -1361,6 +1451,10 @@ export function StockGrid({
                                   pending?.[row.product.id]?.[col.key] !==
                                   undefined
                                 }
+                                savedGlow={
+                                  savedCells.has(`${row.product.id}:${col.key}`) ||
+                                  recentCells.has(`${row.product.id}:${col.key}`)
+                                }
                                 onCommit={commitCell}
                                 onKeyDown={handleKeyDown}
                                 savedValue={getSavedValue?.(
@@ -1399,6 +1493,10 @@ export function StockGrid({
                                   edited={
                                     pending?.[row.product.id]?.[key] !==
                                     undefined
+                                  }
+                                  savedGlow={
+                                    savedCells.has(`${row.product.id}:${key}`) ||
+                                    recentCells.has(`${row.product.id}:${key}`)
                                   }
                                   onCommit={commitCell}
                                   onKeyDown={handleKeyDown}

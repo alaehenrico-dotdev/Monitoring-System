@@ -209,8 +209,12 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { comb
 /// commit or roll back together - see saveOnlineEntry's matching comment
 /// (dailyOnlineStock.service.ts) for the partial-commit bug this closes, and
 /// for why that transaction is SERIALIZABLE rather than the default
-/// REPEATABLE READ (the negative-stock-guard race serializableTransaction's
-/// own doc comment, lib/prisma.ts, describes).
+/// REPEATABLE READ (the lost-update race serializableTransaction's own doc
+/// comment, lib/prisma.ts, describes), and for how negative stock is handled:
+/// it is saved and flagged, never rejected here (see isNegativeStock in
+/// utils/stockMath.ts). Later saved periods are re-derived from this row's new
+/// Remaining Stock by propagateOpeningStock (manualCounts.service.ts), exactly
+/// as on the Online side.
 ///
 /// `db` stays an accepted parameter so related operations can compose this
 /// save into a caller-owned transaction without opening a nested transaction.

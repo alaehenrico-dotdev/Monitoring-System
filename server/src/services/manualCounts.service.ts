@@ -190,25 +190,39 @@ export interface PropagateOptions {
 export type PropagateOutcome = "kept-manual" | "held-locked" | undefined;
 
 /// Section 4.6 - carry-forward of Remaining Stock into the next saved
-/// period's opening stock. A next-period row that was already saved has its
-/// opening stock stored, so it must be re-derived here or it keeps carrying
-/// the old figure. Walks forward row by row: each changed row's new
-/// Remaining Stock feeds the one after it, stopping once an opening stock
-/// comes out unchanged. Manual counts take part only when applied to opening
-/// stock (see getOpeningStock), and only for a row first saved after that
-/// count was published: a row saved earlier keeps carrying the chain it was
-/// saved in, so a publish never reaches back into days already entered. A
-/// counted row's stored system figure and variance are re-derived as it moves.
-/// TOTAL counts are informational only.
+/// period's opening stock, and THE place the carry-forward policy lives (the
+/// repositories' getOpeningStock comments point here).
 ///
-/// A row whose opening was set by an import (openingManual) is never rewritten:
-/// the walk stops there and returns "kept-manual" if that row's opening
-/// differs from what would have carried into it.
+/// A next-period row that was already saved has its opening stock stored, so it
+/// must be re-derived here or it keeps carrying the old figure. Walks forward
+/// row by row: each changed row's new Remaining Stock feeds the one after it,
+/// stopping once an opening stock comes out unchanged. Only the opening, and
+/// the remaining stock that follows from it, are rewritten: everything entered
+/// on the row (In/Out/Production/Delivery/RTS...) is kept.
 ///
-/// A row of a FINISHED period is not rewritten either, and the save that
-/// reached it does not fail: the walk stops there, files a pending stale-opening
-/// request for an admin (staleOpening.service.ts) and returns "held-locked".
-/// Approving it continues the walk from that row.
+/// Who starts a walk, and how far it reaches:
+///  - An entry save (`from: "period"`) re-derives the later rows from that
+///    period's new Remaining Stock. It uses each row's first-save time to ignore
+///    a count published after the row was saved, so an ordinary save never
+///    moves a chain it did not touch.
+///  - PUBLISHING an applied count - a re-audit - (`reachSaved: true`, from
+///    publishManualCounts) ignores that first-save gate: the count becomes the
+///    opening of the next day and, from there, of every later saved day until
+///    another applied count or an import stops the walk. This is what makes a
+///    re-audit of an earlier date move the days already entered after it.
+///  - Editing a count that was applied un-publishes it, which puts the later
+///    days back on the carried-forward figure until it is published again.
+///  - Counts count only when published AND applied to opening (see
+///    getOpeningStock); TOTAL counts are informational only. A counted row's
+///    stored system figure and variance are re-derived as it moves.
+///
+/// What a walk never rewrites (it stops, and nothing fails):
+///  - A row whose opening was set by an import (openingManual): returns
+///    "kept-manual" if that row's opening differs from what would carry into it.
+///  - A row of a FINISHED period: files a pending stale-opening request for an
+///    admin (staleOpening.service.ts) and returns "held-locked". Approving it
+///    continues the walk from that row.
+/// publishManualCounts reports both outcomes as `leftSaved`.
 export async function propagateOpeningStock(
   productId: number,
   entryDate: Date,

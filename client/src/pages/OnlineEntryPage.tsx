@@ -72,10 +72,11 @@ import { colors } from "../theme";
 import type { Shift } from "../types";
 
 /// Re-derives Online Stocks + Remaining Stock from a last-saved entry plus a
-/// staged (not-yet-saved) diff on top of it - shared by the live grid
-/// preview (usePendingEntryChanges' `recompute`, below) and validateImportRow's
-/// advisory negative-stock pre-check, so the two never drift apart on what
-/// "the new figures would be" actually means.
+/// staged (not-yet-saved) diff on top of it - used by usePendingEntryChanges'
+/// `recompute` for the live grid preview. The Save review dialog's
+/// "will end below zero" warning reads the same recomputed rows (displayRows,
+/// via rowsEndingNegative in utils/saveReview.ts), so the grid, the dialog and
+/// the server never disagree on what "the new figures would be" means.
 function computeOnlineFigures(
   entry: Record<string, unknown>,
   changes: Record<string, number>,
@@ -534,10 +535,11 @@ export function OnlineEntryPage() {
         clear(productId);
       } catch (e) {
         const name = priorRow?.product.name ?? `#${productId}`;
-        // The server's own message (e.g. the negative-stock guard's "would
-        // end at -5") is the actual reason - without it, every failure looks
-        // identical ("still shown as unsaved, try Save again.") no matter
-        // what actually went wrong, leaving nothing to act on.
+        // The server's own message (e.g. that this period is finished, or that a
+        // figure is invalid) is the actual reason - without it, every failure
+        // looks identical ("still shown as unsaved, try Save again.") no matter
+        // what actually went wrong, leaving nothing to act on. (Going below zero
+        // is not one of them: that saves, and is flagged instead.)
         const reason = e instanceof Error ? e.message : "unknown error";
         failed.push(`${name} (${reason})`);
       }

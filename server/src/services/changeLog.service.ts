@@ -2,7 +2,7 @@ import { ChangeAction } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 import { changeLogRepository, REPORTS_TABLE, SNAPSHOT_TABLE, type ChangeLogFilters } from "../repositories/changeLogRepository";
 import { toDateOnlyString } from "../utils/date";
-import { diffChanges, summarizeChange } from "../utils/changeSummary";
+import { CALCULATED_FIELDS, diffChanges, summarizeChange } from "../utils/changeSummary";
 
 /**
  * Section 4.8 / 5.8 - every create/edit to a stock entry, manual count, or
@@ -321,6 +321,29 @@ export async function getCellHistory(params: {
       out.push({ changedAt: e.changedAt, who: e.changedBy?.name ?? null, oldValue: prev, newValue: next });
     }
     if (out.length >= params.limit) break;
+  }
+  return out;
+}
+
+/// How long a saved cell keeps its "recently changed" glow.
+const RECENT_CELL_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * For each record, the fields changed by its most recent user save (within the
+ * last 24 hours) - so switching to a past date still shows what was edited
+ * last. Follow-on writes (carried-forward openings, causedById) don't count,
+ * and calculated columns are left out: only what someone typed glows.
+ */
+export async function getRecentlyChangedCells(tableName: string, recordIds: number[], now = new Date()): Promise<Record<number, string[]>> {
+  const entries = await changeLogRepository.findRecentUserEdits(tableName, recordIds, new Date(now.getTime() - RECENT_CELL_WINDOW_MS));
+  const out: Record<number, string[]> = {};
+  for (const e of entries) {
+    if (e.recordId in out) continue; // newest first: only the latest save per record
+    const keys = diffChanges(e.action === "CREATE" ? {} : e.oldValue, e.newValue)
+      .map((c) => c.key)
+      .filter((key) => !CALCULATED_FIELDS.has(key))
+      .filter((key) => e.action !== "CREATE" || numberOrNull((e.newValue as Record<string, unknown> | null)?.[key]) !== 0);
+    out[e.recordId] = keys;
   }
   return out;
 }

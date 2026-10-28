@@ -37,7 +37,6 @@
   --tb-h: 34px;
   --tb-radius: 4px;
   --tb-field-bg: var(--ae-tb-field-bg);
-  --tb-field-bg-hover: var(--ae-tb-field-bg-hover);
   --tb-hairline: var(--ae-tb-hairline);
   --tb-text: var(--ae-tb-text);
   --tb-text-muted: var(--ae-tb-text-muted);
@@ -1458,5 +1457,5 @@
 }
 .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger, .ae-input, .ae-select):is(:focus-visible, [aria-expanded="true"]),
 .ae-datestep :is(.ae-mb-btn, .ae-date-trigger, .ae-input):focus-visible {
-  box-shadow: inset 0 -2px 0 var(--ae-glass-accent, var(--ae-mb-accent)) !important;
+  box-shadow: none !important;
 }

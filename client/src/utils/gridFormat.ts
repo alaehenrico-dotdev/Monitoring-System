@@ -33,10 +33,14 @@ export function formatPercentOfTotal(value: number, total: number): string {
   return `${pct.toFixed(1)}%`;
 }
 
-/// Rejects anything that isn't a non-negative number. Stock figures are
-/// counts of physical product: negative is never a real reading, and the
-/// server's own negative-stock guard would reject it on save anyway, so it
-/// is caught at the keystroke instead of after a round trip.
+/// Rejects anything that isn't a non-negative number. A TYPED figure (an In,
+/// Out, Production... amount) is a count of physical product: negative is never
+/// a real reading, and the server's own schema (z.number().min(0)) would reject
+/// it on save anyway, so it is caught at the keystroke instead of after a round
+/// trip. This is about what is typed, NOT the resulting balance: Remaining Stock
+/// may legitimately come out below zero (saved and flagged, see isNegativeStock
+/// on the server). The one typed figure that may be negative is a CSV-imported
+/// opening stock.
 export function isValidStockValue(raw: string): boolean {
   if (raw.trim() === "") return true; // empty is "clear the cell", committed as 0
   const n = Number(raw);

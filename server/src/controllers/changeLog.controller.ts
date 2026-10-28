@@ -5,6 +5,7 @@ import {
   MAX_CHANGE_LOG_LIMIT,
   exportChangeLogCsv,
   getCellHistory,
+  getRecentlyChangedCells,
   isCellHistoryTable,
   listChangeLog,
 } from "../services/changeLog.service";
@@ -93,6 +94,21 @@ export async function getCellHistoryHandler(req: Request, res: Response) {
     throw HttpError.forbidden("Cell history is only available for the stock entry grids");
   }
   res.json(await getCellHistory(parsed.data));
+}
+
+const recentCellsSchema = z.object({
+  tableName: z.string().min(1),
+  recordIds: z.string().regex(/^\d+(,\d+)*$/).transform((v) => v.split(",").map(Number)),
+});
+
+export async function getRecentCellsHandler(req: Request, res: Response) {
+  const parsed = recentCellsSchema.safeParse(req.query);
+  if (!parsed.success) throw HttpError.badRequest("Invalid recent cells query", parsed.error.flatten());
+  if (!isCellHistoryTable(parsed.data.tableName)) {
+    throw HttpError.forbidden("Recent cells are only available for the stock entry grids");
+  }
+  // A sheet is a few hundred products at most; the cap just bounds the IN list.
+  res.json(await getRecentlyChangedCells(parsed.data.tableName, parsed.data.recordIds.slice(0, 2000)));
 }
 
 const archiveQuerySchema = z.object({

@@ -144,6 +144,16 @@ export const changeLogRepository = {
     });
   },
 
+  /// User-made writes to these records since `since`, newest first - the input
+  /// to the "recently changed cells" glow. Served by the (tableName, recordId, id) index.
+  findRecentUserEdits(tableName: string, recordIds: number[], since: Date) {
+    return prisma.changeLog.findMany({
+      where: { tableName, recordId: { in: recordIds }, changedAt: { gte: since }, causedById: null, action: { in: ["CREATE", "UPDATE"] } },
+      select: { recordId: true, action: true, oldValue: true, newValue: true },
+      orderBy: { id: "desc" },
+    });
+  },
+
   /// Every write a given import batch produced, in the order they were made -
   /// see importBatch.service.ts's revertImportBatch, which reverts each one.
   findByImportBatch(importBatchId: number, db: Db = prisma) {

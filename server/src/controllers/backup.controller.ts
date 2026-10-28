@@ -4,6 +4,7 @@ import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveRes
 import { logSystemEvent } from "../services/changeLog.service";
 import { keepDriveConnectionAcross } from "../services/drive.service";
 import { HttpError } from "../utils/HttpError";
+import { assertAdminPassword } from "../services/adminPassword.service";
 import {
   backupHealth,
   buildReport,
@@ -28,7 +29,13 @@ function backupFileName(): string {
   return `ala-eh-backup-${date}-${time}.sql`;
 }
 
+/// A database dump holds everything, so on top of SUPERVISOR_ADMIN the download
+/// asks for the signed-in admin's own password again (X-Admin-Password header -
+/// the response is a file stream, and a password must not sit in a URL).
 export async function getBackupDownload(req: Request, res: Response) {
+  await assertAdminPassword(req.user!.id, req.header("x-admin-password"));
+  // A full database dump must never sit in any cache.
+  res.setHeader("Cache-Control", "no-store");
   const fileName = backupFileName();
   // The Restore page takes a safety copy first and says so, so history can tell
   // it apart from a routine download.

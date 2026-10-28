@@ -53,13 +53,28 @@ export const dailyOnlineStockRepository = {
   /// encoder skipped a shift), this falls back to the most recent
   /// still-earlier row instead of resetting to a misleading 0.
   ///
-  /// Section 4.4 - if that immediately preceding period also has a saved
-  /// Online manual count, the physical count supersedes its own
-  /// system-computed Remaining Stock as the opening balance here - see
-  /// dailyOfflineStockRepository.getOpeningStock's identical comment for
-  /// the full reasoning (why it's only the one period being carried forward
-  /// from, why it never ripples into a later already-saved period, and why
-  /// a TOTAL-location count is never consulted here).
+  /// Section 4.4 - an Online manual count that a supervisor PUBLISHED WITH "use
+  /// as next day's opening" (manualCount.appliedToOpening) is a fresh starting
+  /// record: it supersedes the system-computed Remaining Stock as the opening
+  /// balance, because it exists to correct that figure (shrinkage, miscounts).
+  /// The latest such count competes with the latest saved row and the later
+  /// wins; from then on each day carries on from its OWN remaining stock until
+  /// the next applied count. Counts that are unpublished, or published as an
+  /// audit only, never open anything. A TOTAL-location count is never
+  /// consulted: it can't be split back into an Online/Offline balance.
+  ///
+  /// Counts open the next DATE (count date < this date), whichever shift they
+  /// were taken on. KNOWN GAP: a MORNING count therefore neither opens its own
+  /// day's Night sheet nor lets that Night's movements reach the next day.
+  /// Audits are expected on the Night sheet (or in whole-day mode); see the
+  /// it.fails cases in openingStock.test.ts before changing this.
+  ///
+  /// `rowCreatedAt` is only for the ordinary carry-forward walks (an entry
+  /// save must not move a chain it did not touch): a period first saved BEFORE
+  /// a count was published ignores that count. Publishing a count (a re-audit)
+  /// deliberately passes none - propagateOpeningStock's `reachSaved` - so the
+  /// new count DOES reach days already saved. Full policy: propagateOpeningStock
+  /// in manualCounts.service.ts. Offline mirrors this function exactly.
   async getOpeningStock(productId: number, entryDate: Date, shift: Shift, db: Db = prisma, rowCreatedAt?: Date): Promise<number> {
     const prior = await db.dailyOnlineStock.findFirst({
       where: {
@@ -72,12 +87,10 @@ export const dailyOnlineStockRepository = {
       orderBy: [{ entryDate: "desc" }, { shift: "desc" }],
       select: { entryDate: true, shift: true, remainingStock: true },
     });
-    // Manual counts are an audit only: Opening is this carried-forward figure
-    // (or an import's). The one exception is a
-    // count a supervisor applied to opening stock when publishing it - a fresh
-    // starting record. The latest such count competes with the latest row, and
-    // the later wins. `rowCreatedAt` is for a period that already has a saved
-    // row: a count published after that row was first saved never reaches it.
+    // Opening is this carried-forward figure (or an import's), except when an
+    // APPLIED count is newer than the latest row (>= on the date: a count wins a
+    // tie). `rowCreatedAt`, when given, hides counts published after that row
+    // was first saved - see the doc comment above for who passes it and why.
     const count = await manualCountRepository.findLatestBefore(productId, entryDate, "ONLINE", db, rowCreatedAt);
     if (count && (!prior || count.entryDate.getTime() >= prior.entryDate.getTime())) {
       return resolveOpeningStock(count.manualCount, 0);

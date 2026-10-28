@@ -84,8 +84,13 @@
   --ae-border: #e7dfc9;
   --ae-border-soft: #f1ebd8;
   --ae-row-hover: rgba(12, 12, 12, 0.035);
-  /* Alternating column fills for every table: odd columns / even columns. Light
-     theme keeps two quiet paper shades; dark theme is charcoal and black. */
+  /* Column fills for every table. Every column is ONE flat colour: body cells use
+     --ae-col-a, column headers --ae-colh-a (the grid used to alternate odd/even
+     columns, which looked uneven next to the read-only columns). The "-b" tokens
+     are NOT read by any rule any more - changing them does nothing; they are only
+     still declared per theme (and minimalism's test pins them equal to "-a").
+     Do not reintroduce an inline cell background (StockGrid's lockedStyle used to
+     set one) or a per-column tone: either one makes some columns look darker. */
   --ae-col-a: #ffffff;
   --ae-col-b: #f6f0de;
   --ae-colh-a: #ece3c8; /* column headers: a step deeper than the body */
@@ -98,7 +103,6 @@
   --ae-warning-bg: #f7e7c2;
   --ae-warning-text: #8a6800;
   --ae-header-bg: #e7dfc9;
-  --ae-header-rule: #0c0c0c;
   --ae-num-text: var(--ae-text);
   --ae-danger-text: #c1272d;
   /* Low Stock row tint (TotalStocksTable) - same relationship to
@@ -125,10 +129,13 @@
   --ae-input-cell-spin: #d4a000;
   --ae-input-cell-spin-hover-bg: rgba(212, 160, 0, 0.18);
   /* Edited (staged, not yet saved) grid cells - green. */
-  --ae-input-cell-edited-bg: #c6ebcf;
-  --ae-input-cell-edited-text: #0c3b1a;
-  --ae-input-cell-edited-border: #2f6b3c;
-  --ae-input-cell-edited-ring: rgba(47, 107, 60, 0.35);
+  --ae-input-cell-edited-bg: #cfe3ff;
+  --ae-input-cell-edited-text: #0b2a5b;
+  --ae-input-cell-edited-border: #2f6fd0;
+  --ae-input-cell-saved-bg: #ffe27a;
+  --ae-input-cell-saved-text: #4a3500;
+  --ae-input-cell-saved-border: #d4a017;
+  --ae-input-cell-saved-glow: rgba(255, 190, 30, 0.75);
 
   /* Toolbar tokens - brand colors, identical in light and dark mode so the
      toolbar border and its action buttons are always visible. */
@@ -156,7 +163,6 @@
   /* Text-safe gold: #d4a000 is too faint on cream. */
   --ae-glass-accent: #8a6800;
   --ae-glass-divider: rgba(36, 29, 20, 0.14);
-  --ae-glass-solid: #fffcf5;
   --ae-glass-shadow:
     0 8px 24px rgba(60, 45, 10, 0.16), 0 0 14px rgba(245, 192, 0, 0.22),
     0 0 28px rgba(245, 192, 0, 0.1);
@@ -164,11 +170,8 @@
     0 16px 40px rgba(60, 45, 10, 0.22), 0 2px 8px rgba(60, 45, 10, 0.12);
 
   /* Toolbar controls that sit on the glass header. */
-  --ae-tb-bg: rgba(255, 255, 255, 0.4);
-  --ae-tb-border: rgba(36, 29, 20, 0.16);
   --ae-tb-field-bg: rgba(255, 255, 255, 0.6);
   --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.9);
-  --ae-tb-field-bg-active: rgba(212, 160, 0, 0.22);
   --ae-tb-hairline: rgba(36, 29, 20, 0.18);
   --ae-tb-text: #241d14;
   --ae-tb-text-muted: rgba(36, 29, 20, 0.6);
@@ -223,7 +226,6 @@
   --ae-warning-bg: #2b2306;
   --ae-warning-text: #fdd023;
   --ae-header-bg: #2a2a2a;
-  --ae-header-rule: #d4a000;
   --ae-num-text: #fff;
   /* The brand red (#c1272d) is a dark, low-luminance red - readable on the
      light paper background but too close to the near-black dark-mode
@@ -244,10 +246,13 @@
   --ae-input-cell-focus-ring: rgba(255, 255, 255, 0.45);
   --ae-input-cell-spin: #f5c000;
   --ae-input-cell-spin-hover-bg: rgba(245, 192, 0, 0.18);
-  --ae-input-cell-edited-bg: #1f5a2f;
+  --ae-input-cell-edited-bg: #1d4a8f;
   --ae-input-cell-edited-text: #fff;
-  --ae-input-cell-edited-border: #4caf68;
-  --ae-input-cell-edited-ring: rgba(76, 175, 104, 0.45);
+  --ae-input-cell-edited-border: #5b9bff;
+  --ae-input-cell-saved-bg: #7a5a00;
+  --ae-input-cell-saved-text: #fff6d6;
+  --ae-input-cell-saved-border: #ffcf40;
+  --ae-input-cell-saved-glow: rgba(255, 207, 64, 0.8);
 
   /* Dark glass - same look the nav drawer always had. */
   --ae-glass-bg: rgba(35, 35, 35, 0.55);
@@ -260,18 +265,14 @@
   --ae-glass-text-muted: #a3a3a3;
   --ae-glass-accent: #d4a000;
   --ae-glass-divider: rgba(229, 229, 229, 0.18);
-  --ae-glass-solid: #232323;
   --ae-glass-shadow:
     0 8px 24px rgba(0, 0, 0, 0.55), 0 0 14px rgba(245, 192, 0, 0.28),
     0 0 28px rgba(245, 192, 0, 0.12);
   --ae-glass-panel-shadow:
     0 16px 40px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
 
-  --ae-tb-bg: rgba(255, 255, 255, 0.035);
-  --ae-tb-border: rgba(255, 255, 255, 0.09);
   --ae-tb-field-bg: rgba(255, 255, 255, 0.06);
   --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.11);
-  --ae-tb-field-bg-active: rgba(255, 255, 255, 0.17);
   --ae-tb-hairline: rgba(255, 255, 255, 0.14);
   /* Toolbar item text/icons are brand yellow in dark mode (the solid-yellow
      primary buttons keep their own dark text). */
@@ -996,6 +997,28 @@ table input[type="number"] {
   color: var(--ae-input-cell-edited-text);
   border-color: transparent;
   box-shadow: none;
+}
+
+/* Saved cell: a staged edit that has just been saved - glowing gold until the
+   cell is edited again. */
+.ae-input-cell.ae-input-cell--saved,
+.ae-input-cell.ae-input-cell--saved:hover:not(:disabled):not(:focus),
+.ae-input-cell.ae-input-cell--saved:focus {
+  background: var(--ae-input-cell-saved-bg);
+  color: var(--ae-input-cell-saved-text);
+  border-color: var(--ae-input-cell-saved-border);
+  box-shadow: 0 0 8px 1px var(--ae-input-cell-saved-glow);
+  animation: ae-saved-glow 2.4s ease-in-out infinite;
+}
+@keyframes ae-saved-glow {
+  50% {
+    box-shadow: 0 0 14px 3px var(--ae-input-cell-saved-glow);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-input-cell.ae-input-cell--saved {
+    animation: none;
+  }
 }
 
 .ae-number-cell {

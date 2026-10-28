@@ -163,20 +163,28 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combi
 /// Wrapped in one DB transaction together with its Offline mirror
 /// (mirrorTransferToOffline, below): both upserts and both change-log writes
 /// commit or roll back together. Previously these ran as separate
-/// sequential awaits - if the mirror's own negative-stock guard threw, the
-/// Online row (and its change-log entry) had already committed, leaving the
-/// two tables inconsistent (Online records a transfer the Offline side never
-/// got) despite the client correctly seeing the save as failed.
+/// sequential awaits - if the mirror's own write threw, the Online row (and
+/// its change-log entry) had already committed, leaving the two tables
+/// inconsistent (Online records a transfer the Offline side never got) despite
+/// the client correctly seeing the save as failed.
 ///
 /// That outer transaction is SERIALIZABLE (serializableTransaction, lib/
 /// prisma.ts), not the default REPEATABLE READ - atomicity alone doesn't
 /// stop two concurrent saves on the SAME row from each reading the same
-/// pre-write Remaining Stock, each computing a non-negative result from it,
-/// and both committing a write that - combined - takes the real balance
-/// negative even though each one's own guard "passed". See
+/// pre-write row and each writing a Remaining Stock computed from it, so the
+/// later commit would silently erase the earlier one's effect. See
 /// serializableTransaction's own doc comment for how SERIALIZABLE closes
 /// that race (and why a transaction conflict there is retried, not an
 /// error).
+///
+/// Negative stock is NOT rejected here: the row saves as computed and is
+/// flagged instead (see isNegativeStock in utils/stockMath.ts for where it is
+/// caught - Admin Queue, Finish Day, the Save review dialog).
+///
+/// After the row is written, propagateOpeningStock (manualCounts.service.ts)
+/// re-derives the opening of every LATER saved period of this product from the
+/// new Remaining Stock, so a correction to an earlier period flows forward; a
+/// finished period is held for an admin's approval rather than rewritten.
 ///
 /// `db` stays an accepted parameter so related operations can compose this
 /// save into a caller-owned transaction without opening a nested transaction.

@@ -174,7 +174,9 @@ async function main() {
   assert.equal(Number(savedGridRow?.entry.remainingStock), Number(savedRow.openingStock) + 11);
   logPass("stock save and readback");
 
-  const backupResponse = await request("/backup/download", { token: admin.token });
+  const noPasswordBackup = await request("/backup/download", { token: admin.token });
+  assert.equal(noPasswordBackup.status, 403, "backup download requires the admin password");
+  const backupResponse = await request("/backup/download", { token: admin.token, headers: { "X-Admin-Password": process.env.E2E_ADMIN_PASSWORD ?? "" } });
   assert.equal(backupResponse.status, 200, "admin can download a database backup");
   const backup = new Uint8Array(await backupResponse.arrayBuffer());
   assert.ok(new TextDecoder().decode(backup.slice(0, 32)).startsWith("-- MySQL dump"), "backup has a mysqldump header");

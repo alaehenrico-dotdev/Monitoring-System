@@ -39,16 +39,18 @@ export type Db = PrismaClient | Prisma.TransactionClient;
 /// P2034). A plain (REPEATABLE READ, the default) transaction gives
 /// atomicity - all its writes commit or roll back together - but NOT
 /// protection against two concurrent transactions both reading the same
-/// pre-write balance and both passing a check like the negative-stock guard
-/// (dailyOnlineStock.service.ts/dailyOfflineStock.service.ts's
-/// saveOnlineEntry/saveOfflineEntry, the only callers of this). Under
+/// pre-write row and each writing a Remaining Stock computed from it, so the
+/// later commit silently overwrites the earlier one's effect (a lost update;
+/// dailyOnlineStock.service.ts/dailyOfflineStock.service.ts's
+/// saveOnlineEntry/saveOfflineEntry are the only callers of this). Under
 /// SERIALIZABLE, InnoDB turns their plain reads into locking reads, so the
 /// second transaction to touch the same row blocks behind the first instead
 /// of racing it - and if both still end up conflicting, one is aborted with
-/// P2034 rather than silently letting stock go negative. That's expected,
-/// not a bug, hence the retry: the aborted transaction re-reads the
-/// now-current balance and re-checks the guard against it, same as if it
-/// had simply been queued behind the other to begin with.
+/// P2034 rather than committing a figure built on a stale read. That's
+/// expected, not a bug, hence the retry: the aborted transaction re-reads the
+/// now-current row and recomputes from it, same as if it had simply been
+/// queued behind the other to begin with. (Going below zero is not what this
+/// protects against: negative stock is allowed on save - see isNegativeStock.)
 export async function serializableTransaction<T>(
   fn: (tx: Prisma.TransactionClient) => Promise<T>,
   attempts = 3,

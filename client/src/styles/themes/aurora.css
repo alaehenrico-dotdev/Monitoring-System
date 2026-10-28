@@ -117,11 +117,8 @@
   --ae-glass-text-muted: rgba(255, 255, 255, 0.82);
   --ae-glass-accent: #ffffff;
   --ae-glass-divider: rgba(255, 255, 255, 0.28);
-  --ae-tb-bg: rgba(255, 255, 255, 0.12);
-  --ae-tb-border: rgba(255, 255, 255, 0.28);
   --ae-tb-field-bg: rgba(255, 255, 255, 0.16);
   --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.26);
-  --ae-tb-field-bg-active: rgba(255, 255, 255, 0.34);
   --ae-tb-hairline: rgba(255, 255, 255, 0.32);
   --ae-tb-text: #ffffff;
   --ae-tb-text-muted: rgba(255, 255, 255, 0.82);
@@ -964,7 +961,7 @@
 .ae-toolbar.ae-mb .ae-mb-filters :is(.ae-select-trigger, .ae-date-trigger):is(:focus-visible, [aria-expanded="true"]) {
   background: var(--ae-tb-field-bg-hover);
   outline: none;
-  box-shadow: inset 0 -2px 0 var(--ae-glass-accent);
+  box-shadow: none;
 }
 
 /* ---- Stock flow chart (FlowLineChart) and channel donut (ShareDonut) -------- */

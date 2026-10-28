@@ -21,6 +21,30 @@ const LOGO_SIZE_COLLAPSED = 32;
 // mid-spin.
 const LOGO_SPIN_MS = 1100;
 
+/// A plain-text title split into per-letter spans, so each letter can glow gold
+/// on its own while the pointer passes over it (.ae-glow-letter in menu-bar.css).
+/// Words stay whole (nowrap) so wrapping never breaks mid-word, and the heading
+/// keeps its full text for screen readers.
+function GlowLetters({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(\s+)/).map((part, w) =>
+        /^\s+$/.test(part) || part === "" ? (
+          part
+        ) : (
+          <span key={w} className="ae-glow-word" aria-hidden="true">
+            {Array.from(part).map((ch, i) => (
+              <span key={i} className="ae-glow-letter">
+                {ch}
+              </span>
+            ))}
+          </span>
+        ),
+      )}
+    </>
+  );
+}
+
 interface PageHeaderProps {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -139,7 +163,9 @@ export function PageHeader({
           </button>
           <div className="ae-page-header-titles">
             <div className="ae-page-header-title-row">
-              <h2>{title}</h2>
+              <h2 aria-label={typeof title === "string" ? title : undefined}>
+                {typeof title === "string" ? <GlowLetters text={title} /> : title}
+              </h2>
               <HeaderExtras />
             </div>
             {/* The subtitle line under the h2 is no longer shown (pages still

@@ -74,14 +74,22 @@ export function calculateVariance(systemRemainingStock: number, manualCount: num
   return round2(manualCount - systemRemainingStock);
 }
 
-/// Negative-stock guard - a channel's own Remaining Stock is the actual
-/// current balance (it becomes next shift's Opening Stock), so a Stock Out
-/// (Fulfillment/Delivery) or a transfer-out larger than what a channel
-/// actually has on hand should be rejected by the service layer rather than
-/// silently persisted as a negative balance. Deliberately just this
-/// predicate, not the rejection itself (HttpError) - this file stays
-/// framework/DB-free by design (see the header comment above); the
-/// services decide what to do when this is true.
+/// True when a channel's Remaining Stock is below zero.
+///
+/// A negative balance is NOT rejected on save - that is deliberate, do not turn
+/// it back into an error. Out figures are often entered before the matching In
+/// (production handed in later), and refusing the save would leave the Out
+/// unrecorded. Instead the row is stored as computed (e.g. -15), and the
+/// consequences come later and elsewhere:
+///  - the Admin Queue lists it (actionQueue.service.ts);
+///  - Finish Day refuses to lock the sheet while any row ends below zero, unless a
+///    supervisor/admin signs it off with a written reason (dayFinish.service.ts,
+///    negativeStock.service.ts); "finish through a range" has no sign-off and
+///    simply blocks (finishThrough.service.ts);
+///  - the Save review dialog warns before the save (client utils/saveReview.ts);
+///  - the negative figure carries into the next period's opening like any other.
+/// Deliberately just this predicate - this file stays framework/DB-free (see the
+/// header comment above); the services decide what to do when it is true.
 export function isNegativeStock(remainingStock: number): boolean {
   return remainingStock < 0;
 }

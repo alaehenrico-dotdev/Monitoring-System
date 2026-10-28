@@ -165,7 +165,11 @@
   justify-content: center;
 }
 /* Unavailable: dimmed AND dashed, so it never depends on colour alone. The
-   reason is its tooltip and its accessible description. */
+   reason is its tooltip and its accessible description. EXCEPTION: inside the
+   date stepper (.ae-datestep, e.g. "Today" when already on today) the dashed
+   outline is removed on purpose - the filter row is borderless in every theme
+   (see the "Filter row" block at the end of toolbar.css), so there it is dimmed
+   only. */
 .ae-mb-btn[aria-disabled="true"] {
   opacity: 0.6;
   cursor: not-allowed;
@@ -602,6 +606,31 @@
   line-height: 1.2;
   overflow-wrap: break-word;
   text-wrap: balance;
+}
+
+/* Header title: each letter lights up gold under the pointer and fades back
+   slowly after it leaves, so sweeping across the title leaves a glowing trail. */
+.ae-glow-word {
+  display: inline-block;
+  white-space: nowrap;
+}
+.ae-glow-letter {
+  display: inline-block;
+  transition:
+    color 0.9s ease-out,
+    text-shadow 0.9s ease-out;
+}
+.ae-glow-letter:hover {
+  color: #f5c000;
+  text-shadow:
+    0 0 6px rgba(245, 192, 0, 0.9),
+    0 0 14px rgba(245, 192, 0, 0.6);
+  transition-duration: 0.08s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-glow-letter {
+    transition: none;
+  }
 }
 
 /* The finish area holds up to two controls (Request unlock, Finish day / Finish

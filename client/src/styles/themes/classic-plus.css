@@ -45,8 +45,6 @@
   --ae-glass-panel-shadow: var(--ae-lit-edge), var(--ae-ring), var(--ae-elev-3);
   --ae-header-wash: rgba(212, 160, 0, 0.1);
 
-  --ae-tb-bg: rgba(255, 255, 255, 0.5);
-  --ae-tb-border: rgba(31, 26, 18, 0.12);
   --ae-tb-field-bg: rgba(255, 255, 255, 0.72);
   --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.95);
   --ae-tb-hairline: rgba(31, 26, 18, 0.14);
@@ -82,8 +80,6 @@
   --ae-glass-divider: rgba(255, 255, 255, 0.14);
   --ae-header-wash: rgba(245, 192, 0, 0.08);
 
-  --ae-tb-bg: rgba(255, 255, 255, 0.04);
-  --ae-tb-border: rgba(255, 255, 255, 0.1);
   --ae-tb-field-bg: rgba(255, 255, 255, 0.07);
   --ae-tb-field-bg-hover: rgba(255, 255, 255, 0.12);
   --ae-tb-hairline: rgba(255, 255, 255, 0.16);
@@ -187,7 +183,7 @@
   --ae-cell-hover: #c79a00;
   --ae-cell-focus: #1f6fd6;
   --ae-cell-focus-ring: rgba(31, 111, 214, 0.28);
-  --ae-cell-edited: #2f6b3c;
+  --ae-cell-edited: #2f6fd0;
   --ae-cell-warn: #a87400;
   --ae-cell-error: #c1272d;
   --ae-cell-locked: #e9e2cd;
@@ -197,7 +193,7 @@
   --ae-cell-hover: #f5c000;
   --ae-cell-focus: #5aa2f0;
   --ae-cell-focus-ring: rgba(90, 162, 240, 0.35);
-  --ae-cell-edited: #4caf68;
+  --ae-cell-edited: #5b9bff;
   --ae-cell-warn: #f5c000;
   --ae-cell-error: #e5626a;
   --ae-cell-locked: #333333;
@@ -227,6 +223,11 @@
 :root[data-ui="plus"] .ae-input-cell.ae-input-cell--edited:focus {
   border-color: var(--ae-cell-focus);
   box-shadow: 0 0 0 2px var(--ae-cell-focus-ring);
+}
+:root[data-ui="plus"] .ae-input-cell.ae-input-cell--saved,
+:root[data-ui="plus"] .ae-input-cell.ae-input-cell--saved:focus {
+  border-color: var(--ae-input-cell-saved-border);
+  box-shadow: 0 0 8px 1px var(--ae-input-cell-saved-glow);
 }
 :root[data-ui="plus"] .ae-input-cell.ae-input-cell--suspicious {
   border-color: var(--ae-cell-warn) !important;

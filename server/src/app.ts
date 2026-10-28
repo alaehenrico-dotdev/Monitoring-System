@@ -62,6 +62,14 @@ export function createApp() {
   // away before the server spends anything reading and parsing up to 1 MB of
   // body per request, which is the cheap part of the flood to skip.
   app.use("/api", apiLimiter);
+  // Every API response is per-user data: `private` keeps shared proxies from
+  // storing it, `no-cache` makes the browser revalidate with Express's own ETag
+  // (a 304 with no body when nothing changed) instead of guessing freshness.
+  // Streamed downloads override this with no-store (see backup.controller.ts).
+  app.use("/api", (_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-cache");
+    next();
+  });
   // API JSON payloads are small; keep an explicit cap so an accidental or
   // hostile oversized body cannot consume unbounded memory. Restore uploads
   // use their own streaming limit in backup.service.ts.

@@ -1,6 +1,7 @@
 import { API_URL, ApiError, getToken, http } from "./http";
 import { saveBlob } from "../utils/saveBlob";
 import { localDateStamp } from "../utils/dateFormat";
+import { requestAdminPassword } from "../utils/passwordPrompt";
 
 /// "pre-restore" marks the safety copy taken just before a restore, so the
 /// backup history can tell it apart from a routine download.
@@ -101,9 +102,19 @@ export async function fetchDatabaseBackup(
   purpose?: BackupPurpose,
 ): Promise<{ blob: Blob; filename: string }> {
   const token = getToken();
-  const res = await fetch(`${API_URL}/backup/download${purpose ? `?purpose=${purpose}` : ""}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  });
+  // The server re-checks the signed-in admin's password for every download;
+  // a wrong one asks again rather than failing the whole backup.
+  let message = "Enter your password to download the database.";
+  let res: Response;
+  for (;;) {
+    const password = await requestAdminPassword(message);
+    if (password === null) throw new Error("Backup cancelled - password not entered.");
+    res = await fetch(`${API_URL}/backup/download${purpose ? `?purpose=${purpose}` : ""}`, {
+      headers: { "X-Admin-Password": password, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    });
+    if (res.status !== 403) break;
+    message = "Incorrect password. Try again.";
+  }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));

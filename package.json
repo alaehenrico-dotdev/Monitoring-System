@@ -25,7 +25,14 @@
     "e2e": "node scripts/e2e.mjs"
   },
   "devDependencies": {
-    "concurrently": "^9.0.1"
+    "@eslint/js": "^10.0.1",
+    "concurrently": "^9.0.1",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^17.13.0",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
   },
   "allowScripts": {
     "@prisma/client@6.19.3": true,
@@ -34,5 +41,8 @@
     "esbuild@0.21.5": true,
     "prisma@6.19.3": true,
     "core-js@3.50.0": true
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.0"
   }
 }

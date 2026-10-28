@@ -1,13 +1,15 @@
 /**
  * Client-side mirror of server/src/utils/stockMath.ts - the same pure
- * formulas, kept in sync by hand. Used ONLY for the CSV Review modal's
- * advisory "would this fail server-side" pre-check (CsvTools.tsx via
- * OnlineEntryPage/OfflineEntryPage's validateImport) - the server remains
- * the sole real enforcement point. If these two files drift apart, the
- * pre-check just gets less accurate (a false "looks fine" or a false
- * warning); it can never let something through that the server wouldn't
- * still correctly reject, since Save always goes through the real endpoint
- * regardless of what this predicts.
+ * formulas, kept in sync by hand. Used for what the grid shows BEFORE a save:
+ * the live recomputed Remaining Stock of staged edits (OnlineEntryPage/
+ * OfflineEntryPage's computeOnlineFigures/computeOfflineFigures) and, from those
+ * rows, the Save review dialog's "will end below zero" warning - and optionally
+ * the CSV Review modal's advisory pre-check (CsvTools' `validateImport`, which no
+ * page currently supplies). The server remains the sole real source of truth:
+ * if these two files drift apart, the preview just gets less accurate (a wrong
+ * warning or a wrong figure on screen); what is SAVED is always recomputed by
+ * the server's own copy. Negative stock is not rejected anywhere - it saves and
+ * is flagged (see isNegativeStock in the server copy).
  */
 
 /// Every stock figure here is stored server-side in a Decimal(14,2) column,

@@ -6,6 +6,18 @@
  * - Navigations are network-first with the cached index.html as the offline
  *   fallback (the app is a client-side-routed SPA).
  * - API requests always go to the live server and are never cached.
+ * - Only SAME-ORIGIN requests are handled here. Cross-origin ones (Google Fonts)
+ *   are deliberately left to the browser: a fetch made from a service worker is
+ *   checked against the CSP's connect-src, which does not allow them, so
+ *   proxying them turned working font loads into network errors. Do not add a
+ *   cache for them here; widen the CSP first (Caddyfile and vite.config.ts).
+ * - Every handler must resolve respondWith() to a real Response (Response.error()
+ *   at worst) - resolving to undefined throws "Failed to convert value to
+ *   'Response'" and breaks the request.
+ * - A service worker belongs to ONE origin (scheme + host + port). One registered
+ *   for an address that is no longer served (e.g. an old http://localhost:8080)
+ *   keeps serving the cached app shell there while every API call fails, which
+ *   looks like a broken login. Unregister it in DevTools > Application.
  */
 const VERSION = "__SW_VERSION__";
 const PRECACHE = self.__PRECACHE__ || [];
