@@ -9,11 +9,13 @@ vi.mock("../repositories/changeLogRepository", () => ({
     findStockRecordsByIds: vi.fn(),
     findProductsByIds: vi.fn(),
     findForRecord: vi.fn(),
+    findRecentUserEdits: vi.fn(),
+    findDayClosures: vi.fn(),
   },
 }));
 
 import { changeLogRepository } from "../repositories/changeLogRepository";
-import { exportChangeLogCsv, getCellHistory, isCellHistoryTable, listChangeLog, recordChange } from "./changeLog.service";
+import { exportChangeLogCsv, getCellHistory, getRecentlyChangedCells, isCellHistoryTable, listChangeLog, recordChange } from "./changeLog.service";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -295,5 +297,199 @@ describe("getCellHistory", () => {
     mockEntries([]);
     await getCellHistory(ONLINE);
     expect(changeLogRepository.findForRecord).toHaveBeenCalledWith("daily_online_stock", 100);
+  });
+});
+
+describe("getRecentlyChangedCells", () => {
+  // No sheet is finished unless a test says so.
+  beforeEach(() => {
+    vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([]);
+    vi.mocked(changeLogRepository.findDayClosures).mockResolvedValue([]);
+  });
+
+  it("keeps cells from earlier saves when a later save touched something else", async () => {
+    vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+      { recordId: 7, action: "UPDATE", oldValue: { delivered: 1, remarks: 0 }, newValue: { delivered: 1, remarks: 4 } },
+      { recordId: 7, action: "UPDATE", oldValue: { delivered: 0 }, newValue: { delivered: 1 } },
+    ] as never);
+    const out = await getRecentlyChangedCells("daily_online_stock", [7]);
+    expect(out[7].sort()).toEqual(["delivered", "remarks"]);
+  });
+
+  it("glows the Delivery (Out) cell: it is typed directly in the Offline grid, not only a sum", async () => {
+    vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+      {
+        recordId: 9,
+        action: "UPDATE",
+        oldValue: { delivery1: 5, deliveryOut: 5, offlineStock: 20, remainingStock: 15 },
+        newValue: { delivery1: 8, deliveryOut: 8, offlineStock: 20, remainingStock: 12 },
+      },
+    ] as never);
+    const out = await getRecentlyChangedCells("daily_offline_stock", [9]);
+    expect(out[9].sort()).toEqual(["delivery1", "deliveryOut"]);
+  });
+
+  it("glows only the Delivery added column whose amount moved, not every one saved with it", async () => {
+    // The old snapshot holds delivery1..5; the new one also carries them as deliveryOut__x1..x3.
+    vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+      {
+        recordId: 9,
+        action: "UPDATE",
+        oldValue: { delivery1: 5, delivery2: 3, delivery3: 0, deliveryOut: 8 },
+        newValue: { delivery1: 5, delivery2: 4, delivery3: 0, deliveryOut: 9, deliveryOut__x1: 5, deliveryOut__x2: 4, deliveryOut__x3: 0 },
+      },
+    ] as never);
+    const out = await getRecentlyChangedCells("daily_offline_stock", [9]);
+    expect(out[9]).toContain("deliveryOut__x2");
+    expect(out[9]).not.toContain("deliveryOut__x1");
+    expect(out[9]).not.toContain("deliveryOut__x3");
+  });
+
+  it("does not glow a new added column that was saved empty", async () => {
+    vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+      {
+        recordId: 4,
+        action: "UPDATE",
+        oldValue: { fulfillmentOut: 6 },
+        newValue: { fulfillmentOut: 6, fulfillmentOut__x1: 0, fulfillmentOut__x2: 0 },
+      },
+    ] as never);
+    const out = await getRecentlyChangedCells("daily_online_stock", [4]);
+    expect(out[4]).toBeUndefined();
+  });
+
+  it("still glows a new added column that holds an amount", async () => {
+    vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+      {
+        recordId: 4,
+        action: "UPDATE",
+        oldValue: { fulfillmentOut: 6 },
+        newValue: { fulfillmentOut: 6, fulfillmentOut__x1: 2, fulfillmentOut__x2: 4 },
+      },
+    ] as never);
+    const out = await getRecentlyChangedCells("daily_online_stock", [4]);
+    expect(out[4].sort()).toEqual(["fulfillmentOut__x1", "fulfillmentOut__x2"]);
+  });
+
+  describe("until the sheet is finished", () => {
+    const D = new Date("2026-10-20T00:00:00.000Z");
+    const record = (id: number, shift = "NIGHT") => ({ id, productId: id, entryDate: D, shift });
+    const closure = (over: object) => ({
+      entryDate: D,
+      shift: "NIGHT",
+      onlineLocked: false,
+      offlineLocked: false,
+      closedAt: new Date("2026-10-21T02:00:00.000Z"),
+      unlockedAt: null,
+      ...over,
+    });
+    const edit = (changedAt: string, key: string, from: number, to: number) => ({
+      recordId: 5,
+      action: "UPDATE",
+      changedAt: new Date(changedAt),
+      oldValue: { [key]: from },
+      newValue: { [key]: to },
+    });
+
+    it("has no time limit on a sheet nobody has finished", async () => {
+      vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([record(5)] as never);
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([edit("2025-01-01T00:00:00.000Z", "rts", 1, 2)] as never);
+      const out = await getRecentlyChangedCells("daily_online_stock", [5]);
+      expect(out[5]).toEqual(["rts"]);
+      expect(vi.mocked(changeLogRepository.findRecentUserEdits).mock.calls[0][2]).toBeUndefined();
+    });
+
+    it("stops glowing what was typed before the page was finished", async () => {
+      vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([record(5)] as never);
+      vi.mocked(changeLogRepository.findDayClosures).mockResolvedValue([closure({ onlineLocked: true })] as never);
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([edit("2026-10-21T01:00:00.000Z", "rts", 1, 2)] as never);
+      expect(await getRecentlyChangedCells("daily_online_stock", [5])).toEqual({});
+      // ...and only reads the log from the finish onwards.
+      expect(vi.mocked(changeLogRepository.findRecentUserEdits).mock.calls[0][2]).toEqual(new Date("2026-10-21T02:00:00.000Z"));
+    });
+
+    it("glows an edit that came in after the finish (an approved correction)", async () => {
+      vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([record(5)] as never);
+      vi.mocked(changeLogRepository.findDayClosures).mockResolvedValue([closure({ onlineLocked: true })] as never);
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+        edit("2026-10-22T09:00:00.000Z", "productionIn", 3, 4),
+        edit("2026-10-21T01:00:00.000Z", "rts", 1, 2),
+      ] as never);
+      const out = await getRecentlyChangedCells("daily_online_stock", [5]);
+      expect(out[5]).toEqual(["productionIn"]);
+    });
+
+    it("starts again at the unlock when a finished page was reopened", async () => {
+      vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([record(5)] as never);
+      vi.mocked(changeLogRepository.findDayClosures).mockResolvedValue([
+        closure({ onlineLocked: false, unlockedAt: new Date("2026-10-22T08:00:00.000Z") }),
+      ] as never);
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+        edit("2026-10-22T09:00:00.000Z", "fulfillmentOut", 5, 6),
+        edit("2026-10-21T01:00:00.000Z", "rts", 1, 2),
+      ] as never);
+      const out = await getRecentlyChangedCells("daily_online_stock", [5]);
+      expect(out[5]).toEqual(["fulfillmentOut"]);
+    });
+
+    it("keeps this page glowing while only the OTHER page has been finished", async () => {
+      vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([record(5)] as never);
+      // Offline finished, Online (the page asked about) still open and never finished.
+      vi.mocked(changeLogRepository.findDayClosures).mockResolvedValue([closure({ offlineLocked: true })] as never);
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([edit("2026-10-20T10:00:00.000Z", "rts", 1, 2)] as never);
+      const out = await getRecentlyChangedCells("daily_online_stock", [5]);
+      expect(out[5]).toEqual(["rts"]);
+    });
+
+    it("finishing one sheet does not touch another date or shift", async () => {
+      vi.mocked(changeLogRepository.findStockRecordsByIds).mockResolvedValue([record(5, "MORNING")] as never);
+      // The closure is for the NIGHT sheet; this record is on the MORNING sheet.
+      vi.mocked(changeLogRepository.findDayClosures).mockResolvedValue([closure({ onlineLocked: true })] as never);
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([edit("2026-10-20T10:00:00.000Z", "rts", 1, 2)] as never);
+      const out = await getRecentlyChangedCells("daily_online_stock", [5]);
+      expect(out[5]).toEqual(["rts"]);
+    });
+  });
+
+  describe("manual counts glow until published", () => {
+    const save = (changedAt: string, count: number, publishedAt: string | null = null) => ({
+      recordId: 3,
+      action: "UPDATE",
+      changedAt: new Date(changedAt),
+      oldValue: { manualCount: count - 1, publishedAt: null },
+      newValue: { manualCount: count, publishedAt },
+    });
+    const publish = (changedAt: string) => ({
+      recordId: 3,
+      action: "UPDATE",
+      changedAt: new Date(changedAt),
+      oldValue: { manualCount: 9, publishedAt: null },
+      newValue: { manualCount: 9, publishedAt: "2026-10-21T03:00:00.000Z" },
+    });
+
+    it("glows a saved, unpublished count however long ago it was saved", async () => {
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([save("2025-03-01T00:00:00.000Z", 9)] as never);
+      const out = await getRecentlyChangedCells("manual_counts", [3]);
+      expect(out[3]).toEqual(["manualCount"]);
+      expect(vi.mocked(changeLogRepository.findRecentUserEdits).mock.calls[0][2]).toBeUndefined();
+    });
+
+    it("stops once the count is published", async () => {
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+        publish("2026-10-21T03:00:00.000Z"),
+        save("2026-10-21T01:00:00.000Z", 9),
+      ] as never);
+      expect(await getRecentlyChangedCells("manual_counts", [3])).toEqual({});
+    });
+
+    it("glows again when a published count is saved anew, and not for what came before the publish", async () => {
+      vi.mocked(changeLogRepository.findRecentUserEdits).mockResolvedValue([
+        save("2026-10-22T09:00:00.000Z", 12), // saved again: un-published
+        publish("2026-10-21T03:00:00.000Z"),
+        save("2026-10-21T01:00:00.000Z", 9),
+      ] as never);
+      const out = await getRecentlyChangedCells("manual_counts", [3]);
+      expect(out[3]).toEqual(["manualCount"]);
+    });
   });
 });

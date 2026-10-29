@@ -90,6 +90,7 @@ import { ReorderProductsDialog } from "../components/ReorderProductsButton";
 import { useAuth } from "../context/AuthContext";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { useCategoryReveal } from "../hooks/useCategoryReveal";
+import { useRecentCells } from "../hooks/useRecentCells";
 import type { ToastVariant } from "../components/Toast";
 
 /// The two places stock is physically counted. Both are entered on this one
@@ -229,6 +230,13 @@ interface Figures {
   /// Every counted (or staged) location in view is an opening balance - the
   /// first count of the product there, which seeds the system and has no variance.
   opening: boolean;
+}
+
+/// The saved count's id in the change log. Read structurally (the API row carries
+/// it, ManualCountEntry doesn't declare it) and only meaningful for a saved row.
+function countRecordId(entry: ManualCountEntry): number | undefined {
+  const id = (entry as { id?: unknown }).id;
+  return typeof id === "number" ? id : undefined;
 }
 
 /// Published counts are final, so the sheet shows their cells blank, ready for
@@ -763,6 +771,23 @@ export function ManualCountPage() {
         };
       })
     : null;
+
+  // Counts a user saved glow gold until they are published, like the Online/
+  // Offline grids (hooks/useRecentCells.ts), so a reopened sheet shows what was
+  // entered last. Only a SAVED row has a change-log record: an unsaved Offline
+  // placeholder is a copy of the Online entry and carries its id, so it is left
+  // out. Publishing moves no row's updatedAt, hence the realtime version.
+  const recentCounts = useRecentCells(
+    "manual_counts",
+    (auditRows ?? []).flatMap((r) =>
+      COUNT_LOCATIONS.map((loc) => ({
+        recordId: r.saved[loc] ? countRecordId(r.entries[loc]) : undefined,
+        cell: `${loc}:${r.product.id}`,
+        version: (r.entries[loc] as { updatedAt?: unknown }).updatedAt,
+      })),
+    ),
+    realtimeVersion,
+  );
 
   // Live figures per row for the current filter: a staged draft overrides the
   // saved count, and its variance is recomputed (Count - System Remaining,
@@ -1653,6 +1678,12 @@ export function ManualCountPage() {
                           <td key={loc}>
                             <NumberCellInput
                               data-cell={`manual-count-${loc}-${r.product.id}`}
+                              className={
+                                drafts[loc][r.product.id] === undefined &&
+                                recentCounts.has(`${loc}:${r.product.id}:manualCount`)
+                                  ? "ae-input-cell--saved"
+                                  : ""
+                              }
                               value={String(
                                 drafts[loc][r.product.id] ??
                                   r.entries[loc].manualCount ??

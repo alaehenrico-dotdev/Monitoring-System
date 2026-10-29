@@ -20,6 +20,7 @@ if (!cmd) {
   process.exit(1);
 }
 
-console.log(`[docker-db] running against 127.0.0.1:${DB_HOST_PORT}`);
+process.stdout.write(`[docker-db] running against 127.0.0.1:${DB_HOST_PORT}
+`);
 const child = spawn(cmd, args, { stdio: "inherit", shell: true, env: { ...process.env, DATABASE_URL: url } });
 child.on("exit", (code) => process.exit(code ?? 1));

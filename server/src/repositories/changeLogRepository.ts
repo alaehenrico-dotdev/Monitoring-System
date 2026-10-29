@@ -146,11 +146,26 @@ export const changeLogRepository = {
 
   /// User-made writes to these records since `since`, newest first - the input
   /// to the "recently changed cells" glow. Served by the (tableName, recordId, id) index.
-  findRecentUserEdits(tableName: string, recordIds: number[], since: Date) {
+  findRecentUserEdits(tableName: string, recordIds: number[], since?: Date) {
     return prisma.changeLog.findMany({
-      where: { tableName, recordId: { in: recordIds }, changedAt: { gte: since }, causedById: null, action: { in: ["CREATE", "UPDATE"] } },
-      select: { recordId: true, action: true, oldValue: true, newValue: true },
+      where: {
+        tableName,
+        recordId: { in: recordIds },
+        ...(since ? { changedAt: { gte: since } } : {}),
+        causedById: null,
+        action: { in: ["CREATE", "UPDATE"] },
+      },
+      select: { recordId: true, action: true, changedAt: true, oldValue: true, newValue: true },
       orderBy: { id: "desc" },
+    });
+  },
+
+  /// The day closures of some dates (both shifts), for the grid glow: a sheet's
+  /// glow starts at its page's last finish or unlock (see getRecentlyChangedCells).
+  findDayClosures(entryDates: Date[]) {
+    return prisma.dayClosure.findMany({
+      where: { entryDate: { in: entryDates } },
+      select: { entryDate: true, shift: true, onlineLocked: true, offlineLocked: true, closedAt: true, unlockedAt: true },
     });
   },
 

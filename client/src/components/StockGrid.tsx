@@ -50,7 +50,8 @@ import {
   type PasteTargetColumn,
 } from "../utils/gridPaste";
 import { showToast } from "./Toast";
-import { getRecentCells } from "../api/changeLog";
+import { useRecentCells } from "../hooks/useRecentCells";
+import { useRealtimeVersion } from "../context/RealtimeContext";
 import { GridSelectionBar } from "./GridSelectionBar";
 import { useCategoryReveal } from "../hooks/useCategoryReveal";
 import {
@@ -232,6 +233,11 @@ interface StockGridProps {
 function recordIdOf(row: GridRow): number | undefined {
   const id = (row.entry as { id?: unknown }).id;
   return typeof id === "number" ? id : undefined;
+}
+
+/// When the saved row last changed - tells the recent-cells lookup a save happened.
+function updatedAtOf(row: GridRow): unknown {
+  return (row.entry as { updatedAt?: unknown }).updatedAt;
 }
 
 function toNum(v: unknown): number {
@@ -505,51 +511,21 @@ export function StockGrid({
       });
     }
   }, [pending, rows]);
-  // Cells the latest save of each row changed (last 24h), from the change log,
-  // so a past date still shows what was edited last. Refetched whenever the
-  // rows change (a save replaces them), keyed "pid:key" like savedCells.
-  const [recentCells, setRecentCells] = useState<ReadonlySet<string>>(
-    () => new Set(),
+  // Cells a user changed that are still news (change log): they glow until the
+  // sheet is finished, and again for edits after an unlock, so a past date or
+  // another device's edit still shows what was typed. Keyed "pid:key" like
+  // savedCells. Refreshed when a row is saved (its updatedAt moves) and on every
+  // realtime change - finishing a day moves no row but ends the glow.
+  const realtimeVersion = useRealtimeVersion();
+  const recentCells = useRecentCells(
+    historyTable,
+    rows.map((r) => ({
+      recordId: recordIdOf(r),
+      cell: String(r.product.id),
+      version: updatedAtOf(r),
+    })),
+    realtimeVersion,
   );
-  const recentIds = useMemo(
-    () =>
-      rows
-        .map((r) => recordIdOf(r))
-        .filter((id): id is number => id !== undefined)
-        .join(","),
-    [rows],
-  );
-  useEffect(() => {
-    if (!historyTable || !recentIds) {
-      setRecentCells((prev) => (prev.size ? new Set() : prev));
-      return;
-    }
-    let cancelled = false;
-    const productByRecord = new Map(
-      rows.flatMap((r) => {
-        const id = recordIdOf(r);
-        return id === undefined ? [] : [[id, r.product.id] as const];
-      }),
-    );
-    getRecentCells(historyTable, recentIds.split(",").map(Number))
-      .then((byRecord) => {
-        if (cancelled) return;
-        const next = new Set<string>();
-        for (const [rid, keys] of Object.entries(byRecord)) {
-          const pid = productByRecord.get(Number(rid));
-          if (pid !== undefined) keys.forEach((k) => next.add(`${pid}:${k}`));
-        }
-        setRecentCells(next);
-      })
-      .catch(() => {
-        // Decoration only - a failed lookup just means no glow.
-      });
-    return () => {
-      cancelled = true;
-    };
-    // `rows` is read for the id -> product map only; recentIds already changes
-    // whenever the set of records does, and a save replaces the records' values.
-  }, [historyTable, recentIds, rows]);
   // Fades a category's rows in and out when it is toggled (hooks/useCategoryReveal.ts).
   const reveal = useCategoryReveal();
   // Which header's right-click menu is open, if any (null = none). Held here

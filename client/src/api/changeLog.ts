@@ -107,8 +107,9 @@ export function getCellHistory(params: {
   return http.get<CellHistoryEntry[]>(`/change-log/cell?${qs}`);
 }
 
-/// Per record id, the fields its latest save (last 24h) changed - drives the
-/// gold "recently saved" glow when browsing past dates.
+/// Per record id, the fields user saves changed that are still news (no time
+/// limit: until the sheet is finished or the count published, and again after an
+/// unlock) - drives the gold glow, including when browsing past dates.
 export function getRecentCells(tableName: string, recordIds: number[]) {
   const qs = new URLSearchParams({ tableName, recordIds: recordIds.join(",") });
   return http.get<Record<number, string[]>>(`/change-log/recent-cells?${qs}`);

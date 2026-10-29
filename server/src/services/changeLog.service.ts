@@ -3,6 +3,7 @@ import { prisma, type Db } from "../lib/prisma";
 import { changeLogRepository, REPORTS_TABLE, SNAPSHOT_TABLE, type ChangeLogFilters } from "../repositories/changeLogRepository";
 import { toDateOnlyString } from "../utils/date";
 import { CALCULATED_FIELDS, diffChanges, summarizeChange } from "../utils/changeSummary";
+import { DELIVERY_COLUMN, DELIVERY_LEGACY_SLOTS, extraCellKey } from "../utils/stockExtras";
 
 /**
  * Section 4.8 / 5.8 - every create/edit to a stock entry, manual count, or
@@ -325,25 +326,114 @@ export async function getCellHistory(params: {
   return out;
 }
 
-/// How long a saved cell keeps its "recently changed" glow.
-const RECENT_CELL_WINDOW_MS = 24 * 60 * 60 * 1000;
+/// Where each record's glow starts: edits made AFTER this moment glow, earlier
+/// ones are history. null = nothing has finished the sheet, so every typed cell
+/// glows however long ago it was typed.
+///
+/// A stock sheet is finished per page (Online and Offline separately, see
+/// dayLock.service.ts's closePeriod):
+///  - this page is locked  -> the sheet's closedAt (anything after it came in
+///    through an approved correction, and glows);
+///  - this page is open    -> its unlockedAt (what was typed since it was reopened),
+///    or null if it was never finished.
+/// closedAt is stamped when EITHER page is finished, so it can be a little later
+/// than this page's own lock - harmless, a locked page takes no edits in between.
+/// Manual counts have no start here: a count's glow ends at its own publish, which
+/// is read from its change-log trail (getRecentlyChangedCells).
+async function glowStarts(tableName: string, recordIds: number[]): Promise<Map<number, Date | null>> {
+  const starts = new Map<number, Date | null>(recordIds.map((id) => [id, null]));
+  if (tableName !== "daily_online_stock" && tableName !== "daily_offline_stock") return starts;
+  const online = tableName === "daily_online_stock";
+
+  const records = await changeLogRepository.findStockRecordsByIds(tableName, recordIds);
+  const dates = [...new Map(records.map((r) => [toDateOnlyString(r.entryDate), r.entryDate] as const)).values()];
+  if (dates.length === 0) return starts;
+
+  const closures = await changeLogRepository.findDayClosures(dates);
+  const closureOf = new Map(closures.map((c) => [`${toDateOnlyString(c.entryDate)}|${c.shift}`, c] as const));
+  for (const r of records) {
+    const closure = closureOf.get(`${toDateOnlyString(r.entryDate)}|${r.shift}`);
+    if (!closure) continue;
+    const locked = online ? closure.onlineLocked : closure.offlineLocked;
+    starts.set(r.id, locked ? closure.closedAt : closure.unlockedAt);
+  }
+  return starts;
+}
+
+/// Delivery (Out)'s first five added columns are stored in the legacy delivery1..5
+/// columns (utils/stockExtras.ts), but a save logs the new snapshot with them as
+/// deliveryOut__x1..5 while the old snapshot only has delivery1..5. Compared as
+/// they are, every unchanged added column looks like it was just filled in and
+/// glows on every save. Reading the old snapshot's legacy columns under the same
+/// keys compares like with like, so only an amount that moved glows.
+function withLegacyDeliveryColumns(tableName: string, snapshot: unknown, after: Record<string, unknown> | null): Record<string, unknown> {
+  const row = snapshot && typeof snapshot === "object" && !Array.isArray(snapshot) ? (snapshot as Record<string, unknown>) : {};
+  if (tableName !== "daily_offline_stock" || !after) return row;
+  const out = { ...row };
+  for (let slot = 1; slot <= DELIVERY_LEGACY_SLOTS; slot++) {
+    const key = extraCellKey(DELIVERY_COLUMN, slot);
+    // Only for a column the new snapshot actually carries - otherwise there is
+    // nothing to compare it with.
+    if (key in after && out[key] === undefined && out[`delivery${slot}`] !== undefined) out[key] = out[`delivery${slot}`];
+  }
+  return out;
+}
+
+/// Calculated columns never glow - except deliveryOut. CALCULATED_FIELDS lists it
+/// because it is stored as the sum of delivery1..delivery5, but the Offline grid
+/// edits Delivery (Out) directly (config/stockColumns.ts), and a flat save only
+/// moves delivery1 in the log, so the typed cell's own key is deliveryOut. Left
+/// out, an edited Delivery (Out) cell lost its glow on reload.
+const NEVER_GLOW = new Set([...CALCULATED_FIELDS].filter((key) => key !== "deliveryOut"));
 
 /**
- * For each record, the fields changed by its most recent user save (within the
- * last 24 hours) - so switching to a past date still shows what was edited
- * last. Follow-on writes (carried-forward openings, causedById) don't count,
- * and calculated columns are left out: only what someone typed glows.
+ * For each record, the fields changed by user saves that are still "news": there
+ * is no time limit - a cell glows until its sheet is finished (a stock sheet) or
+ * its count is published (a manual count), and glows again for whatever is edited
+ * after an unlock or an approved correction. All of those edits count, not just
+ * the newest save: a later save of another cell, or one that only moved
+ * calculated columns, must not erase an earlier cell's glow. Follow-on writes
+ * (carried-forward openings, causedById) don't count, and calculated columns are
+ * left out: only what someone typed glows.
  */
-export async function getRecentlyChangedCells(tableName: string, recordIds: number[], now = new Date()): Promise<Record<number, string[]>> {
-  const entries = await changeLogRepository.findRecentUserEdits(tableName, recordIds, new Date(now.getTime() - RECENT_CELL_WINDOW_MS));
-  const out: Record<number, string[]> = {};
+export async function getRecentlyChangedCells(tableName: string, recordIds: number[]): Promise<Record<number, string[]>> {
+  const starts = await glowStarts(tableName, recordIds);
+  // The oldest start bounds the read; one record with no start means no bound.
+  const bounds = [...starts.values()];
+  const since = bounds.some((s) => s === null) ? undefined : new Date(Math.min(...bounds.map((s) => s!.getTime())));
+  const entries = await changeLogRepository.findRecentUserEdits(tableName, recordIds, since);
+
+  const byRecord = new Map<number, Set<string>>();
+  const finished = new Set<number>(); // records whose newest-first walk has reached its start
   for (const e of entries) {
-    if (e.recordId in out) continue; // newest first: only the latest save per record
-    const keys = diffChanges(e.action === "CREATE" ? {} : e.oldValue, e.newValue)
+    if (finished.has(e.recordId)) continue;
+    const start = starts.get(e.recordId) ?? null;
+    if (start && e.changedAt.getTime() <= start.getTime()) {
+      finished.add(e.recordId);
+      continue;
+    }
+    const after = e.newValue as Record<string, unknown> | null;
+    // A publish approves a count, so what was saved before it is history. Newest
+    // first, reaching a published snapshot ends the walk; a count saved again
+    // afterwards (which un-publishes it) starts a new stretch of news.
+    if (tableName === "manual_counts" && after?.publishedAt) {
+      finished.add(e.recordId);
+      continue;
+    }
+    const before = withLegacyDeliveryColumns(tableName, e.action === "CREATE" ? {} : e.oldValue, after);
+    const keys = diffChanges(before, after)
       .map((c) => c.key)
-      .filter((key) => !CALCULATED_FIELDS.has(key))
-      .filter((key) => e.action !== "CREATE" || numberOrNull((e.newValue as Record<string, unknown> | null)?.[key]) !== 0);
-    out[e.recordId] = keys;
+      .filter((key) => !NEVER_GLOW.has(key))
+      // A figure that did not exist before and is 0 now was not typed: a CREATE
+      // writes every column as 0, and saving a new added column writes a 0 for
+      // every product in it. Only a real amount counts.
+      .filter((key) => !((before[key] === undefined || before[key] === null) && numberOrNull(after?.[key]) === 0));
+    if (keys.length === 0) continue;
+    const set = byRecord.get(e.recordId) ?? new Set<string>();
+    keys.forEach((k) => set.add(k));
+    byRecord.set(e.recordId, set);
   }
+  const out: Record<number, string[]> = {};
+  for (const [id, set] of byRecord) out[id] = [...set];
   return out;
 }
