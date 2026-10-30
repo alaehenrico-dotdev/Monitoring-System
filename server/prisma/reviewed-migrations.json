@@ -6,5 +6,6 @@
   "20261009150000_add_manual_count_publish": "Backfills publishedAt from updatedAt so existing counts stay published. Shipped before this guard existed; statements read, not re-tested.",
   "20261015090000_per_page_day_lock": "Copies isClosed into the new onlineLocked/offlineLocked columns so closed days stay closed. Shipped before this guard existed; statements read, not re-tested.",
   "20261016140000_uppercase_product_names": "Rewrites every products.name to UPPER(TRIM(name)). Lossy: original casing is not recoverable except from a backup. Shipped before this guard existed; statements read, not re-tested.",
-  "20261024090000_flip_variance_sign": "Negates every non-zero manual_counts.variance (variance is now manual - system). Applying it twice would flip the signs back; Prisma applies it once per database. Shipped in v2.4.1; statements read, not re-tested on real data."
+  "20261024090000_flip_variance_sign": "Negates every non-zero manual_counts.variance (variance is now manual - system). Applying it twice would flip the signs back; Prisma applies it once per database. Shipped in v2.4.1; statements read, not re-tested on real data.",
+  "20261030120000_force_password_change": "Sets users.mustChangePassword = true for every existing account, so each person chooses their own password at next sign-in (and the new 10-character rules apply). Reversible by setting the column back to false; no passwords are changed."
 }

@@ -3,12 +3,13 @@ import { z } from "zod";
 import { Role } from "@prisma/client";
 import { createUser, listUsers, resetUserPassword, setUserActive } from "../services/users.service";
 import { HttpError } from "../utils/HttpError";
+import { PASSWORD_MAX, PASSWORD_MIN } from "../utils/password";
 
 const createSchema = z.object({
   name: z.string().min(1),
   username: z.string().min(3),
-  // Same floor as a password reset (below); max 72 because bcrypt ignores the rest.
-  password: z.string().min(8, "Password must be at least 8 characters").max(72),
+  // Length is checked here; the weak-password and "contains the username" rules in the service.
+  password: z.string().min(PASSWORD_MIN, `Password must be at least ${PASSWORD_MIN} characters.`).max(PASSWORD_MAX),
   role: z.nativeEnum(Role),
 });
 
@@ -22,10 +23,10 @@ export async function postUser(req: Request, res: Response) {
   res.status(201).json(await createUser(parsed.data, req.user?.id));
 }
 
-// bcrypt only uses the first 72 bytes, so cap the length rather than let a
-// longer password be silently truncated.
+// Capped at PASSWORD_MAX (see utils/password.ts) rather than letting a longer password
+// be silently truncated by an older bcrypt hash of the same account.
 const passwordSchema = z.object({
-  password: z.string().min(8, "Password must be at least 8 characters").max(72),
+  password: z.string().min(PASSWORD_MIN, `Password must be at least ${PASSWORD_MIN} characters.`).max(PASSWORD_MAX),
 });
 
 export async function patchUserPassword(req: Request, res: Response) {

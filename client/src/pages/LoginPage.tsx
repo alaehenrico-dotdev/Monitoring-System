@@ -2,17 +2,24 @@ import { useState, type FormEvent } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../api/http";
-import { LogoMark } from "../components/LogoMark";
-import { TopBar } from "../components/TopBar";
+import { AuthCard, AuthShell } from "../components/AuthShell";
 import { LoadingOverlay } from "../components/Spinner";
 import { Button, Field, TextInput } from "../components/ui";
-import { colors, fonts } from "../theme";
+import { colors } from "../theme";
+import { forgetDevice, isDeviceRemembered, rememberedUsername } from "../utils/rememberDevice";
+
+const small = { fontSize: "calc(13px * var(--ae-fs, 1))", margin: 0 } as const;
 
 export function LoginPage() {
-  const { user, login, sessionError } = useAuth();
+  const { user, login, completeMfa, sessionError } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(rememberedUsername);
+  // Ticked by default on a device that was remembered before; unticked on a new one.
+  const [remember, setRemember] = useState(isDeviceRemembered);
   const [password, setPassword] = useState("");
+  // Set once the password was right but the account also needs a code from its authenticator.
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -23,127 +30,127 @@ export function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(username, password);
+      if (mfaToken) {
+        await completeMfa(mfaToken, code);
+        navigate("/");
+        return;
+      }
+      const next = await login(username, password, remember);
+      if (next) {
+        setMfaToken(next.mfaToken);
+        setPassword("");
+        return;
+      }
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Login failed");
+      // The half-way sign-in only lasts a few minutes; once it has run out, start over.
+      if (mfaToken && err instanceof ApiError && /expired/i.test(err.message)) {
+        setMfaToken(null);
+        setCode("");
+      }
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <>
-      {/* Login has no page toolbar of its own to carry the clock/toggle
-          (see HeaderExtras, used everywhere past this screen), so it keeps
-          the old fixed top-right chrome. */}
-      <TopBar />
+    <AuthShell>
       {submitting && <LoadingOverlay label="Signing in…" />}
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "var(--ae-vh)",
-          padding: "24px 16px",
-          boxSizing: "border-box",
-          fontFamily: fonts.body,
-          background: colors.charcoal,
-          backgroundImage: `radial-gradient(circle at 50% -10%, ${colors.charcoalSoft}, ${colors.charcoal} 70%)`,
-        }}
-      >
-        <LogoMark size={104} />
-        <h1
-          style={{
-            fontFamily: fonts.wordmark,
-            fontSize: "calc(26px * var(--ae-fs, 1))",
-            fontWeight: 800,
-            color: colors.yellow,
-            margin: "12px 0 2px",
-          }}
-        >
-          Ala Eh!
-        </h1>
-        <p
-          style={{
-            fontSize: "calc(12.5px * var(--ae-fs, 1))",
-            color: colors.cream,
-            opacity: 0.8,
-            margin: "0 0 24px",
-            letterSpacing: 0.4,
-          }}
-        >
-          Online &amp; Offline Stocks Monitoring System
-        </p>
+      <AuthCard onSubmit={handleSubmit}>
+        {mfaToken ? (
+          <>
+            <p style={{ ...small, margin: "0 0 12px", color: colors.subtleInk, lineHeight: 1.5 }}>
+              Enter the 6-digit code from your authenticator app, or one of your recovery codes.
+            </p>
+            <Field label="Verification code" style={{ marginBottom: 16 }}>
+              <TextInput
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                style={{ width: "100%" }}
+                autoComplete="one-time-code"
+                autoFocus
+              />
+            </Field>
+          </>
+        ) : (
+          <>
+            <Field label="Username" style={{ marginBottom: 12 }}>
+              <TextInput
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                style={{ width: "100%" }}
+                autoComplete="username"
+                autoFocus={!username}
+              />
+            </Field>
 
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            width: "100%",
-            maxWidth: 320,
-            boxSizing: "border-box",
-            background: colors.paper,
-            // Same 8px radius as .ae-page-header/Modal/every other card - one
-            // family of rounded brand chrome across the app.
-            borderRadius: 6,
-            padding: 24,
-            // Positioning context for the 1px animated border sweep below
-            // (replaces the old static gold border).
-            position: "relative",
-            boxShadow: "0 12px 32px rgba(0,0,0,0.35)",
-          }}
-        >
-          <div
-            aria-hidden
-            className="ae-modal-border-sweep"
-            style={{ padding: 0.5 }}
-          />
-          <Field label="Username" style={{ marginBottom: 12 }}>
-            <TextInput
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={{ width: "100%" }}
-              autoFocus
-            />
-          </Field>
+            <Field label="Password" style={{ marginBottom: 12 }}>
+              <TextInput
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{ width: "100%" }}
+                autoComplete="current-password"
+                autoFocus={!!username}
+              />
+            </Field>
 
-          <Field label="Password" style={{ marginBottom: 16 }}>
-            <TextInput
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ width: "100%" }}
-            />
-          </Field>
+            <label className="ae-check" style={{ marginBottom: 16 }}>
+              <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              <span>
+                Remember this device
+                <span className="ae-check-hint">Stays signed in here and remembers your username. Only on a device that is yours.</span>
+              </span>
+            </label>
+          </>
+        )}
 
-          {/* A submit error takes precedence once the user has actually tried
+        {/* A submit error takes precedence once the user has actually tried
             signing in; sessionError (the initial session check failing for a
             reason other than "not logged in") is what explains why they
             landed here in the first place, if that's what happened. */}
-          {(error ?? sessionError) && (
-            <p
-              style={{
-                color: colors.danger,
-                fontSize: "calc(13px * var(--ae-fs, 1))",
-                marginTop: -8,
-                marginBottom: 12,
+        {(error ?? sessionError) && (
+          <p role="alert" style={{ ...small, color: colors.danger, marginBottom: 12 }}>
+            {error ?? sessionError}
+          </p>
+        )}
+
+        <Button type="submit" disabled={submitting} style={{ width: "100%", padding: 10 }}>
+          {submitting ? "Signing in…" : mfaToken ? "Verify" : "Sign in"}
+        </Button>
+
+        {!mfaToken && isDeviceRemembered() && (
+          <div style={{ textAlign: "center", marginTop: 8 }}>
+            <button
+              type="button"
+              className="ae-link-btn"
+              onClick={() => {
+                forgetDevice();
+                setUsername("");
+                setRemember(false);
               }}
             >
-              {error ?? sessionError}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            disabled={submitting}
-            style={{ width: "100%", padding: 10 }}
-          >
-            {submitting ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
-
-      </div>
-    </>
+              Forget this device
+            </button>
+          </div>
+        )}
+        {mfaToken && (
+          <div style={{ textAlign: "center", marginTop: 8 }}>
+            <button
+              type="button"
+              className="ae-link-btn"
+              onClick={() => {
+                setMfaToken(null);
+                setCode("");
+                setError(null);
+              }}
+            >
+              Use a different account
+            </button>
+          </div>
+        )}
+      </AuthCard>
+    </AuthShell>
   );
 }

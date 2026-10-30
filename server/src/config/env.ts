@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { parseBackupKey } from "../utils/backupCrypto";
 
 function required(name: string, fallback?: string): string {
   const value = process.env[name] ?? fallback;
@@ -141,6 +142,12 @@ function nonNegativeInt(name: string, fallback: number): number {
   return value;
 }
 
+function rememberDays(name: string, fallback: number): number {
+  const value = nonNegativeInt(name, fallback);
+  if (value > 90) throw new Error(`${name} must be at most 90 days - a stolen long-lived token is the risk this trades against.`);
+  return value;
+}
+
 function limitWindowMs(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) return fallback;
@@ -217,6 +224,11 @@ export const env = {
   // Folder the backup scripts write to (scripts/backup.*). When set, the
   // Backups page lists the files found there and can verify them in place.
   backupDir: process.env.BACKUP_DIR?.trim() || "",
+  // Optional. When set, every backup this server writes (browser download, Google
+  // Drive copies) is AES-256-GCM encrypted, and restore/verify accept encrypted
+  // files. Unset keeps backups as plain .sql / .sql.gz. A malformed value stops
+  // the server at boot rather than silently writing unencrypted backups.
+  backupEncryptionKey: process.env.BACKUP_ENCRYPTION_KEY?.trim() ? parseBackupKey(process.env.BACKUP_ENCRYPTION_KEY) : null,
   // Google Drive (Settings > Google Drive; see docs/GOOGLE_DRIVE.md). All optional:
   // with no client id and secret the page says the feature is not set up and
   // nothing else changes. The redirect URI must be registered with Google
@@ -238,6 +250,10 @@ export const env = {
   // instead of failing open. See .env.example for what to set locally.
   jwtSecret: requiredSecret("JWT_SECRET"),
   jwtExpiresIn: duration("JWT_EXPIRES_IN", "8h", 30 * 24 * 60 * 60),
+  // "Remember this device" on the login page: how many days that sign-in lasts instead of
+  // JWT_EXPIRES_IN. 0 turns the option off (the checkbox is then ignored). Such a session
+  // is still cut off at once by a password change, "sign out everywhere", or deactivation.
+  rememberDeviceDays: rememberDays("REMEMBER_DEVICE_DAYS", 30),
   clientOrigin: clientOrigin(),
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
   // Full path to the mysqldump binary, for hosts (notably Windows) where the

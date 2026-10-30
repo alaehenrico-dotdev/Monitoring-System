@@ -50,6 +50,16 @@ model User {
   // signs out sessions that were opened with the old password - a JWT alone
   // cannot be revoked, and isActive only covers deactivation, not a reset.
   tokenVersion Int      @default(0)
+  // Set when an admin creates the account or resets its password (and for seeded
+  // accounts): the person must choose their own password before using the app.
+  mustChangePassword Boolean @default(false)
+  // Two-step verification (TOTP). The secret is stored AES-GCM sealed (utils/totp.ts);
+  // it only counts once totpEnabledAt is set. totpLastStep blocks replaying a code,
+  // recoveryCodes holds SHA-256 hashes of the unused one-time codes.
+  totpSecret    String?   @db.VarChar(255)
+  totpEnabledAt DateTime?
+  totpLastStep  Int?
+  recoveryCodes Json?
   createdAt    DateTime @default(now())
 
   onlineEntries        DailyOnlineStock[]    @relation("OnlineEncodedBy")

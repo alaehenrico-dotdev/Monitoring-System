@@ -11,6 +11,7 @@ import { createGzip } from "zlib";
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
 import { isMysqldumpHeader } from "../utils/dumpHeader";
+import { createBackupDecryptor, createBackupEncryptor } from "../utils/backupCrypto";
 const RESTORE_MAX_BYTES = 512 * 1024 * 1024;
 const RESTORE_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -60,6 +61,17 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<B
     let sizeBytes = 0;
     let tail = "";
     const dump = spawn(env.mysqldumpPath, mysqldumpArgs({ host, port, user, database }), { env: { ...process.env, MYSQL_PWD: password } });
+    // With a backup key the browser receives the encrypted container, never the plain dump.
+    const sink: NodeJS.WritableStream = env.backupEncryptionKey ? createBackupEncryptor(env.backupEncryptionKey) : res;
+    if (sink !== res) {
+      (sink as NodeJS.ReadWriteStream).pipe(res);
+      // An encryption failure must end the download (a truncated file the browser keeps would
+      // look like a finished backup), not just stop the dump.
+      sink.on("error", () => {
+        dump.kill();
+        res.destroy();
+      });
+    }
 
     let stderr = "";
     dump.stderr.on("data", (chunk) => {
@@ -84,14 +96,14 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<B
       tail = (tail + chunk.toString("latin1")).slice(-4096);
       if (!started) {
         started = true;
-        res.setHeader("Content-Type", "application/sql");
+        res.setHeader("Content-Type", sink === res ? "application/sql" : "application/octet-stream");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       }
       // Respect the client's pace so a slow download doesn't buffer the whole
       // dump in server memory.
-      if (!res.write(chunk)) {
+      if (!sink.write(chunk)) {
         dump.stdout.pause();
-        res.once("drain", () => dump.stdout.resume());
+        sink.once("drain", () => dump.stdout.resume());
       }
     });
 
@@ -106,7 +118,7 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<B
         // into the response, which ended it as soon as mysqldump's output
         // finished - before its exit code was known - so a dump that died
         // partway looked like a complete (but truncated, unrestorable) file.
-        res.end();
+        sink.end();
         resolve({ sizeBytes, sha256: hash.digest("hex"), complete: tail.includes("-- Dump completed") });
       } else {
         reject(new HttpError(500, `mysqldump exited with code ${code}${stderr.trim() ? `: ${stderr.trim()}` : ""}`));
@@ -123,8 +135,13 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<B
 /// DROP/CREATE TABLE statements replace the existing tables, and DDL isn't
 /// transactional, so a failure partway can leave a partly restored database:
 /// the client takes a safety backup first for that reason.
-export function restoreDatabaseFromStream(req: Request): Promise<void> {
+export function restoreDatabaseFromStream(upload: Request): Promise<void> {
   const { host, port, user, password, database } = parseDatabaseUrl(env.databaseUrl);
+
+  // An encrypted backup is decrypted on the way in (wrong key or tampering fails
+  // before MySQL has been sent a byte of it); a plain one passes straight through.
+  const req = upload.pipe(createBackupDecryptor(env.backupEncryptionKey, { lenient: true }));
+  upload.on("error", (e) => req.destroy(e));
 
   return new Promise((resolve, reject) => {
     const mysql = spawn(env.mysqlPath, ["--host", host, "--port", port, "--user", user, database], {
@@ -145,6 +162,11 @@ export function restoreDatabaseFromStream(req: Request): Promise<void> {
     };
     const timeout = setTimeout(() => fail(new HttpError(408, "Restore timed out and was stopped.")), RESTORE_TIMEOUT_MS);
 
+    // `req` is now the decrypting stream, which never reports the browser hanging up: watch
+    // the upload itself, so an interrupted file stops the restore instead of leaving it waiting.
+    upload.once("close", () => {
+      if (!upload.complete) fail(new HttpError(400, "The upload was interrupted - the restore was stopped."));
+    });
     mysql.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     mysql.on("error", (err) => {
       fail((err as NodeJS.ErrnoException).code === "ENOENT"
@@ -245,7 +267,8 @@ export interface DumpFileSummary {
 }
 
 /// The same dump as `streamDatabaseBackup`, written gzipped to `filePath`
-/// instead of an HTTP response - for the scheduled and "back up now" copies
+/// instead of an HTTP response (encrypted when BACKUP_ENCRYPTION_KEY is set; the
+/// size and checksum are of the gzip, before encryption) - for the scheduled and "back up now" copies
 /// that go to Google Drive. Nothing is buffered whole: dump output flows
 /// through gzip to the file. A dump that fails leaves no file behind.
 export async function dumpDatabaseToGzipFile(filePath: string): Promise<DumpFileSummary> {
@@ -293,7 +316,7 @@ export async function dumpDatabaseToGzipFile(filePath: string): Promise<DumpFile
     // one to report, so it wins over the stream error it causes.
     const [exit, written] = await Promise.allSettled([
       exited,
-      pipeline(dump.stdout, watchDump, createGzip(), measureOutput, createWriteStream(filePath)),
+      pipeline(dump.stdout, watchDump, createGzip(), measureOutput, ...(env.backupEncryptionKey ? [createBackupEncryptor(env.backupEncryptionKey)] : []), createWriteStream(filePath)),
     ]);
     if (exit.status === "rejected") throw exit.reason;
     if (written.status === "rejected") throw written.reason;

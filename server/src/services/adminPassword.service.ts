@@ -1,4 +1,4 @@
-import bcrypt from "bcryptjs";
+import { verifyPassword } from "../utils/password";
 import { userRepository } from "../repositories/userRepository";
 import { HttpError } from "../utils/HttpError";
 
@@ -19,7 +19,7 @@ export async function assertAdminPassword(userId: number, password: string | und
     throw new HttpError(429, "Too many incorrect passwords - try again in a few minutes");
   }
   const user = await userRepository.findById(userId);
-  const ok = !!password && !!user && (await bcrypt.compare(password, user.passwordHash));
+  const ok = !!password && !!user && (await verifyPassword(password, user.passwordHash));
   if (!ok) {
     failures.set(userId, { count: (current?.count ?? 0) + 1, firstAt: current?.firstAt ?? now });
     throw HttpError.forbidden("Incorrect password");

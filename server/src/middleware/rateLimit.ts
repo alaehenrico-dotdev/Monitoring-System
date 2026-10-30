@@ -85,6 +85,17 @@ export const loginIpLimiter = rateLimit({
   keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ""),
 });
 
+/// Second step of a two-step login. A code is only six digits, so this is tighter than
+/// the password limiter; the per-account counter in services/mfa.service.ts backs it up.
+export const mfaLimiter = rateLimit({
+  windowMs: env.rateLimit.loginWindowMs,
+  limit: env.rateLimit.loginLimit,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many verification attempts - please wait a few minutes and try again." },
+  keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ""),
+});
+
 export const passcodeLimiter = rateLimit({
   windowMs: env.rateLimit.passcodeWindowMs,
   limit: env.rateLimit.passcodeLimit,

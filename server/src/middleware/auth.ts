@@ -14,6 +14,8 @@ import { userRepository } from "../repositories/userRepository";
 // relative to the token's lifetime while keeping the added DB load low.
 const USER_STATUS_TTL_MS = 30_000;
 
+const PASSWORD_CHANGE_PATHS = new Set(["/api/auth/me", "/api/auth/change-password"]);
+
 /// Verifies the Bearer token, re-checks the user's current isActive/role
 /// against the DB (see USER_STATUS_TTL_MS above), and attaches the result
 /// to req.user.
@@ -40,6 +42,13 @@ async function authenticateHandler(req: Request, _res: Response, next: NextFunct
   // before that is no longer valid even though it has not expired.
   if ((decoded.tv ?? 0) !== status.tokenVersion) {
     throw HttpError.unauthorized("Your session has ended - please sign in again");
+  }
+
+  // A seeded account, or one an admin created or reset, still has a password somebody
+  // else knows. Until the person replaces it, the only things they can do are look
+  // themselves up and change it - so this is enforced here, not just by the screen.
+  if (status.mustChangePassword && !PASSWORD_CHANGE_PATHS.has(req.originalUrl.split("?")[0].replace(/\/+$/, ""))) {
+    throw HttpError.forbidden("You must change your password before continuing.");
   }
 
   req.user = { ...decoded, role: status.role };

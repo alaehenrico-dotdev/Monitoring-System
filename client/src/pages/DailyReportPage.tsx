@@ -675,6 +675,8 @@ export function DailyReportPage() {
         onDismiss={() => setDriveSaving(null)}
         variant="info"
         duration={null}
+        // The spinner in the message is the indicator; the "i" badge would be a second icon.
+        hideIcon
       />
 
       {report?.snapshot && (

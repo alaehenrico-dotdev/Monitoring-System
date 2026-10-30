@@ -89,7 +89,7 @@ chmod 700 "$BACKUP_DIR" "$TARGET_DIR" 2>/dev/null || true
 # --- disk space safety check -------------------------------------------------
 FREE_MB="$(df -Pm "$TARGET_DIR" | awk 'NR==2 {print $4}')"
 NEED_MB="$MIN_FREE_MB"
-LAST_DUMP="$(ls -1t "$TARGET_DIR"/*.sql.gz 2>/dev/null | head -n 1 || true)"
+LAST_DUMP="$(ls -1t "$TARGET_DIR"/*.sql.gz{,.enc} 2>/dev/null | head -n 1 || true)"
 if [[ -n "$LAST_DUMP" ]]; then
   LAST_MB=$(( ( $(stat -c %s "$LAST_DUMP") * 3 + 1048575 ) / 1048576 ))
   (( LAST_MB > NEED_MB )) && NEED_MB="$LAST_MB"
@@ -102,7 +102,18 @@ fi
 STAMP="$(date '+%Y-%m-%d_%H%M%S')"
 NAME="db_backup_$STAMP"
 if [[ -n "$LABEL" ]]; then NAME+="_$(printf '%s' "$LABEL" | tr -cd 'A-Za-z0-9_-')"; fi
-FINAL="$TARGET_DIR/$NAME.sql.gz"
+# Encryption is on whenever BACKUP_ENCRYPTION_KEY is set (environment or
+# server/.env) - the same switch the API uses, so a cron backup and a Drive
+# backup are the same kind of file. The plain dump never touches the disk:
+# mysqldump | gzip | encrypt. Needs the built server (server/dist/cli).
+CRYPT="node $REPO_ROOT/server/dist/cli/backupCrypt.js"
+ENCRYPT=0
+if [[ -n "${BACKUP_ENCRYPTION_KEY:-}" ]] || grep -qE '^[[:space:]]*BACKUP_ENCRYPTION_KEY[[:space:]]*=[[:space:]]*["'"'"']?[^"'"'"'[:space:]#]' "$REPO_ROOT/server/.env" 2>/dev/null; then
+  ENCRYPT=1
+  [[ -f "$REPO_ROOT/server/dist/cli/backupCrypt.js" ]] || { log "BACKUP_ENCRYPTION_KEY is set but server/dist is not built (npm run build). Nothing was written." ERROR; exit 1; }
+fi
+EXT="sql.gz"; (( ENCRYPT )) && EXT="sql.gz.enc"
+FINAL="$TARGET_DIR/$NAME.$EXT"
 PARTIAL="$FINAL.partial"
 
 # Any failure or interrupt from here on must not leave a half-written file
@@ -119,18 +130,20 @@ export MYSQL_PWD="$DB_PASS"
   --host "$DB_HOST" --port "$DB_PORT" --user "$DB_USER" \
   --single-transaction --routines --triggers \
   --no-tablespaces \
-  "$DB_NAME" | gzip -c > "$PARTIAL"
+  "$DB_NAME" | gzip -c | { if (( ENCRYPT )); then (cd "$REPO_ROOT/server" && $CRYPT encrypt); else cat; fi; } > "$PARTIAL"
+# Reads the dump back out of the file as written (decrypting if need be).
+read_dump() { if (( ENCRYPT )); then (cd "$REPO_ROOT/server" && $CRYPT decrypt) < "$PARTIAL" | gzip -dc; else gzip -dc "$PARTIAL"; fi; }
 
 # --- verify before publishing ------------------------------------------------
 # A dump is only trusted if it starts with the MySQL/MariaDB header AND ends
 # with the "Dump completed" trailer mysqldump writes last - which is what
 # tells a truncated dump (disk full, killed mid-stream, lost connection) from
 # a complete one. Same two checks as Test-DumpFile in backup-common.ps1.
-if ! gzip -dc "$PARTIAL" 2>/dev/null | head -n 1 | grep -qE '^-- (MySQL|MariaDB) dump'; then
+if ! read_dump 2>/dev/null | head -n 1 | grep -qE '^-- (MySQL|MariaDB) dump'; then
   log "Verification failed - no dump header. Discarded." ERROR
   exit 1
 fi
-if ! gzip -dc "$PARTIAL" 2>/dev/null | tail -n 5 | grep -q '^-- Dump completed'; then
+if ! read_dump 2>/dev/null | tail -n 5 | grep -q '^-- Dump completed'; then
   log "Verification failed - the dump is incomplete or unreadable. Discarded." ERROR
   exit 1
 fi
@@ -147,7 +160,7 @@ if [[ "$MODE" == "daily" ]]; then
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
     rm -f "$f" && log "Purged old backup: $(basename "$f")"
-  done < <(ls -1t "$TARGET_DIR"/db_backup_*.sql.gz 2>/dev/null | tail -n +2 \
+  done < <(ls -1t "$TARGET_DIR"/db_backup_*.sql.gz{,.enc} 2>/dev/null | tail -n +2 \
             | while IFS= read -r f; do
                 if [[ $(( ( $(date +%s) - $(stat -c %Y "$f") ) / 86400 )) -ge $RETENTION_DAYS ]]; then echo "$f"; fi
               done)
@@ -155,7 +168,7 @@ else
   while IFS= read -r f; do
     [[ -z "$f" ]] && continue
     rm -f "$f" && log "Purged old snapshot: $(basename "$f")"
-  done < <(ls -1t "$TARGET_DIR"/db_backup_*.sql.gz 2>/dev/null | tail -n +$(( KEEP_SNAPSHOTS + 1 )))
+  done < <(ls -1t "$TARGET_DIR"/db_backup_*.sql.gz{,.enc} 2>/dev/null | tail -n +$(( KEEP_SNAPSHOTS + 1 )))
 fi
 
 # Leftovers from a run that was killed mid-dump before the trap could fire.

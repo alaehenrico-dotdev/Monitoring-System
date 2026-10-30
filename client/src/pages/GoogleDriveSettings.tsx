@@ -504,6 +504,8 @@ export function GoogleDriveSettings() {
         onDismiss={() => setBackupToastClosed(true)}
         variant="info"
         duration={null}
+        // The spinner in the message is the indicator; the "i" badge would be a second icon.
+        hideIcon
       />
       <Toast message={notice} onDismiss={() => setNotice(null)} variant="success" />
       <Toast message={error} onDismiss={() => setError(null)} variant="error" duration={null} />

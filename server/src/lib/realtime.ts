@@ -1,7 +1,8 @@
-import { invalidatePrefix } from "./cache";
+import { getOrSet, invalidatePrefix } from "./cache";
 import type { Server as HttpServer } from "http";
 import { WebSocket, WebSocketServer } from "ws";
 import { verifyToken } from "../utils/jwt";
+import { userRepository } from "../repositories/userRepository";
 
 /**
  * Single shared realtime broadcast channel (same "one shared instance" shape
@@ -23,6 +24,38 @@ const HEARTBEAT_INTERVAL_MS = 30000;
 const authenticatedClients = new Set<WebSocket>();
 /// Who each authenticated socket belongs to, so a notice can go to admins only.
 const roleOf = new WeakMap<WebSocket, string>();
+/// The account and token version a socket signed in with, re-checked on every heartbeat.
+const identityOf = new WeakMap<WebSocket, { id: number; tv: number }>();
+
+/// A token's signature only proves it was issued once. Whether it may still be used is
+/// decided here, the same way middleware/auth.ts decides it for HTTP requests (and from the
+/// same 30-second cache, which deactivation, resets and "sign out everywhere" invalidate):
+/// the account must be active, still on the token version the socket signed in with, and
+/// not waiting on a forced password change. The role is the account's CURRENT one.
+async function liveRole(id: number, tv: number): Promise<string | null> {
+  const status = await getOrSet(`user-status:${id}`, 30_000, () => userRepository.findStatus(id));
+  if (!status || !status.isActive || status.tokenVersion !== tv || status.mustChangePassword) return null;
+  return status.role;
+}
+
+/// Drops every socket whose account was signed out, deactivated or reset since it connected
+/// (and refreshes the role of the rest). Runs on every heartbeat; one lookup per distinct
+/// account, from the shared 30-second status cache.
+export async function revalidateClients(): Promise<void> {
+  await Promise.all(
+    [...authenticatedClients].map(async (ws) => {
+      const who = identityOf.get(ws);
+      if (!who) return;
+      try {
+        const role = await liveRole(who.id, who.tv);
+        if (role) roleOf.set(ws, role);
+        else ws.close(4001, "Session ended");
+      } catch {
+        // A database blip must not disconnect everyone: keep the socket, check again next beat.
+      }
+    }),
+  );
+}
 
 export function attachRealtime(server: HttpServer): void {
   const wss = // maxPayload: the only thing a client ever sends is a tiny auth message,
@@ -51,17 +84,25 @@ export function attachRealtime(server: HttpServer): void {
 
     ws.once("message", (raw) => {
       clearTimeout(authTimer);
-      try {
-        const msg = JSON.parse(raw.toString());
-        if (msg?.type !== "auth" || typeof msg.token !== "string") {
-          throw new Error("Expected an auth message");
+      void (async () => {
+        try {
+          const msg = JSON.parse(raw.toString());
+          if (msg?.type !== "auth" || typeof msg.token !== "string") {
+            throw new Error("Expected an auth message");
+          }
+          const user = verifyToken(msg.token);
+          const tv = user.tv ?? 0;
+          const role = await liveRole(user.id, tv);
+          if (!role) throw new Error("Account is no longer allowed to connect");
+          // The socket may have closed while the account was being looked up.
+          if (ws.readyState !== WebSocket.OPEN) return;
+          roleOf.set(ws, role);
+          identityOf.set(ws, { id: user.id, tv });
+          authenticatedClients.add(ws);
+        } catch {
+          ws.close(4001, "Unauthorized");
         }
-        const user = verifyToken(msg.token);
-        roleOf.set(ws, user.role);
-        authenticatedClients.add(ws);
-      } catch {
-        ws.close(4001, "Unauthorized");
-      }
+      })();
     });
 
     ws.on("close", () => {
@@ -74,7 +115,9 @@ export function attachRealtime(server: HttpServer): void {
   // proxies in front of this server commonly drop idle connections without
   // ever sending a close frame, so a missed pong is the only signal.
   const heartbeat = setInterval(() => {
+    void revalidateClients();
     for (const ws of authenticatedClients) {
+
       if ((ws as WebSocket & { isAlive?: boolean }).isAlive === false) {
         ws.terminate();
         continue;

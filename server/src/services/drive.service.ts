@@ -354,7 +354,7 @@ function formatSize(bytes: number): string {
 
 function backupFileName(now = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `ala-eh-backup-${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}.sql.gz`;
+  return `ala-eh-backup-${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}.sql.gz${env.backupEncryptionKey ? ".enc" : ""}`;
 }
 
 let backupInFlight: Promise<unknown> | null = null;
@@ -385,7 +385,7 @@ async function doBackup(trigger: "manual" | "scheduled", userId?: number) {
     const id = await uploadFile(await accessTokenFor(conn), {
       name: fileName,
       parentId: conn.backupFolderId,
-      mimeType: "application/gzip",
+      mimeType: env.backupEncryptionKey ? "application/octet-stream" : "application/gzip",
       size,
       body: (body = createReadStream(tmp)),
     });

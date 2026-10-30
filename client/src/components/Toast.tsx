@@ -30,6 +30,10 @@ interface ToastProps {
   /// auto-dismiss timer when the message changes. Defaults to the message
   /// itself when it's a string; pass one when `message` is JSX.
   id?: string;
+  /// Leaves out the variant badge (the "i", check, cross or "!" tile), for a toast whose
+  /// message already carries its own animated indicator - e.g. a "Backing up…" progress
+  /// message that shows the spinner itself, where the badge would only be a second icon.
+  hideIcon?: boolean;
   /// No longer used: every toast now shares one bottom-right stack (see
   /// getStack) so they can't overlap. Kept so existing call sites compile.
   offset?: number;
@@ -141,6 +145,7 @@ export function Toast({
   action,
   title,
   id,
+  hideIcon = false,
 }: ToastProps) {
   const dismissRef = useRef(onDismiss);
   // Synced in an effect rather than during render (refs must not be written
@@ -202,18 +207,20 @@ export function Toast({
               at a glance it is the only thing that has to be seen, and it
               carries the same meaning to someone who can't separate a 3px
               red border from a 3px amber one. */}
-          <span
-            className="ae-toast-icon"
-            role="img"
-            aria-label={VARIANT_LABEL[variant]}
-            style={{
-              color: HUE[variant],
-              background: `color-mix(in srgb, ${HUE[variant]} 20%, var(--ae-surface))`,
-              borderColor: `color-mix(in srgb, ${HUE[variant]} 40%, transparent)`,
-            }}
-          >
-            <ToastIcon variant={variant} />
-          </span>
+          {!hideIcon && (
+            <span
+              className="ae-toast-icon"
+              role="img"
+              aria-label={VARIANT_LABEL[variant]}
+              style={{
+                color: HUE[variant],
+                background: `color-mix(in srgb, ${HUE[variant]} 20%, var(--ae-surface))`,
+                borderColor: `color-mix(in srgb, ${HUE[variant]} 40%, transparent)`,
+              }}
+            >
+              <ToastIcon variant={variant} />
+            </span>
+          )}
           <div className="ae-toast-message" title={title}>
             {message}
           </div>

@@ -12,7 +12,7 @@ vi.mock("./changeLog.service", () => ({ recordChange: vi.fn() }));
 
 import { userRepository } from "../repositories/userRepository";
 import { recordChange } from "./changeLog.service";
-import bcrypt from "bcryptjs";
+import { verifyPassword } from "../utils/password";
 import { invalidate } from "../lib/cache";
 import { createUser, resetUserPassword, setUserActive } from "./users.service";
 
@@ -73,10 +73,12 @@ describe("resetUserPassword", () => {
   it("stores a hash of the new password and audits it without the secret", async () => {
     vi.mocked(userRepository.findById).mockResolvedValue({ id: 5, username: "ben" } as never);
     await resetUserPassword(5, "brand-new-pass", 1);
-    const [id, hash, db] = vi.mocked(userRepository.setPasswordHash).mock.calls[0];
+    const [id, hash, mustChange, db] = vi.mocked(userRepository.setPasswordHash).mock.calls[0];
     expect(id).toBe(5);
+    expect(mustChange).toBe(true); // the admin knows it, so the person must replace it
     expect(db).toBe(tx);
-    expect(await bcrypt.compare("brand-new-pass", hash)).toBe(true);
+    expect(hash).toMatch(/^scrypt\$\d+\$8\$\d+\$/); // current settings
+    expect(await verifyPassword("brand-new-pass", hash)).toBe(true);
     const [entry] = vi.mocked(recordChange).mock.calls[0];
     expect(entry).toMatchObject({ tableName: "users", recordId: 5, action: "UPDATE", changedById: 1 });
     expect(JSON.stringify(entry)).not.toMatch(/brand-new-pass/);
@@ -87,6 +89,13 @@ describe("resetUserPassword", () => {
     vi.mocked(userRepository.findById).mockResolvedValue({ id: 5, username: "ben" } as never);
     await resetUserPassword(5, "brand-new-pass", 1);
     expect(invalidate).toHaveBeenCalledWith("user-status:5");
+  });
+
+  it("refuses a weak or username-containing password before touching the database", async () => {
+    vi.mocked(userRepository.findById).mockResolvedValue({ id: 5, username: "ben" } as never);
+    await expect(resetUserPassword(5, "password123", 1)).rejects.toMatchObject({ status: 400 });
+    await expect(resetUserPassword(5, "ben-is-the-best-1", 1)).rejects.toMatchObject({ status: 400 });
+    expect(userRepository.setPasswordHash).not.toHaveBeenCalled();
   });
 
   it("404s for an unknown user", async () => {

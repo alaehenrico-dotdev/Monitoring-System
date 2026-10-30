@@ -3,6 +3,8 @@ import { applyPendingMigrations, restoreDatabaseFromStream, streamDatabaseBackup
 import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveResetToken } from "../services/dataReset.service";
 import { logSystemEvent } from "../services/changeLog.service";
 import { keepDriveConnectionAcross } from "../services/drive.service";
+import { env } from "../config/env";
+import { createBackupDecryptor } from "../utils/backupCrypto";
 import { HttpError } from "../utils/HttpError";
 import { assertAdminPassword } from "../services/adminPassword.service";
 import {
@@ -26,7 +28,7 @@ function backupFileName(): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   const date = `${now.getUTCFullYear()}-${pad(now.getUTCMonth() + 1)}-${pad(now.getUTCDate())}`;
   const time = `${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}`;
-  return `ala-eh-backup-${date}-${time}.sql`;
+  return `ala-eh-backup-${date}-${time}${env.backupEncryptionKey ? ".sql.enc" : ".sql"}`;
 }
 
 /// A database dump holds everything, so on top of SUPERVISOR_ADMIN the download
@@ -106,7 +108,10 @@ export async function getBackupHistory(_req: Request, res: Response) {
 /// Pre-restore check: reads an uploaded dump (raw body, like /restore) without
 /// touching the database, and says whether it is safe to rely on.
 export async function postValidate(req: Request, res: Response) {
-  const inspection = await inspectDump(req);
+  // Encrypted uploads are decrypted first, so the report describes the dump inside.
+  const decrypted = req.pipe(createBackupDecryptor(env.backupEncryptionKey, { lenient: true }));
+  req.on("error", (e) => decrypted.destroy(e));
+  const inspection = await inspectDump(decrypted);
   res.json(await buildReport(inspection));
 }
 

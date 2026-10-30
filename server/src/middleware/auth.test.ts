@@ -123,3 +123,31 @@ describe("authenticate", () => {
     expect(userRepository.findStatus).not.toHaveBeenCalled();
   });
 });
+
+describe("authenticate - password change required", () => {
+  function reqFor(url: string): Request {
+    return { headers: { authorization: "Bearer t" }, originalUrl: url } as unknown as Request;
+  }
+  async function run(url: string) {
+    vi.mocked(verifyToken).mockReturnValue(decodedUser);
+    vi.mocked(userRepository.findStatus).mockResolvedValue({ isActive: true, role: "SUPERVISOR_ADMIN", tokenVersion: 0, mustChangePassword: true } as never);
+    const next = vi.fn();
+    authenticate(reqFor(url), {} as Response, next as NextFunction);
+    await vi.waitFor(() => expect(next).toHaveBeenCalled());
+    return next.mock.calls[0][0];
+  }
+
+  it("lets the person look themselves up and change the password", async () => {
+    expect(await run("/api/auth/me")).toBeUndefined();
+    expect(await run("/api/auth/change-password")).toBeUndefined();
+    expect(await run("/api/auth/me?x=1")).toBeUndefined();
+  });
+
+  it("blocks everything else, including backups and user admin, until it is changed", async () => {
+    for (const url of ["/api/products", "/api/backup/download", "/api/users", "/api/auth/mfa/setup", "/api/auth/me/../users"]) {
+      const err = await run(url);
+      expect(err, url).toBeInstanceOf(HttpError);
+      expect(err.status).toBe(403);
+    }
+  });
+});

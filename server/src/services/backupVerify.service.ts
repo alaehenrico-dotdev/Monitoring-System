@@ -9,6 +9,7 @@ import { env } from "../config/env";
 import { prisma } from "../lib/prisma";
 import { HttpError } from "../utils/HttpError";
 import { isMysqldumpHeader } from "../utils/dumpHeader";
+import { createBackupDecryptor } from "../utils/backupCrypto";
 
 const TRAILER = "-- Dump completed";
 const TAIL_BYTES = 4096;
@@ -144,7 +145,7 @@ export interface BackupFile {
   modifiedAt: Date;
 }
 
-const BACKUP_FILE_RE = /\.(sql|sql\.gz)$/i;
+const BACKUP_FILE_RE = /\.(sql|sql\.gz)(\.enc)?$/i;
 
 /// Backups the scripts wrote to BACKUP_DIR (empty when it isn't configured).
 export async function listBackupFiles(): Promise<BackupFile[]> {
@@ -180,10 +181,19 @@ export async function verifyBackupFile(name: string, userId?: number | null): Pr
   const file = (await listBackupFiles()).find((f) => f.name === name);
   if (!file || !env.backupDir) throw HttpError.notFound("No such backup file.");
   const full = path.join(env.backupDir, file.name);
-  const gz = /\.gz$/i.test(file.name);
+  const gz = /\.gz(\.enc)?$/i.test(file.name);
+  const enc = /\.enc$/i.test(file.name);
   const source = createReadStream(full);
-  const stream = gz ? source.pipe(createGunzip()) : source;
-  if (gz) source.on("error", (e) => stream.destroy(e));
+  let stream: Readable = source;
+  if (enc) {
+    stream = stream.pipe(createBackupDecryptor(env.backupEncryptionKey));
+    source.on("error", (e) => stream.destroy(e));
+  }
+  if (gz) {
+    const encrypted = stream;
+    stream = encrypted.pipe(createGunzip());
+    encrypted.on("error", (e) => stream.destroy(e));
+  }
   let inspection: DumpInspection;
   try {
     inspection = await inspectDump(stream);

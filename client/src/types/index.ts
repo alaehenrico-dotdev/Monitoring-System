@@ -10,6 +10,10 @@ export interface AuthUser {
   username: string;
   name: string;
   role: Role;
+  /// Present on /auth/me: the person must choose a new password before anything else.
+  mustChangePassword?: boolean;
+  /// Present on /auth/me: two-step verification is turned on for this account.
+  mfaEnabled?: boolean;
 }
 
 export interface Product {

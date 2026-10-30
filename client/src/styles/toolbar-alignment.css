@@ -1137,3 +1137,148 @@
   background: var(--tb-field-bg);
 }
 
+
+/* ---------------------------------------------------------------------------
+   Settings > My Account: one glass card per setting (same surface as
+   .ae-dash-card and the Backup / Restore cards), each a title + one-line
+   description on the left and its single action on the right. Wraps onto two
+   lines when the card is narrow, and the action fills the width on a phone.
+   ------------------------------------------------------------------------ */
+.ae-setting {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+  padding: 14px 18px;
+}
+.ae-setting-text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.ae-setting-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: calc(14px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text);
+}
+.ae-setting-desc {
+  margin-top: 2px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  line-height: 1.45;
+  color: var(--ae-text-muted);
+}
+.ae-setting-action {
+  flex: none;
+}
+.ae-account-role--on {
+  color: var(--ae-success-text);
+  border-color: currentColor;
+}
+@media (max-width: 520px) {
+  .ae-setting-action,
+  .ae-setting-action .ae-btn {
+    width: 100%;
+  }
+}
+
+/* A value the person has to copy or type into another app (the authenticator
+   key, the recovery codes). Monospace so 0/O and 1/l are told apart, and one
+   click selects all of it. */
+.ae-code-block {
+  margin: 0;
+  padding: 10px 12px;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 6px;
+  background: var(--ae-bg-alt);
+  color: var(--ae-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: calc(13.5px * var(--ae-fs, 1));
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.ae-recovery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+@media (max-width: 380px) {
+  .ae-recovery-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The QR code is a white plate (scanners need dark-on-light in every theme) with
+   its size reserved up front, so the dialog does not jump when the code appears. */
+.ae-qr {
+  width: min(100%, 188px);
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--ae-hairline);
+}
+.ae-qr img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  box-sizing: border-box;
+}
+
+/* Small text-style action (Forget this device, Use a different account). */
+.ae-link-btn {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ae-text-muted);
+  font: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  cursor: pointer;
+}
+.ae-link-btn:hover {
+  color: var(--ae-text);
+  text-decoration: underline;
+}
+.ae-link-btn:focus-visible {
+  outline: 2px solid var(--ae-btn-yellow);
+  outline-offset: 2px;
+}
+
+/* A checkbox with its label: the whole row is the click target (44px tall on a phone). */
+.ae-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  font-size: calc(13.5px * var(--ae-fs, 1));
+  line-height: 1.4;
+}
+.ae-check input {
+  flex: none;
+  margin: 2px 0 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ae-btn-yellow);
+}
+.ae-check-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+@media (pointer: coarse) {
+  .ae-check {
+    min-height: 44px;
+    align-items: center;
+  }
+  .ae-link-btn {
+    min-height: 44px;
+  }
+}

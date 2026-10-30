@@ -5,7 +5,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { getMe, login as loginRequest } from "../api/auth";
+import {
+  changePassword as changePasswordRequest,
+  getMe,
+  login as loginRequest,
+  loginWithCode,
+  signOutEverywhere as signOutEverywhereRequest,
+} from "../api/auth";
 import {
   ApiError,
   getToken,
@@ -15,11 +21,21 @@ import {
 import type { AuthUser } from "../types";
 import { parkDraftsForLogout, restoreDraftBackup } from "../utils/draftBackup";
 import { countAllUnsavedWork } from "../utils/unsavedWork";
+import { isDeviceRemembered, saveDeviceChoice } from "../utils/rememberDevice";
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  /// Resolves with `{ mfaToken }` when the account has two-step verification on: the
+  /// sign-in is then finished with `completeMfa`. Resolves with null once signed in.
+  login: (username: string, password: string, rememberDevice?: boolean) => Promise<{ mfaToken: string } | null>;
+  completeMfa: (mfaToken: string, code: string) => Promise<void>;
+  /// Signs this account out on every other device (and keeps this one signed in).
+  signOutEverywhere: () => Promise<void>;
+  /// Changes the signed-in user's own password (other sessions are signed out).
+  changeOwnPassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /// Re-reads who is signed in (e.g. after turning two-step verification on or off).
+  refreshUser: () => Promise<void>;
   logout: () => void;
   /// Set only when the initial session check (below) failed for a reason
   /// OTHER than "not actually logged in" - a network/server failure while a
@@ -37,7 +53,10 @@ interface AuthContextValue {
   /// passed) - a no-op unless there is unsaved work, same rule as a 401.
   expireSession: () => void;
   /// Signs the CURRENT user back in over the expired session.
-  reauthenticate: (password: string) => Promise<void>;
+  /// Resolves with `{ mfaToken }` when the account also needs a code: finish with
+  /// `reauthenticateWithCode`. Resolves with null once the session is valid again.
+  reauthenticate: (password: string) => Promise<{ mfaToken: string } | null>;
+  reauthenticateWithCode: (mfaToken: string, code: string) => Promise<void>;
   /// Log out from the expired-session dialog but keep the unsaved edits for
   /// this user's next sign-in (see utils/draftBackup.ts).
   logoutKeepingDrafts: () => void;
@@ -111,12 +130,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null);
   }, []);
 
-  async function login(username: string, password: string) {
-    const { token, user: authUser } = await loginRequest(username, password);
+  /// Stores the token and loads the full profile (/auth/me carries the account-security
+  /// flags the login response does not). A profile that cannot be read leaves no session.
+  async function startSession(token: string) {
     setToken(token);
-    adopt(authUser);
+    try {
+      adopt(await getMe());
+    } catch (err) {
+      setToken(null);
+      throw err;
+    }
     setSessionError(null);
     setSessionExpired(false);
+  }
+
+  async function login(username: string, password: string, rememberDevice = false) {
+    const result = await loginRequest(username, password, rememberDevice);
+    // Recorded as soon as the password is right (also for the two-step branch, whose
+    // second request carries no flag: the server keeps the choice inside its token).
+    saveDeviceChoice(rememberDevice, username);
+    if ("mfaRequired" in result) return { mfaToken: result.mfaToken };
+    await startSession(result.token);
+    return null;
+  }
+
+  async function completeMfa(mfaToken: string, code: string) {
+    const { token } = await loginWithCode(mfaToken, code);
+    await startSession(token);
+  }
+
+  async function changeOwnPassword(currentPassword: string, newPassword: string) {
+    const { token } = await changePasswordRequest(currentPassword, newPassword, isDeviceRemembered());
+    await startSession(token);
+  }
+
+  async function signOutEverywhere() {
+    const { token } = await signOutEverywhereRequest(isDeviceRemembered());
+    await startSession(token);
+  }
+
+  async function refreshUser() {
+    adopt(await getMe());
   }
 
   function logout() {
@@ -131,12 +185,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function reauthenticate(password: string) {
     if (!user) throw new Error("Not signed in.");
-    const { token, user: authUser } = await loginRequest(
-      user.username,
-      password,
-    );
+    // Same choice as when this device signed in, so a remembered device stays remembered.
+    const result = await loginRequest(user.username, password, isDeviceRemembered());
+    if ("mfaRequired" in result) return { mfaToken: result.mfaToken };
+    resumeSession(result.token, result.user);
+    return null;
+  }
+
+  async function reauthenticateWithCode(mfaToken: string, code: string) {
+    if (!user) throw new Error("Not signed in.");
+    const result = await loginWithCode(mfaToken, code);
+    resumeSession(result.token, result.user);
+  }
+
+  /// Same person, valid session again: keeps the profile flags the login response lacks.
+  function resumeSession(token: string, claims: AuthUser) {
     setToken(token);
-    setUser(authUser);
+    // If the person signed out while the request was in flight there is nobody to resume.
+    setUser((current) => (current ? { ...current, ...claims } : current));
     setSessionExpired(false);
   }
 
@@ -156,11 +222,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         login,
+        completeMfa,
+        signOutEverywhere,
+        changeOwnPassword,
+        refreshUser,
         logout,
         sessionError,
         sessionExpired,
         expireSession,
         reauthenticate,
+        reauthenticateWithCode,
         logoutKeepingDrafts,
         recoveredDrafts,
         dismissRecovered: () => setRecoveredDrafts(0),

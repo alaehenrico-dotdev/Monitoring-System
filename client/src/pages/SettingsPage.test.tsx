@@ -11,6 +11,7 @@ vi.mock("../components/PageHeader", () => ({ PageHeader: ({ subtitle }: { subtit
 vi.mock("./DatabaseBackupPage", () => ({ DatabaseBackupPage: () => <div>backup tool</div> }));
 vi.mock("./DataResetPage", () => ({ DataResetPage: () => <div>reset tool</div> }));
 vi.mock("./UserPasswordsPage", () => ({ UserPasswordsPage: () => <div>passwords tool</div> }));
+vi.mock("./AccountSettings", () => ({ AccountSettings: () => <div>account page</div> }));
 
 const root = document.documentElement;
 const open = () =>
@@ -75,17 +76,26 @@ describe("SettingsPage appearance", () => {
 describe("SettingsPage tabs by role", () => {
   it("gives an admin the admin tools as well", () => {
     open();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Appearance", "Entry Rules", "Backup & Restore", "Google Drive", "Data Reset", "User Passwords"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Appearance", "My Account", "Entry Rules", "Backup & Restore", "Google Drive", "Data Reset", "User Passwords"]);
     fireEvent.click(screen.getByRole("tab", { name: "Data Reset" }));
     expect(screen.getByText("reset tool")).toBeTruthy();
   });
 
-  it.each(["ONLINE_ENCODER", "OFFLINE_ENCODER"])("shows a %s only Appearance, and none of the admin tools", (role) => {
+  it.each(["ONLINE_ENCODER", "OFFLINE_ENCODER"])("shows a %s only Appearance and My Account, and none of the admin tools", (role) => {
     auth.role = role;
     open();
-    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Appearance"]);
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Appearance", "My Account"]);
     expect(screen.queryByText(/tool$/)).toBeNull();
     expect(screen.getByText("How the app looks on this computer.")).toBeTruthy();
+  });
+});
+
+describe("SettingsPage account tab", () => {
+  it.each(["SUPERVISOR_ADMIN", "ONLINE_ENCODER"])("opens password and two-step settings for a %s", (role) => {
+    auth.role = role;
+    open();
+    fireEvent.click(screen.getByRole("tab", { name: "My Account" }));
+    expect(screen.getByText("account page")).toBeTruthy();
   });
 });
 

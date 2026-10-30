@@ -207,7 +207,7 @@ export function DatabaseRestoreCard() {
             <input
               ref={fileInput}
               type="file"
-              accept=".sql,application/sql,text/plain"
+              accept=".sql,.enc,application/sql,application/octet-stream,text/plain"
               hidden
               onChange={(e) => {
                 chooseFile(e.target.files?.[0] ?? null);

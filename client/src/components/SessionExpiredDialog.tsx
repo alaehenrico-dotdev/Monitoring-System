@@ -18,23 +18,41 @@ import { colors } from "../theme";
  * keeps the edits for this user's next sign-in.
  */
 export function SessionExpiredDialog() {
-  const { user, reauthenticate, logoutKeepingDrafts } = useAuth();
+  const { user, reauthenticate, reauthenticateWithCode, logoutKeepingDrafts } = useAuth();
   const [password, setPassword] = useState("");
+  // Set when the password was right but the account also needs a code.
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
+  const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!password || busy) return;
+    if ((mfaToken ? !code : !password) || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await reauthenticate(password);
+      if (mfaToken) {
+        await reauthenticateWithCode(mfaToken, code);
+        return;
+      }
+      const next = await reauthenticate(password);
+      if (next) {
+        setMfaToken(next.mfaToken);
+        setPassword("");
+        setBusy(false);
+      }
     } catch (err) {
-      setPassword("");
+      if (mfaToken) {
+        setCode("");
+        // The half-way sign-in only lasts a few minutes; once it ran out, ask for the password again.
+        if (err instanceof ApiError && /expired/i.test(err.message)) setMfaToken(null);
+      } else setPassword("");
       setError(
         err instanceof ApiError && err.status === 401
-          ? "That password isn't right."
+          ? mfaToken
+            ? err.message
+            : "That password isn't right."
           : err instanceof Error
             ? err.message
             : "Couldn't sign in. Check your connection and try again.",
@@ -56,16 +74,29 @@ export function SessionExpiredDialog() {
           Sign back in as <strong>{user?.name ?? user?.username}</strong> to
           keep working, then save again.
         </p>
-        <Field label="Password" style={{ marginBottom: 12 }}>
-          <TextInput
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%" }}
-            autoFocus
-            autoComplete="current-password"
-          />
-        </Field>
+        {mfaToken ? (
+          <Field label="Verification code" style={{ marginBottom: 12 }}>
+            <TextInput
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              style={{ width: "100%" }}
+              autoFocus
+              autoComplete="one-time-code"
+              placeholder="6-digit code or a recovery code"
+            />
+          </Field>
+        ) : (
+          <Field label="Password" style={{ marginBottom: 12 }}>
+            <TextInput
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ width: "100%" }}
+              autoFocus
+              autoComplete="current-password"
+            />
+          </Field>
+        )}
         {error && (
           <div
             role="alert"
@@ -90,8 +121,8 @@ export function SessionExpiredDialog() {
           >
             Log out
           </Button>
-          <Button type="submit" variant="primary" disabled={busy || !password}>
-            {busy ? "Signing in…" : "Sign in"}
+          <Button type="submit" variant="primary" disabled={busy || (mfaToken ? !code : !password)}>
+            {busy ? "Signing in…" : mfaToken ? "Verify" : "Sign in"}
           </Button>
         </div>
       </form>

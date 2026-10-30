@@ -8,16 +8,9 @@ import { Button, Field, TextInput } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { colors } from "../theme";
+import { initials } from "../utils/initials";
 
-const MIN_LENGTH = 8;
-
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  const first = parts[0][0];
-  const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
-  return (first + last).toUpperCase();
-}
+const MIN_LENGTH = 10;
 
 /// Admin-only (it lives on the Settings page, and the server requires
 /// SUPERVISOR_ADMIN): the one place a password can be changed. Replaces the
@@ -46,8 +39,9 @@ export function UserPasswordsPage() {
   return (
     <div style={{ width: "100%", maxWidth: 760, margin: "0 auto" }}>
       <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk, margin: "0 0 20px" }}>
-        Only an administrator can change passwords. Pick an account and set a
-        new one, then hand it to the user.
+        Pick an account and set a temporary password, then hand it to the user.
+        They are asked to choose their own the next time they sign in. Users can
+        also change their own under Settings &gt; My Account.
       </p>
       {loadError && (
         <p role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))" }}>

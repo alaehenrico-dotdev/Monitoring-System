@@ -4,15 +4,24 @@ vi.mock("../repositories/userRepository", () => ({
   userRepository: { findByUsername: vi.fn() },
 }));
 vi.mock("./changeLog.service", () => ({ logSystemEvent: vi.fn() }));
+// Wrapped so a test can see WHETHER the hash was checked (the real check still runs).
+vi.mock("../utils/password", async (orig) => {
+  const real = await orig<typeof import("../utils/password")>();
+  return { ...real, verifyPassword: vi.fn(real.verifyPassword) };
+});
 
 import bcrypt from "bcryptjs";
+import { verifyPassword } from "../utils/password";
 import { userRepository } from "../repositories/userRepository";
 import { login } from "./auth.service";
 import { logSystemEvent } from "./changeLog.service";
 import { verifyToken } from "../utils/jwt";
 
+type Session = { token: string; user: Record<string, unknown> };
 const PASSWORD = "correct-horse-battery";
-const HASH = bcrypt.hashSync(PASSWORD, 10);
+// An older (bcrypt) hash, as every account has until its owner next signs in - which also
+// exercises the verify-then-upgrade path. The upgrade itself is covered in mfaLogin.test.ts.
+const HASH = bcrypt.hashSync(PASSWORD, 4);
 
 function user(overrides: Record<string, unknown> = {}) {
   return {
@@ -32,7 +41,7 @@ describe("login - success", () => {
   it("returns a token carrying the user's identity and role", async () => {
     vi.mocked(userRepository.findByUsername).mockResolvedValue(user() as never);
 
-    const result = await login("ana", PASSWORD);
+    const result = (await login("ana", PASSWORD)) as Session;
 
     expect(result.user).toEqual({ id: 7, username: "ana", name: "Ana Cruz", role: "ONLINE_ENCODER" });
     expect(verifyToken(result.token)).toMatchObject({ id: 7, role: "ONLINE_ENCODER" });
@@ -41,7 +50,7 @@ describe("login - success", () => {
   it("never returns the password hash to the caller", async () => {
     vi.mocked(userRepository.findByUsername).mockResolvedValue(user() as never);
 
-    const result = await login("ana", PASSWORD);
+    const result = (await login("ana", PASSWORD)) as Session;
 
     expect(JSON.stringify(result)).not.toContain(HASH);
     expect(result.user).not.toHaveProperty("passwordHash");
@@ -90,28 +99,24 @@ describe("login - user enumeration", () => {
    * duration assertion would be flaky on shared CI, while "did we spend the
    * hash cost on the miss path" is the actual invariant.
    */
-  it("still performs a bcrypt comparison when the username does not exist", async () => {
-    const compare = vi.spyOn(bcrypt, "compare");
+  it("still checks a password hash when the username does not exist", async () => {
     vi.mocked(userRepository.findByUsername).mockResolvedValue(null as never);
 
     await login("nobody", PASSWORD).catch(() => {});
 
-    expect(compare).toHaveBeenCalledTimes(1);
-    // Compared against a real hash, not an empty string - bcrypt returns
-    // early on a malformed hash, which would reintroduce the timing gap.
-    const [, hash] = compare.mock.calls[0];
-    expect(String(hash)).toMatch(/^\$2[aby]\$\d{2}\$/);
-    compare.mockRestore();
+    expect(verifyPassword).toHaveBeenCalledTimes(1);
+    // Compared against a real, current-cost hash, not an empty string - a malformed hash
+    // returns early, which would reintroduce the timing gap.
+    const [, hash] = vi.mocked(verifyPassword).mock.calls[0];
+    expect(String(hash)).toMatch(/^scrypt\$\d+\$8\$\d+\$/);
   });
 
-  it("performs a bcrypt comparison on a deactivated account too", async () => {
-    const compare = vi.spyOn(bcrypt, "compare");
+  it("checks a password hash on a deactivated account too", async () => {
     vi.mocked(userRepository.findByUsername).mockResolvedValue(user({ isActive: false }) as never);
 
     await login("ana", PASSWORD).catch(() => {});
 
-    expect(compare).toHaveBeenCalledTimes(1);
-    compare.mockRestore();
+    expect(verifyPassword).toHaveBeenCalledTimes(1);
   });
 
   it("the dummy hash can never actually authenticate", async () => {

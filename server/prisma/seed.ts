@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "../src/utils/password";
 
 const prisma = new PrismaClient();
 
@@ -219,9 +219,10 @@ async function seedUsers() {
     const password = fromEnv || randomPassword();
     if (!fromEnv) generated.push({ username: u.username, password });
 
-    const passwordHash = await bcrypt.hash(password, 10);
+    const passwordHash = await hashPassword(password);
+    // The password above is known to whoever ran the seed, so the first sign-in must replace it.
     await prisma.user.create({
-      data: { name: u.name, username: u.username, passwordHash, role: u.role },
+      data: { name: u.name, username: u.username, passwordHash, role: u.role, mustChangePassword: true },
     });
   }
 

@@ -2,16 +2,18 @@ import { useState } from "react";
 import { DatabaseBackupPage } from "./DatabaseBackupPage";
 import { DataResetPage } from "./DataResetPage";
 import { UserPasswordsPage } from "./UserPasswordsPage";
+import { AccountSettings } from "./AccountSettings";
 import { AppearanceSettings } from "./AppearanceSettings";
 import { GoogleDriveSettings } from "./GoogleDriveSettings";
 import { EntryRulesSettings } from "./EntryRulesSettings";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../context/AuthContext";
 
-type Tab = "appearance" | "entry" | "backup" | "drive" | "reset" | "passwords";
+type Tab = "appearance" | "account" | "entry" | "backup" | "drive" | "reset" | "passwords";
 
 const TABS: { key: Tab; label: string; adminOnly: boolean }[] = [
   { key: "appearance", label: "Appearance", adminOnly: false },
+  { key: "account", label: "My Account", adminOnly: false },
   { key: "entry", label: "Entry Rules", adminOnly: true },
   { key: "backup", label: "Backup & Restore", adminOnly: true },
   { key: "drive", label: "Google Drive", adminOnly: true },
@@ -61,6 +63,7 @@ export function SettingsPage() {
       </div>
 
       {tab === "appearance" && <AppearanceSettings />}
+      {tab === "account" && <AccountSettings />}
       {isAdmin && tab === "entry" && <EntryRulesSettings />}
       {isAdmin && tab === "backup" && <DatabaseBackupPage />}
       {isAdmin && tab === "drive" && <GoogleDriveSettings />}
