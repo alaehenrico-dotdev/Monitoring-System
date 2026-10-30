@@ -39,7 +39,10 @@ else
     exit 1
   fi
   # Keep the newest $KEEP snapshots.
-  ls -1t "$DIR"/premigrate_*.sql.gz{,.enc} 2>/dev/null | tail -n +"$((KEEP + 1))" | while read -r old; do rm -f "$old"; done
+  # Housekeeping must never stop the start: `ls` exits non-zero when one of the two patterns
+  # (plain / encrypted) matches nothing, which `set -e` + `pipefail` would turn into an exit
+  # before the migration runs - so its status is swallowed.
+  { ls -1t "$DIR"/premigrate_*.sql.gz "$DIR"/premigrate_*.sql.gz.enc 2>/dev/null || true; }     | tail -n +"$((KEEP + 1))" | while read -r old; do rm -f "$old"; done
 fi
 
 npx prisma migrate deploy
