@@ -58,12 +58,10 @@ export function AwaitingReleasePage() {
   const { user } = useAuth();
   const role = user?.role;
   const isAdmin = role === "SUPERVISOR_ADMIN";
-  // An encoder works their own page; the admin works either.
-  const ownPage: ReleaseLocation | null = role === "ONLINE_ENCODER" ? "ONLINE" : role === "OFFLINE_ENCODER" ? "OFFLINE" : null;
-  const canAct = (loc: ReleaseLocation) => isAdmin || ownPage === loc;
+  // Encoders record and edit items on either page; releasing and writing off are the admin's approval.
 
   const [status, setStatus] = useState<ReleaseStatus | "ALL">("AWAITING");
-  const [location, setLocation] = useState<ReleaseLocation | "ALL">(ownPage ?? "ALL");
+  const [location, setLocation] = useState<ReleaseLocation | "ALL">("ALL");
   const fetchPage = useCallback(
     (offset: number, limit: number) =>
       listPendingReleases({ status: status === "ALL" ? undefined : status, location: location === "ALL" ? undefined : location }, offset, limit),
@@ -96,7 +94,7 @@ export function AwaitingReleasePage() {
       />
       <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
         <p style={{ fontSize: "calc(13px * var(--ae-fs, 1))", lineHeight: 1.55, color: colors.subtleInk, margin: "0 0 10px" }}>
-          Leave these out of the night's entries and count, and record them here instead - the day can finish without them. When they're labeled, release them:
+          Leave these out of the night's entries and count, and record them here instead - the day can finish without them. When they're labeled, the admin releases them:
           the quantity is added to Production (In) on the shift they become sellable, so nothing already reported changes.
         </p>
 
@@ -109,13 +107,11 @@ export function AwaitingReleasePage() {
             ))}
           </div>
           <span style={{ flex: 1 }} />
-          {!ownPage && (
-            <Select aria-label="Page" value={location} onChange={(e) => setLocation(e.target.value as ReleaseLocation | "ALL")} style={{ width: "auto" }}>
-              <option value="ALL">Online &amp; Offline</option>
-              <option value="ONLINE">Online</option>
-              <option value="OFFLINE">Offline</option>
-            </Select>
-          )}
+          <Select aria-label="Page" value={location} onChange={(e) => setLocation(e.target.value as ReleaseLocation | "ALL")} style={{ width: "auto" }}>
+            <option value="ALL">Online &amp; Offline</option>
+            <option value="ONLINE">Online</option>
+            <option value="OFFLINE">Offline</option>
+          </Select>
           <Button size="sm" onClick={() => setDialog({ kind: "add" })}>
             Add item
           </Button>
@@ -139,7 +135,6 @@ export function AwaitingReleasePage() {
               <ItemRow
                 key={item.id}
                 item={item}
-                canAct={canAct(item.location)}
                 isAdmin={isAdmin}
                 onRelease={() => setDialog({ kind: "release", item })}
                 onEdit={() => setDialog({ kind: "edit", item })}
@@ -159,7 +154,7 @@ export function AwaitingReleasePage() {
         />
       </div>
 
-      {dialog?.kind === "add" && <AddDialog ownPage={ownPage} onClose={() => setDialog(null)} onDone={done} />}
+      {dialog?.kind === "add" && <AddDialog onClose={() => setDialog(null)} onDone={done} />}
       {dialog?.kind === "release" && <ReleaseDialog item={dialog.item} onClose={() => setDialog(null)} onDone={done} />}
       {dialog?.kind === "edit" && <EditDialog item={dialog.item} onClose={() => setDialog(null)} onDone={done} />}
       {dialog?.kind === "cancel" && <CancelDialog item={dialog.item} onClose={() => setDialog(null)} onDone={done} />}
@@ -172,14 +167,12 @@ export function AwaitingReleasePage() {
 
 function ItemRow({
   item,
-  canAct,
   isAdmin,
   onRelease,
   onEdit,
   onCancel,
 }: {
   item: PendingRelease;
-  canAct: boolean;
   isAdmin: boolean;
   onRelease: () => void;
   onEdit: () => void;
@@ -200,11 +193,13 @@ function ItemRow({
         </span>
         <span style={{ color: colors.subtleInk }}>{PAGE_LABEL[item.location]}</span>
         <span style={{ flex: 1 }} />
-        {awaiting && canAct && (
+        {awaiting && (
           <>
-            <Button className="ae-btn-solid" size="sm" onClick={onRelease}>
-              Release…
-            </Button>
+            {isAdmin && (
+              <Button className="ae-btn-solid" size="sm" onClick={onRelease}>
+                Release…
+              </Button>
+            )}
             <Button className="ae-btn-solid" size="sm" onClick={onEdit}>
               Edit
             </Button>
@@ -285,9 +280,9 @@ function FormError({ message }: { message: string | null }) {
   ) : null;
 }
 
-function AddDialog({ ownPage, onClose, onDone }: { ownPage: ReleaseLocation | null; onClose: () => void; onDone: (message: string) => void }) {
+function AddDialog({ onClose, onDone }: { onClose: () => void; onDone: (message: string) => void }) {
   const now = getCurrentShiftAndDate();
-  const [location, setLocation] = useState<ReleaseLocation>(ownPage ?? "OFFLINE");
+  const [location, setLocation] = useState<ReleaseLocation>("OFFLINE");
   const [products, setProducts] = useState<Product[] | null>(null);
   const [productId, setProductId] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -325,14 +320,12 @@ function AddDialog({ ownPage, onClose, onDone }: { ownPage: ReleaseLocation | nu
   return (
     <Modal title="Add an item awaiting release" onClose={busy ? () => {} : onClose} width={480}>
       <div style={{ display: "grid", gap: 12 }}>
-        {!ownPage && (
-          <Field label="Page">
-            <Select value={location} onChange={(e) => setLocation(e.target.value as ReleaseLocation)}>
-              <option value="OFFLINE">Offline</option>
-              <option value="ONLINE">Online</option>
-            </Select>
-          </Field>
-        )}
+        <Field label="Page">
+          <Select value={location} onChange={(e) => setLocation(e.target.value as ReleaseLocation)}>
+            <option value="OFFLINE">Offline</option>
+            <option value="ONLINE">Online</option>
+          </Select>
+        </Field>
         <Field label="Product">
           <Select value={productId} onChange={(e) => setProductId(e.target.value)} disabled={!products}>
             <option value="">{products ? "Choose a product…" : "Loading…"}</option>

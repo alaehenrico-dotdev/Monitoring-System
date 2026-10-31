@@ -1,4 +1,4 @@
-export type Role = "ONLINE_ENCODER" | "OFFLINE_ENCODER" | "SUPERVISOR_ADMIN";
+export type Role = "ENCODER" | "SUPERVISOR_ADMIN";
 export type StockLocation = "ONLINE" | "OFFLINE" | "TOTAL";
 /// Entries are recorded per operating shift, not just per day: Morning
 /// (7am-4pm) and Night (4pm-1am). Night crosses midnight - see

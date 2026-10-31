@@ -28,7 +28,7 @@ describe("ProtectedRoute", () => {
   });
 
   it("shows the app to a signed-in user", () => {
-    auth.user = { id: 1, role: "ONLINE_ENCODER" };
+    auth.user = { id: 1, role: "ENCODER" };
     open();
     expect(screen.getByText("the app")).toBeTruthy();
   });

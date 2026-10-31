@@ -10,9 +10,10 @@ import { colors } from "../theme";
 
 const note = { margin: 0, fontSize: "calc(12.5px * var(--ae-fs, 1))", lineHeight: 1.5 } as const;
 
-/// Forgot password, for someone who cannot sign in. There is no email in this system, so an
+/// Forgot password, for someone who cannot sign in. There is no email in this system. Either an
 /// administrator issues a one-time code (Settings > User Passwords > Reset code) and hands it
-/// over; it works once and expires after 30 minutes. Reachable without signing in.
+/// over (it works once and expires after 30 minutes), or an Encoder with two-step verification
+/// uses a current authenticator code or a recovery code. Reachable without signing in.
 export function ForgotPasswordPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -51,18 +52,21 @@ export function ForgotPasswordPage() {
         <p style={{ ...note, margin: "0 0 16px", color: colors.subtleInk }}>
           Ask your administrator for a reset code. It works once and expires after 30 minutes. Then enter it here with your username and a new password.
         </p>
+        <p style={{ ...note, margin: "-8px 0 16px", color: colors.subtleInk }}>
+          If two-step verification is on for your account, you can use the 6-digit code from your authenticator app (or a recovery code) instead.
+        </p>
         <div style={{ display: "grid", gap: 12 }}>
           <Field label="Username">
             <TextInput value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus style={{ width: "100%" }} />
           </Field>
-          <Field label="Reset code">
+          <Field label="Reset code or authenticator code">
             <TextInput
               value={code}
               onChange={(e) => setCode(e.target.value)}
               autoComplete="off"
               autoCapitalize="characters"
               spellCheck={false}
-              placeholder="XXXXX-XXXXX"
+              placeholder="XXXXX-XXXXX or 123456"
               style={{ width: "100%" }}
             />
           </Field>

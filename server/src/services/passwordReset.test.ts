@@ -9,8 +9,11 @@ vi.mock("../repositories/userRepository", () => ({
     setResetCode: vi.fn(),
     recordResetFailure: vi.fn(),
     consumeResetCode: vi.fn(),
+    setPasswordHash: vi.fn(),
   },
 }));
+const verifyMfaCode = vi.hoisted(() => vi.fn());
+vi.mock("./mfa.service", () => ({ verifyMfaCode }));
 vi.mock("./changeLog.service", () => ({ recordChange: vi.fn(), logSystemEvent: vi.fn() }));
 const assertAdminPassword = vi.hoisted(() => vi.fn());
 vi.mock("./adminPassword.service", () => ({ assertAdminPassword }));
@@ -166,5 +169,51 @@ describe("resetPasswordWithCode (the person, signed out)", () => {
     ]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect(results.filter((r) => r.status === "rejected")).toHaveLength(1);
+  });
+});
+
+describe("resetPasswordWithCode with an authenticator (an Encoder, signed out)", () => {
+  const encoder = (over: Record<string, unknown> = {}) =>
+    account({ role: "ENCODER", resetCodeHash: null, resetCodeExpiresAt: null, totpEnabledAt: new Date(), totpSecret: "sealed", ...over });
+
+  it("sets the new password and signs out other sessions when the authenticator code is right", async () => {
+    vi.mocked(userRepository.findByUsername).mockResolvedValue(encoder() as never);
+    verifyMfaCode.mockResolvedValue(true);
+    await resetPasswordWithCode("ana", "123456", GOOD_PASSWORD, "10.0.0.5");
+    expect(userRepository.setPasswordHash).toHaveBeenCalledWith(7, expect.any(String), false);
+    expect(invalidate).toHaveBeenCalledWith("user-status:7");
+    expect(logSystemEvent).toHaveBeenCalledWith("password_reset_by_mfa", expect.objectContaining({ username: "ana" }), 7, "UPDATE");
+  });
+
+  it("answers a wrong or locked-out authenticator code like any other bad code", async () => {
+    vi.mocked(userRepository.findByUsername).mockResolvedValue(encoder() as never);
+    verifyMfaCode.mockResolvedValue(false);
+    await expect(resetPasswordWithCode("ana", "000000", GOOD_PASSWORD)).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/invalid or has expired/) });
+    verifyMfaCode.mockRejectedValue(new Error("Too many incorrect codes"));
+    await expect(resetPasswordWithCode("ana", "000000", GOOD_PASSWORD)).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/invalid or has expired/) });
+    expect(userRepository.setPasswordHash).not.toHaveBeenCalled();
+  });
+
+  it("never lets an Admin reset with an authenticator code alone", async () => {
+    vi.mocked(userRepository.findByUsername).mockResolvedValue(encoder({ role: "SUPERVISOR_ADMIN" }) as never);
+    verifyMfaCode.mockResolvedValue(true);
+    await expect(resetPasswordWithCode("ana", "123456", GOOD_PASSWORD)).rejects.toMatchObject({ status: 400 });
+    expect(verifyMfaCode).not.toHaveBeenCalled();
+    expect(userRepository.setPasswordHash).not.toHaveBeenCalled();
+  });
+
+  it("does not offer it to an Encoder without two-step verification, or a deactivated one", async () => {
+    verifyMfaCode.mockResolvedValue(true);
+    for (const over of [{ totpEnabledAt: null }, { isActive: false }]) {
+      vi.mocked(userRepository.findByUsername).mockResolvedValue(encoder(over) as never);
+      await expect(resetPasswordWithCode("ana", "123456", GOOD_PASSWORD)).rejects.toMatchObject({ status: 400 });
+    }
+    expect(verifyMfaCode).not.toHaveBeenCalled();
+  });
+
+  it("refuses a weak password before any code is checked or spent", async () => {
+    vi.mocked(userRepository.findByUsername).mockResolvedValue(encoder() as never);
+    await expect(resetPasswordWithCode("ana", "123456", "password123")).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/common/) });
+    expect(verifyMfaCode).not.toHaveBeenCalled();
   });
 });

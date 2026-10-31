@@ -65,14 +65,12 @@ jobs:
       DATA_RESET_PASSCODE: "482913"
       CLIENT_ORIGIN: http://localhost:5173
       SEED_ADMIN_PASSWORD: "E2eAdmin-Only-Password-8492"
-      SEED_ONLINE_ENCODER_PASSWORD: "E2eOnline-Only-Password-8492"
-      SEED_OFFLINE_ENCODER_PASSWORD: "E2eOffline-Only-Password-8492"
+      SEED_ENCODER_PASSWORD: "E2eEncoder-Only-Password-8492"
       E2E_DATABASE_NAME: ala_eh_stocks_e2e
       E2E_ALLOW_DESTRUCTIVE_RESTORE: I_HAVE_A_DISPOSABLE_E2E_DATABASE
       E2E_RESET_PASSCODE: "482913"
       E2E_ADMIN_PASSWORD: "E2eAdmin-Only-Password-8492"
-      E2E_ONLINE_PASSWORD: "E2eOnline-Only-Password-8492"
-      E2E_OFFLINE_PASSWORD: "E2eOffline-Only-Password-8492"
+      E2E_ENCODER_PASSWORD: "E2eEncoder-Only-Password-8492"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

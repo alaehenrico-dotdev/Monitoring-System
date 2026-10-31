@@ -28,7 +28,7 @@ function user(overrides: Record<string, unknown> = {}) {
     id: 7,
     username: "ana",
     name: "Ana Cruz",
-    role: "ONLINE_ENCODER",
+    role: "ENCODER",
     passwordHash: HASH,
     isActive: true,
     ...overrides,
@@ -43,8 +43,8 @@ describe("login - success", () => {
 
     const result = (await login("ana", PASSWORD)) as Session;
 
-    expect(result.user).toEqual({ id: 7, username: "ana", name: "Ana Cruz", role: "ONLINE_ENCODER" });
-    expect(verifyToken(result.token)).toMatchObject({ id: 7, role: "ONLINE_ENCODER" });
+    expect(result.user).toEqual({ id: 7, username: "ana", name: "Ana Cruz", role: "ENCODER" });
+    expect(verifyToken(result.token)).toMatchObject({ id: 7, role: "ENCODER" });
   });
 
   it("never returns the password hash to the caller", async () => {

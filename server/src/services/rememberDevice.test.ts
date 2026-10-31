@@ -28,7 +28,7 @@ const base = {
   id: 7,
   username: "ana",
   name: "Ana Cruz",
-  role: "ONLINE_ENCODER",
+  role: "ENCODER",
   passwordHash: hashPasswordSync(PASSWORD),
   isActive: true,
   tokenVersion: 2,

@@ -176,10 +176,15 @@ async function seedProducts() {
       // No natural unique key in the doc beyond name+category, so upsert by
       // hand - this is also what backfills `sku` onto a product that was
       // seeded before it existed, rather than creating a duplicate row.
-      const existing = await prisma.product.findFirst({
-        where: { name, category: group.category },
-        select: { id: true },
-      });
+      // `sku` is unique, so match on it first: a product that was renamed or
+      // moved category since it was seeded must be updated, not re-created
+      // (which would fail on products_sku_key).
+      const existing =
+        (sku ? await prisma.product.findUnique({ where: { sku }, select: { id: true } }) : null) ??
+        (await prisma.product.findFirst({
+          where: { name, category: group.category },
+          select: { id: true },
+        }));
       if (existing) {
         await prisma.product.update({
           where: { id: existing.id },
@@ -205,8 +210,7 @@ async function seedProducts() {
 async function seedUsers() {
   const defaultUsers = [
     { name: "System Administrator", username: "admin", role: "SUPERVISOR_ADMIN" as const, envVar: "SEED_ADMIN_PASSWORD" },
-    { name: "Online Encoder", username: "online.encoder", role: "ONLINE_ENCODER" as const, envVar: "SEED_ONLINE_ENCODER_PASSWORD" },
-    { name: "Offline Encoder", username: "offline.encoder", role: "OFFLINE_ENCODER" as const, envVar: "SEED_OFFLINE_ENCODER_PASSWORD" },
+    { name: "Encoder", username: "encoder", role: "ENCODER" as const, envVar: "SEED_ENCODER_PASSWORD" },
   ];
 
   const generated: { username: string; password: string }[] = [];

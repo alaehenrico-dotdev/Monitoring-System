@@ -149,9 +149,9 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
 
 ### First logins (seeded)
 
-`npm run seed` creates three accounts: `admin` (Supervisor-Admin), `online.encoder` and `offline.encoder`.
-There are no fixed default passwords: each is taken from `SEED_ADMIN_PASSWORD` / `SEED_ONLINE_ENCODER_PASSWORD` /
-`SEED_OFFLINE_ENCODER_PASSWORD` if set, otherwise a random one is generated and printed once at the end of the seed.
+`npm run seed` creates two accounts: `admin` (Admin) and `encoder` (Encoder).
+There are no fixed default passwords: each is taken from `SEED_ADMIN_PASSWORD` / `SEED_ENCODER_PASSWORD`
+if set, otherwise a random one is generated and printed once at the end of the seed.
 Whichever it was, each account must choose its own password (10+ characters, nothing common) the first time it signs in.
 Administrators should then turn on two-step verification under Settings > My Account.
 
@@ -197,7 +197,7 @@ Administrators should then turn on two-step verification under Settings > My Acc
 - Settings page (Supervisor-Admin): a full `mysqldump` database backup, streamed straight to a
   browser download with a live byte counter, and the passcode-gated Data Reset panel for wiping
   transactional data between test runs or a new rollout period.
-- Role-based access: Online Encoder / Offline Encoder / Supervisor-Admin (Section 3.2).
+- Role-based access: Encoder (enters stock on both grids, requests corrections) / Admin (approvals, releases, reports, setup).
 
 **Data entry & reporting tools**
 - Excel-style zoom (25%–200%) on every grid page — genuinely re-lays-out text/cells/inputs at the

@@ -21,9 +21,9 @@ beforeEach(() => vi.clearAllMocks());
 describe("createUser - audit trail", () => {
   it("logs the new account in the same transaction, without the password hash", async () => {
     vi.mocked(userRepository.findByUsername).mockResolvedValue(null);
-    vi.mocked(userRepository.create).mockResolvedValue({ id: 12, name: "Ben", username: "ben", role: "ONLINE_ENCODER", isActive: true } as never);
+    vi.mocked(userRepository.create).mockResolvedValue({ id: 12, name: "Ben", username: "ben", role: "ENCODER", isActive: true } as never);
 
-    await createUser({ name: "Ben", username: "ben", password: "secret-pass", role: "ONLINE_ENCODER" }, 1);
+    await createUser({ name: "Ben", username: "ben", password: "secret-pass", role: "ENCODER" }, 1);
 
     expect(userRepository.create).toHaveBeenCalledWith(expect.objectContaining({ username: "ben" }), tx);
     const [entry, db] = vi.mocked(recordChange).mock.calls[0];
@@ -34,7 +34,7 @@ describe("createUser - audit trail", () => {
 
   it("logs nothing when the username is taken", async () => {
     vi.mocked(userRepository.findByUsername).mockResolvedValue({ id: 1 } as never);
-    await expect(createUser({ name: "Ben", username: "ben", password: "secret-pass", role: "ONLINE_ENCODER" }, 1)).rejects.toMatchObject({ status: 409 });
+    await expect(createUser({ name: "Ben", username: "ben", password: "secret-pass", role: "ENCODER" }, 1)).rejects.toMatchObject({ status: 409 });
     expect(recordChange).not.toHaveBeenCalled();
   });
 });

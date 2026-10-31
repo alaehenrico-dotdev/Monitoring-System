@@ -24,6 +24,60 @@ client (`client/`, React, built to static files). Nginx replaces the Caddy that 
 
 ---
 
+## Start here: Hostinger and the first connection
+
+Skip any part you have already done. Hostinger renames menu items now and then, so if a name below does not
+match, look for the closest one. The generic guide covers these in its sections 2 and 3.
+
+**A. In the Hostinger dashboard (hPanel, in your browser)**
+
+1. Log in to hPanel and open **VPS**, then your **KVM 2** server. The overview page shows the **server IP**.
+   Copy it: it is your `YOUR_SERVER_IP` everywhere below.
+2. If the server is not set up yet, run the VPS setup: choose plain **Ubuntu 24.04 LTS** (no control panel
+   such as cPanel or CyberPanel, and no pre-installed app templates), set a strong **root password**, and
+   optionally add your SSH key. Wait until the status says running.
+3. Find the **browser terminal** (a button on the VPS page). Keep it in mind: it is your way back in if you ever
+   lock yourself out of SSH.
+4. Find **Snapshots / Backups** for the VPS. Take a snapshot once the server is set up (and again before big
+   changes). It protects the whole machine, which the app's own database backups do not.
+5. If hPanel has a **Firewall** section for the VPS, allow only SSH (22), HTTP (80) and HTTPS (443). The
+   server's own `ufw` firewall (next part) does the same job; having both is fine.
+
+**B. Your domain**
+
+6. Buy a domain if you have none (Hostinger, Namecheap and others all work; a VPS does not include one).
+7. In the DNS settings of the company that holds the domain (in Hostinger: **Domains** > your domain >
+   **DNS / DNS Zone**) add an **A record**: name `stocks`, points to `YOUR_SERVER_IP`. Remove any old A record
+   for the same name that points elsewhere.
+8. On your laptop (PowerShell): `nslookup stocks.yourdomain.com`. Wait until it returns your server IP
+   (minutes, sometimes a few hours). Do not go past step 9 of this guide before it does.
+
+**C. First connection and basic safety (guide section 2)**
+
+9. On your laptop, in PowerShell:
+   ```powershell
+   ssh root@YOUR_SERVER_IP
+   ```
+   Answer `yes` to the fingerprint question, then type the root password (nothing shows while you type).
+10. Inside the server, as root:
+    ```bash
+    apt update && apt upgrade -y
+    adduser yourname
+    usermod -aG sudo yourname
+    ufw allow OpenSSH
+    ufw allow 80
+    ufw allow 443
+    ufw enable
+    ufw status
+    ```
+    Run `ufw allow OpenSSH` **before** `ufw enable`, or you lock yourself out.
+11. Open a **second** PowerShell window and check the new user works: `ssh yourname@YOUR_SERVER_IP`. From here
+    on, use that user (commands that need admin rights start with `sudo`). `exit` leaves the session.
+12. When the whole site works, do the SSH hardening from the guide's section 13 (SSH keys, no root login, no
+    password login, fail2ban, automatic security updates).
+
+You do **not** need to install PHP, Python or Composer for this app.
+
 ## 0. Check the tools (about 1 minute)
 
 ```bash
@@ -162,7 +216,7 @@ Now create the first accounts. Pick the admin password yourself, or leave the va
 prints random passwords once:
 
 ```bash
-SEED_ADMIN_PASSWORD='a-long-passphrase-you-choose' npm run seed
+SEED_ADMIN_PASSWORD='a-long-passphrase-you-choose' SEED_ENCODER_PASSWORD='another-long-passphrase' npm run seed
 ```
 
 The seed also loads the product list. Whatever the passwords are, every seeded account must choose its own
@@ -301,7 +355,7 @@ complete dump before touching anything, and takes a safety snapshot first.
 3. Put the **same** `BACKUP_ENCRYPTION_KEY` in the server's `.env` if the file is encrypted, then
    `pm2 restart ala-eh-api --update-env`.
 4. Sign in as the seeded admin, open Settings > Backup & Restore > Restore, and upload the file.
-5. After the restore the accounts are the ones from your backup, so sign in with those. The seeded admin is gone.
+5. A restore never changes the user accounts: the server keeps its own accounts, passwords, roles and two-step settings, so keep signing in as the seeded admin. Accounts that exist only in the backup stay in the database (old entries point at them) but are deactivated; create the people you need again from Settings > User Passwords.
 
 ## 13. Updating after a push (guide section 10)
 
@@ -313,6 +367,18 @@ It pulls, installs, builds, **takes a database snapshot and then migrates**, res
 it to answer. Nginx needs no change for a normal update.
 
 Then check: `.env.example` gained variables? Add them to `server/.env`. Open the site and try the changed feature.
+
+From a Windows PC, PowerShell can run the update over SSH (replace the user and address):
+
+```powershell
+ssh deploy@YOUR_SERVER_IP "bash /var/www/ala-eh/deploy/vps/deploy.sh"
+```
+
+**Updating to 2.5.0** (Encoder and Admin roles): the deploy takes the usual snapshot first, then runs the
+`single_encoder_role` migration, which turns every Online and Offline Encoder into an **Encoder** (they can then
+enter on both the Online and Offline sheets). No new required settings. Do **not** run `npm run seed` on the live
+server: it would add a new `encoder` account. After the deploy, open Settings > User Passwords and check the
+accounts; the old `online.encoder` and `offline.encoder` still work, now as Encoders.
 
 **Rolling back** a bad release: find the last good commit with `git log --oneline -5`, then
 `git reset --hard abc1234 && npm ci && npm run build && pm2 restart ala-eh-api`. A rollback does **not**

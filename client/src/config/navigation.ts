@@ -11,11 +11,7 @@ export interface NavGroup {
   links: NavLinkDef[];
 }
 
-const ALL_ROLES: Role[] = [
-  "ONLINE_ENCODER",
-  "OFFLINE_ENCODER",
-  "SUPERVISOR_ADMIN",
-];
+const ALL_ROLES: Role[] = ["ENCODER", "SUPERVISOR_ADMIN"];
 
 /**
  * Single source of truth for the app's page list and who may open each one -
@@ -99,7 +95,6 @@ export function pagesForRole(role: Role | undefined): NavLinkDef[] {
 export const GRID_PAGES = ["/online", "/offline", "/total-stocks"] as const;
 
 /// Where a product result goes when the user isn't already on a grid page.
-/// An offline encoder has no business being dropped onto the Online grid.
-export function defaultGridPageFor(role: Role | undefined): string {
-  return role === "OFFLINE_ENCODER" ? "/offline" : "/online";
+export function defaultGridPageFor(_role: Role | undefined): string {
+  return "/online";
 }

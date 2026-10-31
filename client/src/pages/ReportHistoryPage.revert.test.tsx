@@ -71,7 +71,7 @@ describe("Audit History - revert a published audit", () => {
   });
 
   it("is not offered to anyone but an admin", async () => {
-    auth.role = "ONLINE_ENCODER";
+    auth.role = "ENCODER";
     show();
     await screen.findAllByText("Download");
     expect(screen.queryByRole("button", { name: "Revert" })).toBeNull();

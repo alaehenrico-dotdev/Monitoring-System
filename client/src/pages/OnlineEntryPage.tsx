@@ -168,7 +168,7 @@ export function OnlineEntryPage() {
     Record<number, number>
   >({});
   const roleCanEdit =
-    user?.role === "ONLINE_ENCODER" || user?.role === "SUPERVISOR_ADMIN";
+    user?.role === "ENCODER" || user?.role === "SUPERVISOR_ADMIN";
   const realtimeVersion = useRealtimeVersion();
   const { online, reconnects } = useOnlineStatus();
   // A finished day is frozen: the sheet opens read-only with its saved state

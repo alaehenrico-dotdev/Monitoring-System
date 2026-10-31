@@ -7,6 +7,7 @@ import { hashPassword, passwordProblem } from "../utils/password";
 import { DUMMY_RESET_HASH, generateResetCode, hashResetCode, RESET_CODE_TTL_MS, RESET_MAX_ATTEMPTS, sameResetHash } from "../utils/resetCode";
 import { issueSession } from "./auth.service";
 import { assertAdminPassword } from "./adminPassword.service";
+import { verifyMfaCode } from "./mfa.service";
 import { logSystemEvent, recordChange } from "./changeLog.service";
 
 function assertAcceptablePassword(password: string, username: string) {
@@ -70,13 +71,20 @@ export async function issueResetCode(targetId: number, actorId: number, actorPas
   return { code, expiresAt };
 }
 
-/// Forgot password, from the login page: username + the code an administrator handed over + a
-/// new password. Every way of being wrong (no such account, no code, expired, wrong, too many
-/// guesses) gives the same answer, so this cannot be used to find out which usernames exist or
-/// have a code outstanding. A wrong guess at a live code counts against it (5, then it is
-/// cancelled); a new password that breaks the rules does NOT use the code up.
+/// Forgot password, from the login page: username + a proof + a new password. The proof is
+/// either the one-time code an administrator handed over, or - for an Encoder who has two-step
+/// verification on - a current authenticator code (or an unused recovery code). An Admin account
+/// can only use an administrator-issued code or the server command, never its authenticator alone.
+/// Every way of being wrong (no such account, no code, expired, wrong, too many guesses, locked)
+/// gives the same answer, so this cannot be used to find out which usernames exist, who has a
+/// code outstanding or who has two-step on. A wrong guess at a live admin code counts against it
+/// (5, then it is cancelled); a wrong authenticator code counts against the account's lockout
+/// (mfa.service.ts). A new password that breaks the rules is refused BEFORE either proof is
+/// spent, and does not use anything up.
 export async function resetPasswordWithCode(username: string, code: string, newPassword: string, ip?: string) {
   const invalid = () => HttpError.badRequest("That reset code is invalid or has expired. Ask your administrator for a new one.");
+  // Checked first and for everyone, so it says nothing about the account and never burns a code.
+  assertAcceptablePassword(newPassword, username);
   const user = await userRepository.findByUsername(username);
   const now = new Date();
   const hasCode = !!user && !!user.resetCodeHash && !!user.resetCodeExpiresAt;
@@ -84,18 +92,29 @@ export async function resetPasswordWithCode(username: string, code: string, newP
   const matches = sameResetHash(hashResetCode(code), hasCode ? user!.resetCodeHash! : DUMMY_RESET_HASH);
   const live = hasCode && user!.isActive && user!.resetCodeExpiresAt! > now && user!.resetCodeAttempts < RESET_MAX_ATTEMPTS;
 
-  if (!(matches && live)) {
-    if (hasCode) await userRepository.recordResetFailure(user!.id, RESET_MAX_ATTEMPTS);
-    // Only the attempted username and the address - never the code. Kept short so junk cannot bloat the log.
-    await logSystemEvent("password_reset_failed", { username: username.slice(0, 64), ip: ip ?? null });
-    throw invalid();
+  if (matches && live) {
+    const consumed = await userRepository.consumeResetCode(user!.id, user!.resetCodeHash!, now, await hashPassword(newPassword));
+    if (!consumed) throw invalid();
+    invalidate(`user-status:${user!.id}`);
+    await logSystemEvent("password_reset_by_code", { username: user!.username, ip: ip ?? null }, user!.id, "UPDATE");
+    return;
   }
 
-  assertAcceptablePassword(newPassword, user!.username);
-  const consumed = await userRepository.consumeResetCode(user!.id, user!.resetCodeHash!, now, await hashPassword(newPassword));
-  if (!consumed) throw invalid();
-  invalidate(`user-status:${user!.id}`);
-  await logSystemEvent("password_reset_by_code", { username: user!.username, ip: ip ?? null }, user!.id, "UPDATE");
+  // Self-service: an Encoder with two-step verification proves it is them with their authenticator.
+  if (user && user.isActive && user.role === Role.ENCODER && user.totpEnabledAt && user.totpSecret) {
+    const verified = await verifyMfaCode(user, code).catch(() => false);
+    if (verified) {
+      await userRepository.setPasswordHash(user.id, await hashPassword(newPassword), false);
+      invalidate(`user-status:${user.id}`);
+      await logSystemEvent("password_reset_by_mfa", { username: user.username, ip: ip ?? null }, user.id, "UPDATE");
+      return;
+    }
+  }
+
+  if (hasCode) await userRepository.recordResetFailure(user!.id, RESET_MAX_ATTEMPTS);
+  // Only the attempted username and the address - never the code. Kept short so junk cannot bloat the log.
+  await logSystemEvent("password_reset_failed", { username: username.slice(0, 64), ip: ip ?? null });
+  throw invalid();
 }
 
 export async function listUsers() {

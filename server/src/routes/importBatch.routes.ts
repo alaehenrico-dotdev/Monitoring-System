@@ -7,7 +7,7 @@ const router = Router();
 
 // Whoever can import (same roles as Manual Count's own PUT) can create a
 // batch, finalize it, and see what's been imported so far.
-const canImport = authorize(ROLES.SUPERVISOR_ADMIN, ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER);
+const canImport = authorize(ROLES.SUPERVISOR_ADMIN, ROLES.ENCODER);
 
 router.get("/", authenticate, canImport, asyncHandler(getImportBatches));
 router.post("/", authenticate, canImport, asyncHandler(postImportBatch));

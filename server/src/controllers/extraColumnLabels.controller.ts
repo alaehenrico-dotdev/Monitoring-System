@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { Role } from "@prisma/client";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
@@ -25,12 +24,6 @@ export async function getExtraLabels(req: Request, res: Response) {
 export async function putExtraLabel(req: Request, res: Response) {
   const parsed = putSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Invalid column name", parsed.error.flatten());
-  // The same gate as the grid the column belongs to.
-  const role = req.user?.role;
-  const allowed =
-    role === Role.SUPERVISOR_ADMIN ||
-    (parsed.data.location === "ONLINE" ? role === Role.ONLINE_ENCODER : role === Role.OFFLINE_ENCODER);
-  if (!allowed) throw HttpError.forbidden("You cannot rename columns on this grid");
   res.json(
     await saveExtraLabel(
       { ...parsed.data, entryDate: parseDateOnly(req.body?.date), shift: parseShift(req.body?.shift) },

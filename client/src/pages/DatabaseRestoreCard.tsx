@@ -39,7 +39,8 @@ function formatBytes(bytes: number): string {
 /// passcode Data Reset does (verified server-side, not just here), an
 /// explicit confirmation, and - like Data Reset - takes a safety backup of
 /// the CURRENT database to this device first, aborting if that fails, because
-/// a restore that dies partway can leave the database half-replaced.
+/// a restore that dies partway can leave the database half-replaced. The server
+/// keeps its own user accounts (passwords, roles, two-step) across a restore.
 export function DatabaseRestoreCard() {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<Status>("idle");

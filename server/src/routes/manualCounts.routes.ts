@@ -28,14 +28,14 @@ router.post("/publish", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHa
 router.patch(
   "/:productId/remarks",
   authenticate,
-  authorize(ROLES.SUPERVISOR_ADMIN, ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER),
+  authorize(ROLES.SUPERVISOR_ADMIN, ROLES.ENCODER),
   asyncHandler(patchCountRemarks)
 );
 
 router.put(
   "/:productId",
   authenticate,
-  authorize(ROLES.SUPERVISOR_ADMIN, ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER),
+  authorize(ROLES.SUPERVISOR_ADMIN, ROLES.ENCODER),
   asyncHandler(putManualCount)
 );
 

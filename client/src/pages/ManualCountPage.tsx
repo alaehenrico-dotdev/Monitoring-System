@@ -286,18 +286,8 @@ export function ManualCountPage() {
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
   const setShift = (s: Shift) =>
     setDateShift((prev) => ({ ...prev, shift: s }));
-  // Online/Offline encoders only work their own channel, so the page opens on
-  // (and stays on) their matching column; only the supervisor can switch.
-  const role = useAuth().user?.role;
-  const lockedLocation: CountLocation | null =
-    role === "ONLINE_ENCODER"
-      ? "ONLINE"
-      : role === "OFFLINE_ENCODER"
-        ? "OFFLINE"
-        : null;
   // Which location(s) the table shows/edits: "TOTAL" = both.
   const [sourceFilter, setSourceFilter] = useState<StockLocation>(() => {
-    if (lockedLocation) return lockedLocation;
     if (resumed) return resumed.source;
     const src = searchParams.get("source");
     return openedFromHistory &&
@@ -306,9 +296,8 @@ export function ManualCountPage() {
       : "TOTAL";
   });
   // Which location a CSV import goes into when the filter shows both.
-  const [importLocation, setImportLocation] = useState<CountLocation>(
-    lockedLocation ?? "ONLINE",
-  );
+  const [importLocation, setImportLocation] =
+    useState<CountLocation>("ONLINE");
   const csvLocation: CountLocation =
     sourceFilter === "TOTAL" ? importLocation : sourceFilter;
   const showOffline = sourceFilter !== "ONLINE";
@@ -1394,12 +1383,10 @@ export function ManualCountPage() {
                   ]}
                 />
               </FilterSlot>
-              {!lockedLocation && (
-                <StockSourceFilter
-                  value={sourceFilter}
-                  onChange={setSourceFilter}
-                />
-              )}
+              <StockSourceFilter
+                value={sourceFilter}
+                onChange={setSourceFilter}
+              />
               <DateStepper
                 value={date}
                 onChange={setDate}
@@ -1457,9 +1444,7 @@ export function ManualCountPage() {
                     if (sourceFilter !== "TOTAL") setSourceFilter(t.location);
                   }
                 }}
-                importLocations={
-                  lockedLocation ? [lockedLocation] : COUNT_LOCATIONS
-                }
+                importLocations={COUNT_LOCATIONS}
                 importTodayValue={getCurrentShiftAndDate().date}
                 columns={csvColumns}
                 // Import reads ONLY the file's Manual Count column (never

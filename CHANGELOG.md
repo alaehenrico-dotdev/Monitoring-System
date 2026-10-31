@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 2.5.0 - 2026-10-31
+
+**Upgrading a running server:** run the normal deploy (`deploy/vps/deploy.sh`, which snapshots the database before it migrates). One migration, `20261031090000_single_encoder_role`, turns every Online and Offline Encoder into an **Encoder**. No new required settings. Do not re-run `npm run seed` on a live server: it would add a new `encoder` account. Remove the accounts you do not need from the database or keep them (they all keep working as Encoders).
+
+### Changed
+- **Restoring a database no longer touches user accounts.** The server's own accounts - passwords, roles, two-step verification, active flag and sessions - are put back exactly as they were after every restore, so an older backup can never lock anyone out or bring a removed account back. Accounts that exist only in the backup are kept (old entries point at them) but deactivated. Moving data from another PC now means keeping the server's own admin sign-in.
+
+### Added
+- **Forgot password with an authenticator.** An Encoder who has two-step verification on can reset a forgotten password from the login page with a current authenticator code (or an unused recovery code) instead of waiting for an administrator. Admin accounts still need an administrator-issued code or the server command. A weak new password is now refused before any code is checked or spent, wrong authenticator codes count toward the existing per-account lockout, and every failure gives the same answer. Successful resets are logged as `password_reset_by_mfa` and sign out the account's other sessions.
+
+### Changed
+- **Two roles: Encoder and Admin.** The separate Online and Offline Encoder roles are merged into one **Encoder** (migration `20261031090000_single_encoder_role` converts existing accounts). An Encoder enters stock on both the Online and Offline grids, counts, adds and edits Awaiting Release items, and requests corrections; the Consolidated sheet is read-only for them. Approvals now belong to the Admin: **releasing** an Awaiting Release item (as well as writing it off), approving or rejecting corrections, publishing audits, closing months, reports, SKUs and settings. `npm run seed` now creates `admin` and `encoder` (`SEED_ENCODER_PASSWORD`).
+
 ### Added
 - **Account security.** Everyone gets Settings > My Account:
   - **Change your own password** (needs the current one; signs out your other sessions).

@@ -83,15 +83,15 @@ describe("rankQuickJump - role filtering", () => {
   const groupOf = (p: { to: string }) =>
     navGroups.find((g) => g.links.some((l) => l.to === p.to))?.heading ?? "Page";
 
-  it("offers an online encoder only the pages their role can open", () => {
-    const labels = rankQuickJump("", pagesForRole("ONLINE_ENCODER"), [], groupOf).map((r) => r.label);
+  it("offers an encoder only the pages their role can open", () => {
+    const labels = rankQuickJump("", pagesForRole("ENCODER"), [], groupOf).map((r) => r.label);
     expect(labels).toEqual(["Audit", "Online Entry", "Offline Entry", "Awaiting Release", "Consolidated", "Daily Out", "Corrections", "Settings"]);
     expect(labels).not.toContain("Dashboard");
     expect(labels).not.toContain("Change Log");
   });
 
   it("never surfaces an admin-only page to an encoder, even on a direct match", () => {
-    for (const role of ["ONLINE_ENCODER", "OFFLINE_ENCODER"] as const) {
+    for (const role of ["ENCODER"] as const) {
       const pages = pagesForRole(role);
       expect(rankQuickJump("dashboard", pages, [])).toEqual([]);
       expect(rankQuickJump("change log", pages, [])).toEqual([]);

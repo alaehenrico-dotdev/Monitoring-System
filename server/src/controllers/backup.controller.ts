@@ -3,6 +3,7 @@ import { applyPendingMigrations, restoreDatabaseFromStream, streamDatabaseBackup
 import { assertValidResetToken, consumeResetToken, releaseResetToken, reserveResetToken } from "../services/dataReset.service";
 import { logSystemEvent } from "../services/changeLog.service";
 import { keepDriveConnectionAcross } from "../services/drive.service";
+import { keepUserAccountsAcross } from "../services/userAccounts.service";
 import { env } from "../config/env";
 import { createBackupDecryptor } from "../utils/backupCrypto";
 import { HttpError } from "../utils/HttpError";
@@ -79,14 +80,19 @@ export async function postRestore(req: Request, res: Response) {
   const tokenId = assertValidResetToken(token, req.user!);
   reserveResetToken(tokenId);
   try {
-    // The file replaces every table, the Drive connection included; keep this
-    // server's own so a stale or foreign token in the file cannot replace it.
-    await keepDriveConnectionAcross(() => restoreDatabaseFromStream(req));
-    // The tables are replaced now, so the passcode is spent even if the
-    // update below fails - a retry would restore the file all over again.
-    consumeResetToken(tokenId);
-    // An older backup has an older table layout; bring it up to this version.
-    await applyPendingMigrations();
+    // The file replaces every table, so two things of this server's own are kept:
+    // the user accounts (passwords, roles, MFA - a restore must never change who can
+    // sign in or with what), and the Drive connection (a stale or foreign token in
+    // the file must not replace it).
+    await keepUserAccountsAcross(async () => {
+      await keepDriveConnectionAcross(() => restoreDatabaseFromStream(req));
+      // The tables are replaced now, so the passcode is spent even if the
+      // update below fails - a retry would restore the file all over again.
+      consumeResetToken(tokenId);
+      // An older backup has an older table layout; bring it up to this version
+      // (before the accounts go back, so the users table has its current columns).
+      await applyPendingMigrations();
+    });
     // Written into the restored database, so it is the first line of its history.
     await logSystemEvent("backup_restore", {}, req.user?.id, "UPDATE");
     res.json({ success: true });

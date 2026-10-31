@@ -23,11 +23,7 @@ describe("GET /report-history access", () => {
   beforeEach(() => listReportHistory.mockReset().mockResolvedValue([]));
 
   it("lets any role read Audit Report history", async () => {
-    for (const role of [
-      "ONLINE_ENCODER",
-      "OFFLINE_ENCODER",
-      "SUPERVISOR_ADMIN",
-    ]) {
+    for (const role of ["ENCODER", "SUPERVISOR_ADMIN"]) {
       const c = call(role, "Audit Report");
       await c.run();
       expect(c.json).toHaveBeenCalledWith([]);
@@ -37,7 +33,7 @@ describe("GET /report-history access", () => {
 
   it("keeps Daily and Variance history Supervisor/Admin only", async () => {
     for (const type of ["Daily Report", "Variance Report", undefined]) {
-      await expect(call("ONLINE_ENCODER", type).run()).rejects.toMatchObject({
+      await expect(call("ENCODER", type).run()).rejects.toMatchObject({
         status: 403,
       });
     }

@@ -6,7 +6,6 @@ import { HttpError } from "../utils/HttpError";
 import { finishDay, getFinishChecklist, getFinishSummary } from "../services/dayFinish.service";
 import { finishThrough, previewFinishThrough } from "../services/finishThrough.service";
 import { currentUnlockRequest, requestUnlock } from "../services/unlockRequest.service";
-import { Role } from "@prisma/client";
 import { closeDay, closeReadiness, getClosureStatus, listClosures, unlockDay, type EntryLocation } from "../services/dayLock.service";
 
 const unlockSchema = z.object({
@@ -55,16 +54,9 @@ const unlockRequestSchema = z.object({
   reason: z.string().trim().min(5, "Give a reason (at least 5 characters)").max(500),
 });
 
-/// An encoder may ask for their own page only; an admin may ask for either.
-function assertOwnPage(role: Role | undefined, location: EntryLocation) {
-  const ok = role === Role.SUPERVISOR_ADMIN || (location === "ONLINE" ? role === Role.ONLINE_ENCODER : role === Role.OFFLINE_ENCODER);
-  if (!ok) throw HttpError.forbidden("You cannot request an unlock on this page");
-}
-
 export async function postUnlockRequest(req: Request, res: Response) {
   const parsed = unlockRequestSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest(parsed.error.issues[0]?.message ?? "Invalid request", parsed.error.flatten());
-  assertOwnPage(req.user?.role, parsed.data.location);
   res.json(await requestUnlock({ ...parsed.data, entryDate: parseDateOnly(req.body?.date), shift: parseShift(req.body?.shift) }, req.user?.id));
 }
 
@@ -87,41 +79,32 @@ export async function getFinishInfo(req: Request, res: Response) {
 }
 
 /// The encoder's "Finish day": lock ONE entry page (and, once both pages are
-/// finished, save the report snapshot). An encoder can only finish their own
-/// page; an admin can finish either.
+/// finished, save the report snapshot). Encoders and admins can finish either.
 export async function postFinish(req: Request, res: Response) {
   const location = parseLocation(req.body?.location);
   if (!location) throw HttpError.badRequest("Say which page to finish (location: ONLINE or OFFLINE)");
   const role = req.user?.role;
-  if ((role === "ONLINE_ENCODER" && location !== "ONLINE") || (role === "OFFLINE_ENCODER" && location !== "OFFLINE")) {
-    throw HttpError.forbidden("You can only finish your own entry page.");
-  }
   const reason = typeof req.body?.negativeReason === "string" ? req.body.negativeReason : undefined;
   res.json(
     await finishDay(parseDateOnly(req.body?.date), parseShift(req.body?.shift), location, req.user?.id, { allowed: role === "SUPERVISOR_ADMIN", reason }),
   );
 }
 
-/// An encoder can only finish their own page; an admin can finish either.
-function finishLocation(req: Request, value: unknown): EntryLocation {
+function finishLocation(value: unknown): EntryLocation {
   const location = parseLocation(value);
   if (!location) throw HttpError.badRequest("Say which page to finish (location: ONLINE or OFFLINE)");
-  const role = req.user?.role;
-  if ((role === "ONLINE_ENCODER" && location !== "ONLINE") || (role === "OFFLINE_ENCODER" && location !== "OFFLINE")) {
-    throw HttpError.forbidden("You can only finish your own entry page.");
-  }
   return location;
 }
 
 /// What "finish through this date" would lock, with blockers and warnings.
 export async function getFinishThroughPreview(req: Request, res: Response) {
-  res.json(await previewFinishThrough(parseDateOnly(req.query.through), finishLocation(req, req.query.location)));
+  res.json(await previewFinishThrough(parseDateOnly(req.query.through), finishLocation(req.query.location)));
 }
 
 /// Finishes every unfinished period of one page up to the date, oldest first, all
 /// or nothing. Warnings must be acknowledged; blockers cannot be.
 export async function postFinishThrough(req: Request, res: Response) {
-  const location = finishLocation(req, req.body?.location);
+  const location = finishLocation(req.body?.location);
   res.json(
     await finishThrough(parseDateOnly(req.body?.through), location, req.user?.id, { acknowledgeWarnings: req.body?.acknowledgeWarnings === true }),
   );

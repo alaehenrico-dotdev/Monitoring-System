@@ -65,7 +65,7 @@ describe("broadcastNotice", () => {
 
   it("reaches only the roles it is addressed to", async () => {
     const admin = await connect("SUPERVISOR_ADMIN");
-    const encoder = await connect("ONLINE_ENCODER");
+    const encoder = await connect("ENCODER");
     await settle();
     broadcastNotice({ level: "success", message: "Backup saved" }, ["SUPERVISOR_ADMIN"]);
     await settle();
@@ -75,7 +75,7 @@ describe("broadcastNotice", () => {
 
   it("reaches everyone signed in when no roles are given", async () => {
     const admin = await connect("SUPERVISOR_ADMIN");
-    const encoder = await connect("OFFLINE_ENCODER");
+    const encoder = await connect("ENCODER");
     await settle();
     broadcastNotice({ level: "info", message: "Hello" });
     await settle();
@@ -98,8 +98,8 @@ describe("broadcastNotice", () => {
   });
 
   it("uses the account's current role, not the one frozen in the token", async () => {
-    const admin = await connect("ONLINE_ENCODER", "SUPERVISOR_ADMIN:900:0");
-    accounts.set(900, { isActive: true, role: "ONLINE_ENCODER", tokenVersion: 0, mustChangePassword: false });
+    const admin = await connect("ENCODER", "SUPERVISOR_ADMIN:900:0");
+    accounts.set(900, { isActive: true, role: "ENCODER", tokenVersion: 0, mustChangePassword: false });
     await settle();
     broadcastNotice({ level: "success", message: "Backup saved" }, ["SUPERVISOR_ADMIN"]);
     await settle();
@@ -107,12 +107,12 @@ describe("broadcastNotice", () => {
   });
 
   it("drops a connected socket once its account is signed out or deactivated", async () => {
-    const kept = await connect("ONLINE_ENCODER");
+    const kept = await connect("ENCODER");
     const revoked = await connect("SUPERVISOR_ADMIN");
     const demoted = await connect("SUPERVISOR_ADMIN");
     await settle();
     accounts.set(revoked.id, { isActive: true, role: "SUPERVISOR_ADMIN", tokenVersion: 1, mustChangePassword: false }); // signed out everywhere
-    accounts.set(demoted.id, { isActive: true, role: "ONLINE_ENCODER", tokenVersion: 0, mustChangePassword: false });
+    accounts.set(demoted.id, { isActive: true, role: "ENCODER", tokenVersion: 0, mustChangePassword: false });
     await revalidateClients();
     expect(await revoked.closed).toBe(4001);
     expect(kept.ws.readyState).toBe(WebSocket.OPEN);

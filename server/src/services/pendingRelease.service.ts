@@ -85,14 +85,12 @@ export async function updatePendingRelease(
   id: number,
   patch: { quantity?: number; reason?: string },
   userId?: number,
-  authorize?: (location: EntryLoc) => void,
 ) {
   if (patch.quantity !== undefined && (!(patch.quantity > 0) || patch.quantity > MAX_QUANTITY || round2(patch.quantity) !== patch.quantity)) {
     throw HttpError.badRequest("Quantity must be more than 0, with at most 2 decimals.");
   }
   return prisma.$transaction(async (tx) => {
     const item = await loadAwaiting(tx, id);
-    authorize?.(item.location as EntryLoc);
     const updated = await tx.pendingRelease.update({ where: { id }, data: { quantity: patch.quantity, reason: patch.reason } });
     await recordChange({ tableName: PENDING_RELEASES_TABLE, recordId: id, action: "UPDATE", changedById: userId, oldValue: item, newValue: updated }, tx);
     return updated;
@@ -130,9 +128,6 @@ export async function releasePendingRelease(
   note: string | undefined,
   userId?: number,
   now: Date = new Date(),
-  /// Called with the item's own page once it is loaded, so a caller can refuse a
-  /// role that does not work that page. Throws to refuse.
-  authorize?: (location: EntryLoc) => void,
 ) {
   const today = toDateOnlyString(now);
   const day = toDateOnlyString(target.entryDate);
@@ -143,7 +138,6 @@ export async function releasePendingRelease(
 
   const result = await serializableTransaction(async (tx) => {
     const item = await loadAwaiting(tx, id);
-    authorize?.(item.location as EntryLoc);
     if (day < toDateOnlyString(item.madeDate)) {
       throw HttpError.badRequest(`These were made on ${toDateOnlyString(item.madeDate)}; they can't be released before that.`);
     }

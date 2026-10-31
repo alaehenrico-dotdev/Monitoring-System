@@ -68,6 +68,7 @@ service-account*.json
 # and are source.
 *.sql.gz
 *.sql.gz.*
+*.sql.enc
 *.sql.zip
 *.sql.bz2
 *.sql.xz

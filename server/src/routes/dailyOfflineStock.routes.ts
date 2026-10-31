@@ -5,13 +5,13 @@ import { getOfflineStockGrid, putOfflineStockEntry } from "../controllers/dailyO
 
 const router = Router();
 
-// Section 3.2 - every role can view the Offline grid (Online Encoder is
-// read-only here); only the Offline Encoder / Supervisor-Admin can write.
+// Section 3.2 - every role can view the Offline grid; Encoders and the
+// Admin can write.
 router.get("/", authenticate, asyncHandler(getOfflineStockGrid));
 router.put(
   "/:productId",
   authenticate,
-  authorize(ROLES.OFFLINE_ENCODER, ROLES.SUPERVISOR_ADMIN),
+  authorize(ROLES.ENCODER, ROLES.SUPERVISOR_ADMIN),
   asyncHandler(putOfflineStockEntry)
 );
 

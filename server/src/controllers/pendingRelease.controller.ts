@@ -1,6 +1,5 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
-import { Role } from "@prisma/client";
 import { HttpError } from "../utils/HttpError";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
@@ -11,7 +10,6 @@ import {
   listPendingReleases,
   releasePendingRelease,
   updatePendingRelease,
-  type EntryLoc,
 } from "../services/pendingRelease.service";
 
 const quantity = z.number().finite().positive().max(99_999_999);
@@ -43,14 +41,6 @@ function parse<T>(schema: z.ZodType<T>, body: unknown): T {
   return parsed.data;
 }
 
-/// An encoder works their own page only; an admin works either.
-function assertOwnPage(req: Request, location: EntryLoc) {
-  const role = req.user?.role;
-  if ((role === Role.ONLINE_ENCODER && location !== "ONLINE") || (role === Role.OFFLINE_ENCODER && location !== "OFFLINE")) {
-    throw HttpError.forbidden("You can only work with your own entry page.");
-  }
-}
-
 export async function getPendingReleases(req: Request, res: Response) {
   const status = ["AWAITING", "RELEASED", "CANCELLED"].includes(String(req.query.status)) ? (req.query.status as "AWAITING" | "RELEASED" | "CANCELLED") : undefined;
   const location = req.query.location === "ONLINE" || req.query.location === "OFFLINE" ? req.query.location : undefined;
@@ -66,21 +56,18 @@ export async function getPendingSummary(_req: Request, res: Response) {
 
 export async function postPendingRelease(req: Request, res: Response) {
   const body = parse(createSchema, req.body);
-  assertOwnPage(req, body.location);
   res.status(201).json(
     await createPendingRelease({ ...body, madeDate: parseDateOnly(body.madeDate) }, req.user?.id),
   );
 }
 
 export async function patchPendingRelease(req: Request, res: Response) {
-  res.json(await updatePendingRelease(id(req), parse(updateSchema, req.body), req.user?.id, (location) => assertOwnPage(req, location)));
+  res.json(await updatePendingRelease(id(req), parse(updateSchema, req.body), req.user?.id));
 }
 
 export async function postRelease(req: Request, res: Response) {
   const body = parse(releaseSchema, req.body);
-  const result = await releasePendingRelease(id(req), { entryDate: parseDateOnly(body.date), shift: parseShift(body.shift) }, body.note, req.user?.id, undefined, (location) =>
-    assertOwnPage(req, location),
-  );
+  const result = await releasePendingRelease(id(req), { entryDate: parseDateOnly(body.date), shift: parseShift(body.shift) }, body.note, req.user?.id);
   res.json(result);
 }
 

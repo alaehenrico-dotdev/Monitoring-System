@@ -13,7 +13,7 @@ const api = vi.hoisted(() => ({
 vi.mock("../api/pendingReleases", () => api);
 const products = vi.hoisted(() => ({ listProducts: vi.fn() }));
 vi.mock("../api/products", () => products);
-const auth = vi.hoisted(() => ({ role: "OFFLINE_ENCODER" as string }));
+const auth = vi.hoisted(() => ({ role: "ENCODER" as string }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: auth.role } }) }));
 vi.mock("../context/RealtimeContext", () => ({ useRealtimeVersion: () => 0 }));
 vi.mock("../components/PageHeader", () => ({ PageHeader: ({ children }: { children?: ReactNode }) => <div>{children}</div> }));
@@ -43,22 +43,23 @@ const item = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   id = 0;
-  auth.role = "OFFLINE_ENCODER";
+  auth.role = "ENCODER";
   api.listPendingReleases.mockResolvedValue({ items: [item()], total: 1 });
   products.listProducts.mockResolvedValue([{ id: 11, name: "SPECIAL", sku: "AFP007" }]);
 });
 
 describe("AwaitingReleasePage", () => {
-  it("lists what is waiting, with its age, and starts on the encoder's own page", async () => {
+  it("lists what is waiting, with its age, for both pages", async () => {
     render(<AwaitingReleasePage />);
     expect(await screen.findByText("SPECIAL (AFP007)")).toBeTruthy();
     expect(screen.getByText(/waiting 3 days/)).toBeTruthy();
     expect(screen.getByText(/No sticker yet/)).toBeTruthy();
-    expect(api.listPendingReleases).toHaveBeenCalledWith({ status: "AWAITING", location: "OFFLINE" }, 0, 20);
-    expect(screen.queryByRole("combobox", { name: "Page" })).toBeNull(); // an encoder has no page choice
+    expect(api.listPendingReleases).toHaveBeenCalledWith({ status: "AWAITING", location: undefined }, 0, 20);
+    expect(screen.getByRole("combobox", { name: "Page" })).toBeTruthy();
   });
 
   it("releases an item into the current shift and says where it went", async () => {
+    auth.role = "SUPERVISOR_ADMIN";
     api.releasePendingRelease.mockResolvedValue({});
     render(<AwaitingReleasePage />);
     fireEvent.click(await screen.findByRole("button", { name: /Release…/ }));
@@ -72,6 +73,7 @@ describe("AwaitingReleasePage", () => {
   });
 
   it("keeps the dialog open with the server's reason when a release is refused", async () => {
+    auth.role = "SUPERVISOR_ADMIN";
     api.releasePendingRelease.mockRejectedValue(new Error("Offline entries for 2026-10-17 (Night shift) are finished and locked."));
     render(<AwaitingReleasePage />);
     fireEvent.click(await screen.findByRole("button", { name: /Release…/ }));
@@ -101,11 +103,11 @@ describe("AwaitingReleasePage", () => {
     await waitFor(() => expect(api.cancelPendingRelease).toHaveBeenCalledWith(1, "Spoiled in storage"));
   });
 
-  it("does not offer actions on another page's items", async () => {
-    api.listPendingReleases.mockResolvedValue({ items: [item({ location: "ONLINE" })], total: 1 });
+  it("leaves releasing to the admin, but lets an encoder edit", async () => {
     render(<AwaitingReleasePage />);
     await screen.findByText("SPECIAL (AFP007)");
     expect(screen.queryByRole("button", { name: /Release…/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeTruthy();
   });
 
   it("adds an item for the product, quantity and reason given", async () => {
@@ -117,7 +119,7 @@ describe("AwaitingReleasePage", () => {
     expect(add.disabled).toBe(true);
 
     await waitFor(() => expect(within(dialog).getByRole("option", { name: /SPECIAL/ })).toBeTruthy());
-    fireEvent.change(within(dialog).getAllByRole("combobox")[0], { target: { value: "11" } });
+    fireEvent.change(within(dialog).getAllByRole("combobox")[1], { target: { value: "11" } });
     fireEvent.change(within(dialog).getByLabelText("Quantity"), { target: { value: "12" } });
     expect(add.disabled).toBe(false);
     fireEvent.click(add);

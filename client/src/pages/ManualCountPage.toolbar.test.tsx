@@ -335,7 +335,7 @@ describe("ManualCountPage - publishing the sheet", () => {
   });
 
   it("is a supervisor's step: encoders do not get the button", async () => {
-    auth.role = "ONLINE_ENCODER";
+    auth.role = "ENCODER";
     await open();
     await screen.findAllByText("3 unpublished");
     expect(publishBtn()).toBeUndefined();

@@ -91,33 +91,31 @@ async function main() {
   assert.equal(healthBody.database, "ok");
   logPass("API and database readiness");
 
-  const onlineUser = await login(process.env.E2E_ONLINE_USERNAME ?? "online.encoder", process.env.E2E_ONLINE_PASSWORD ?? "");
-  const offlineUser = await login(process.env.E2E_OFFLINE_USERNAME ?? "offline.encoder", process.env.E2E_OFFLINE_PASSWORD ?? "");
+  const encoder = await login(process.env.E2E_ENCODER_USERNAME ?? "encoder", process.env.E2E_ENCODER_PASSWORD ?? "");
   const admin = await login(process.env.E2E_ADMIN_USERNAME ?? "admin", process.env.E2E_ADMIN_PASSWORD ?? "");
-  assert.equal(onlineUser.user.role, "ONLINE_ENCODER");
-  assert.equal(offlineUser.user.role, "OFFLINE_ENCODER");
+  assert.equal(encoder.user.role, "ENCODER");
   assert.equal(admin.user.role, "SUPERVISOR_ADMIN");
 
   const badLogin = await request("/auth/login", {
     method: "POST",
-    body: { username: process.env.E2E_ONLINE_USERNAME ?? "online.encoder", password: "deliberately-wrong-password" },
+    body: { username: process.env.E2E_ENCODER_USERNAME ?? "encoder", password: "deliberately-wrong-password" },
   });
   assert.equal(badLogin.status, 401, "invalid credentials are rejected");
   logPass("login and role assignment");
 
-  const productsResponse = await request("/products", { token: onlineUser.token });
+  const productsResponse = await request("/products", { token: encoder.token });
   const products = await expectJson(productsResponse, 200, "authenticated product list");
   const product = products.find((item) => item.sku === "AFP001") ?? products[0];
   assert.ok(product?.id, "seeded product exists");
 
   const date = new Date(Date.now() + randomInt(5_000, 20_000) * 86_400_000).toISOString().slice(0, 10);
   const stockPath = `/online-stock/${product.id}?date=${date}&shift=NIGHT`;
-  const forbiddenWrite = await request(stockPath, {
-    method: "PUT",
-    token: offlineUser.token,
-    body: { productionIn: 1 },
+  const forbiddenRelease = await request("/pending-releases/1/release", {
+    method: "POST",
+    token: encoder.token,
+    body: { date, shift: "NIGHT" },
   });
-  assert.equal(forbiddenWrite.status, 403, "offline encoders cannot write online stock");
+  assert.equal(forbiddenRelease.status, 403, "encoders cannot release an awaiting item - that is the admin's approval");
   logPass("role-based write permissions");
 
   // Awaiting release, month close and Finish pending days: the role boundaries
@@ -126,25 +124,17 @@ async function main() {
   // so they leave the database as they found it.
   const anonymousList = await request("/pending-releases");
   assert.equal(anonymousList.status, 401, "the awaiting-release list needs a login");
-  const encoderCloseMonth = await request("/month-closures/2020-01/close", { method: "POST", token: onlineUser.token, body: {} });
+  const encoderCloseMonth = await request("/month-closures/2020-01/close", { method: "POST", token: encoder.token, body: {} });
   assert.equal(encoderCloseMonth.status, 403, "encoders cannot close a month");
   const encoderUnlockMonth = await request("/month-closures/2020-01/unlock", {
     method: "POST",
-    token: offlineUser.token,
+    token: encoder.token,
     body: { reason: "an encoder is not allowed to do this" },
   });
   assert.equal(encoderUnlockMonth.status, 403, "encoders cannot unlock a month");
-  const encoderWriteOff = await request("/pending-releases/1/cancel", { method: "POST", token: onlineUser.token, body: { note: "not allowed" } });
+  const encoderWriteOff = await request("/pending-releases/1/cancel", { method: "POST", token: encoder.token, body: { note: "not allowed" } });
   assert.equal(encoderWriteOff.status, 403, "only an admin writes an awaiting item off");
-  const wrongPageItem = await request("/pending-releases", {
-    method: "POST",
-    token: onlineUser.token,
-    body: { location: "OFFLINE", productId: product.id, quantity: 1, madeDate: date, madeShift: "NIGHT", reason: "e2e: wrong page" },
-  });
-  assert.equal(wrongPageItem.status, 403, "an Online encoder cannot record an Offline item");
-  const wrongPageFinish = await request("/day-closures/finish-through/preview?through=2020-01-02&location=OFFLINE", { token: onlineUser.token });
-  assert.equal(wrongPageFinish.status, 403, "an Online encoder cannot plan an Offline finish");
-  logPass("role boundaries on awaiting release, month close and finish pending days");
+  logPass("role boundaries on awaiting release and month close");
 
   const pendingSummary = await expectJson(await request("/pending-releases/summary", { token: admin.token }), 200, "awaiting-release summary");
   assert.equal(typeof pendingSummary.awaiting, "number");
@@ -153,7 +143,7 @@ async function main() {
   const readiness = await expectJson(await request("/month-closures/2020-01/readiness", { token: admin.token }), 200, "month readiness");
   assert.equal(readiness.ready, false, "a month with no entries is not ready to close");
   const finishPlan = await expectJson(
-    await request("/day-closures/finish-through/preview?through=2020-01-02&location=ONLINE", { token: onlineUser.token }),
+    await request("/day-closures/finish-through/preview?through=2020-01-02&location=ONLINE", { token: encoder.token }),
     200,
     "finish pending days preview",
   );
@@ -162,12 +152,12 @@ async function main() {
 
   const save = await request(stockPath, {
     method: "PUT",
-    token: onlineUser.token,
+    token: encoder.token,
     body: { productionIn: 11 },
   });
   const savedRow = await expectJson(save, 200, "online stock save");
   assert.equal(Number(savedRow.remainingStock), Number(savedRow.openingStock) + 11);
-  const gridResponse = await request(`/online-stock?date=${date}&shift=NIGHT`, { token: onlineUser.token });
+  const gridResponse = await request(`/online-stock?date=${date}&shift=NIGHT`, { token: encoder.token });
   const grid = await expectJson(gridResponse, 200, "saved online stock is readable");
   const savedGridRow = grid.find((item) => item.product.id === product.id);
   assert.equal(savedGridRow?.isSaved, true);
@@ -184,7 +174,7 @@ async function main() {
   const sentinelDate = addDays(date, 2);
   const sentinel = await request(`/online-stock/${product.id}?date=${sentinelDate}&shift=NIGHT`, {
     method: "PUT",
-    token: onlineUser.token,
+    token: encoder.token,
     body: { productionIn: 99 },
   });
   assert.equal(sentinel.status, 200, "post-backup sentinel row was created");

@@ -10,9 +10,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// Two roles: an ENCODER enters stock on both the Online and Offline grids; the
+/// admin (SUPERVISOR_ADMIN) approves, reports on and configures everything.
 enum Role {
-  ONLINE_ENCODER
-  OFFLINE_ENCODER
+  ENCODER
   SUPERVISOR_ADMIN
 }
 

@@ -22,26 +22,26 @@ router.get("/finish-summary", authenticate, asyncHandler(getFinishInfo));
 router.post(
   "/finish",
   authenticate,
-  authorize(ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER, ROLES.SUPERVISOR_ADMIN),
+  authorize(ROLES.ENCODER, ROLES.SUPERVISOR_ADMIN),
   asyncHandler(postFinish),
 );
 router.get(
   "/finish-through/preview",
   authenticate,
-  authorize(ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER, ROLES.SUPERVISOR_ADMIN),
+  authorize(ROLES.ENCODER, ROLES.SUPERVISOR_ADMIN),
   asyncHandler(getFinishThroughPreview),
 );
 router.post(
   "/finish-through",
   authenticate,
-  authorize(ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER, ROLES.SUPERVISOR_ADMIN),
+  authorize(ROLES.ENCODER, ROLES.SUPERVISOR_ADMIN),
   asyncHandler(postFinishThrough),
 );
 router.get("/unlock-request", authenticate, asyncHandler(getUnlockRequest));
 router.post(
   "/unlock-request",
   authenticate,
-  authorize(ROLES.ONLINE_ENCODER, ROLES.OFFLINE_ENCODER, ROLES.SUPERVISOR_ADMIN),
+  authorize(ROLES.ENCODER, ROLES.SUPERVISOR_ADMIN),
   asyncHandler(postUnlockRequest),
 );
 router.get("/", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), asyncHandler(getClosures));

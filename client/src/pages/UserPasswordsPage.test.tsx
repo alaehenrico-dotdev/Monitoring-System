@@ -8,8 +8,8 @@ vi.mock("../api/users", () => api);
 vi.mock("../components/Toast", () => ({ showToast: vi.fn() }));
 
 const ACCOUNTS = [
-  { id: 1, name: "Ana Cruz", username: "ana", role: "ONLINE_ENCODER", isActive: true },
-  { id: 2, name: "Ben Reyes", username: "ben", role: "OFFLINE_ENCODER", isActive: false },
+  { id: 1, name: "Ana Cruz", username: "ana", role: "ENCODER", isActive: true },
+  { id: 2, name: "Ben Reyes", username: "ben", role: "ENCODER", isActive: false },
 ];
 const dialog = () => screen.getByRole("dialog");
 

@@ -8,7 +8,7 @@ const close = vi.hoisted(() => vi.fn());
 
 vi.mock("../context/AuthContext", () => ({
   useAuth: () => ({
-    user: { id: 1, username: "ana", name: "Ana Cruz", role: "ONLINE_ENCODER" },
+    user: { id: 1, username: "ana", name: "Ana Cruz", role: "ENCODER" },
     logout,
   }),
 }));
