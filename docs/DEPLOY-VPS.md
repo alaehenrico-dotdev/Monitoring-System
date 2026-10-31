@@ -154,9 +154,9 @@ For a private repo, use the deploy key method from the guide.
 ## 4. A folder for backups
 
 ```bash
-sudo mkdir -p /var/backups/ala-eh
-sudo chown $USER:$USER /var/backups/ala-eh
-chmod 700 /var/backups/ala-eh
+sudo mkdir -p /var/backups/alaeh-stocks
+sudo chown $USER:$USER /var/backups/alaeh-stocks
+chmod 700 /var/backups/alaeh-stocks
 ```
 
 The backup script and the pre-update snapshots write here.
@@ -184,7 +184,7 @@ openssl rand -base64 32      # use for BACKUP_ENCRYPTION_KEY
 | `CLIENT_ORIGIN` | `https://stocks.yourdomain.com` exactly as typed in the browser, no trailing slash |
 | `HOST` / `PORT` | `127.0.0.1` / `4000` (the example file already has these) |
 | `TRUST_PROXY` | leave it unset: the default `loopback` is right, because Nginx runs on this same machine |
-| `BACKUP_DIR` | `/var/backups/ala-eh/daily` (the Backups page lists the files it finds here) |
+| `BACKUP_DIR` | `/var/backups/alaeh-stocks/daily` (the Backups page lists the files it finds here) |
 | `BACKUP_ENCRYPTION_KEY` | the second generated value. **Copy it somewhere off the server** (password manager): without it your encrypted backups cannot be opened. |
 
 If the password has symbols in it, they must be percent-encoded inside `DATABASE_URL`; a password from
@@ -319,7 +319,7 @@ Run it once by hand to see it work:
 
 ```bash
 bash /var/www/ala-eh/scripts/backup.sh
-ls -lh /var/backups/ala-eh/daily        # a .sql.gz.enc file
+ls -lh /var/backups/alaeh-stocks/daily        # a .sql.gz.enc file
 ```
 
 It also shows up under Settings > Backup & Restore, where each file can be verified in place.
@@ -327,7 +327,7 @@ It also shows up under Settings > Backup & Restore, where each file can be verif
 **Off the server** (a backup next to the database is lost with it). From PowerShell on your laptop:
 
 ```powershell
-scp yourname@YOUR_SERVER_IP:/var/backups/ala-eh/daily/* .
+scp yourname@YOUR_SERVER_IP:/var/backups/alaeh-stocks/daily/* .
 ```
 
 You can also connect Google Drive for a weekly encrypted copy (Settings > Google Drive; see
@@ -383,7 +383,7 @@ accounts; the old `online.encoder` and `offline.encoder` still work, now as Enco
 **Rolling back** a bad release: find the last good commit with `git log --oneline -5`, then
 `git reset --hard abc1234 && npm ci && npm run build && pm2 restart alaeh-stocks`. A rollback does **not**
 undo database migrations. If a migration has to be undone, restore the snapshot the deploy took
-(`/var/backups/ala-eh/snapshots`, newest first) with `restore.sh` as in step 11.
+(`/var/backups/alaeh-stocks/snapshots`, newest first) with `restore.sh` as in step 11.
 
 ## 14. Checks and troubleshooting for this app
 
@@ -396,7 +396,7 @@ undo database migrations. If a migration has to be undone, restore the snapshot 
 | Screens do not update live | The `/ws` block is missing or was edited: it needs the `Upgrade` and `Connection "upgrade"` headers. |
 | 404 on a page refresh | The `try_files $uri /index.html` line in `location /` is missing. |
 | Restore fails with 413 or a timeout | The `/api/backup/` block was removed or edited (it allows 520 MB and 10 minutes). |
-| Backups page lists nothing | `BACKUP_DIR` in `server/.env` must be `/var/backups/ala-eh/daily`, and the cron job must have run once. |
+| Backups page lists nothing | `BACKUP_DIR` in `server/.env` must be `/var/backups/alaeh-stocks/daily`, and the cron job must have run once. |
 | `mysqldump` not found when backing up | `sudo apt install -y mysql-client`. |
 | `npm run build` ends with `Killed` | Out of memory: add the swap file from guide section 14. |
 | Deploy script stops at `git pull` | Local changes on the server. `git status`, then discard or commit them; the script never merges. |

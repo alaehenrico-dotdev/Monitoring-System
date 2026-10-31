@@ -63,7 +63,7 @@ service-account*.json
 
 # --- Data that must never be committed ----------------------------------------
 # Database dumps and backups. The backup scripts write outside the repo by default
-# (C:\ala-eh-backups, /var/backups/ala-eh); this catches one pointed inside it.
+# (C:\ala-eh-backups, /var/backups/alaeh-stocks); this catches one pointed inside it.
 # Deliberately NOT "*.sql": the migrations under server/prisma/migrations are SQL
 # and are source.
 *.sql.gz

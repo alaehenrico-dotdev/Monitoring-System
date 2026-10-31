@@ -9,8 +9,8 @@
 # restore of the wrong file is itself recoverable.
 #
 # Usage:
-#   scripts/restore.sh --file /var/backups/ala-eh/daily/db_backup_2026-10-09_020000.sql.gz --yes
-#   scripts/restore.sh --file /var/backups/ala-eh/daily/db_backup_2026-10-09_020000.sql.gz.enc --yes
+#   scripts/restore.sh --file /var/backups/alaeh-stocks/daily/db_backup_2026-10-09_020000.sql.gz --yes
+#   scripts/restore.sh --file /var/backups/alaeh-stocks/daily/db_backup_2026-10-09_020000.sql.gz.enc --yes
 #   scripts/restore.sh --latest --yes
 #
 # An encrypted backup (.sql.gz.enc, made when BACKUP_ENCRYPTION_KEY is set) is decrypted into a
@@ -19,7 +19,7 @@
 #
 # Env: DATABASE_URL (required, read from server/.env if present),
 #      BACKUP_ENCRYPTION_KEY (only for encrypted backups; read from server/.env if present),
-#      BACKUP_DIR (default /var/backups/ala-eh), MYSQL_PATH, MYSQLDUMP_PATH.
+#      BACKUP_DIR (default /var/backups/alaeh-stocks), MYSQL_PATH, MYSQLDUMP_PATH.
 
 set -Eeuo pipefail
 
@@ -62,7 +62,7 @@ DB_PORT="${hostport#*:}"
 DB_NAME="${hostpath#*/}"
 DB_NAME="${DB_NAME%%\?*}"
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/ala-eh}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/alaeh-stocks}"
 
 if (( LATEST )); then
   FILE="$(ls -1t "$BACKUP_DIR"/daily/*.sql.gz "$BACKUP_DIR"/daily/*.sql.gz.enc \

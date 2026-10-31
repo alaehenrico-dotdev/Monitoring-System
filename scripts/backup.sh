@@ -20,7 +20,7 @@
 #   scripts/backup.sh --mode snapshot --label pre-migration
 #
 # Env: DATABASE_URL (required, read from server/.env if present),
-#      BACKUP_DIR (default /var/backups/ala-eh), MYSQLDUMP_PATH.
+#      BACKUP_DIR (default /var/backups/alaeh-stocks), MYSQLDUMP_PATH.
 
 # Exit on error, on unset variable, and make a failing stage of a pipeline
 # fail the whole pipeline - without pipefail, `mysqldump | gzip` reports
@@ -79,7 +79,7 @@ DB_PORT="${hostport#*:}"
 DB_NAME="${hostpath#*/}"
 DB_NAME="${DB_NAME%%\?*}"
 
-BACKUP_DIR="${BACKUP_DIR:-/var/backups/ala-eh}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/alaeh-stocks}"
 SUB="daily"; [[ "$MODE" == "snapshot" ]] && SUB="snapshots"
 TARGET_DIR="$BACKUP_DIR/$SUB"
 mkdir -p "$TARGET_DIR"

@@ -12,7 +12,7 @@
 //   node scripts/docker-backup.mjs restore --file <path.sql.gz> --yes --database scratch_check
 //
 // Backups go to DOCKER_BACKUP_DIR (default C:\ala-eh-backups\docker, or
-// /var/backups/ala-eh/docker) - outside the repo and outside the Docker volume, so
+// /var/backups/alaeh-stocks/docker) - outside the repo and outside the Docker volume, so
 // `docker compose down -v` or a deleted volume cannot take them with it. The
 // newest DOCKER_BACKUP_KEEP (default 30) are kept.
 //
@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const APP_DB = "ala_eh_stocks";
-const DIR = process.env.DOCKER_BACKUP_DIR || (process.platform === "win32" ? "C:\\ala-eh-backups\\docker" : "/var/backups/ala-eh/docker");
+const DIR = process.env.DOCKER_BACKUP_DIR || (process.platform === "win32" ? "C:\\ala-eh-backups\\docker" : "/var/backups/alaeh-stocks/docker");
 const KEEP = Number(process.env.DOCKER_BACKUP_KEEP || 30);
 const IN_CONTAINER = "/tmp/ala-eh-transfer.sql.gz";
 

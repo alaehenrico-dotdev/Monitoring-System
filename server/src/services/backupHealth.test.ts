@@ -58,7 +58,7 @@ describe("backupHealth - when a backup counts as overdue", () => {
   });
 
   it("keeps the configured rule when a backup folder with daily scripts is set, whatever Drive does", async () => {
-    mocks.env.backupDir = "/var/backups/ala-eh";
+    mocks.env.backupDir = "/var/backups/alaeh-stocks";
     mocks.prisma.driveConnection.findUnique.mockResolvedValue({ autoBackup: true });
     // (the folder does not exist in this test, so it lists nothing; the record decides)
     lastBackup(5 * 24);
