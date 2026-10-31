@@ -46,6 +46,13 @@ step "Migrating the database (snapshot first)"
 npm run db:migrate:deploy
 
 step "Restarting the API"
+# The process used to be called ala-eh-api. A server that still has it would otherwise start a
+# second copy under the new name next to it, and the two would fight over the same port. Remove
+# the old one once (a few seconds of downtime); pm2 then starts it again under its new name.
+if pm2 describe ala-eh-api >/dev/null 2>&1; then
+  echo "Renaming the PM2 process ala-eh-api -> alaeh-stocks"
+  pm2 delete ala-eh-api
+fi
 pm2 startOrReload ecosystem.config.cjs --update-env
 pm2 save
 
@@ -55,7 +62,7 @@ for _ in $(seq 1 30); do
   if curl -fsS "http://127.0.0.1:$API_PORT/health/live" >/dev/null 2>&1; then up=1; break; fi
   sleep 1
 done
-[[ -n "$up" ]] || die "The API did not answer. Look at: pm2 logs ala-eh-api --lines 50"
+[[ -n "$up" ]] || die "The API did not answer. Look at: pm2 logs alaeh-stocks --lines 50"
 
 printf '\nDeployed OK (%s)\n' "$(git log --oneline -1)"
 printf 'Check it in the browser, and if .env.example gained new variables, add them to server/.env.\n'

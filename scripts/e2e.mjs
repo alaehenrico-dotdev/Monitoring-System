@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const baseUrl = process.env.E2E_API_URL ?? "http://127.0.0.1:4000";
@@ -35,12 +35,25 @@ function checkHealth() {
   return fetch(new URL("/health", baseUrl));
 }
 
+// A seeded account must choose its own password before it can do anything else (the API
+// answers 403 until it does), exactly as a person's first sign-in goes. So after logging in,
+// replace a still-forced password and carry on with the new session. The result also holds
+// the password now in effect, for the steps that must send it again (the backup download).
 async function login(username, password) {
   const response = await request("/auth/login", { method: "POST", body: { username, password } });
   assert.equal(response.status, 200, `login for ${username}`);
   const result = await response.json();
   assert.ok(result.token, `login token for ${username}`);
-  return result;
+  const me = await expectJson(await request("/auth/me", { token: result.token }), 200, `profile for ${username}`);
+  if (!me.mustChangePassword) return { ...result, password };
+  const next = `E2e-Changed-${randomUUID()}`;
+  const changed = await expectJson(
+    await request("/auth/change-password", { method: "POST", token: result.token, body: { currentPassword: password, newPassword: next } }),
+    200,
+    `first-login password change for ${username}`,
+  );
+  assert.ok(changed.token, `session after the password change for ${username}`);
+  return { ...changed, password: next };
 }
 
 async function expectJson(response, status, label) {
@@ -166,7 +179,7 @@ async function main() {
 
   const noPasswordBackup = await request("/backup/download", { token: admin.token });
   assert.equal(noPasswordBackup.status, 403, "backup download requires the admin password");
-  const backupResponse = await request("/backup/download", { token: admin.token, headers: { "X-Admin-Password": process.env.E2E_ADMIN_PASSWORD ?? "" } });
+  const backupResponse = await request("/backup/download", { token: admin.token, headers: { "X-Admin-Password": admin.password } });
   assert.equal(backupResponse.status, 200, "admin can download a database backup");
   const backup = new Uint8Array(await backupResponse.arrayBuffer());
   assert.ok(new TextDecoder().decode(backup.slice(0, 32)).startsWith("-- MySQL dump"), "backup has a mysqldump header");

@@ -4,7 +4,7 @@
 module.exports = {
   apps: [
     {
-      name: "ala-eh-api",
+      name: "alaeh-stocks",
       cwd: "./server",
       script: "dist/server.js",
       env: { NODE_ENV: "production", HOST: "127.0.0.1" },

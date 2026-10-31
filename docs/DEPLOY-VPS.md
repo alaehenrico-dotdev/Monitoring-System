@@ -238,12 +238,12 @@ pm2 install pm2-logrotate
 [CHECK]
 
 ```bash
-pm2 status                                        # ala-eh-api: online
+pm2 status                                        # alaeh-stocks: online
 curl -fsS http://127.0.0.1:4000/health/live       # {"status":"ok"}
 sudo ss -tulpn | grep 4000                        # must show 127.0.0.1:4000, never 0.0.0.0
 ```
 
-If it is not online, `pm2 logs ala-eh-api --lines 50` says why. A missing or too-short setting is named in
+If it is not online, `pm2 logs alaeh-stocks --lines 50` says why. A missing or too-short setting is named in
 the message.
 
 ## 8. Nginx (guide section 7)
@@ -292,7 +292,7 @@ sudo certbot renew --dry-run
 ```
 
 `CLIENT_ORIGIN` in `server/.env` must already be the `https://` address (step 5). If you had to change it:
-`pm2 restart ala-eh-api --update-env`.
+`pm2 restart alaeh-stocks --update-env`.
 
 ## 10. First sign-in
 
@@ -339,10 +339,10 @@ And use Hostinger's snapshot feature as the whole-server backup.
 server, which also works when the app is down):
 
 ```bash
-pm2 stop ala-eh-api
+pm2 stop alaeh-stocks
 bash /var/www/ala-eh/scripts/restore.sh --latest --yes          # or --file /path/to/backup.sql.gz.enc
 npm run prisma:migrate:deploy --workspace server                 # only needed if the backup is from an older version
-pm2 start ala-eh-api
+pm2 start alaeh-stocks
 ```
 
 `restore.sh` opens encrypted backups itself (it needs the same key in `server/.env`), checks the file is a
@@ -353,7 +353,7 @@ complete dump before touching anything, and takes a safety snapshot first.
 1. On the other PC, download a backup from Settings > Backup & Restore.
 2. On the server, finish steps 1 to 10 (seed first, so you can sign in).
 3. Put the **same** `BACKUP_ENCRYPTION_KEY` in the server's `.env` if the file is encrypted, then
-   `pm2 restart ala-eh-api --update-env`.
+   `pm2 restart alaeh-stocks --update-env`.
 4. Sign in as the seeded admin, open Settings > Backup & Restore > Restore, and upload the file.
 5. A restore never changes the user accounts: the server keeps its own accounts, passwords, roles and two-step settings, so keep signing in as the seeded admin. Accounts that exist only in the backup stay in the database (old entries point at them) but are deactivated; create the people you need again from Settings > User Passwords.
 
@@ -381,7 +381,7 @@ server: it would add a new `encoder` account. After the deploy, open Settings > 
 accounts; the old `online.encoder` and `offline.encoder` still work, now as Encoders.
 
 **Rolling back** a bad release: find the last good commit with `git log --oneline -5`, then
-`git reset --hard abc1234 && npm ci && npm run build && pm2 restart ala-eh-api`. A rollback does **not**
+`git reset --hard abc1234 && npm ci && npm run build && pm2 restart alaeh-stocks`. A rollback does **not**
 undo database migrations. If a migration has to be undone, restore the snapshot the deploy took
 (`/var/backups/ala-eh/snapshots`, newest first) with `restore.sh` as in step 11.
 
@@ -389,8 +389,8 @@ undo database migrations. If a migration has to be undone, restore the snapshot 
 
 | Symptom | Likely cause and fix |
 |---|---|
-| 502 Bad Gateway | The API is not running: `pm2 status`, `pm2 logs ala-eh-api --lines 50`. A bad setting is named in the log. |
-| API restarts in a loop | `server/.env` problem (short `JWT_SECRET`, missing `CLIENT_ORIGIN`, wrong `DATABASE_URL`). Fix it, then `pm2 restart ala-eh-api --update-env`. |
+| 502 Bad Gateway | The API is not running: `pm2 status`, `pm2 logs alaeh-stocks --lines 50`. A bad setting is named in the log. |
+| API restarts in a loop | `server/.env` problem (short `JWT_SECRET`, missing `CLIENT_ORIGIN`, wrong `DATABASE_URL`). Fix it, then `pm2 restart alaeh-stocks --update-env`. |
 | Login says the server cannot be reached / CORS errors | `CLIENT_ORIGIN` does not exactly match the address in the browser (`https`, no trailing slash). |
 | Everyone shares one login limit, or one person's typos lock others out | The API sees every visitor as `127.0.0.1`: `TRUST_PROXY` was set to something other than `loopback`, or Nginx lost its `X-Forwarded-For` header. |
 | Screens do not update live | The `/ws` block is missing or was edited: it needs the `Upgrade` and `Connection "upgrade"` headers. |
@@ -407,7 +407,7 @@ undo database migrations. If a migration has to be undone, restore the snapshot 
 - [ ] `nslookup stocks.yourdomain.com` returns the server IP
 - [ ] `server/.env` filled in, `chmod 600`, not shown by `git status`; the encryption key is saved off the server
 - [ ] `npm run db:migrate:deploy` and `npm run seed` ran without errors
-- [ ] `pm2 status` shows `ala-eh-api` online; `pm2 startup` and `pm2 save` done
+- [ ] `pm2 status` shows `alaeh-stocks` online; `pm2 startup` and `pm2 save` done
 - [ ] `sudo ss -tulpn`: only 22, 80, 443 public; the API on `127.0.0.1:4000`; MySQL on `127.0.0.1:3306`
 - [ ] `sudo nginx -t` ok, site enabled, Certbot done, `certbot renew --dry-run` passes
 - [ ] Signed in over `https://`, chose a new password, two-step on, a second admin created

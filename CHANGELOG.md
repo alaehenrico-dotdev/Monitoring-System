@@ -4,7 +4,7 @@
 
 ## 2.5.0 - 2026-10-31
 
-**Upgrading a running server:** run the normal deploy (`deploy/vps/deploy.sh`, which snapshots the database before it migrates). One migration, `20261031090000_single_encoder_role`, turns every Online and Offline Encoder into an **Encoder**. No new required settings. Do not re-run `npm run seed` on a live server: it would add a new `encoder` account. Remove the accounts you do not need from the database or keep them (they all keep working as Encoders).
+**Upgrading a running server:** run the normal deploy (`deploy/vps/deploy.sh`, which snapshots the database before it migrates). One migration, `20261031090000_single_encoder_role`, turns every Online and Offline Encoder into an **Encoder**. The PM2 process is now called `alaeh-stocks` (was `ala-eh-api`); `deploy.sh` removes the old one for you, so use `pm2 logs alaeh-stocks` from now on. No new required settings. Do not re-run `npm run seed` on a live server: it would add a new `encoder` account. Remove the accounts you do not need from the database or keep them (they all keep working as Encoders).
 
 ### Changed
 - **Restoring a database no longer touches user accounts.** The server's own accounts - passwords, roles, two-step verification, active flag and sessions - are put back exactly as they were after every restore, so an older backup can never lock anyone out or bring a removed account back. Accounts that exist only in the backup are kept (old entries point at them) but deactivated. Moving data from another PC now means keeping the server's own admin sign-in.

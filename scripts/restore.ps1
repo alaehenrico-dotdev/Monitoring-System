@@ -7,9 +7,9 @@
   Verifies the file, takes a safety snapshot of the CURRENT database first
   (unless -SkipSafetySnapshot), then asks you to type RESTORE before replacing
   anything. Stop the API first so nothing writes mid-restore:
-      pm2 stop ala-eh-api
+      pm2 stop alaeh-stocks
   ...and start it again afterwards:
-      pm2 start ala-eh-api
+      pm2 start alaeh-stocks
 
 .PARAMETER File
   Path to the backup. Use -List to see what's available.
@@ -89,7 +89,7 @@ try {
     if ($proc.ExitCode -ne 0) { throw "mysql exited with code $($proc.ExitCode): $($errTask.Result.Trim())" }
 
     Write-Log "Restore OK: '$target' now matches $File"
-    if (-not $Database) { Write-Host "Start the API again if you stopped it:  pm2 start ala-eh-api" }
+    if (-not $Database) { Write-Host "Start the API again if you stopped it:  pm2 start alaeh-stocks" }
     exit 0
 } catch {
     Write-Log "Restore FAILED: $_" "ERROR"
