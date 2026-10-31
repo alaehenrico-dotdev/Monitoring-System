@@ -95,7 +95,10 @@ fi
 # Restoring a truncated dump is how a bad backup becomes a bad database: the
 # mysql client applies whatever statements it got and exits 0, leaving a
 # half-populated schema that looks restored.
-if ! gzip -dc "$SRC" 2>/dev/null | head -n 1 | grep -qE '^-- (MySQL|MariaDB) dump'; then
+# First line captured on its own: `head | grep -q` closes the pipe early, and under `pipefail`
+# the decompressor's resulting SIGPIPE would make a good large dump look unrecognisable.
+FIRST_LINE="$(gzip -dc "$SRC" 2>/dev/null | head -n 1 || true)"
+if ! grep -qE '^-- (MySQL|MariaDB) dump' <<<"$FIRST_LINE"; then
   log "Refusing to restore: $FILE is not a recognisable MySQL dump." ERROR
   exit 1
 fi

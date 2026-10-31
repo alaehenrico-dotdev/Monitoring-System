@@ -139,7 +139,12 @@ read_dump() { if (( ENCRYPT )); then (cd "$REPO_ROOT/server" && $CRYPT decrypt) 
 # with the "Dump completed" trailer mysqldump writes last - which is what
 # tells a truncated dump (disk full, killed mid-stream, lost connection) from
 # a complete one. Same two checks as Test-DumpFile in backup-common.ps1.
-if ! read_dump 2>/dev/null | head -n 1 | grep -qE '^-- (MySQL|MariaDB) dump'; then
+# The first line is captured on its own, NOT piped straight into `head | grep -q`: head (and
+# grep -q) quit after one line, so the decompressor feeding them is killed by SIGPIPE on any dump
+# bigger than the pipe buffer, and `set -o pipefail` then reports that as a failed pipeline - a
+# perfectly good dump discarded as "no dump header". The `|| true` absorbs exactly that.
+FIRST_LINE="$(read_dump 2>/dev/null | head -n 1 || true)"
+if ! grep -qE '^-- (MySQL|MariaDB) dump' <<<"$FIRST_LINE"; then
   log "Verification failed - no dump header. Discarded." ERROR
   exit 1
 fi

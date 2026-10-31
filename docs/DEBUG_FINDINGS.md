@@ -12,6 +12,7 @@ Last updated: 2026-10-31. Scope: the two-role change (Encoder / Admin), forgot-p
 | F-04 | Low | Dead role-lock code left behind by the role merge (`lockedLocation`, `ownPage`, per-page checks) | Fixed (verified) |
 | F-05 | Low | Authenticator reset adds work only for Encoders with MFA, so response time could hint who has MFA | Accepted risk |
 | F-06 | Low | Authenticator lockout is in memory, per API process | Accepted risk |
+| F-07 | High | `backup.sh` / `restore.sh` reject valid large dumps ("no dump header") under `pipefail` | Fixed (verified) |
 
 ## F-01 Seed crashes on re-run
 - **Evidence:** `P2002 Unique constraint failed on products_sku_key` at `seed.ts` `product.create`.
@@ -33,6 +34,12 @@ Last updated: 2026-10-31. Scope: the two-role change (Encoder / Admin), forgot-p
 ## F-04 Dead code after the role merge
 - **Fix:** removed the always-null `lockedLocation` and `ownPage` flags and the unused per-role location checks and `authorize` hook.
 - **Verification:** type-check, lint, 109 client test files and 87 server test files pass.
+
+## F-07 Valid large dumps rejected by the header check
+- **Evidence:** the pre-deploy snapshot on the VPS ended with `Verification failed - no dump header. Discarded.` although mysqldump and the encryption step had succeeded.
+- **Root cause:** `read_dump | head -n 1 | grep -q` under `set -Eeuo pipefail`. `head` exits after one line, the decompressor gets SIGPIPE (141) on any dump larger than the pipe buffer, and `pipefail` turns that into a failed check. `restore.sh` had the same pattern.
+- **Fix:** capture the first line in a command substitution with `|| true`, then match it (`scripts/backup.sh`, `scripts/restore.sh`).
+- **Verification:** reproduced with a 5 MB synthetic dump under `pipefail`: old check rejected it, new check accepts it and still rejects a non-dump (observed). `bash -n` passes. Not yet run against the real VPS database.
 
 ## Accepted risks (decision needed from the owner)
 - **F-05:** the MFA reset path runs only for Encoders with two-step on. Impact is low because every response is the same message and attempts are rate-limited per IP and username.

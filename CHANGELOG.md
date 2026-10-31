@@ -4,6 +4,9 @@
 
 ## 2.5.0 - 2026-10-31
 
+### Fixed
+- **`backup.sh` and `restore.sh` rejected good dumps of any real database.** The header check piped the whole decompressed dump into `head -n 1`; under `set -o pipefail` the decompressor's "broken pipe" on a dump larger than the pipe buffer failed the check, so the pre-deploy snapshot was discarded as "no dump header" (and a restore refused a valid file). Small test databases never triggered it.
+
 **Upgrading a running server:** run the normal deploy (`deploy/vps/deploy.sh`, which snapshots the database before it migrates). One migration, `20261031090000_single_encoder_role`, turns every Online and Offline Encoder into an **Encoder**. The default backup folder is now `/var/backups/alaeh-stocks` (create it once: `sudo mkdir -p /var/backups/alaeh-stocks/snapshots /var/backups/alaeh-stocks/daily && sudo chown -R $USER:$USER /var/backups/alaeh-stocks && chmod -R 700 /var/backups/alaeh-stocks`; set `BACKUP_DIR="/var/backups/alaeh-stocks/daily"` in `server/.env` for the Backups page). The PM2 process is now called `alaeh-stocks` (was `ala-eh-api`); `deploy.sh` removes the old one for you, so use `pm2 logs alaeh-stocks` from now on. No new required settings. Do not re-run `npm run seed` on a live server: it would add a new `encoder` account. Remove the accounts you do not need from the database or keep them (they all keep working as Encoders).
 
 ### Changed
