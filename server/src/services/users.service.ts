@@ -4,6 +4,7 @@ import { HttpError } from "../utils/HttpError";
 import { invalidate } from "../lib/cache";
 import { prisma } from "../lib/prisma";
 import { hashPassword, passwordProblem } from "../utils/password";
+import { DUMMY_RESET_HASH, generateResetCode, hashResetCode, RESET_CODE_TTL_MS, RESET_MAX_ATTEMPTS, sameResetHash } from "../utils/resetCode";
 import { issueSession } from "./auth.service";
 import { assertAdminPassword } from "./adminPassword.service";
 import { logSystemEvent, recordChange } from "./changeLog.service";
@@ -52,6 +53,49 @@ export async function signOutEverywhere(userId: number, remember = false) {
 export async function getSecurityFlags(userId: number) {
   const flags = await userRepository.findSecurityFlags(userId);
   return { mustChangePassword: flags?.mustChangePassword ?? false, mfaEnabled: Boolean(flags?.totpEnabledAt) };
+}
+
+/// An administrator issues a one-time reset code for someone who forgot their password. It needs
+/// the admin's own password again (this opens an account), replaces any earlier code for that
+/// account, and is shown to the admin only now: only its hash is stored.
+export async function issueResetCode(targetId: number, actorId: number, actorPassword: string | undefined) {
+  await assertAdminPassword(actorId, actorPassword);
+  const user = await userRepository.findById(targetId);
+  if (!user) throw HttpError.notFound("User not found");
+  if (!user.isActive) throw HttpError.conflict("That account is deactivated - reactivate it first.");
+  const code = generateResetCode();
+  const expiresAt = new Date(Date.now() + RESET_CODE_TTL_MS);
+  await userRepository.setResetCode(targetId, hashResetCode(code), expiresAt);
+  await logSystemEvent("password_reset_code_issued", { username: user.username, expiresAt: expiresAt.toISOString() }, actorId, "UPDATE");
+  return { code, expiresAt };
+}
+
+/// Forgot password, from the login page: username + the code an administrator handed over + a
+/// new password. Every way of being wrong (no such account, no code, expired, wrong, too many
+/// guesses) gives the same answer, so this cannot be used to find out which usernames exist or
+/// have a code outstanding. A wrong guess at a live code counts against it (5, then it is
+/// cancelled); a new password that breaks the rules does NOT use the code up.
+export async function resetPasswordWithCode(username: string, code: string, newPassword: string, ip?: string) {
+  const invalid = () => HttpError.badRequest("That reset code is invalid or has expired. Ask your administrator for a new one.");
+  const user = await userRepository.findByUsername(username);
+  const now = new Date();
+  const hasCode = !!user && !!user.resetCodeHash && !!user.resetCodeExpiresAt;
+  // The comparison runs in every case, against a dummy when there is nothing real to compare.
+  const matches = sameResetHash(hashResetCode(code), hasCode ? user!.resetCodeHash! : DUMMY_RESET_HASH);
+  const live = hasCode && user!.isActive && user!.resetCodeExpiresAt! > now && user!.resetCodeAttempts < RESET_MAX_ATTEMPTS;
+
+  if (!(matches && live)) {
+    if (hasCode) await userRepository.recordResetFailure(user!.id, RESET_MAX_ATTEMPTS);
+    // Only the attempted username and the address - never the code. Kept short so junk cannot bloat the log.
+    await logSystemEvent("password_reset_failed", { username: username.slice(0, 64), ip: ip ?? null });
+    throw invalid();
+  }
+
+  assertAcceptablePassword(newPassword, user!.username);
+  const consumed = await userRepository.consumeResetCode(user!.id, user!.resetCodeHash!, now, await hashPassword(newPassword));
+  if (!consumed) throw invalid();
+  invalidate(`user-status:${user!.id}`);
+  await logSystemEvent("password_reset_by_code", { username: user!.username, ip: ip ?? null }, user!.id, "UPDATE");
 }
 
 export async function listUsers() {

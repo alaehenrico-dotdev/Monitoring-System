@@ -35,6 +35,9 @@ jobs:
       - name: Check migrations for unreviewed data-risky statements
         run: npm run check:migrations
 
+      - name: Typecheck (the server build leaves tests out, so this is what checks them)
+        run: npm run typecheck
+
       - name: Test (both workspaces)
         run: npm test
 

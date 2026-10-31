@@ -1,0 +1,6 @@
+{
+  // What gets compiled into dist/ and shipped: the app, without its tests.
+  // `npm run typecheck` still checks the tests (tsconfig.json), so nothing goes unchecked.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+}

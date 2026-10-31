@@ -1,5 +1,6 @@
-// PM2 runs the API; Caddy serves the built client and proxies API/WebSocket
-// traffic (deploy/caddy/Caddyfile, see the README "Production deployment").
+// PM2 runs the API; a web server in front serves the built client and proxies API/WebSocket
+// traffic: Caddy (deploy/caddy/Caddyfile) or Nginx (deploy/nginx/ala-eh.conf, walkthrough in
+// docs/DEPLOY-VPS.md). See the README "Production deployment".
 module.exports = {
   apps: [
     {

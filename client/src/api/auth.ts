@@ -41,3 +41,8 @@ export function enableMfa(code: string) {
 export function disableMfa(password: string, code: string) {
   return http.post<{ success: true }>("/auth/mfa/disable", { password, code });
 }
+
+/// Forgot password (signed out): the one-time code an administrator issued, plus a new password.
+export function resetPasswordWithCode(username: string, code: string, newPassword: string) {
+  return http.post<{ success: true }>("/auth/forgot-password/reset", { username, code, newPassword });
+}

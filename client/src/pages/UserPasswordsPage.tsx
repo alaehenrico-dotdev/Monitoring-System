@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import {
+  issueResetCode,
   listAccounts,
   setAccountPassword,
   type AccountSummary,
@@ -19,6 +20,7 @@ export function UserPasswordsPage() {
   const [accounts, setAccounts] = useState<AccountSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [target, setTarget] = useState<AccountSummary | null>(null);
+  const [codeTarget, setCodeTarget] = useState<AccountSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -75,20 +77,36 @@ export function UserPasswordsPage() {
                   )}
                 </div>
               </div>
-              <Button
-                variant="secondary"
-                className="ae-btn-solid"
-                size="sm"
-                onClick={() => setTarget(a)}
-              >
-                Set password
-              </Button>
+              <div className="ae-account-actions">
+                <Button
+                  variant="secondary"
+                  className="ae-btn-solid"
+                  size="sm"
+                  onClick={() => setTarget(a)}
+                >
+                  Set password
+                </Button>
+                {a.isActive && (
+                  <Button
+                    variant="secondary"
+                    className="ae-btn-solid"
+                    size="sm"
+                    title="For someone who forgot their password: a one-time code they enter on the login page"
+                    onClick={() => setCodeTarget(a)}
+                  >
+                    Reset code
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>
       )}
       {target && (
         <SetPasswordModal account={target} onClose={() => setTarget(null)} />
+      )}
+      {codeTarget && (
+        <ResetCodeModal account={codeTarget} onClose={() => setCodeTarget(null)} />
       )}
     </div>
   );
@@ -176,6 +194,87 @@ function SetPasswordModal({
           {saving ? "Saving…" : "Change password"}
         </Button>
       </form>
+    </Modal>
+  );
+}
+
+/// Issues the one-time code for someone who forgot their password. Two steps: the admin
+/// confirms their own password, then the code is shown once to read out or hand over.
+function ResetCodeModal({ account, onClose }: { account: AccountSummary; onClose: () => void }) {
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [issued, setIssued] = useState<{ code: string; expiresAt: Date } | null>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!password || busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const r = await issueResetCode(account.id, password);
+      setIssued({ code: r.code, expiresAt: new Date(r.expiresAt) });
+      setPassword("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't issue a reset code. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title={`Reset code - ${account.name}`} width={400} onClose={onClose}>
+      {!issued ? (
+        <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }} autoComplete="off">
+          <p style={{ margin: 0, fontSize: "calc(12.5px * var(--ae-fs, 1))", lineHeight: 1.5, color: colors.subtleInk }}>
+            For {account.name} to set a new password after forgetting theirs. Confirm your own password to create a one-time code.
+          </p>
+          <Field label="Your password">
+            <TextInput
+              type="password"
+              autoComplete="current-password"
+              autoFocus
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </Field>
+          {error && (
+            <p role="alert" style={{ margin: 0, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.danger }}>
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={busy || !password} loading={busy} loadingLabel="Creating…">
+            Create reset code
+          </Button>
+        </form>
+      ) : (
+        <div style={{ display: "grid", gap: 14 }}>
+          <div className="ae-code-block" style={{ fontSize: "calc(20px * var(--ae-fs, 1))", textAlign: "center", letterSpacing: "0.12em" }}>
+            {issued.code}
+          </div>
+          <p style={{ margin: 0, fontSize: "calc(12.5px * var(--ae-fs, 1))", lineHeight: 1.5, color: colors.subtleInk }}>
+            Give this to {account.name} in person or by phone, not in a group chat. It works once, expires at{" "}
+            <strong style={{ color: colors.ink }}>{issued.expiresAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</strong> (30 minutes), and replaces any earlier code. They enter it with their username under{" "}
+            <em>Forgot password?</em> on the login page. It is shown only now.
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Button
+              type="button"
+              variant="secondary"
+              style={{ flex: "1 1 120px" }}
+              onClick={() => {
+                void navigator.clipboard?.writeText(issued.code).then(() => showToast("Reset code copied.", "success"));
+              }}
+            >
+              Copy
+            </Button>
+            <Button type="button" style={{ flex: "2 1 160px" }} onClick={onClose}>
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
     </Modal>
   );
 }

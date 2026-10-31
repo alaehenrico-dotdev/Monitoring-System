@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { completeMfaLogin, login } from "../services/auth.service";
-import { changeOwnPassword, getSecurityFlags, signOutEverywhere } from "../services/users.service";
+import { changeOwnPassword, getSecurityFlags, resetPasswordWithCode, signOutEverywhere } from "../services/users.service";
 import { disableMfa, enableMfa, startMfaSetup } from "../services/mfa.service";
 import { PASSWORD_MAX } from "../utils/password";
 import { HttpError } from "../utils/HttpError";
@@ -67,5 +67,19 @@ export async function postMfaDisable(req: Request, res: Response) {
   const password = typeof req.body?.password === "string" ? req.body.password : undefined;
   const code = typeof req.body?.code === "string" ? req.body.code : "";
   await disableMfa(req.user!.id, password, code);
+  res.json({ success: true });
+}
+
+const forgotPasswordSchema = z.object({
+  username: z.string().min(1).max(64),
+  code: z.string().min(1).max(32),
+  newPassword: z.string().min(1).max(PASSWORD_MAX),
+});
+
+/// Public (the person cannot sign in): username + the code an administrator issued + a new password.
+export async function postForgotPasswordReset(req: Request, res: Response) {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest("Username, reset code and new password are required");
+  await resetPasswordWithCode(parsed.data.username.trim(), parsed.data.code, parsed.data.newPassword, req.ip);
   res.json({ success: true });
 }

@@ -21,6 +21,7 @@
     "backup:docker": "node scripts/docker-backup.mjs backup",
     "restore:docker": "node scripts/docker-backup.mjs restore",
     "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "e2e": "node scripts/e2e.mjs"
   },

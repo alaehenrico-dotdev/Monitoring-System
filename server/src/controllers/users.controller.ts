@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { Role } from "@prisma/client";
-import { createUser, listUsers, resetUserPassword, setUserActive } from "../services/users.service";
+import { createUser, issueResetCode, listUsers, resetUserPassword, setUserActive } from "../services/users.service";
 import { HttpError } from "../utils/HttpError";
 import { PASSWORD_MAX, PASSWORD_MIN } from "../utils/password";
 
@@ -51,4 +51,15 @@ export async function patchUserActive(req: Request, res: Response) {
   // setUserActive) and can leave nobody able to sign in as an admin.
   if (!isActive && userId === req.user?.id) throw HttpError.badRequest("You cannot deactivate your own account");
   res.json(await setUserActive(userId, isActive, req.user?.id));
+}
+
+const resetCodeSchema = z.object({ password: z.string().min(1) });
+
+/// Issues a one-time forgot-password code for an account. Needs the admin's own password.
+export async function postUserResetCode(req: Request, res: Response) {
+  const userId = Number(req.params.id);
+  if (!Number.isInteger(userId)) throw HttpError.badRequest("Invalid user id");
+  const parsed = resetCodeSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest("Your password is required to issue a reset code");
+  res.json(await issueResetCode(userId, req.user!.id, parsed.data.password));
 }

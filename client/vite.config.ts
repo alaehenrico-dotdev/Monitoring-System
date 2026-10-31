@@ -77,8 +77,7 @@ function pwaPrecachePlugin(): Plugin {
     closeBundle() {
       const files = walk(outDir)
         .map((f) => "/" + relative(outDir, f).split("\\").join("/"))
-        // The emblem source PNG (1.3 MB) is only the master the watermark images were made from.
-        .filter((f) => f !== "/sw.js" && !f.endsWith(".map") && !/\.(webm|mp4)$/.test(f) && f !== "/Glossy Black Ala Eh! Emblem.png")
+        .filter((f) => f !== "/sw.js" && !f.endsWith(".map") && !/\.(webm|mp4)$/.test(f))
         .sort();
       const version = createHash("sha1").update(files.join(",")).digest("hex").slice(0, 10);
       const swPath = join(outDir, "sw.js");

@@ -3,7 +3,7 @@ import { Role } from "@prisma/client";
 import { verifyToken } from "../utils/jwt";
 import { HttpError } from "../utils/HttpError";
 import { asyncHandler } from "../utils/asyncHandler";
-import { getOrSet } from "../lib/cache";
+import { getOrSet, invalidate } from "../lib/cache";
 import { userRepository } from "../repositories/userRepository";
 
 // A JWT's role/isActive claims are frozen at login time (see auth.service.ts)
@@ -32,9 +32,18 @@ async function authenticateHandler(req: Request, _res: Response, next: NextFunct
     throw HttpError.unauthorized("Invalid or expired token");
   }
 
-  const status = await getOrSet(`user-status:${decoded.id}`, USER_STATUS_TTL_MS, () =>
-    userRepository.findStatus(decoded.id),
-  );
+  const statusKey = `user-status:${decoded.id}`;
+  const loadStatus = () => getOrSet(statusKey, USER_STATUS_TTL_MS, () => userRepository.findStatus(decoded.id));
+  let status = await loadStatus();
+  // A token can only carry a version the database has already reached. One NEWER than the
+  // cached status therefore means the cache is stale: the account's credentials were changed
+  // by something that could not clear this process's cache (the recovery commands run as
+  // separate processes). Look again instead of turning the person away for up to 30 seconds -
+  // which would hit exactly someone who has just recovered a locked-out account.
+  if (status && (decoded.tv ?? 0) > status.tokenVersion) {
+    invalidate(statusKey);
+    status = await loadStatus();
+  }
   if (!status || !status.isActive) {
     throw HttpError.unauthorized("Account is no longer active");
   }

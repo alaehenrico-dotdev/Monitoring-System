@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./LoginPage";
 import { forgetDevice, isDeviceRemembered, rememberedUsername, saveDeviceChoice } from "../utils/rememberDevice";
 
@@ -56,6 +56,21 @@ describe("remembered device storage", () => {
     expect(isDeviceRemembered()).toBe(false);
     expect(rememberedUsername()).toBe("");
     spy.mockRestore();
+  });
+});
+
+describe("LoginPage forgot password", () => {
+  it("links to the reset screen, and offers it only on the password step", () => {
+    render(
+      <MemoryRouter initialEntries={["/login"]}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<div>reset screen</div>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password?" }));
+    expect(screen.getByText("reset screen")).toBeTruthy();
   });
 });
 

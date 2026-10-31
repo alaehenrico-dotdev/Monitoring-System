@@ -42,6 +42,8 @@ coverage
 **/.vscode
 **/.idea
 **/.vite
+# Design masters (source art the shipped images were made from) - not part of any image.
+client/design
 **/.eslintcache
 **/Thumbs.db
 **/.DS_Store

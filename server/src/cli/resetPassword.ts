@@ -1,8 +1,10 @@
 // Recovery CLI: set a user's password directly on the database - for when nobody can
 // sign in as an admin to use Settings > User Passwords (or to rotate the seeded accounts).
 //
-// Usage (from server/):
-//   npx tsx prisma/resetPassword.ts <username>
+// Usage:
+//   Docker (the server): docker compose exec api node dist/cli/resetPassword.js <username>
+//   From a checkout:     npm run reset-password --workspace server -- <username>
+//                        npm run reset-password:docker --workspace server -- <username>  (Docker database from the host)
 // The new password is typed at a hidden prompt, or taken from NEW_PASSWORD for scripts.
 // It is deliberately NOT a command-line argument: arguments end up in shell history and
 // in the process list where other users of the machine can read them.
@@ -11,7 +13,7 @@
 // session opened with the old password is signed out (tokenVersion), and the person has
 // to choose their own password at their next sign-in.
 import { PrismaClient } from "@prisma/client";
-import { hashPassword, passwordProblem } from "../src/utils/password";
+import { hashPassword, passwordProblem } from "../utils/password";
 
 const prisma = new PrismaClient();
 
@@ -44,7 +46,7 @@ function askHidden(question: string): Promise<string> {
 async function main() {
   const username = process.argv[2];
   if (!username || process.argv.length > 3) {
-    console.error("Usage: npx tsx prisma/resetPassword.ts <username>   (password is asked for, or set NEW_PASSWORD)");
+    console.error("Usage: resetPassword <username>   (the password is asked for, or set NEW_PASSWORD)");
     process.exit(1);
   }
 
@@ -73,7 +75,7 @@ async function main() {
     data: { passwordHash: await hashPassword(password), mustChangePassword: true, tokenVersion: { increment: 1 } },
   });
   // eslint-disable-next-line no-console -- a command-line tool: its output is the console
-  console.log(`Password updated for "${username}". Their other sessions are signed out, and they must choose a new password at next sign-in.`);
+  console.log(`Password updated for "${username}". Their other sessions are signed out (a running server notices within 30 seconds), and they must choose a new password at next sign-in.`);
 }
 
 main()

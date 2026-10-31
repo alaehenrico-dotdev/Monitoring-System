@@ -138,12 +138,7 @@ For a real address, point a domain at the server, open ports 80 and 443, and set
 - Copy the backup folder to another disk or a cloud drive now and then: a backup on the same disk does not survive the disk.
 - Keep `.env` safe too (passwords, `JWT_SECRET`, `DRIVE_TOKEN_KEY`): it is not in git, and without `DRIVE_TOKEN_KEY` / `JWT_SECRET` you must reconnect Drive and log everyone in again.
 
-**VPS without Docker (PM2 + Caddy):** build the client (`npm run build --workspace client`),
-copy `client/dist` to `/var/www/ala-eh/client/dist`, run the API with PM2
-(`ecosystem.config.cjs`), then run Caddy with the same Caddyfile and:
-`SITE_ADDRESS=stocks.example.com SITE_ROOT=/var/www/ala-eh/client/dist API_UPSTREAM=127.0.0.1:4000 caddy run --config deploy/caddy/Caddyfile`
-(or set those in the Caddy service's environment). Set `CLIENT_ORIGIN` in `server/.env` to
-`https://stocks.example.com`.
+**VPS without Docker (PM2 + Nginx or Caddy):** the complete step-by-step is in [`docs/DEPLOY-VPS.md`](docs/DEPLOY-VPS.md) (Ubuntu 24.04, Nginx, PM2, MySQL on the host, HTTPS, backups, updates). The Nginx site is `deploy/nginx/ala-eh.conf` and updates are one command: `bash deploy/vps/deploy.sh`. To use Caddy instead, build the client (`npm run build --workspace client`), copy `client/dist` to `/var/www/ala-eh/client/dist`, run the API with PM2 (`ecosystem.config.cjs`), then run Caddy with the same Caddyfile and: `SITE_ADDRESS=stocks.example.com SITE_ROOT=/var/www/ala-eh/client/dist API_UPSTREAM=127.0.0.1:4000 caddy run --config deploy/caddy/Caddyfile`. Either way set `CLIENT_ORIGIN` in `server/.env` to `https://stocks.example.com`.
 
 ### 5. Tests & linting
 
@@ -152,13 +147,15 @@ npm run test    # runs both workspaces' Vitest suites
 npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server + client
 ```
 
-### Default logins (seeded — change before real use)
+### First logins (seeded)
 
-| Username | Password | Role |
-|---|---|---|
-| `admin` | `admin123` | Supervisor-Admin — sees every page |
-| `online.encoder` | `online123` | Online Encoder |
-| `offline.encoder` | `offline123` | Offline Encoder |
+`npm run seed` creates three accounts: `admin` (Supervisor-Admin), `online.encoder` and `offline.encoder`.
+There are no fixed default passwords: each is taken from `SEED_ADMIN_PASSWORD` / `SEED_ONLINE_ENCODER_PASSWORD` /
+`SEED_OFFLINE_ENCODER_PASSWORD` if set, otherwise a random one is generated and printed once at the end of the seed.
+Whichever it was, each account must choose its own password (10+ characters, nothing common) the first time it signs in.
+Administrators should then turn on two-step verification under Settings > My Account.
+
+**Someone forgot their password?** There is no email in this system. An administrator opens Settings > User Passwords, clicks **Reset code** for that person and gives them the code (one use, 30 minutes). The person clicks **Forgot password?** on the login page and enters their username, the code and a new password. If nobody can sign in as an administrator (the only admin forgot their password), run this on the server: `docker compose exec api node dist/cli/resetPassword.js <username>` (it asks for the new password; their other sessions are signed out and they choose their own at next sign-in). If that admin also lost their phone, `docker compose exec api node dist/cli/resetMfa.js <username>` turns two-step off. Without Docker, use `npm run reset-password` / `npm run reset-mfa` in `server/`. It is a good idea to keep two administrator accounts.
 
 ## Features
 

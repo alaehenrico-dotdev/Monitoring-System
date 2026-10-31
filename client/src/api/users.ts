@@ -19,3 +19,9 @@ export function listAccounts() {
 export function setAccountPassword(userId: number, password: string) {
   return http.patch<{ success: boolean }>(`/users/${userId}/password`, { password });
 }
+
+/// Admin issues a one-time code for someone who forgot their password. Needs the admin's own
+/// password. The code is returned once; the server keeps only its hash.
+export function issueResetCode(userId: number, password: string) {
+  return http.post<{ code: string; expiresAt: string }>(`/users/${userId}/reset-code`, { password });
+}

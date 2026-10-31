@@ -60,6 +60,11 @@ model User {
   totpEnabledAt DateTime?
   totpLastStep  Int?
   recoveryCodes Json?
+  // Forgot password: a one-time code an administrator issued (SHA-256 hash only), when it
+  // stops working, and how many wrong guesses it has absorbed (see utils/resetCode.ts).
+  resetCodeHash      String?   @db.VarChar(64)
+  resetCodeExpiresAt DateTime?
+  resetCodeAttempts  Int       @default(0)
   createdAt    DateTime @default(now())
 
   onlineEntries        DailyOnlineStock[]    @relation("OnlineEncodedBy")

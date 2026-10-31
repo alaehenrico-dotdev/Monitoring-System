@@ -11,8 +11,17 @@
 #
 # This PC only, no port in the address: set BIND_ADDRESS=127.0.0.1, HTTP_PORT=80,
 # CLIENT_ORIGIN=http://localhost  ->  http://localhost
+# Container logs rotate (3 x 10 MB each): Docker keeps them forever by default, which on a VPS
+# slowly fills the disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
+    logging: *logging
     image: mysql:8.0
     restart: unless-stopped
     # Hardening: a process in the container cannot gain privileges through a setuid
@@ -41,6 +50,7 @@ services:
     networks: [internal]
 
   api:
+    logging: *logging
     build:
       context: .
       dockerfile: server/Dockerfile
@@ -79,6 +89,7 @@ services:
     networks: [internal]
 
   web:
+    logging: *logging
     build:
       context: .
       dockerfile: client/Dockerfile

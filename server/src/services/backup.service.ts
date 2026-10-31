@@ -3,8 +3,10 @@ import { broadcastRealtimeEvent } from "../lib/realtime";
 import { spawn } from "child_process";
 import type { Request, Response } from "express";
 import { createHash } from "crypto";
-import { createWriteStream } from "fs";
+import { createReadStream, createWriteStream } from "fs";
 import { rm } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 import { Transform } from "stream";
 import { pipeline } from "stream/promises";
 import { createGzip } from "zlib";
@@ -127,21 +129,67 @@ export function streamDatabaseBackup(res: Response, filename: string): Promise<B
   });
 }
 
-/// Section Admin - Database Restore. Streams an uploaded `mysqldump` file
-/// (the request body itself, never buffered whole) into the `mysql` client.
-/// The file must open with mysqldump's own header - checked on the first
-/// chunk, before anything is sent to MySQL - so an arbitrary file (or a
-/// hand-written script) can't be run through this endpoint. The dump's
-/// DROP/CREATE TABLE statements replace the existing tables, and DDL isn't
-/// transactional, so a failure partway can leave a partly restored database:
-/// the client takes a safety backup first for that reason.
-export function restoreDatabaseFromStream(upload: Request): Promise<void> {
-  const { host, port, user, password, database } = parseDatabaseUrl(env.databaseUrl);
+/// Section Admin - Database Restore. The uploaded file (the request body, never held whole in
+/// memory) is first written to a temporary file - decrypted on the way if it is an encrypted
+/// backup - and checked as it goes: it must open with mysqldump's own header (so an arbitrary
+/// file, or a hand-written script, cannot be run through this endpoint), stay within the size
+/// limit, and, for an encrypted backup, pass its integrity check to the very last byte. Only then
+/// is that file fed to the `mysql` client. A damaged, cut-short or tampered file is therefore
+/// turned away before the first statement runs, instead of being applied up to the point where
+/// the damage happens to show. The dump's DROP/CREATE TABLE statements replace the existing
+/// tables, and DDL isn't transactional, so a failure partway through the restore itself can
+/// still leave a partly restored database: the client takes a safety backup first for that reason.
+export async function restoreDatabaseFromStream(upload: Request): Promise<void> {
+  const file = join(tmpdir(), `ala-eh-restore-${process.pid}-${Date.now()}.sql`);
+  try {
+    await spoolRestoreUpload(upload, file);
+    await runRestore(file);
+  } finally {
+    await rm(file, { force: true });
+  }
+}
 
-  // An encrypted backup is decrypted on the way in (wrong key or tampering fails
-  // before MySQL has been sent a byte of it); a plain one passes straight through.
-  const req = upload.pipe(createBackupDecryptor(env.backupEncryptionKey, { lenient: true }));
-  upload.on("error", (e) => req.destroy(e));
+async function spoolRestoreUpload(upload: Request, file: string): Promise<void> {
+  let received = 0;
+  let head: Buffer = Buffer.alloc(0);
+  let validated = false;
+  const check = new Transform({
+    transform(chunk: Buffer, _enc, done) {
+      received += chunk.length;
+      if (received > RESTORE_MAX_BYTES) return done(new HttpError(413, "Backup exceeds the 512 MB restore limit."));
+      if (validated) return done(null, chunk);
+      head = Buffer.concat([head, chunk]);
+      const text = head.subarray(0, 256).toString("utf8").replace(/^\uFEFF/, "");
+      if (!isMysqldumpHeader(text)) {
+        if (head.length >= 256) return done(HttpError.badRequest("That file isn't a database backup made by this system's Download Backup."));
+        return done(); // keep reading until there is enough to judge
+      }
+      validated = true;
+      const held = head;
+      head = Buffer.alloc(0);
+      done(null, held);
+    },
+    flush(done) {
+      if (received === 0) return done(HttpError.badRequest("No backup file was uploaded."));
+      if (!validated) return done(HttpError.badRequest("That file doesn't contain a complete database backup header."));
+      done();
+    },
+  });
+
+  try {
+    await pipeline(upload, createBackupDecryptor(env.backupEncryptionKey, { lenient: true }), check, createWriteStream(file), {
+      signal: AbortSignal.timeout(RESTORE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    if (err instanceof HttpError) throw err;
+    if ((err as Error)?.name === "TimeoutError" || (err as Error)?.name === "AbortError") throw new HttpError(408, "Restore timed out and was stopped.");
+    // Anything else at this point is the connection itself: the browser went away mid-upload.
+    throw new HttpError(400, "The upload was interrupted - the restore was stopped.");
+  }
+}
+
+function runRestore(file: string): Promise<void> {
+  const { host, port, user, password, database } = parseDatabaseUrl(env.databaseUrl);
 
   return new Promise((resolve, reject) => {
     const mysql = spawn(env.mysqlPath, ["--host", host, "--port", port, "--user", user, database], {
@@ -150,23 +198,18 @@ export function restoreDatabaseFromStream(upload: Request): Promise<void> {
 
     let stderr = "";
     let settled = false;
-    let received = 0;
-    let prefix = Buffer.alloc(0);
-    let validated = false;
     const fail = (err: unknown) => {
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
       mysql.kill();
+      // Part of the file may already have run, so nothing cached from before is trustworthy.
+      invalidateAll();
+      broadcastRealtimeEvent();
       reject(err);
     };
     const timeout = setTimeout(() => fail(new HttpError(408, "Restore timed out and was stopped.")), RESTORE_TIMEOUT_MS);
 
-    // `req` is now the decrypting stream, which never reports the browser hanging up: watch
-    // the upload itself, so an interrupted file stops the restore instead of leaving it waiting.
-    upload.once("close", () => {
-      if (!upload.complete) fail(new HttpError(400, "The upload was interrupted - the restore was stopped."));
-    });
     mysql.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
     mysql.on("error", (err) => {
       fail((err as NodeJS.ErrnoException).code === "ENOENT"
@@ -175,42 +218,9 @@ export function restoreDatabaseFromStream(upload: Request): Promise<void> {
     });
     mysql.stdin.on("error", () => {});
 
-    req.on("data", (rawChunk: Buffer | string) => {
-      if (settled) return;
-      const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
-      received += chunk.length;
-      if (received > RESTORE_MAX_BYTES) {
-        fail(new HttpError(413, "Backup exceeds the 512 MB restore limit."));
-        return;
-      }
-      if (!validated) {
-        prefix = Buffer.concat([prefix, chunk]);
-        const headerText = prefix.subarray(0, 256).toString("utf8").replace(/^\uFEFF/, "");
-        if (!isMysqldumpHeader(headerText)) {
-          if (prefix.length >= 256) fail(HttpError.badRequest("That file isn't a database backup made by this system's Download Backup."));
-          return;
-        }
-        validated = true;
-        if (!mysql.stdin.write(prefix)) {
-          req.pause();
-          mysql.stdin.once("drain", () => req.resume());
-        }
-        prefix = Buffer.alloc(0);
-        return;
-      }
-      if (!mysql.stdin.write(chunk)) {
-        req.pause();
-        mysql.stdin.once("drain", () => req.resume());
-      }
-    });
-    req.on("end", () => {
-      if (settled) return;
-      if (received === 0) fail(HttpError.badRequest("No backup file was uploaded."));
-      else if (!validated) fail(HttpError.badRequest("That file doesn't contain a complete database backup header."));
-      else mysql.stdin.end();
-    });
-    req.on("error", fail);
-    req.on("aborted", () => fail(new HttpError(400, "The upload was interrupted - the restore was stopped.")));
+    const input = createReadStream(file);
+    input.on("error", fail);
+    input.pipe(mysql.stdin);
 
     mysql.on("close", (code) => {
       if (settled) return;

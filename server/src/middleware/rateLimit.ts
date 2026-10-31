@@ -96,6 +96,21 @@ export const mfaLimiter = rateLimit({
   keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ""),
 });
 
+/// Forgot password: the reset code is the only thing standing between a stranger and an
+/// account, so guesses are limited per address AND per username, on top of the 5 wrong guesses
+/// each code absorbs before it is cancelled (services/users.service.ts).
+export const resetCodeLimiter = rateLimit({
+  windowMs: env.rateLimit.loginWindowMs,
+  limit: env.rateLimit.loginLimit,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many attempts - please wait a few minutes and try again." },
+  keyGenerator: (req: Request) => {
+    const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
+    return `${ipKeyGenerator(req.ip ?? "")}:reset:${username}`;
+  },
+});
+
 export const passcodeLimiter = rateLimit({
   windowMs: env.rateLimit.passcodeWindowMs,
   limit: env.rateLimit.passcodeLimit,

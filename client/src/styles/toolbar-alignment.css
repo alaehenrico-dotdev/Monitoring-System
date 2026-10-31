@@ -1282,3 +1282,20 @@
     min-height: 44px;
   }
 }
+
+/* Settings > User Passwords: an account's buttons (Set password, Reset code) sit side by side
+   and share the row's width on a phone. */
+.ae-account-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 520px) {
+  .ae-account-actions {
+    width: 100%;
+  }
+  .ae-account-actions .ae-btn {
+    flex: 1 1 0;
+  }
+}

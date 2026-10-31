@@ -120,8 +120,15 @@ export function LoginPage() {
           {submitting ? "Signing in…" : mfaToken ? "Verify" : "Sign in"}
         </Button>
 
-        {!mfaToken && isDeviceRemembered() && (
+        {!mfaToken && (
           <div style={{ textAlign: "center", marginTop: 8 }}>
+            <button type="button" className="ae-link-btn" onClick={() => navigate("/forgot-password")}>
+              Forgot password?
+            </button>
+          </div>
+        )}
+        {!mfaToken && isDeviceRemembered() && (
+          <div style={{ textAlign: "center", marginTop: 0 }}>
             <button
               type="button"
               className="ae-link-btn"

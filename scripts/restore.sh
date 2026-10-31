@@ -10,9 +10,15 @@
 #
 # Usage:
 #   scripts/restore.sh --file /var/backups/ala-eh/daily/db_backup_2026-10-09_020000.sql.gz --yes
+#   scripts/restore.sh --file /var/backups/ala-eh/daily/db_backup_2026-10-09_020000.sql.gz.enc --yes
 #   scripts/restore.sh --latest --yes
 #
+# An encrypted backup (.sql.gz.enc, made when BACKUP_ENCRYPTION_KEY is set) is decrypted into a
+# private temporary file first - with the key from the environment or server/.env, via the built
+# server (server/dist/cli) - and checked like any other; the temporary file is always removed.
+#
 # Env: DATABASE_URL (required, read from server/.env if present),
+#      BACKUP_ENCRYPTION_KEY (only for encrypted backups; read from server/.env if present),
 #      BACKUP_DIR (default /var/backups/ala-eh), MYSQL_PATH, MYSQLDUMP_PATH.
 
 set -Eeuo pipefail
@@ -59,21 +65,41 @@ DB_NAME="${DB_NAME%%\?*}"
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/ala-eh}"
 
 if (( LATEST )); then
-  FILE="$(ls -1t "$BACKUP_DIR"/daily/*.sql.gz "$BACKUP_DIR"/snapshots/*.sql.gz 2>/dev/null | head -n 1 || true)"
+  FILE="$(ls -1t "$BACKUP_DIR"/daily/*.sql.gz "$BACKUP_DIR"/daily/*.sql.gz.enc \
+                 "$BACKUP_DIR"/snapshots/*.sql.gz "$BACKUP_DIR"/snapshots/*.sql.gz.enc 2>/dev/null | head -n 1 || true)"
   [[ -n "$FILE" ]] || { log "No backups found under $BACKUP_DIR" ERROR; exit 1; }
 fi
 [[ -n "$FILE" ]] || { log "Pass --file <path> or --latest" ERROR; exit 2; }
 [[ -f "$FILE" ]] || { log "No such backup: $FILE" ERROR; exit 1; }
 
+# An encrypted backup is opened into a private temporary .sql.gz, and everything below works on
+# that. It is removed however this script ends.
+SRC="$FILE"
+TMP_GZ=""
+cleanup() { if [[ -n "$TMP_GZ" ]]; then rm -f "$TMP_GZ"; fi; }
+trap cleanup EXIT
+if [[ "$FILE" == *.enc ]]; then
+  CRYPT_JS="$REPO_ROOT/server/dist/cli/backupCrypt.js"
+  [[ -f "$CRYPT_JS" ]] || { log "$FILE is encrypted but the server is not built ($CRYPT_JS missing) - run: npm run build" ERROR; exit 1; }
+  TMP_GZ="$(mktemp --suffix=.sql.gz)"
+  chmod 600 "$TMP_GZ"
+  log "Decrypting $FILE ..."
+  if ! (cd "$REPO_ROOT/server" && node "$CRYPT_JS" decrypt) < "$FILE" > "$TMP_GZ"; then
+    log "Could not decrypt $FILE - wrong BACKUP_ENCRYPTION_KEY, or the file is damaged or has been tampered with." ERROR
+    exit 1
+  fi
+  SRC="$TMP_GZ"
+fi
+
 # --- verify the archive BEFORE touching the live database --------------------
 # Restoring a truncated dump is how a bad backup becomes a bad database: the
 # mysql client applies whatever statements it got and exits 0, leaving a
 # half-populated schema that looks restored.
-if ! gzip -dc "$FILE" 2>/dev/null | head -n 1 | grep -qE '^-- (MySQL|MariaDB) dump'; then
+if ! gzip -dc "$SRC" 2>/dev/null | head -n 1 | grep -qE '^-- (MySQL|MariaDB) dump'; then
   log "Refusing to restore: $FILE is not a recognisable MySQL dump." ERROR
   exit 1
 fi
-if ! gzip -dc "$FILE" 2>/dev/null | tail -n 5 | grep -q '^-- Dump completed'; then
+if ! gzip -dc "$SRC" 2>/dev/null | tail -n 5 | grep -q '^-- Dump completed'; then
   log "Refusing to restore: $FILE is truncated (no 'Dump completed' trailer)." ERROR
   exit 1
 fi
@@ -95,7 +121,7 @@ if (( ! SKIP_SAFETY )); then
 fi
 
 log "Restoring '$DB_NAME' from $FILE"
-gzip -dc "$FILE" | "${MYSQL_PATH:-mysql}" \
+gzip -dc "$SRC" | "${MYSQL_PATH:-mysql}" \
   --host "$DB_HOST" --port "$DB_PORT" --user "$DB_USER" \
   --default-character-set=utf8mb4 "$DB_NAME"
 

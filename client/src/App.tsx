@@ -13,6 +13,7 @@ import { JumpscareHost } from "./components/JumpscareHost";
 import { TopProgressProvider } from "./hooks/useTopProgress";
 import { LoadingBlock } from "./components/Spinner";
 import { LoginPage } from "./pages/LoginPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 
 // Every page below `<ProtectedRoute>` is its own lazily-loaded chunk instead
 // of bundled into the one main chunk every visitor downloads before they've
@@ -124,6 +125,7 @@ export default function App() {
             >
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
                 <Route element={<ProtectedRoute />}>
                   <Route element={<ShiftModeGate />}>

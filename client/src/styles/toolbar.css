@@ -832,7 +832,7 @@
 }
 
 /* App-wide default background: the page color with the Glossy Black Ala Eh!
-   emblem (public/Glossy Black Ala Eh! Emblem.png) as a large, centered, fixed
+   emblem (master: client/design/glossy-black-emblem-master.png, not shipped) as a large, centered, fixed
    watermark. It is a pseudo-element behind everything (the cards, tables and
    inputs are opaque and simply cover it, so it only shows in the gaps between
    them and through the glass header/nav drawer) - it never affects layout or

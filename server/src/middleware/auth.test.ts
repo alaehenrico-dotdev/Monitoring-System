@@ -14,10 +14,12 @@ vi.mock("../repositories/userRepository", () => ({
 // findStatus mock actually gets hit instead of a prior test's cached result.
 vi.mock("../lib/cache", () => ({
   getOrSet: vi.fn((_key: string, _ttlMs: number, fetcher: () => unknown) => fetcher()),
+  invalidate: vi.fn(),
 }));
 
 import { verifyToken } from "../utils/jwt";
 import { userRepository } from "../repositories/userRepository";
+import { getOrSet, invalidate } from "../lib/cache";
 import { authenticate } from "./auth";
 
 const decodedUser = { id: 1, username: "alice", name: "Alice", role: "SUPERVISOR_ADMIN" as const };
@@ -149,5 +151,40 @@ describe("authenticate - password change required", () => {
       expect(err, url).toBeInstanceOf(HttpError);
       expect(err.status).toBe(403);
     }
+  });
+});
+
+describe("authenticate - cache gone stale behind the database", () => {
+  function reqFor(): Request {
+    return { headers: { authorization: "Bearer t" }, originalUrl: "/api/products" } as unknown as Request;
+  }
+
+  it("re-checks the database when the token is NEWER than the cached account status", async () => {
+    // The cache still holds version 0; the account was reset from the command line (version 2)
+    // and the person has just signed in again with a version-2 token.
+    vi.mocked(verifyToken).mockReturnValue({ ...decodedUser, tv: 2 });
+    vi.mocked(getOrSet).mockResolvedValueOnce({ isActive: true, role: "SUPERVISOR_ADMIN", tokenVersion: 0, mustChangePassword: false } as never);
+    vi.mocked(userRepository.findStatus).mockResolvedValue({ isActive: true, role: "SUPERVISOR_ADMIN", tokenVersion: 2, mustChangePassword: false } as never);
+
+    const req = reqFor();
+    const next = vi.fn();
+    authenticate(req, {} as Response, next as NextFunction);
+
+    await vi.waitFor(() => expect(next).toHaveBeenCalled());
+    expect(next).toHaveBeenCalledWith();
+    expect(invalidate).toHaveBeenCalledWith("user-status:1");
+    expect(req.user).toBeDefined();
+  });
+
+  it("still turns away a token OLDER than the account (the normal revoked-session case), without a second lookup", async () => {
+    vi.mocked(verifyToken).mockReturnValue({ ...decodedUser, tv: 0 });
+    vi.mocked(userRepository.findStatus).mockResolvedValue({ isActive: true, role: "SUPERVISOR_ADMIN", tokenVersion: 2, mustChangePassword: false } as never);
+
+    const next = vi.fn();
+    authenticate(reqFor(), {} as Response, next as NextFunction);
+
+    await vi.waitFor(() => expect(next).toHaveBeenCalled());
+    expect(next.mock.calls[0][0]).toMatchObject({ status: 401 });
+    expect(invalidate).not.toHaveBeenCalled();
   });
 });

@@ -56,9 +56,39 @@ export const userRepository = {
   setPasswordHash(id: number, passwordHash: string, mustChange = true, db: Db = prisma) {
     return db.user.update({
       where: { id },
-      data: { passwordHash, mustChangePassword: mustChange, tokenVersion: { increment: 1 } },
+      // A new password also cancels any reset code that was waiting to be used.
+      data: { passwordHash, mustChangePassword: mustChange, tokenVersion: { increment: 1 }, resetCodeHash: null, resetCodeExpiresAt: null, resetCodeAttempts: 0 },
       select: { id: true },
     });
+  },
+
+  /// Stores a freshly issued reset code (replacing any earlier one) with a clean attempt count.
+  setResetCode(id: number, hash: string, expiresAt: Date) {
+    return prisma.user.update({ where: { id }, data: { resetCodeHash: hash, resetCodeExpiresAt: expiresAt, resetCodeAttempts: 0 }, select: { id: true } });
+  },
+
+  /// A wrong guess at a live code. Once `maxAttempts` is reached the code is cancelled outright.
+  async recordResetFailure(id: number, maxAttempts: number) {
+    const { resetCodeAttempts } = await prisma.user.update({
+      where: { id },
+      data: { resetCodeAttempts: { increment: 1 } },
+      select: { resetCodeAttempts: true },
+    });
+    if (resetCodeAttempts >= maxAttempts) {
+      await prisma.user.update({ where: { id }, data: { resetCodeHash: null, resetCodeExpiresAt: null, resetCodeAttempts: 0 }, select: { id: true } });
+    }
+  },
+
+  /// Spends the code and sets the new password in ONE conditional update: only a row that
+  /// still holds exactly this hash, unexpired, can be consumed, so two requests racing with the
+  /// same code cannot both win. Signs out every session (tokenVersion) and clears the
+  /// forced-change flag, since the person just chose this password themselves.
+  async consumeResetCode(id: number, hash: string, now: Date, passwordHash: string): Promise<boolean> {
+    const r = await prisma.user.updateMany({
+      where: { id, resetCodeHash: hash, resetCodeExpiresAt: { gt: now } },
+      data: { passwordHash, mustChangePassword: false, tokenVersion: { increment: 1 }, resetCodeHash: null, resetCodeExpiresAt: null, resetCodeAttempts: 0 },
+    });
+    return r.count === 1;
   },
 
   /// "Sign out everywhere": every token issued so far stops working (see middleware/auth.ts).

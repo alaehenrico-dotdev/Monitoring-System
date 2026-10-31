@@ -5,6 +5,7 @@ import {
   randomBytes,
 } from "node:crypto";
 import { Transform, type TransformCallback } from "node:stream";
+import { HttpError } from "./HttpError";
 
 /// Encrypted backup container ("ALAEBK01"), streamed so a dump is never held whole:
 ///
@@ -26,7 +27,12 @@ const HEADER_BYTES = BACKUP_MAGIC.length + SALT_BYTES + PREFIX_BYTES;
 const FRAME_BYTES = 64 * 1024;
 const INFO = Buffer.from("ala-eh backup file key v1", "ascii");
 
-export class BackupCryptoError extends Error {}
+/// A wrong key, a damaged or tampered file: the caller sent something unusable (400), not a server fault.
+export class BackupCryptoError extends HttpError {
+  constructor(message: string) {
+    super(400, message);
+  }
+}
 
 /// Master key as set in BACKUP_ENCRYPTION_KEY: 32 random bytes, base64 or 64 hex
 /// characters (`openssl rand -base64 32`). A passphrase is refused on purpose: a

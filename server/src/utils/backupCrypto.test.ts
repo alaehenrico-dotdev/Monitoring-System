@@ -64,6 +64,12 @@ describe("backup encryption", () => {
     await expect(decrypt(Buffer.concat([enc, Buffer.from("x")]), 5000)).rejects.toThrow(BackupCryptoError);
   });
 
+  it("reports a bad file as a client error (400), never a server fault", async () => {
+    const enc = await encrypt(randomBytes(1000));
+    await expect(decrypt(enc, 100, randomBytes(32))).rejects.toMatchObject({ status: 400 });
+    await expect(decrypt(enc.subarray(0, enc.length - 5), 100)).rejects.toMatchObject({ status: 400 });
+  });
+
   it("rejects reordered frames", async () => {
     const enc = await encrypt(randomBytes(65536 * 3));
     const frame = 4 + 65536 + 16;
