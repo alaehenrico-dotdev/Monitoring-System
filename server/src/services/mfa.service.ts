@@ -53,7 +53,23 @@ export async function verifyMfaCode(user: Pick<User, "id" | "totpSecret" | "totp
   assertNotLocked(user.id);
   const text = code.trim();
   if (user.totpSecret) {
-    const step = verifyTotp(openSecret(user.totpSecret), text, user.totpLastStep ?? null);
+    // The secret is sealed with a key derived from JWT_SECRET. If that changed since two-step
+    // was set up (or the users table came from a server with another one), it cannot be opened.
+    // That must read as "this code did not work", not crash the request with a 500 - and it must
+    // not shut out the recovery codes below, which are stored as plain hashes and need no key.
+    let step: number | null = null;
+    try {
+      step = verifyTotp(openSecret(user.totpSecret), text, user.totpLastStep ?? null);
+    } catch {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "mfa-secret-unreadable",
+          userId: user.id,
+          message: "The stored authenticator secret cannot be decrypted - JWT_SECRET is not the one it was set up with. Use a recovery code, or run: npm run reset-mfa -- <username>",
+        }),
+      );
+    }
     if (step !== null && (await userRepository.consumeTotpStep(user.id, step))) {
       failures.delete(user.id);
       return true;

@@ -134,6 +134,27 @@ describe("two-step login", () => {
   });
 });
 
+describe("an authenticator secret the server can no longer read (JWT_SECRET changed since setup)", () => {
+  const unreadable = { id: 41, totpSecret: Buffer.from("this was sealed with some other key entirely").toString("base64") };
+
+  it("answers a wrong or unreadable code with 401, never a 500", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const mfaToken = await challenge(unreadable);
+    await expect(completeMfaLogin(mfaToken, "123456")).rejects.toMatchObject({ status: 401, message: "Incorrect verification code" });
+    expect(err).toHaveBeenCalledWith(expect.stringContaining("mfa-secret-unreadable"));
+    err.mockRestore();
+  });
+
+  it("still lets a recovery code in, since those do not depend on the key", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const code = "ABCDE-FGHJK";
+    const mfaToken = await challenge({ ...unreadable, recoveryCodes: [hashRecoveryCode(code)] });
+    const session = await completeMfaLogin(mfaToken, code);
+    expect(verifyToken(session.token)).toMatchObject({ id: 41 });
+    expect(userRepository.setRecoveryCodes).toHaveBeenCalledWith(41, []);
+  });
+});
+
 describe("hash upgrade at login", () => {
   it("replaces an old bcrypt hash with a scrypt one after a successful sign-in, and never fails the login if that breaks", async () => {
     const plain = { ...mfaUser(), totpEnabledAt: null, passwordHash: bcrypt.hashSync(PASSWORD, 10) };
