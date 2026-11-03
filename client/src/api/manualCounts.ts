@@ -123,7 +123,7 @@ export function setCountRemarks(
 /// updated: a finished one (held for approval) or one with an imported opening.
 /// Supervisor/Admin only.
 export function publishManualCounts(date: string, shift: Shift, applyToOpening = false) {
-  return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; leftSaved?: number; snapshotId?: number }>(
+  return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; leftSaved?: number; impliedZero?: number; snapshotId?: number }>(
     `/manual-counts/publish?date=${date}&shift=${shift}`,
     { applyToOpening },
   );

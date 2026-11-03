@@ -47,6 +47,8 @@ function GlowLetters({ text }: { text: string }) {
 
 interface PageHeaderProps {
   title: ReactNode;
+  /// Chips shown beside the title (an entry page's date, shift and status).
+  badges?: ReactNode;
   subtitle?: ReactNode;
   /// Dashboard's own subtitle needs a distinct class (larger, theme-
   /// following text, from before every page shared this card) - everyone
@@ -85,6 +87,7 @@ interface PageHeaderProps {
 /// the tab strip on MS Office apps.
 export function PageHeader({
   title,
+  badges,
   children,
 }: PageHeaderProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -166,6 +169,7 @@ export function PageHeader({
               <h2 aria-label={typeof title === "string" ? title : undefined}>
                 {typeof title === "string" ? <GlowLetters text={title} /> : title}
               </h2>
+              {badges && <span className="ae-page-header-badges">{badges}</span>}
               <HeaderExtras />
             </div>
             {/* The subtitle line under the h2 is no longer shown (pages still

@@ -427,6 +427,8 @@ describe("publishing counts", () => {
     beforeEach(() => {
       vi.mocked(manualCountRepository.markPublished).mockImplementation(((id: number) => Promise.resolve({ id, publishedAt: new Date() })) as never);
       vi.mocked(manualCountRepository.findOne).mockResolvedValue(null);
+      // No uncounted products unless a test says so (see "a product that was not counted is 0").
+      vi.mocked(productRepository.findActive).mockResolvedValue([]);
       vi.mocked(dailyOnlineStockRepository.findNext).mockResolvedValue(null);
       vi.mocked(dailyOfflineStockRepository.findNext).mockResolvedValue(null);
       vi.mocked(isLockedForCarry).mockResolvedValue(false);
@@ -460,6 +462,67 @@ describe("publishing counts", () => {
         expect.anything(),
       );
       expect(vi.mocked(recordChange).mock.calls.map((c) => c[0].tableName)).toEqual(["manual_counts", "daily_online_stock"]);
+    });
+
+    describe("a product that was not counted is 0", () => {
+      beforeEach(() => {
+        vi.mocked(productRepository.findActive).mockResolvedValue([{ id: 10 }, { id: 11 }] as never);
+        vi.mocked(manualCountRepository.upsert).mockImplementation(((_id: number | undefined, data: object) => Promise.resolve({ id: 100, ...data })) as never);
+      });
+
+      it("gives every uncounted active product-location a count of 0, applied to the next day's opening", async () => {
+        vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+
+        const out = await publishManualCounts(DATE, SHIFT, 7, true);
+
+        // 10 Online was counted; 10 Offline, 11 Online and 11 Offline were not.
+        expect(out.impliedZero).toBe(3);
+        const created = vi.mocked(manualCountRepository.upsert).mock.calls.map((c) => c[1]);
+        expect(created.map((c) => `${c.productId}:${c.location}`)).toEqual(["10:OFFLINE", "11:ONLINE", "11:OFFLINE"]);
+        expect(created.every((c) => c.manualCount === 0)).toBe(true);
+        // Remarked, so it explains itself instead of showing up as an unexplained variance.
+        expect(manualCountRepository.updateRemarks).toHaveBeenCalledWith(100, "Not counted in this audit - treated as 0.", expect.anything());
+        // Released as applied, like a typed count: 1 typed + 3 automatic.
+        expect(vi.mocked(manualCountRepository.markPublished).mock.calls.filter((c) => c[3] === true)).toHaveLength(4);
+        // And the next day is re-derived from each, as for any applied count.
+        expect(dailyOnlineStockRepository.findNext).toHaveBeenCalledTimes(2);
+        expect(dailyOfflineStockRepository.findNext).toHaveBeenCalledTimes(2);
+      });
+
+      it("measures the variance against what the system holds (an uncounted -96 or 354 is a real difference)", async () => {
+        vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+        vi.mocked(dailyOnlineStockRepository.getOpeningStock).mockResolvedValue(43);
+        vi.mocked(dailyOfflineStockRepository.getOpeningStock).mockResolvedValue(0);
+        vi.mocked(dailyOnlineStockRepository.findByProductAndDate).mockResolvedValue(null as never);
+        vi.mocked(dailyOfflineStockRepository.findByProductAndDate).mockResolvedValue(null as never);
+
+        await publishManualCounts(DATE, SHIFT, 7, true);
+
+        // 43 is what the Online side holds; Offline holds 0.
+        const byKey = new Map(vi.mocked(manualCountRepository.upsert).mock.calls.map((c) => [`${c[1].productId}:${c[1].location}`, c[1]]));
+        expect(byKey.get("11:ONLINE")).toMatchObject({ systemRemainingStock: 43, variance: -43 });
+        expect(byKey.get("11:OFFLINE")).toMatchObject({ systemRemainingStock: 0, variance: 0 });
+      });
+
+      it("leaves a count that is already on the sheet alone", async () => {
+        vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+        vi.mocked(manualCountRepository.findOne).mockImplementation(((id: number, _d: Date, _s: string, loc: string) =>
+          Promise.resolve(id === 11 && loc === "ONLINE" ? { id: 5, publishedAt: new Date() } : null)) as never);
+
+        const out = await publishManualCounts(DATE, SHIFT, 7, true);
+
+        expect(out.impliedZero).toBe(2);
+        expect(vi.mocked(manualCountRepository.upsert).mock.calls.map((c) => `${c[1].productId}:${c[1].location}`)).toEqual(["10:OFFLINE", "11:OFFLINE"]);
+      });
+
+      it("only when published as the next day's opening: an audit-only publish adds nothing", async () => {
+        vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([pending(1, 10, "ONLINE")] as never);
+
+        const out = await publishManualCounts(DATE, SHIFT, 7, false);
+
+        expect(out.impliedZero).toBe(0);
+        expect(manualCountRepository.upsert).not.toHaveBeenCalled();
+      });
     });
 
     it("leaves a later day alone when it already opens at the count", async () => {

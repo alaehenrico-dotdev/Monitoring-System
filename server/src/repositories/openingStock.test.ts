@@ -239,6 +239,18 @@ describe("an audit is a fresh opening: yesterday's remaining stock never reaches
     }
   });
 
+  it("SPECIAL at -96, counted 0 on Oct 30 night, shows 0 on Oct 31 (the product has no row on the audit day)", async () => {
+    // Real shape: the -96 sits on an earlier row (Oct 24); nothing was entered on Oct 30 itself.
+    db.online = [{ productId: 23, entryDate: day("2026-10-24"), shift: "NIGHT", remainingStock: -96 }];
+    db.counts = [applied(23, "2026-10-30", 0)];
+
+    expect(await dailyOnlineStockRepository.getOpeningStock(23, day("2026-10-31"), "MORNING")).toBe(0);
+    expect((await dailyOnlineStockRepository.getOpeningStocksForProducts([23], day("2026-10-31"), "MORNING")).get(23)).toBe(0);
+    // Without that count the -96 keeps carrying, which is what the live data shows for this product.
+    db.counts = [];
+    expect(await dailyOnlineStockRepository.getOpeningStock(23, day("2026-10-31"), "MORNING")).toBe(-96);
+  });
+
   it("the Offline side follows the same rule", async () => {
     db.offline = nights(-90);
     db.counts = [{ ...applied(1, "2026-06-10", 0), location: "OFFLINE" }];

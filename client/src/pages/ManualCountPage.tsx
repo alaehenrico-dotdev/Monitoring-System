@@ -88,6 +88,7 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { useUndoRedoKeys } from "../hooks/useGridView";
 import { ReorderProductsDialog } from "../components/ReorderProductsButton";
 import { useAuth } from "../context/AuthContext";
+import { uncountedProducts } from "../utils/uncountedProducts";
 import { useTopProgress } from "../hooks/useTopProgress";
 import { useCategoryReveal } from "../hooks/useCategoryReveal";
 import { useRecentCells } from "../hooks/useRecentCells";
@@ -587,7 +588,7 @@ export function ManualCountPage() {
     setPublishing(true);
     setError(null);
     try {
-      const { published, leftSaved = 0 } = await publishManualCounts(date, shift, applyToOpening);
+      const { published, leftSaved = 0, impliedZero = 0 } = await publishManualCounts(date, shift, applyToOpening);
       setShowPublishConfirm(false);
       setApplyToOpening(true);
       // Later saved days are recalculated by an applied publish. Say when one could
@@ -596,10 +597,12 @@ export function ManualCountPage() {
       const left = leftSaved
         ? ` · ${leftSaved} product${leftSaved === 1 ? "" : "s"} ${leftSaved === 1 ? "has" : "have"} a later day that could not be updated (finished and waiting for approval, or an imported opening)`
         : "";
+      // Products nobody counted were set to 0 (see publishManualCounts, server side).
+      const zeroed = impliedZero ? ` · ${impliedZero} not counted, set to 0` : "";
       setNotice({
         message: `Published ${published} count${published === 1 ? "" : "s"} - ${
           applyToOpening ? "now the next day's opening stock" : "now final for reporting"
-        }${left}`,
+        }${zeroed}${left}`,
         variant: "success",
       });
       // The server broadcasts the change; re-read now so the badge and button
@@ -882,6 +885,9 @@ export function ManualCountPage() {
   const unpublishedCount = savedCounts.filter(
     (r) => !r.entry.publishedAt,
   ).length;
+  // Active products with no count on this sheet: listed in the Publish dialog (a warning, not a
+  // block), since an audit only replaces the figure of a product that was counted.
+  const uncounted = gridRows ? uncountedProducts(gridRows) : [];
   // Published counts show blank (see blankPublished), so they are no longer in
   // savedCounts - but the sheet still says it was published.
   const publishedCount = COUNT_LOCATIONS.flatMap((loc) => gridRows?.[loc] ?? []).filter((r) => r.entry.publishedAt).length;
@@ -1883,6 +1889,39 @@ export function ManualCountPage() {
           {formatDateDisplay(date)} · {shiftWithWord(shift)} will be
           approved as final for reporting. Changing a count afterwards takes it
           back to unpublished until you publish again.
+          {uncounted.length > 0 && (
+            <div
+              role="note"
+              style={{
+                marginTop: 12,
+                padding: "8px 10px",
+                border: "1px solid var(--ae-border)",
+                borderLeft: "3px solid var(--ae-warning-text)",
+                borderRadius: 6,
+                fontSize: "calc(12.5px * var(--ae-fs, 1))",
+              }}
+            >
+              <strong>
+                {uncounted.length} product count{uncounted.length === 1 ? " is" : "s are"} missing on this sheet.
+              </strong>{" "}
+              {applyToOpening
+                ? "A product that is not counted counts as 0: it opens the next day at 0, whatever it holds now (the figure shown, a negative included). Untick the option below to keep their current figures instead."
+                : "Published as an audit only, these keep their current figure into the next day, and a negative stays negative."}
+              <ul style={{ margin: "6px 0 0", padding: 0, listStyle: "none", maxHeight: 140, overflowY: "auto" }}>
+                {uncounted.slice(0, 40).map((u) => (
+                  <li key={`${u.location}-${u.productId}`} style={{ display: "flex", gap: 8, justifyContent: "space-between" }}>
+                    <span>
+                      {u.name} <span style={{ color: colors.subtleInk }}>· {u.category} · {u.location === "ONLINE" ? "Online" : "Offline"}</span>
+                    </span>
+                    <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: 700, color: u.system < 0 ? colors.danger : colors.subtleInk }}>
+                      {u.system.toLocaleString()}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {uncounted.length > 40 && <div style={{ marginTop: 4, color: colors.subtleInk }}>+{uncounted.length - 40} more</div>}
+            </div>
+          )}
           <label
             style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 12 }}
           >
@@ -1900,7 +1939,8 @@ export function ManualCountPage() {
                 counted figure and carries on from there - days already saved
                 after it are recalculated too (what was entered on them is kept;
                 only their opening and remaining change). A finished day waits
-                for an admin&apos;s approval instead.
+                for an admin&apos;s approval instead. A product with no count
+                on this sheet counts as 0.
               </span>
             </span>
           </label>

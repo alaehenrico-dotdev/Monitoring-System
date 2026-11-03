@@ -482,6 +482,10 @@ export async function getVarianceReport(filters: {
 
 export const MAX_REMARKS_LENGTH = 500;
 
+/// The remark an automatic count of 0 carries, so it explains itself in the variance report and is
+/// not listed as an unexplained variance.
+export const NOT_COUNTED_NOTE = "Not counted in this audit - treated as 0.";
+
 /**
  * Publishes a sheet's counts (one date + shift, every location): the
  * supervisor's sign-off that the counts are final for reporting. Counts are an
@@ -496,6 +500,10 @@ export const MAX_REMARKS_LENGTH = 500;
  * stays; `leftSaved` says how many products had such a day.
  * Variance is untouched: it is still the count against the system's remaining
  * stock on the counted day. Each publish is logged against the count.
+ *
+ * With `applyToOpening`, a product (active, Online or Offline) with no count on the sheet counts
+ * as 0: it is given a count of 0, remarked "Not counted in this audit - treated as 0.", and its
+ * next day opens at 0 like any other counted figure. `impliedZero` says how many were added.
  */
 export async function publishManualCounts(entryDate: Date, shift: Shift, userId?: number, applyToOpening = false) {
   const result = await prisma.$transaction(
@@ -521,10 +529,52 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
         // later saved day after it, until another count or an import stops the walk.
         if (apply && (await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId, { reachSaved: true }))) leftSaved++;
       }
+      // A product that was not counted is 0, not "whatever it was": published as the next
+      // day's opening, every active Online / Offline product with no count on this sheet gets a
+      // count of 0 (noted as such), so nothing from the past - a negative included - carries on.
+      let impliedZero = 0;
+      if (applyToOpening) {
+        const counted = new Set(pending.map((c) => `${c.productId}:${c.location}`));
+        const activeProducts = await productRepository.findActive();
+        for (const product of activeProducts) {
+          for (const location of ["ONLINE", "OFFLINE"] as const) {
+            if (counted.has(`${product.id}:${location}`)) continue;
+            // Already counted on this sheet (an earlier publish of it): leave that count alone.
+            if (await manualCountRepository.findOne(product.id, entryDate, shift, location, tx)) continue;
+            if (impliedZero === 0) await assertPeriodOpen(entryDate, shift, tx, "count");
+            const systemRemainingStock = await getSystemRemainingStock(product.id, entryDate, shift, location, tx);
+            const isOpeningBalance = !(await manualCountRepository.hasAnyCount(product.id, location, tx));
+            const created = await manualCountRepository.upsert(
+              undefined,
+              {
+                productId: product.id,
+                entryDate,
+                shift,
+                location,
+                systemRemainingStock,
+                manualCount: 0,
+                variance: isOpeningBalance ? 0 : calculateVariance(systemRemainingStock, 0),
+                isOpeningBalance,
+                countedById: userId,
+              },
+              tx,
+            );
+            await manualCountRepository.updateRemarks(created.id, NOT_COUNTED_NOTE, tx);
+            const changeId = await recordChange(
+              { tableName: TABLE, recordId: created.id, action: "CREATE", changedById: userId, newValue: { ...created, remarks: NOT_COUNTED_NOTE } },
+              tx,
+            );
+            const published = await manualCountRepository.markPublished(created.id, userId ?? null, now, true, tx);
+            releasedCounts.push({ ...published, remarks: NOT_COUNTED_NOTE });
+            impliedZero++;
+            if (await propagateOpeningStock(product.id, entryDate, shift, location, userId, tx, changeId, { reachSaved: true })) leftSaved++;
+          }
+        }
+      }
       // Every publish leaves a frozen copy and an Audit History entry, whether or
       // not the counts were applied to the next day's opening stock.
       const snapshotId = await saveAuditSnapshot(entryDate, shift, now, releasedCounts, applyToOpening, userId, tx);
-      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, leftSaved, snapshotId };
+      return { published: pending.length, publishedAt: now, appliedToOpening: applyToOpening, leftSaved, impliedZero, snapshotId };
     },
     { timeout: 120_000, maxWait: 10_000 },
   );

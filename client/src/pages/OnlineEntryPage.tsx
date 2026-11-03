@@ -12,6 +12,10 @@ import { belowZeroWarnings } from "../utils/finishWarnings";
 import { useDayLock } from "../hooks/useDayLock";
 import { useSaveShortcut } from "../hooks/useSaveShortcut";
 import { PageHeader } from "../components/PageHeader";
+import { LockIcon } from "../components/icons";
+import { EntryBadges, type EntryStatus } from "../components/EntryBadges";
+import { EntryTotalsStrip } from "../components/EntryTotalsStrip";
+import { EntrySaveBar } from "../components/EntrySaveBar";
 import { TableSkeleton } from "../components/Skeleton";
 import { LoadingOverlay } from "../components/Spinner";
 import { useTopProgress } from "../hooks/useTopProgress";
@@ -625,10 +629,21 @@ export function OnlineEntryPage() {
       ? `${SHIFT_LABELS[otherShift(shift)]} already has ${otherShiftCount} saved entr${otherShiftCount === 1 ? "y" : "ies"} for ${date} - double-check you're on the right shift before entering data.`
       : null;
 
+  const entryStatus: EntryStatus = dayLock.locked
+    ? "finished"
+    : splitDayView
+      ? "split"
+      : dayLock.entryBlockedBy
+        ? "blocked"
+        : !roleCanEdit
+          ? "view"
+          : "open";
+
   return (
     <div>
       <PageHeader
-        title={`Daily Online Stock Monitoring - ${formatDateDisplay(date)} - ${shiftWithWord(shift)}`}
+        title="Online Entry"
+        badges={<EntryBadges date={date} shift={shift} status={entryStatus} />}
         subtitle="Stocks In/Out transfers also update the Offline table."
       >
         <EntryToolbar
@@ -716,10 +731,17 @@ export function OnlineEntryPage() {
         />
       )}
       {splitDayView && (
-        <p role="status" className="ae-mm-note" style={{ margin: "0 0 10px" }}>
-          This day was entered by shift (Morning and Night). With shifts switched off it shows the two added together
-          and is read-only. Use Request unlock in the toolbar to ask an admin to open it, switch shifts back on in Settings to edit it, or request a correction.
-        </p>
+        <div role="status" className="ae-day-lock">
+          <span className="ae-day-lock-icon" aria-hidden>
+            <LockIcon />
+          </span>
+          <div className="ae-day-lock-text">
+            <strong>This day was entered by shift (Morning and Night).</strong>
+            <span>
+              With shifts switched off it shows the two added together and is read-only. Use Request unlock in the toolbar to ask an admin to open it, switch shifts back on in Settings to edit it, or request a correction.
+            </span>
+          </div>
+        </div>
       )}
       {dayLock.locked && (
         <DayLockBanner
@@ -731,6 +753,9 @@ export function OnlineEntryPage() {
         />
       )}
       <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
+      {displayRows && (
+        <EntryTotalsStrip rows={displayRows} rowFilter={rowFilter} onRowFilterChange={setRowFilter} changed={pendingCount} />
+      )}
       {!rows ? (
         <TableSkeleton
           headers={["SKU", "Product", ...columns.map((c) => c.label)]}
@@ -779,11 +804,15 @@ export function OnlineEntryPage() {
           />
         </div>
       )}
-      {!roleCanEdit && (
-        <p style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 8 }}>
-          Read-only: your role can view but not edit Online entries.
-        </p>
-      )}
+      <EntrySaveBar
+        pendingCount={pendingCount}
+        pendingCellCount={pendingCellCount}
+        saving={saving}
+        failed={saveFailed}
+        onReview={() => setShowPreview(true)}
+        onDiscard={() => setShowClearConfirm(true)}
+        onRetry={() => void handleSaveAll()}
+      />
       {showPreview && (
         <Modal title="Review and save" onClose={() => setShowPreview(false)}>
           <SaveSummary
