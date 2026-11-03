@@ -93,8 +93,23 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
+/* The stock pools lead: Online and Offline are the big tiles, Active SKUs the small one. */
+.ae-dash-stats--hero {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 2fr) minmax(0, 1fr);
+  gap: 14px;
+  margin: 12px 0 18px;
+}
+@media (max-width: 900px) {
+  .ae-dash-stats--hero {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ae-dash-stats--hero > :nth-child(3) {
+    grid-column: 1 / -1;
+  }
+}
 @media (max-width: 520px) {
-  .ae-dash-stats {
+  .ae-dash-stats,
+  .ae-dash-stats--hero {
     grid-template-columns: 1fr;
   }
 }
@@ -149,35 +164,7 @@
 .ae-dash-hero-activity .ae-dash-card .ae-table td {
   padding: 6px 10px;
 }
-/* Compact stat tiles - three across the left column. */
-.ae-dash-hero-left .ae-dash-stat {
-  gap: 8px;
-  padding: 14px 12px;
-}
-.ae-dash-hero-left .ae-dash-stat-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 6px;
-}
-.ae-dash-hero-left .ae-dash-stat-icon svg {
-  width: 16px;
-  height: 16px;
-}
-.ae-dash-hero-left .ae-dash-stat-value {
-  font-size: clamp(22px, 2.4vw, 34px);
-}
-.ae-dash-hero-left .ae-dash-stat-label {
-  font-size: calc(11px * var(--ae-fs, 1));
-  line-height: 1.25;
-}
 @media (min-width: 1500px) {
-  .ae-dash-hero-left .ae-dash-stat {
-    padding: 20px 16px;
-    gap: 10px;
-  }
-  .ae-dash-hero-left .ae-dash-stat-label {
-    font-size: calc(12px * var(--ae-fs, 1));
-  }
   .ae-dash-hero-activity .ae-dash-card .ae-table {
     font-size: 13px;
   }
@@ -217,19 +204,37 @@
 }
 /* Icon badge - the small rounded chip each stat card leads with, CRM-tile
    style, tinted brand gold (or danger red for the alert variant). */
+.ae-dash-stat-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
 .ae-dash-stat-icon {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
   background: color-mix(in srgb, #d4a000 14%, transparent);
   color: #d4a000;
 }
+.ae-dash-stat--hero {
+  padding: 20px 22px;
+  gap: 14px;
+}
+.ae-dash-stat--hero .ae-dash-stat-icon {
+  width: 38px;
+  height: 38px;
+}
+.ae-dash-stat--hero .ae-dash-stat-value {
+  font-size: clamp(34px, 4.4vw, 52px);
+}
 .ae-dash-stat-value {
   position: relative;
-  font-size: clamp(26px, 5vw, 36px);
+  font-size: clamp(24px, 3vw, 30px);
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -242,73 +247,102 @@
   font-weight: 600;
   color: var(--ae-text-muted);
 }
-/* Dashboard "Quick Access" - one-click shortcuts to the app's major
-   Data Entry pages, so a supervisor lands here and can jump straight to
-   the page they actually need instead of opening the nav drawer first. */
+/* Quick links: one slim row of pill buttons to the day-to-day pages, so landing here doesn't
+   need the nav drawer. Wraps on a phone. */
 .ae-dash-quicklinks {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 10px;
-  /* Flex items don't collapse margins, so this bottom margin used to stack
-     with .ae-dash-hero-row's own 12px top margin for a 36px gap below the
-     quick-access row - almost twice the 20px gap above it (the subtitle's
-     8px bottom margin + this row's own 12px top margin). Matched to 8px so
-     the two sides land on the same 20px total. */
-  margin: 12px 0 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 6px;
   flex-shrink: 0;
 }
 .ae-dash-quicklink {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 6px 12px 6px 8px;
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border: none;
-  border-radius: 6px;
+  border: 0.3px solid var(--ae-hairline);
+  border-radius: 999px;
   color: var(--ae-text);
   text-decoration: none;
-  font-size: calc(13.5px * var(--ae-fs, 1));
-  font-weight: 700;
-  box-shadow:
-    0 1px 2px rgba(12, 12, 12, 0.04),
-    0 4px 10px rgba(12, 12, 12, 0.06);
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 600;
   transition:
     border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    box-shadow 0.15s ease;
 }
 .ae-dash-quicklink-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
-  border-radius: 6px;
-  background: color-mix(in srgb, #d4a000 14%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, #d4a000 16%, transparent);
   color: #d4a000;
 }
+.ae-dash-quicklink-icon svg {
+  width: 14px;
+  height: 14px;
+}
 .ae-dash-quicklink-label {
-  flex: 1;
   min-width: 0;
 }
 .ae-dash-quicklink:hover {
   border-color: #f5c000;
-  box-shadow: 0 4px 14px rgba(212, 160, 0, 0.22);
-  transform: translateY(-1px);
+  box-shadow: 0 2px 10px rgba(212, 160, 0, 0.22);
+}
+.ae-dash-quicklink:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
 }
 .ae-dash-quicklink-arrow {
-  flex-shrink: 0;
-  color: var(--ae-text-muted);
-  transition:
-    transform 0.15s ease,
-    color 0.15s ease;
+  display: none;
 }
-.ae-dash-quicklink:hover .ae-dash-quicklink-arrow {
-  color: #d4a000;
-  transform: translateX(2px);
+
+/* Greeting row and the small section label above the insights. */
+.ae-dash-greeting {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 12px 0 0;
+}
+.ae-dash-greeting-text {
+  margin: 0;
+  font-size: calc(20px * var(--ae-fs, 1));
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-dash-greeting-chip {
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  padding: 2px 10px;
+  border-radius: 999px;
+}
+.ae-dash-eyebrow {
+  margin: 0;
+  font-size: calc(11px * var(--ae-fs, 1));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ae-text-muted);
+}
+/* Recent Activity: action dot. */
+.ae-dash-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ae-text);
+}
+.ae-dash-action-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
 }
 
 .ae-dash-section {
@@ -405,20 +439,25 @@
   text-decoration: underline;
 }
 
-/* "vs prev day" change under a figure (neutral - stock has no good/bad direction). */
+/* "vs prev day" change under a figure: a pill (neutral - stock has no good/bad direction). */
 .ae-dash-stat-delta {
   position: relative;
-  font-size: calc(10.5px * var(--ae-fs, 1));
-  font-weight: 600;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: calc(11px * var(--ae-fs, 1));
+  font-weight: 700;
   white-space: nowrap;
   color: var(--ae-text-muted);
+  background: color-mix(in srgb, var(--ae-text-muted) 14%, transparent);
 }
-
-/* Top-align the content of every tile in the stat row so the icons line up
-   (a tile without a "vs prev day" line, like Active SKUs, used to sit lower
-   than its neighbours because the content was vertically centred). */
-.ae-dash-hero-left .ae-dash-stat {
-  justify-content: flex-start;
+.ae-dash-stat-delta--up {
+  color: var(--ae-text);
+  background: color-mix(in srgb, #d4a000 18%, transparent);
+}
+.ae-dash-stat-delta--down {
+  color: var(--ae-text);
+  background: color-mix(in srgb, var(--ae-text-muted) 22%, transparent);
 }
 
 /* Insights row: Entry status / Top variances / Low & negative stock / Lowest
@@ -430,7 +469,7 @@
      report ->"), and with a narrow gap it ran straight into the next panel's
      heading and read as one line. */
   gap: 10px 22px;
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   flex-shrink: 0;
 }
 @media (min-width: 1280px) {
@@ -640,16 +679,6 @@
 .ae-dash-seg button:focus-visible {
   outline: 2px solid #d4a000;
   outline-offset: -2px;
-}
-
-/* Slimmer quick-access tiles - the row sits above the new insights row, so
-   every pixel of height here pushes the stat cards and chart down. */
-.ae-dash-quicklink {
-  padding: 10px 14px;
-}
-.ae-dash-quicklink-icon {
-  width: 28px;
-  height: 28px;
 }
 
 /* Recent Activity: record name truncates, "by <name>" sits underneath. */

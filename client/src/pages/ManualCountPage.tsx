@@ -369,8 +369,9 @@ export function ManualCountPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [publishing, setPublishing] = useState(false);
   // Publish-dialog choice: also make the counts the next day's opening stock.
-  // Off by default - counts are an audit only unless a supervisor opts in.
-  const [applyToOpening, setApplyToOpening] = useState(false);
+  // On by default (an audit replaces the old figure); a supervisor can untick it to
+  // publish a count as an audit only.
+  const [applyToOpening, setApplyToOpening] = useState(true);
   // Publishing is the supervisor's approval step; encoders see the state only.
   const canPublish = useAuth().user?.role === "SUPERVISOR_ADMIN";
   // Undo / redo over the staged (unsaved) counts. A step is one cell edit (all
@@ -588,7 +589,7 @@ export function ManualCountPage() {
     try {
       const { published, leftSaved = 0 } = await publishManualCounts(date, shift, applyToOpening);
       setShowPublishConfirm(false);
-      setApplyToOpening(false);
+      setApplyToOpening(true);
       // Later saved days are recalculated by an applied publish. Say when one could
       // not be (a finished day goes to an admin; an imported opening stays), so a
       // day that keeps its old opening is expected rather than mistaken for a miss.
@@ -1529,8 +1530,8 @@ export function ManualCountPage() {
         >
           {openingCount} first count{openingCount === 1 ? "" : "s"} will be
           recorded as opening balances - they are not counted as variance.
-          A count only becomes a shift&apos;s opening stock if you tick the
-          option when publishing.
+          A count only becomes a shift&apos;s opening stock if you leave the
+          option ticked when publishing.
         </p>
       )}
       {!auditRows ? (
@@ -1875,7 +1876,7 @@ export function ManualCountPage() {
           onConfirm={() => void handlePublish()}
           onCancel={() => {
             setShowPublishConfirm(false);
-            setApplyToOpening(false);
+            setApplyToOpening(true);
           }}
         >
           {unpublishedCount} saved count{unpublishedCount === 1 ? "" : "s"} for{" "}

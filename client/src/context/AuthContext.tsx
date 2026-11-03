@@ -37,14 +37,13 @@ interface AuthContextValue {
   /// Re-reads who is signed in (e.g. after turning two-step verification on or off).
   refreshUser: () => Promise<void>;
   logout: () => void;
-  /// Set only when the initial session check (below) failed for a reason
-  /// OTHER than "not actually logged in" - a network/server failure while a
-  /// token did exist, say. Distinguishing this from an invalid/expired token
-  /// matters because that's the ordinary, silent case (a first-time visitor,
-  /// or a session that's genuinely expired) - conflating the two would leave
-  /// someone whose backend is simply unreachable staring at a blank login
-  /// form with no explanation of why they were logged out.
+  /// Set only when a session that was in use ended without the person asking
+  /// (revoked, deactivated, expired mid-use). A first visit, a manual log out
+  /// and a failed start-up check stay silent. The login screen shows it once
+  /// and dismisses it with clearSessionError.
   sessionError: string | null;
+  /// Dismisses the "your session ended" notice once the person has seen it.
+  clearSessionError: () => void;
   /// True while the server has rejected our token but there is unsaved work on
   /// screen. Instead of bouncing to the login page (which unmounts the grids),
   /// Layout shows a re-login dialog over the page; edits stay exactly as they were.
@@ -101,12 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         // A token existed and the request still failed for some other reason
         // - don't wipe out what might still be a perfectly valid session over
-        // a transient failure.
-        setSessionError(
-          e instanceof Error
-            ? e.message
-            : "Couldn't reach the server - check your connection and try again.",
-        );
+        // a transient failure. Nothing is announced either: the login screen's
+        // notice is only for a session that ended after the person was in.
       })
       .finally(() => {
         setLoading(false);
@@ -228,6 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshUser,
         logout,
         sessionError,
+        clearSessionError: () => setSessionError(null),
         sessionExpired,
         expireSession,
         reauthenticate,

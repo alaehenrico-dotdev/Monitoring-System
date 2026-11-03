@@ -1299,3 +1299,273 @@
     flex: 1 1 0;
   }
 }
+
+/* ---- Signed-out screens (AuthShell / AuthCard) ----------------------------------------
+   Wide: a brand panel beside the form. Phone: a compact brand header over the form. The
+   card reuses .ae-modal-panel, so each theme preset's dialog rules (radius, frame, shadow,
+   glass) already restyle it; only the page backdrop is themed below. The backdrop is the
+   permanently dark brand chrome in every preset. */
+.ae-auth {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: var(--ae-vh);
+  box-sizing: border-box;
+  background: #1a1a1a;
+  background-image: radial-gradient(circle at 50% -10%, #2a2a2a, #1a1a1a 70%);
+}
+.ae-auth-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 16px 8px;
+  text-align: center;
+  color: #e5e5e5;
+}
+.ae-auth-wordmark {
+  margin: 8px 0 2px;
+  font-size: calc(26px * var(--ae-fs, 1));
+  font-weight: 800;
+}
+.ae-auth-system {
+  margin: 0;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  letter-spacing: 0.4px;
+  opacity: 0.8;
+}
+.ae-auth-pitch {
+  display: none;
+  margin: 20px 0 0;
+  max-width: 28ch;
+  font-size: calc(18px * var(--ae-fs, 1));
+  line-height: 1.4;
+  opacity: 0.95;
+}
+.ae-auth-main {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 16px 40px;
+  box-sizing: border-box;
+}
+@media (min-width: 900px) {
+  .ae-auth {
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 1fr);
+  }
+  .ae-auth-brand {
+    padding: 48px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .ae-auth-wordmark {
+    font-size: calc(40px * var(--ae-fs, 1));
+  }
+  .ae-auth-pitch {
+    display: block;
+  }
+  .ae-auth-main {
+    padding: 48px 32px;
+  }
+}
+
+.ae-auth-card {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 28px 24px 24px;
+  background: var(--ae-bg);
+  color: var(--ae-text);
+  border-radius: 6px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+.ae-auth-heading {
+  margin: 0 0 18px;
+}
+.ae-auth-heading h2 {
+  margin: 0;
+  font-size: calc(21px * var(--ae-fs, 1));
+  font-weight: 700;
+}
+.ae-auth-heading p {
+  margin: 4px 0 0;
+  font-size: calc(13px * var(--ae-fs, 1));
+  line-height: 1.5;
+  color: var(--ae-text-muted);
+}
+
+/* Password field: label row with the forgot link, a show/hide toggle inside the input. */
+.ae-auth-label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.ae-auth-label-row label {
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+.ae-auth-label-row .ae-link-btn {
+  min-height: 0;
+  padding: 0 2px;
+  font-size: calc(12px * var(--ae-fs, 1));
+}
+.ae-auth-pw {
+  position: relative;
+}
+.ae-auth-pw .ae-input {
+  padding-right: 54px;
+}
+.ae-auth-pw-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--ae-text-muted);
+  font: inherit;
+  font-size: calc(12px * var(--ae-fs, 1));
+  cursor: pointer;
+}
+.ae-auth-pw-toggle:hover {
+  color: var(--ae-text);
+}
+.ae-auth-hint {
+  margin: 4px 0 0;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-warning-text);
+}
+.ae-auth-error {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: var(--ae-danger-bg);
+  color: var(--ae-danger-text);
+  font-size: calc(13px * var(--ae-fs, 1));
+  line-height: 1.4;
+}
+.ae-auth-notice {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  background: var(--ae-warning-bg);
+  color: var(--ae-warning-text);
+  font-size: calc(13px * var(--ae-fs, 1));
+  line-height: 1.4;
+}
+.ae-auth-error svg,
+.ae-auth-notice svg {
+  flex: none;
+  margin-top: 1px;
+}
+.ae-auth-code {
+  width: 100%;
+  text-align: center;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: calc(22px * var(--ae-fs, 1));
+  letter-spacing: 0.35em;
+  padding: 10px;
+}
+.ae-auth-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 8px;
+}
+
+/* ---- Per-preset backdrops (the card itself follows the dialog rules above) ---- */
+:root[data-ui="glass"] .ae-auth {
+  background:
+    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.45), transparent 60%),
+    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.32), transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.3), transparent 60%),
+    #0f0d0a;
+}
+:root[data-ui="brutal"] .ae-auth {
+  background: #1a1a1a;
+}
+:root[data-ui="brutal"] .ae-auth-brand {
+  border-right: 3px solid var(--ae-nb-gold);
+}
+:root[data-ui="brutal"] .ae-auth-error,
+:root[data-ui="brutal"] .ae-auth-card {
+  border-radius: 0;
+}
+:root[data-ui="minimal"] .ae-auth,
+:root[data-ui="flat"] .ae-auth,
+:root[data-ui="enterprise"] .ae-auth {
+  background: #1a1a1a;
+}
+:root[data-ui="enterprise"] .ae-auth-error,
+:root[data-ui="minimal"] .ae-auth-error,
+:root[data-ui="aurora"] .ae-auth-error {
+  border-radius: 3px;
+}
+:root[data-ui="halloween"] .ae-auth-brand,
+:root[data-ui="aurora"] .ae-auth-brand {
+  border-right-color: rgba(245, 192, 0, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-auth *,
+  .ae-auth-card {
+    transition: none !important;
+  }
+}
+
+/* ---- Frosted-glass login card (default "classic" theme) ---------------------------------
+   A translucent gradient pane with a backdrop blur and a bright edge, floating over soft gold,
+   red and green light. Scoped to the default theme: every other preset keeps its own card
+   (see the dialog rules in styles/themes), and the Glass preset has its own frosting. */
+:root[data-ui="classic"] .ae-auth {
+  background:
+    radial-gradient(520px 420px at 78% 18%, rgba(245, 192, 0, 0.32), transparent 62%),
+    radial-gradient(480px 420px at 92% 78%, rgba(193, 39, 45, 0.22), transparent 62%),
+    radial-gradient(520px 460px at 55% 100%, rgba(47, 107, 60, 0.24), transparent 62%),
+    radial-gradient(circle at 50% -10%, #2a2a2a, #1a1a1a 70%);
+}
+:root[data-ui="classic"] .ae-auth-card {
+  /* Smoked black glass in light and dark mode alike, so the card carries the dark-mode
+     tokens for everything inside it (text, fields, notices). */
+  --ae-bg: #1a1a1a;
+  --ae-bg-alt: #222222;
+  --ae-surface: rgba(255, 255, 255, 0.06);
+  --ae-text: #ffffff;
+  --ae-text-muted: #b5b5b5;
+  --ae-border: rgba(255, 255, 255, 0.18);
+  --ae-hairline: rgba(255, 255, 255, 0.22);
+  --ae-warning-bg: rgba(245, 192, 0, 0.12);
+  --ae-warning-text: #fdd023;
+  --ae-danger-text: #ff8088;
+  --ae-danger-bg: rgba(193, 39, 45, 0.22);
+  color: var(--ae-text);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(245, 192, 0, 0.1) 100%),
+    rgba(10, 10, 10, 0.62);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: blur(22px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+:root[data-ui="classic"] .ae-auth-card .ae-modal-border-sweep {
+  display: none;
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root[data-ui="classic"] .ae-auth-card {
+    background: #1a1a1a;
+  }
+}

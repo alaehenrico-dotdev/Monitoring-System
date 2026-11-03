@@ -217,6 +217,43 @@ describe("an audit published as the next day's opening", () => {
   });
 });
 
+describe("an audit is a fresh opening: yesterday's remaining stock never reaches it", () => {
+  const nights = (remaining: number) => [{ productId: 1, entryDate: day("2026-06-10"), shift: "NIGHT" as Shift, remainingStock: remaining }];
+
+  it.each([
+    ["a positive count", 50],
+    ["a zero count", 0],
+  ])("a product at -90 audited to %s opens the next day at the count", async (_label, counted) => {
+    db.online = nights(-90);
+    db.counts = [applied(1, "2026-06-10", counted)];
+
+    expect(await dailyOnlineStockRepository.getOpeningStock(1, day("2026-06-11"), "MORNING")).toBe(counted);
+    expect((await dailyOnlineStockRepository.getOpeningStocksForProducts([1], day("2026-06-11"), "MORNING")).get(1)).toBe(counted);
+  });
+
+  it("a change to yesterday's remaining stock after the audit does not move the fresh opening", async () => {
+    db.counts = [applied(1, "2026-06-10", 50)];
+    for (const remaining of [-90, -400, 0, 1200]) {
+      db.online = nights(remaining);
+      expect(await dailyOnlineStockRepository.getOpeningStock(1, day("2026-06-11"), "MORNING")).toBe(50);
+    }
+  });
+
+  it("the Offline side follows the same rule", async () => {
+    db.offline = nights(-90);
+    db.counts = [{ ...applied(1, "2026-06-10", 0), location: "OFFLINE" }];
+
+    expect(await dailyOfflineStockRepository.getOpeningStock(1, day("2026-06-11"), "MORNING")).toBe(0);
+  });
+
+  it("an audit that was not applied still lets the -90 carry (audit only)", async () => {
+    db.online = nights(-90);
+    db.counts = [{ ...applied(1, "2026-06-10", 50), appliedToOpening: false }];
+
+    expect(await dailyOnlineStockRepository.getOpeningStock(1, day("2026-06-11"), "MORNING")).toBe(-90);
+  });
+});
+
 describe("a day saved before the audit was published keeps its figures", () => {
   const savedBefore = new Date("2026-06-10T10:00:00.000Z"); // first saved before the 20:00 publish
 

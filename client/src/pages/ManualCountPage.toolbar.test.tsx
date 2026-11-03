@@ -286,8 +286,8 @@ describe("ManualCountPage - publishing the sheet", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Publish/ })[0]);
     fireEvent.click(await screen.findByRole("button", { name: "Publish 3" }));
 
-    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), expect.any(String), false));
-    expect(await screen.findByText(/Published 3 counts - now final for reporting/)).toBeTruthy();
+    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), expect.any(String), true));
+    expect(await screen.findByText(/Published 3 counts - now the next day's opening stock/)).toBeTruthy();
   });
 
   it("can also use the counts as the next day's opening stock, and says how many later days could not be updated", async () => {
@@ -297,12 +297,24 @@ describe("ManualCountPage - publishing the sheet", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: /Publish/ })[0]);
     const toggle = (await screen.findByLabelText(/Also use these counts as the next day's opening stock/)) as HTMLInputElement;
-    expect(toggle.checked).toBe(false);
-    fireEvent.click(toggle);
+    expect(toggle.checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Publish 3" }));
 
     await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), true));
     expect(await screen.findByText(/now the next day's opening stock · 2 products have a later day that could not be updated/)).toBeTruthy();
+  });
+
+  it("publishes as an audit only when the option is unticked", async () => {
+    api.publishManualCounts.mockResolvedValue({ published: 3, publishedAt: "2026-10-09T22:00:00.000Z", appliedToOpening: false });
+    await open();
+    await screen.findAllByText("3 unpublished");
+
+    fireEvent.click(screen.getAllByRole("button", { name: /Publish/ })[0]);
+    fireEvent.click(await screen.findByLabelText(/Also use these counts as the next day's opening stock/));
+    fireEvent.click(screen.getByRole("button", { name: "Publish 3" }));
+
+    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), false));
+    expect(await screen.findByText(/Published 3 counts - now final for reporting/)).toBeTruthy();
   });
 
   it("says Published once every saved count is, and has nothing left to publish", async () => {

@@ -37,7 +37,8 @@ import { colors } from "../theme";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useCountUp } from "../hooks/useCountUp";
 import { useRealtimeVersion } from "../context/RealtimeContext";
-import { getCurrentShiftAndDate } from "../utils/shift";
+import { getCurrentShiftAndDate, SHIFT_LABELS } from "../utils/shift";
+import { useAuth } from "../context/AuthContext";
 
 type Totals = {
   /// Online and Offline are separate stock pools (Section 2.1) - each gets
@@ -92,6 +93,12 @@ function addDays(iso: string, days: number): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
+/// "Good morning" / "afternoon" / "evening" from the local clock.
+function greeting(now: Date = new Date()): string {
+  const h = now.getHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
 type Delta = { diff: number };
 
 /// Change since the previous day (stock levels have no good/bad direction,
@@ -141,6 +148,8 @@ export function DashboardPage() {
     useDaysOfStock(viewDate);
   const isToday = viewDate === today;
   const realtimeVersion = useRealtimeVersion();
+  const { user } = useAuth();
+  const firstName = user?.name?.trim().split(/\s+/)[0];
 
   // `today` (above) is recomputed on every render, so it's never itself
   // stale - but nothing otherwise re-renders this page as time passes. Left
@@ -332,20 +341,59 @@ export function DashboardPage() {
         duration={null}
       />
 
-      <div className="ae-dash-quicklinks">
-        {QUICK_LINKS.map((l) => (
-          <Link key={l.to} to={l.to} className="ae-dash-quicklink">
-            <span aria-hidden className="ae-dash-quicklink-icon">
-              {l.icon}
-            </span>
-            <span className="ae-dash-quicklink-label">{l.label}</span>
-            <span aria-hidden className="ae-dash-quicklink-arrow">
-              <ChevronRightIcon />
-            </span>
-          </Link>
-        ))}
+      <div className="ae-dash-greeting">
+        <h3 className="ae-dash-greeting-text">
+          {greeting()}
+          {firstName ? `, ${firstName}` : ""}
+        </h3>
+        <span className="ae-dash-chip ae-dash-chip--progress ae-dash-greeting-chip">
+          {SHIFT_LABELS[currentShift]} · {formatDate(today)}
+        </span>
       </div>
 
+      <div
+        className="ae-dash-stats ae-dash-stats--hero"
+        role={stocks || showStatsError ? undefined : "status"}
+        aria-busy={stocks || showStatsError ? undefined : "true"}
+      >
+        {totals ? (
+          <>
+            <StatCard
+              hero
+              icon={<BoxIcon />}
+              label="Online remaining stock"
+              value={totals.online}
+              to="/total-stocks"
+              delta={makeDelta(totals.online, prevTotals?.online)}
+            />
+            <StatCard
+              hero
+              icon={<BoxIcon />}
+              label="Offline remaining stock"
+              value={totals.offline}
+              to="/total-stocks"
+              delta={makeDelta(totals.offline, prevTotals?.offline)}
+            />
+            <StatCard
+              icon={<TagIcon />}
+              label="Active SKUs"
+              value={activeProducts}
+              to="/products"
+            />
+          </>
+        ) : showStatsError ? (
+          <div className="ae-dash-stats-error" role="alert">
+            <span>Couldn't load the stock figures.</span>
+            <Button variant="ghost" size="sm" onClick={retry}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <StatCardsSkeleton count={3} />
+        )}
+      </div>
+
+      <h3 className="ae-dash-eyebrow">Needs attention</h3>
       {/* "What needs attention" row: entry progress for the shift, the
           biggest variances, low/negative stock and the lowest days left.
           The variance and low-stock cards reuse the Consolidated rows
@@ -366,58 +414,29 @@ export function DashboardPage() {
         <NeedsRestockCard rows={daysOfStock} failed={daysOfStockFailed} />
       </div>
 
-      {/* Two columns: the monitoring stat cards with Recent Activity
-          stacked directly beneath them (same width/grid, reduced size) on
-          the left, and the Monthly Monitoring graph on the right - the
-          largest card, stretched to the full height of the left column.
-          Column widths live in .ae-dash-hero-row in index.css. */}
+      <div className="ae-dash-quicklinks" aria-label="Quick links">
+        {QUICK_LINKS.map((l) => (
+          <Link key={l.to} to={l.to} className="ae-dash-quicklink">
+            <span aria-hidden className="ae-dash-quicklink-icon">
+              {l.icon}
+            </span>
+            <span className="ae-dash-quicklink-label">{l.label}</span>
+            <span aria-hidden className="ae-dash-quicklink-arrow">
+              <ChevronRightIcon />
+            </span>
+          </Link>
+        ))}
+      </div>
+
+      {/* Recent Activity (left) beside the Monthly Monitoring graph (right, stretched to the
+          full height of the left column). Column widths live in .ae-dash-hero-row. */}
       <div className="ae-dash-hero-row">
         <div className="ae-dash-hero-left">
-          <div
-            className="ae-dash-stats"
-            role={stocks || showStatsError ? undefined : "status"}
-            aria-busy={stocks || showStatsError ? undefined : "true"}
-          >
-            {totals ? (
-              <>
-                <StatCard
-                  icon={<TagIcon />}
-                  label="Active SKUs"
-                  value={activeProducts}
-                  to="/products"
-                />
-                <StatCard
-                  icon={<BoxIcon />}
-                  label="Online remaining stock"
-                  value={totals.online}
-                  to="/total-stocks"
-                  delta={makeDelta(totals.online, prevTotals?.online)}
-                />
-                <StatCard
-                  icon={<BoxIcon />}
-                  label="Offline remaining stock"
-                  value={totals.offline}
-                  to="/total-stocks"
-                  delta={makeDelta(totals.offline, prevTotals?.offline)}
-                />
-              </>
-            ) : showStatsError ? (
-              <div className="ae-dash-stats-error" role="alert">
-                <span>Couldn't load the stock figures.</span>
-                <Button variant="ghost" size="sm" onClick={retry}>
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <StatCardsSkeleton count={3} />
-            )}
-          </div>
-
           {/* Recent Activity: the change_log (Section 5.8) is otherwise only
             visible on its own dedicated page - surfacing the last few edits
             here means a supervisor can spot something odd (a bulk edit, a
             deletion, an unfamiliar name) without navigating away first.
-            Sits right under the stat cards, same width, compact size. */}
+            Compact, beside the chart. */}
           <section className="ae-dash-section ae-dash-hero-activity">
             <h3 className="ae-dash-heading">
               Recent Activity
@@ -428,7 +447,7 @@ export function DashboardPage() {
             <div className="ae-dash-card">
               {recentActivity === null ? (
                 <TableSkeleton
-                  headers={["Action", "Record", "When"]}
+                  headers={["Action", "Record"]}
                   minWidth={320}
                   rows={5}
                   cellPadding="8px 12px"
@@ -455,7 +474,7 @@ export function DashboardPage() {
                   >
                     <thead>
                       <tr>
-                        {["Action", "Record", "When"].map((h) => (
+                        {["Action", "Record"].map((h) => (
                           <th key={h}>{h}</th>
                         ))}
                       </tr>
@@ -498,12 +517,13 @@ function CardMessage({ children }: { children: ReactNode }) {
 /// to compare against.
 function DeltaBadge({ delta }: { delta: Delta | undefined }) {
   if (!delta) return null;
+  const dir = delta.diff === 0 ? "flat" : delta.diff > 0 ? "up" : "down";
   const text =
-    delta.diff === 0
+    dir === "flat"
       ? "No change"
-      : `${delta.diff > 0 ? "▲" : "▼"} ${Math.abs(delta.diff).toLocaleString()} vs prev day`;
+      : `${dir === "up" ? "▲" : "▼"} ${Math.abs(delta.diff).toLocaleString()} vs prev day`;
   return (
-    <span className="ae-dash-stat-delta" title="Compared with the previous day">
+    <span className={`ae-dash-stat-delta ae-dash-stat-delta--${dir}`} title="Compared with the previous day">
       {text}
     </span>
   );
@@ -517,7 +537,9 @@ function StatCard({
   value,
   to,
   delta,
+  hero,
 }: {
+  hero?: boolean;
   icon: ReactNode;
   label: string;
   value: number | undefined;
@@ -528,16 +550,18 @@ function StatCard({
   // changes (including the first time it resolves from `undefined`).
   const animatedValue = useCountUp(value);
 
-  const className = `ae-dash-stat${to ? " ae-dash-stat--link" : ""}`;
+  const className = `ae-dash-stat${hero ? " ae-dash-stat--hero" : ""}${to ? " ae-dash-stat--link" : ""}`;
   const body = (
     <>
-      <div aria-hidden className="ae-dash-stat-icon">
-        {icon}
+      <div className="ae-dash-stat-head">
+        <div aria-hidden className="ae-dash-stat-icon">
+          {icon}
+        </div>
+        <div className="ae-dash-stat-label">{label}</div>
       </div>
       <div className="ae-dash-stat-value">
         {value !== undefined ? animatedValue.toLocaleString() : "—"}
       </div>
-      <div className="ae-dash-stat-label">{label}</div>
       <DeltaBadge delta={delta} />
     </>
   );
@@ -592,12 +616,15 @@ function ActivityRow({
   const description = describeRecord(entry, productsById);
   return (
     // The whole row is clickable; the Record cell holds a real link so the
-    // row is also reachable by keyboard. Who made the change sits under the
-    // record (a separate "Changed by" column wouldn't fit this compact
-    // version) - the full Change Log page this links to has everything.
+    // row is also reachable by keyboard. Who made the change and when sit under
+    // the record (a separate column wouldn't fit this compact version) - the
+    // full Change Log page this links to has everything.
     <tr style={{ cursor: "pointer" }} onClick={() => navigate("/change-log")}>
-      <td style={{ fontWeight: 700, color: ACTION_COLOR[entry.action] }}>
-        {entry.action}
+      <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
+        <span className="ae-dash-action">
+          <span aria-hidden className="ae-dash-action-dot" style={{ background: ACTION_COLOR[entry.action] }} />
+          {entry.action}
+        </span>
       </td>
       <td>
         <Link
@@ -608,15 +635,9 @@ function ActivityRow({
         >
           {description}
         </Link>
-        <span className="ae-dash-cell-sub">
-          by {entry.changedBy?.name ?? "system"}
+        <span className="ae-dash-cell-sub" title={new Date(entry.changedAt).toLocaleString()}>
+          by {entry.changedBy?.name ?? "system"} · {formatRelativeTime(entry.changedAt)}
         </span>
-      </td>
-      <td
-        style={{ whiteSpace: "nowrap", color: colors.subtleInk }}
-        title={new Date(entry.changedAt).toLocaleString()}
-      >
-        {formatRelativeTime(entry.changedAt)}
       </td>
     </tr>
   );

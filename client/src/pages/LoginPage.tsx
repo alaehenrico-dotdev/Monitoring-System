@@ -5,13 +5,10 @@ import { ApiError } from "../api/http";
 import { AuthCard, AuthShell } from "../components/AuthShell";
 import { LoadingOverlay } from "../components/Spinner";
 import { Button, Field, TextInput } from "../components/ui";
-import { colors } from "../theme";
 import { forgetDevice, isDeviceRemembered, rememberedUsername } from "../utils/rememberDevice";
 
-const small = { fontSize: "calc(13px * var(--ae-fs, 1))", margin: 0 } as const;
-
 export function LoginPage() {
-  const { user, login, completeMfa, sessionError } = useAuth();
+  const { user, login, completeMfa, sessionError, clearSessionError } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState(rememberedUsername);
   // Ticked by default on a device that was remembered before; unticked on a new one.
@@ -22,12 +19,15 @@ export function LoginPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [capsLock, setCapsLock] = useState(false);
 
   if (user) return <Navigate to="/" replace />;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    seen();
     setSubmitting(true);
     try {
       if (mfaToken) {
@@ -54,81 +54,124 @@ export function LoginPage() {
     }
   }
 
+  // The "session ended" notice is shown once: it goes as soon as the person starts typing or
+  // submits, so it never lingers beside a fresh attempt or comes back on the next visit.
+  const notice = error ? null : sessionError;
+  const seen = () => {
+    if (sessionError) clearSessionError();
+  };
+
   return (
     <AuthShell>
       {submitting && <LoadingOverlay label="Signing in…" />}
-      <AuthCard onSubmit={handleSubmit}>
+      <AuthCard
+        onSubmit={handleSubmit}
+        title={mfaToken ? "Two-step verification" : "Sign in"}
+        subtitle={mfaToken ? "Enter the 6-digit code from your authenticator app, or one of your recovery codes." : "Use your account to open the stock monitor."}
+      >
         {mfaToken ? (
-          <>
-            <p style={{ ...small, margin: "0 0 12px", color: colors.subtleInk, lineHeight: 1.5 }}>
-              Enter the 6-digit code from your authenticator app, or one of your recovery codes.
-            </p>
-            <Field label="Verification code" style={{ marginBottom: 16 }}>
-              <TextInput
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                style={{ width: "100%" }}
-                autoComplete="one-time-code"
-                autoFocus
-              />
-            </Field>
-          </>
+          <Field label="Verification code" style={{ marginBottom: 16 }}>
+            <TextInput
+              value={code}
+              onChange={(e) => {
+                seen();
+                setCode(e.target.value);
+              }}
+              className="ae-auth-code"
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              autoFocus
+            />
+          </Field>
         ) : (
           <>
             <Field label="Username" style={{ marginBottom: 12 }}>
               <TextInput
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  seen();
+                  setUsername(e.target.value);
+                }}
                 style={{ width: "100%" }}
                 autoComplete="username"
                 autoFocus={!username}
               />
             </Field>
 
-            <Field label="Password" style={{ marginBottom: 12 }}>
-              <TextInput
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                style={{ width: "100%" }}
-                autoComplete="current-password"
-                autoFocus={!!username}
-              />
-            </Field>
+            <div style={{ marginBottom: 12 }}>
+              <div className="ae-auth-label-row">
+                <label htmlFor="login-password">Password</label>
+                <button type="button" className="ae-link-btn" onClick={() => navigate("/forgot-password")}>
+                  Forgot password?
+                </button>
+              </div>
+              <div className="ae-auth-pw">
+                <TextInput
+                  id="login-password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => {
+                    seen();
+                    setPassword(e.target.value);
+                  }}
+                  onKeyDown={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                  onKeyUp={(e) => setCapsLock(e.getModifierState("CapsLock"))}
+                  onBlur={() => setCapsLock(false)}
+                  style={{ width: "100%", boxSizing: "border-box" }}
+                  autoComplete="current-password"
+                  autoFocus={!!username}
+                />
+                <button
+                  type="button"
+                  className="ae-auth-pw-toggle"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((v) => !v)}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+              {capsLock && (
+                <p className="ae-auth-hint" role="status">
+                  Caps Lock is on.
+                </p>
+              )}
+            </div>
 
             <label className="ae-check" style={{ marginBottom: 16 }}>
               <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-              <span>
-                Remember this device
-                <span className="ae-check-hint">Stays signed in here and remembers your username. Only on a device that is yours.</span>
-              </span>
+              <span>Remember this device</span>
             </label>
           </>
         )}
 
-        {/* A submit error takes precedence once the user has actually tried
-            signing in; sessionError (the initial session check failing for a
-            reason other than "not logged in") is what explains why they
-            landed here in the first place, if that's what happened. */}
-        {(error ?? sessionError) && (
-          <p role="alert" style={{ ...small, color: colors.danger, marginBottom: 12 }}>
-            {error ?? sessionError}
-          </p>
+        {error && (
+          <div role="alert" className="ae-auth-error">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M8 4.5v4M8 10.8v.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
+        {/* Not an error: an explanation of why the person landed here, after a session that
+            was in use ended (expired, revoked). Shown once, then dismissed by seen(). */}
+        {notice && (
+          <div role="status" className="ae-auth-notice">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+              <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M8 7.2v4M8 4.8v.01" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>{notice}</span>
+          </div>
         )}
 
         <Button type="submit" disabled={submitting} style={{ width: "100%", padding: 10 }}>
           {submitting ? "Signing in…" : mfaToken ? "Verify" : "Sign in"}
         </Button>
 
-        {!mfaToken && (
-          <div style={{ textAlign: "center", marginTop: 8 }}>
-            <button type="button" className="ae-link-btn" onClick={() => navigate("/forgot-password")}>
-              Forgot password?
-            </button>
-          </div>
-        )}
-        {!mfaToken && isDeviceRemembered() && (
-          <div style={{ textAlign: "center", marginTop: 0 }}>
+        <div className="ae-auth-foot">
+          {!mfaToken && isDeviceRemembered() && (
             <button
               type="button"
               className="ae-link-btn"
@@ -140,10 +183,8 @@ export function LoginPage() {
             >
               Forget this device
             </button>
-          </div>
-        )}
-        {mfaToken && (
-          <div style={{ textAlign: "center", marginTop: 8 }}>
+          )}
+          {mfaToken && (
             <button
               type="button"
               className="ae-link-btn"
@@ -153,10 +194,10 @@ export function LoginPage() {
                 setError(null);
               }}
             >
-              Use a different account
+              ← Use a different account
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </AuthCard>
     </AuthShell>
   );

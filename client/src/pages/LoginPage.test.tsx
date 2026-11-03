@@ -6,7 +6,8 @@ import { forgetDevice, isDeviceRemembered, rememberedUsername, saveDeviceChoice 
 
 const auth = vi.hoisted(() => ({
   user: null,
-  sessionError: null,
+  sessionError: null as string | null,
+  clearSessionError: vi.fn(),
   login: vi.fn(),
   completeMfa: vi.fn(),
 }));
@@ -105,5 +106,23 @@ describe("LoginPage remember this device", () => {
     expect(usernameInput(container).value).toBe("");
     expect(tick().checked).toBe(false);
     expect(isDeviceRemembered()).toBe(false);
+  });
+});
+
+describe("LoginPage session-ended notice", () => {
+  it("shows the notice once, and dismisses it when the person starts typing", () => {
+    auth.sessionError = "Your session expired - please log in again.";
+    const { container } = open();
+    expect(screen.getByRole("status").textContent).toContain("session expired");
+    fireEvent.change(usernameInput(container), { target: { value: "a" } });
+    expect(auth.clearSessionError).toHaveBeenCalledTimes(1);
+    auth.sessionError = null;
+  });
+
+  it("shows nothing on an ordinary visit", () => {
+    auth.sessionError = null;
+    open();
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
