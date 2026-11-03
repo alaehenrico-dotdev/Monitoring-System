@@ -242,7 +242,7 @@
   background: #232323;
   color: #e5e5e5;
   border: 0.5px solid var(--ae-hairline);
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.45);
   font-size: calc(12.5px * var(--ae-fs, 1));
   outline: none;
@@ -279,7 +279,7 @@
   color: inherit;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   transition: background-color var(--ae-dur-micro) var(--ae-ease-out);
 }
@@ -416,7 +416,7 @@
   border: 1px solid var(--ae-border);
   /* Slightly softer than the 6px dialogs: a toast is a floating pill over the
      page, not a panel docked into it. */
-  border-radius: 10px;
+  border-radius: 4px;
   box-shadow: 0 8px 28px rgba(12, 12, 12, 0.28);
   position: relative;
 }
@@ -465,7 +465,7 @@
   height: 32px;
   flex-shrink: 0;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: 4px;
 }
 .ae-toast-message {
   flex: 1;
@@ -544,7 +544,7 @@
   background: #232323;
   color: #e5e5e5;
   border: 0.5px solid var(--ae-hairline);
-  border-radius: 8px;
+  border-radius: 4px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.45);
   animation: ae-quickjump-in var(--ae-dur-enter) var(--ae-ease-out);
 }
@@ -595,7 +595,7 @@
   color: inherit;
   background: transparent;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   /* The highlight follows the arrow keys rather than jumping between rows.
      Deliberately NOT an entrance animation on the rows themselves: the list
@@ -675,7 +675,7 @@
   align-items: center;
   gap: 8px;
   padding: 5px 9px;
-  border-radius: 8px;
+  border-radius: 4px;
   cursor: pointer;
   transition: background-color var(--ae-dur-micro) var(--ae-ease-out);
 }
@@ -719,7 +719,7 @@
 }
 .ae-cell-history-row {
   padding: 6px 9px;
-  border-radius: 8px;
+  border-radius: 4px;
   /* Entries arrive one after another instead of appearing as a block. Safe
      to stagger here, unlike the quick-jump list: this renders once when the
      popover opens and the server caps it at ten rows, so the whole sequence
@@ -793,7 +793,7 @@
   color: inherit;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   /* Leans toward the direction it will navigate. 2px is enough to read as
      "this responds" without shifting the row's neighbours - it's a transform,
@@ -1043,7 +1043,7 @@
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: 1px solid var(--ae-border);
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: inset 2px 0 0 var(--ae-lock-accent), var(--ae-lock-shadow);
 }
 .ae-day-lock-icon {
@@ -1191,7 +1191,7 @@
   margin: 0;
   padding: 10px 12px;
   border: 0.3px solid var(--ae-hairline);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--ae-bg-alt);
   color: var(--ae-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -1218,7 +1218,7 @@
   width: min(100%, 188px);
   aspect-ratio: 1 / 1;
   margin: 0 auto;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #fff;
   box-shadow: 0 0 0 1px var(--ae-hairline);
 }
@@ -1374,7 +1374,7 @@
   padding: 28px 24px 24px;
   background: var(--ae-bg);
   color: var(--ae-text);
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
 }
 .ae-auth-heading {
@@ -1445,7 +1445,7 @@
   align-items: flex-start;
   margin: 0 0 12px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid currentColor;
   background: var(--ae-danger-bg);
   color: var(--ae-danger-text);
@@ -1458,7 +1458,7 @@
   align-items: flex-start;
   margin: 0 0 12px;
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 4px;
   border: 1px solid currentColor;
   background: var(--ae-warning-bg);
   color: var(--ae-warning-text);
@@ -1556,7 +1556,7 @@
   -webkit-backdrop-filter: blur(22px) saturate(140%);
   backdrop-filter: blur(22px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
+  border-radius: 4px;
   box-shadow:
     0 20px 50px rgba(0, 0, 0, 0.6),
     inset 0 1px 0 rgba(255, 255, 255, 0.12);
@@ -1586,7 +1586,7 @@
 .ae-entry-badge {
   padding: 2px 9px;
   border: 0.3px solid var(--ae-hairline);
-  border-radius: 999px;
+  border-radius: 4px;
   background: var(--ae-surface-glass);
   color: var(--ae-text-muted);
   font-size: calc(11.5px * var(--ae-fs, 1));
@@ -1617,7 +1617,7 @@
   gap: 8px;
   padding: 5px 12px;
   border: 0.3px solid var(--ae-hairline);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
@@ -1665,7 +1665,7 @@
   padding: 8px 12px;
   border: 0.3px solid var(--ae-hairline);
   border-left: 3px solid #d4a000;
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--ae-surface);
   color: var(--ae-text);
   box-shadow: 0 6px 20px rgba(12, 12, 12, 0.22);

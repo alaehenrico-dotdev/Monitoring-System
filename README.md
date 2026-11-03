@@ -175,6 +175,22 @@ Administrators should then turn on two-step verification under Settings > My Acc
   back on the carried-forward figure until it is published again. A
   combined Total-location count stays purely informational (Variance Report / Consolidated) since
   it can't be unambiguously split back between the two pools.
+  **Audit rules (decided 2026-11-03; the code and tests pin them, change them only deliberately):**
+  1. A count published with "use as next day's opening" (ticked by default) is a *fresh opening*:
+     the next day opens at exactly the counted figure, 0 included, and nothing from earlier days
+     (remaining stock, negatives, movements) carries into it.
+  2. A product with **no count** on the sheet counts as **0**. Publishing with the tick gives every
+     active Online/Offline product without a count an automatic count of 0 (remarked "Not counted in
+     this audit - treated as 0."), with no confirmation. An audit-only publish adds nothing, and an
+     empty publish does nothing.
+  3. Counts are never negative, so an applied audit leaves no negative opening. Negatives can only
+     return from new entries on the day itself.
+  4. An audit reaches only the days **after** its own date. The audited day keeps its own closing
+     figures, which the variance is measured against; earlier days and earlier audits are untouched.
+  5. Later saved days are recalculated from the count (their entered figures are kept). A finished
+     day is held for an admin's approval and an imported opening stays; the publish says how many.
+  6. Total-location counts are informational and never applied.
+  The code comments in `manualCounts.service.ts` (above `propagateOpeningStock`) list the same rules.
 - Auto-mirrored Online↔Offline transfer figures (Section 4.3), written once and reflected on both
   sides without duplicate typing. A Stock Out (Fulfillment/Delivery, or a transfer to the other
   channel) may be saved before the In that covers it, so Remaining Stock can go negative on a

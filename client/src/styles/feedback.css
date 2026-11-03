@@ -300,7 +300,7 @@
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
 }
 .ae-hist-empty h3 {
   margin: 6px 0 0;
@@ -318,7 +318,7 @@
   justify-content: center;
   width: 44px;
   height: 44px;
-  border-radius: 6px;
+  border-radius: 4px;
   background: #f5c000;
   color: #0c0c0c;
 }

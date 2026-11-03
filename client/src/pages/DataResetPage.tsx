@@ -187,7 +187,7 @@ export function DataResetPage() {
           margin: "0 auto",
           background: PANEL_BG,
           border: `1px solid ${PANEL_BORDER}`,
-          borderRadius: 6,
+          borderRadius: 4,
           padding: 28,
         }}
       >
@@ -208,7 +208,7 @@ export function DataResetPage() {
               width: 36,
               height: 36,
               flexShrink: 0,
-              borderRadius: 6,
+              borderRadius: 4,
               border: `1px solid ${PANEL_BORDER}`,
               color: PANEL_TEXT_MUTED,
             }}
@@ -256,7 +256,7 @@ export function DataResetPage() {
               letterSpacing: 3,
               padding: "10px 12px",
               // Pill, matching every other text input in the app (.ae-input).
-              borderRadius: 6,
+              borderRadius: 4,
               border: `1px solid ${PANEL_BORDER}`,
               background: "rgba(255,255,255,0.05)",
               color: PANEL_TEXT,
@@ -312,7 +312,7 @@ export function DataResetPage() {
           maxWidth: 760,
           background: `linear-gradient(180deg, ${PANEL_BG_ALT}, ${PANEL_BG})`,
           border: `1px solid ${PANEL_BORDER}`,
-          borderRadius: 6,
+          borderRadius: 4,
           padding: "36px 40px",
           boxShadow: "0 14px 34px rgba(12, 12, 12,0.28)",
         }}
@@ -382,7 +382,7 @@ export function DataResetPage() {
             background: "rgba(255,255,255,0.03)",
             border: `1px solid ${PANEL_BORDER}`,
             // One step down from the outer panel's 8px - reads as nested inside it.
-            borderRadius: 6,
+            borderRadius: 4,
             marginBottom: 28,
           }}
         >

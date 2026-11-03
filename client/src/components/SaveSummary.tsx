@@ -31,7 +31,7 @@ export function SaveSummary({
         style={{
           padding: "10px 12px",
           border: `1px solid ${colors.border}`,
-          borderRadius: 6,
+          borderRadius: 4,
           background: colors.paperAlt,
         }}
       >
@@ -50,7 +50,7 @@ export function SaveSummary({
           style={{
             margin: "8px 0 0",
             padding: "8px 10px",
-            borderRadius: 6,
+            borderRadius: 4,
             fontSize: "calc(12.5px * var(--ae-fs, 1))",
             background: n.tone === "warn" ? colors.warningBg : colors.paperAlt,
             color: n.tone === "warn" ? colors.warningText : colors.ink,

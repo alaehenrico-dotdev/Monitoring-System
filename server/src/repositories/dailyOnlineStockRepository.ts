@@ -63,6 +63,12 @@ export const dailyOnlineStockRepository = {
   /// audit only, never open anything. A TOTAL-location count is never
   /// consulted: it can't be split back into an Online/Offline balance.
   ///
+  /// AUDIT RULES (see propagateOpeningStock, manualCounts.service.ts): an applied count is a FRESH
+  /// opening - the next day opens at exactly the count (0 included), never at the count plus or
+  /// minus anything from yesterday. Keep `count.entryDate >= prior.entryDate` (the count wins a
+  /// tie) and keep the count unaffected by the previous day's remaining stock, negative or not.
+  /// Counts are never negative. Uncounted products are given a count of 0 at publish, not here.
+  ///
   /// Counts open the next DATE (count date < this date), whichever shift they
   /// were taken on. KNOWN GAP: a MORNING count therefore neither opens its own
   /// day's Night sheet nor lets that Night's movements reach the next day.

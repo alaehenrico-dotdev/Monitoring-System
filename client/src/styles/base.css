@@ -591,7 +591,7 @@ table input[type="number"] {
   font-size: calc(13px * var(--ae-fs, 1));
   border: 1px solid var(--ae-border);
   border-left: 3px solid #f5c000;
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--ae-row-selected-bg);
 }
 .ae-selection-count {
@@ -743,7 +743,7 @@ table input[type="number"] {
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
-  border-radius: 6px;
+  border-radius: 4px;
   flex: 1;
   min-height: 0;
   margin: 0 calc(-18px / var(--ae-zoom, 1)) calc(-18px / var(--ae-zoom, 1));
@@ -809,7 +809,7 @@ table input[type="number"] {
   position: relative;
   overflow: hidden;
   border: 0.3px solid var(--ae-hairline);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--ae-surface-glass);
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
@@ -927,7 +927,7 @@ table input[type="number"] {
   font-size: calc(13px * var(--ae-fs, 1));
   padding: 7px 10px;
   border: 0.3px solid var(--ae-hairline);
-  border-radius: 6px;
+  border-radius: 4px;
   background: var(--ae-surface);
   color: var(--ae-text);
   transition:
@@ -1134,7 +1134,7 @@ table input[type="number"] {
   border: 0.3px solid var(--ae-hairline);
   /* Same 8px radius as .ae-page-header/.ae-modal-panel - every floating
      panel in the app reads as the same family of rounded brand chrome. */
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
   font-size: calc(13px * var(--ae-fs, 1));
   user-select: none;
@@ -1155,7 +1155,7 @@ table input[type="number"] {
   flex: 1;
   padding: 6px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
   font-size: calc(14px * var(--ae-fs, 1));
@@ -1395,7 +1395,7 @@ table input[type="number"] {
   background: var(--ae-surface);
   color: var(--ae-text);
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow: 0 16px 48px rgba(12, 12, 12, 0.35);
   font-size: calc(13px * var(--ae-fs, 1));
   outline: none;

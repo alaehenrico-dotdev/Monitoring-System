@@ -285,7 +285,7 @@ export function DatabaseRestoreCard() {
           style={{
             marginTop: 8,
             padding: "8px 10px",
-            borderRadius: 6,
+            borderRadius: 4,
             fontSize: "calc(12.5px * var(--ae-fs, 1))",
             border: `1px solid ${check.state === "done" && check.report.ok ? colors.border : colors.danger}`,
             color: colors.ink,

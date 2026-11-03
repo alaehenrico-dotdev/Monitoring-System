@@ -7,6 +7,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * tested as one: an applied count is a fresh starting record, every later day
  * carries on from its own remaining stock, and a day saved before the publish
  * keeps the chain it was saved in.
+ *
+ * The "fresh opening" block encodes AUDIT RULES 1 and 3 (see propagateOpeningStock in
+ * manualCounts.service.ts): the count, 0 included, is exactly what the next day opens at, whatever
+ * yesterday held. They record the owner's decisions - do not weaken them to make a change pass.
  */
 
 type Shift = "MORNING" | "NIGHT";

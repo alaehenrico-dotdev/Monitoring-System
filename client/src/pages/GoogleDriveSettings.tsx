@@ -59,7 +59,7 @@ const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : nul
 
 const card = {
   border: `1px solid ${colors.border}`,
-  borderRadius: 8,
+  borderRadius: 4,
   padding: "12px 14px",
   display: "grid",
   gap: 8,

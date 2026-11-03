@@ -274,7 +274,7 @@ function LocationTrace({
 
 const sectionStyle = {
   border: `1px solid ${colors.border}`,
-  borderRadius: 6,
+  borderRadius: 4,
   padding: "10px 12px",
   marginBottom: 12,
 } as const;

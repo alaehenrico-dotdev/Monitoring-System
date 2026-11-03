@@ -54,7 +54,7 @@ export function AddProductForm({
     <form
       onSubmit={(e) => void submit(e)}
       aria-label="Add product"
-      style={{ border: `1px solid ${colors.border}`, borderRadius: 6, padding: 10, marginBottom: 12, background: colors.paperAlt }}
+      style={{ border: `1px solid ${colors.border}`, borderRadius: 4, padding: 10, marginBottom: 12, background: colors.paperAlt }}
     >
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
         <Field label="Product name" style={{ flex: "1 1 180px" }}>

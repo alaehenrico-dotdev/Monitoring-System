@@ -464,6 +464,8 @@ describe("publishing counts", () => {
       expect(vi.mocked(recordChange).mock.calls.map((c) => c[0].tableName)).toEqual(["manual_counts", "daily_online_stock"]);
     });
 
+    // AUDIT RULE 2 (see propagateOpeningStock in manualCounts.service.ts): the owner decided that an
+    // uncounted product counts as 0, with no confirmation step. These tests record that decision.
     describe("a product that was not counted is 0", () => {
       beforeEach(() => {
         vi.mocked(productRepository.findActive).mockResolvedValue([{ id: 10 }, { id: 11 }] as never);

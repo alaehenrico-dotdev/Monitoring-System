@@ -382,7 +382,7 @@ export function ProductsAdminPage() {
                           marginLeft: 8,
                           padding: "1px 7px",
                           border: `1px solid ${colors.subtleInk}`,
-                          borderRadius: 6,
+                          borderRadius: 4,
                           fontSize: "calc(10.5px * var(--ae-fs, 1))",
                           fontWeight: 700,
                           letterSpacing: "0.04em",

@@ -64,7 +64,7 @@ export function Modal({
           color: colors.ink,
           // Same 8px radius as .ae-page-header/.ae-datepicker/.ae-dropdown -
           // overflow: hidden clips the header/body's square corners to it.
-          borderRadius: 6,
+          borderRadius: 4,
           overflow: "hidden",
           boxShadow:
             "0 24px 64px rgba(12, 12, 12, 0.38), 0 2px 8px rgba(12, 12, 12, 0.18)",

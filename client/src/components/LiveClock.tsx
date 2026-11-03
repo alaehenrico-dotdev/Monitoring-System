@@ -27,7 +27,7 @@ export function LiveClock() {
         color: colors.ink,
         background: colors.surface,
         border: "0.5px solid var(--ae-border)",
-        borderRadius: 6,
+        borderRadius: 4,
         padding: "8px 14px",
         flexShrink: 0,
         boxShadow: "0 1px 4px rgba(12, 12, 12,0.1)",

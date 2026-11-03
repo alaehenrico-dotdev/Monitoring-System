@@ -193,6 +193,26 @@ export type PropagateOutcome = "kept-manual" | "held-locked" | undefined;
 /// period's opening stock, and THE place the carry-forward policy lives (the
 /// repositories' getOpeningStock comments point here).
 ///
+/// AUDIT RULES (agreed with the owner, 2026-11-03). Tests pin these (openingStock.test.ts,
+/// manualCounts.service.test.ts); change them only on the owner's say-so:
+///  1. FRESH OPENING. A count published with "use as next day's opening" (applied) is a fresh
+///     starting record: the next day opens at EXACTLY the counted figure (0 included). Nothing from
+///     earlier days - their remaining stock, a negative, their movements - carries into it. A count
+///     wins the tie against a row on its own date.
+///  2. NOT COUNTED = 0. When publishing applied, every active product with no count on the sheet,
+///     in Online and in Offline, is given a count of 0 (remarked NOT_COUNTED_NOTE), so it opens the
+///     next day at 0 too. Owner's choice: no confirmation. Only when at least one real count is
+///     published (an empty publish must never zero the system). Audit-only publishes add nothing.
+///  3. COUNTS ARE NEVER NEGATIVE (the controller rejects below 0), so an applied audit leaves no
+///     negative opening anywhere. Negatives can only come back from new entries on the day itself.
+///  4. FORWARD ONLY. An audit reaches the days after its own date, never before it. The audited day
+///     keeps its own closing figures: the variance is the count measured against them.
+///  5. LATER SAVED DAYS follow the count (reachSaved): only their opening and the remaining that
+///     follows change, what was entered on them is kept. A finished day is held for an admin, an
+///     imported opening (openingManual) stays, and both are reported as `leftSaved`.
+///  6. TOTAL-location counts are informational and never applied.
+///  7. The Publish dialog's tick is ON by default (the owner can untick it for an audit only).
+///
 /// A next-period row that was already saved has its opening stock stored, so it
 /// must be re-derived here or it keeps carrying the old figure. Walks forward
 /// row by row: each changed row's new Remaining Stock feeds the one after it,
@@ -483,7 +503,9 @@ export async function getVarianceReport(filters: {
 export const MAX_REMARKS_LENGTH = 500;
 
 /// The remark an automatic count of 0 carries, so it explains itself in the variance report and is
-/// not listed as an unexplained variance.
+/// not listed as an unexplained variance (the Admin Queue only lists counts with NO remark). Audit
+/// rule 2 (see propagateOpeningStock): a product that was not counted is 0. Do not drop the remark
+/// and do not change the wording without checking the places that read it.
 export const NOT_COUNTED_NOTE = "Not counted in this audit - treated as 0.";
 
 /**
@@ -500,6 +522,8 @@ export const NOT_COUNTED_NOTE = "Not counted in this audit - treated as 0.";
  * stays; `leftSaved` says how many products had such a day.
  * Variance is untouched: it is still the count against the system's remaining
  * stock on the counted day. Each publish is logged against the count.
+ *
+ * AUDIT RULES 1-7 are listed above propagateOpeningStock; this function carries out rules 2 and 5.
  *
  * With `applyToOpening`, a product (active, Online or Offline) with no count on the sheet counts
  * as 0: it is given a count of 0, remarked "Not counted in this audit - treated as 0.", and its
@@ -529,8 +553,10 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
         // later saved day after it, until another count or an import stops the walk.
         if (apply && (await propagateOpeningStock(count.productId, entryDate, shift, count.location, userId, tx, changeId, { reachSaved: true }))) leftSaved++;
       }
-      // A product that was not counted is 0, not "whatever it was": published as the next
-      // day's opening, every active Online / Offline product with no count on this sheet gets a
+      // AUDIT RULE 2 (see propagateOpeningStock): a product that was not counted is 0, not
+      // "whatever it was". This block stays inside the same transaction as the real counts, runs
+      // only for an applied publish, and only because `pending` is non-empty (the check at the
+      // top throws otherwise). Published as the next day's opening, every active Online / Offline product with no count on this sheet gets a
       // count of 0 (noted as such), so nothing from the past - a negative included - carries on.
       let impliedZero = 0;
       if (applyToOpening) {

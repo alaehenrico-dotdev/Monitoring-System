@@ -324,7 +324,7 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
             maxHeight: "calc(var(--ae-vh) * 0.5)",
             overflowY: "auto",
             border: `1px solid ${colors.border}`,
-            borderRadius: 6,
+            borderRadius: 4,
           }}
         >
           {items.map((p, i) => (

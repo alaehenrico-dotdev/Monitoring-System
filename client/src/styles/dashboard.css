@@ -188,7 +188,7 @@
   /* Same 8px radius as .ae-page-header - every card on this page reads as
      the same family of "rounded brand chrome" instead of the old sharp-
      cornered boxes. */
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow:
     0 1px 2px rgba(12, 12, 12, 0.04),
     0 4px 10px rgba(12, 12, 12, 0.06);
@@ -217,7 +217,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: 4px;
   background: color-mix(in srgb, #d4a000 14%, transparent);
   color: #d4a000;
 }
@@ -265,7 +265,7 @@
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: 0.3px solid var(--ae-hairline);
-  border-radius: 999px;
+  border-radius: 4px;
   color: var(--ae-text);
   text-decoration: none;
   font-size: calc(13px * var(--ae-fs, 1));
@@ -321,7 +321,7 @@
 .ae-dash-greeting-chip {
   font-size: calc(11.5px * var(--ae-fs, 1));
   padding: 2px 10px;
-  border-radius: 999px;
+  border-radius: 4px;
 }
 .ae-dash-eyebrow {
   margin: 0;
@@ -374,7 +374,7 @@
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: 0.3px solid var(--ae-hairline);
-  border-radius: 6px;
+  border-radius: 4px;
   box-shadow:
     0 1px 2px rgba(12, 12, 12, 0.04),
     0 4px 10px rgba(12, 12, 12, 0.06);
@@ -426,7 +426,7 @@
   color: var(--ae-danger-text);
   background: var(--ae-surface-glass);
   border: 0.3px solid var(--ae-danger-text);
-  border-radius: 6px;
+  border-radius: 4px;
 }
 .ae-dash-inline-btn {
   padding: 0;
@@ -444,7 +444,7 @@
   position: relative;
   align-self: flex-start;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 4px;
   font-size: calc(11px * var(--ae-fs, 1));
   font-weight: 700;
   white-space: nowrap;

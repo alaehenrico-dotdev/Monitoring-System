@@ -257,7 +257,7 @@ export function TotalStocksTable({
                               marginLeft: 8,
                               padding: "1px 7px",
                               border: `1px solid ${colors.danger}`,
-                              borderRadius: 6,
+                              borderRadius: 4,
                               fontSize: 10.5,
                               fontWeight: 700,
                               letterSpacing: "0.04em",

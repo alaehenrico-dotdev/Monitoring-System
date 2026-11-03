@@ -67,6 +67,12 @@ export const dailyOfflineStockRepository = {
   /// back into an Online/Offline balance, so it stays purely informational
   /// (Variance Report / Total Stocks).
   ///
+  /// AUDIT RULES (see propagateOpeningStock, manualCounts.service.ts): an applied count is a FRESH
+  /// opening - the next day opens at exactly the count (0 included), never at the count plus or
+  /// minus anything from yesterday. Keep `count.entryDate >= prior.entryDate` (the count wins a
+  /// tie) and keep the count unaffected by the previous day's remaining stock, negative or not.
+  /// Counts are never negative. Uncounted products are given a count of 0 at publish, not here.
+  ///
   /// Counts open the next DATE, whichever shift they were taken on (KNOWN GAP
   /// for MORNING counts - see dailyOnlineStockRepository.getOpeningStock and the
   /// it.fails cases in openingStock.test.ts before changing this).

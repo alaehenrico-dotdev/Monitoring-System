@@ -956,7 +956,7 @@
   backdrop-filter: blur(24px) saturate(150%);
   color: var(--ae-glass-text);
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   /* The bottom padding is the collapse ribbon's own strip (it is 18px tall and
      sits on the bottom edge), so it never covers the toolbar's buttons. */
   padding: 9px 14px 10px;

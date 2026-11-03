@@ -371,7 +371,9 @@ export function ManualCountPage() {
   const [publishing, setPublishing] = useState(false);
   // Publish-dialog choice: also make the counts the next day's opening stock.
   // On by default (an audit replaces the old figure); a supervisor can untick it to
-  // publish a count as an audit only.
+  // publish a count as an audit only. AUDIT RULE 7 - keep it defaulting to true, and reset to
+  // true after a publish or a cancel (the audit rules are listed above propagateOpeningStock in
+  // the server's manualCounts.service.ts).
   const [applyToOpening, setApplyToOpening] = useState(true);
   // Publishing is the supervisor's approval step; encoders see the state only.
   const canPublish = useAuth().user?.role === "SUPERVISOR_ADMIN";
@@ -597,7 +599,7 @@ export function ManualCountPage() {
       const left = leftSaved
         ? ` · ${leftSaved} product${leftSaved === 1 ? "" : "s"} ${leftSaved === 1 ? "has" : "have"} a later day that could not be updated (finished and waiting for approval, or an imported opening)`
         : "";
-      // Products nobody counted were set to 0 (see publishManualCounts, server side).
+      // Products nobody counted were set to 0 (AUDIT RULE 2, done by publishManualCounts on the server).
       const zeroed = impliedZero ? ` · ${impliedZero} not counted, set to 0` : "";
       setNotice({
         message: `Published ${published} count${published === 1 ? "" : "s"} - ${
@@ -886,7 +888,8 @@ export function ManualCountPage() {
     (r) => !r.entry.publishedAt,
   ).length;
   // Active products with no count on this sheet: listed in the Publish dialog (a warning, not a
-  // block), since an audit only replaces the figure of a product that was counted.
+  // block). AUDIT RULE 2: published with the tick on, the server counts each of them as 0, so the
+  // wording below must keep saying so; unticked, they keep their current figure.
   const uncounted = gridRows ? uncountedProducts(gridRows) : [];
   // Published counts show blank (see blankPublished), so they are no longer in
   // savedCounts - but the sheet still says it was published.
@@ -1897,7 +1900,7 @@ export function ManualCountPage() {
                 padding: "8px 10px",
                 border: "1px solid var(--ae-border)",
                 borderLeft: "3px solid var(--ae-warning-text)",
-                borderRadius: 6,
+                borderRadius: 4,
                 fontSize: "calc(12.5px * var(--ae-fs, 1))",
               }}
             >

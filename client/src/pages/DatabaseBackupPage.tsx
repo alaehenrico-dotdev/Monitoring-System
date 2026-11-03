@@ -96,7 +96,7 @@ export function DatabaseBackupPage() {
         backdropFilter: "var(--ae-glass-blur)",
         WebkitBackdropFilter: "var(--ae-glass-blur)",
         border: `1px solid ${colors.border}`,
-        borderRadius: 6,
+        borderRadius: 4,
         overflow: "hidden",
       }}
     >

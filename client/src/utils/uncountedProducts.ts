@@ -9,10 +9,13 @@ export interface UncountedProduct {
   system: number;
 }
 
-/// Every active product with no count on this sheet, per location. An audit only replaces the
-/// figure of a product that was counted, so these keep carrying their current figure (a negative
-/// one stays negative) into the next day. Rows that were published already show blank on the
-/// sheet but carry a publishedAt, so they are counted, not missing. Negative figures sort first,
+/// Every active product with no count on this sheet, per location. This must mirror what the
+/// server does when publishing with the tick on (AUDIT RULE 2, manualCounts.service.ts): it gives
+/// each of these a count of 0, so they open the next day at 0. Published as an audit only, they
+/// keep carrying their current figure instead. Keep the two lists in step.
+///
+/// Rows that were published already show blank on the sheet but carry a publishedAt, so they are
+/// counted, not missing. Negative figures sort first,
 /// since they are the ones that must not slip through.
 export function uncountedProducts(rows: Record<"ONLINE" | "OFFLINE", ManualCountGridRow[]>): UncountedProduct[] {
   const out: UncountedProduct[] = [];

@@ -1340,7 +1340,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 style={{
                   margin: "0 0 12px",
                   padding: "10px 12px",
-                  borderRadius: 10,
+                  borderRadius: 4,
                   border: `1px solid ${colors.border}`,
                   fontSize: "calc(12.5px * var(--ae-fs, 1))",
                   color: colors.warningText,
@@ -1456,7 +1456,7 @@ export const CsvTools = forwardRef<CsvToolsHandle, CsvToolsProps>(
                 style={{
                   marginTop: 18,
                   padding: "12px 14px",
-                  borderRadius: 10,
+                  borderRadius: 4,
                   border: `1px solid ${colors.border}`,
                   fontSize: "calc(12.5px * var(--ae-fs, 1))",
                 }}

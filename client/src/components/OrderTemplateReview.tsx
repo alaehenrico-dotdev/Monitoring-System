@@ -189,7 +189,7 @@ export function OrderTemplateReview({
           maxHeight: "calc(var(--ae-vh) * 0.5)",
           overflowY: "auto",
           border: `1px solid ${colors.border}`,
-          borderRadius: 6,
+          borderRadius: 4,
         }}
       >
         {plan.items.map((item, i) => {

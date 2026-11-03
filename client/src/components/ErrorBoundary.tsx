@@ -86,7 +86,7 @@ export class ErrorBoundary extends Component<Props, State> {
             background: colors.yellow,
             border: "none",
             // Pill, matching .ae-btn - every button in the app is this shape.
-            borderRadius: 6,
+            borderRadius: 4,
             cursor: "pointer",
           }}
         >

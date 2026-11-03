@@ -1,0 +1,105 @@
+name: Deploy
+
+# Deploys to the VPS over SSH by running deploy/vps/deploy.sh there (git pull, npm ci,
+# build, database snapshot + migrations, pm2 reload, wait for /health/live). The server
+# runs under PM2 + Nginx, not Docker; see docs/DEPLOY-VPS.md section 13.
+#
+# Optional environment VARIABLES (Settings -> Environments -> production -> Variables):
+#   DEPLOY_PATH        app folder on the server        (default /var/www/ala-eh)
+#   DEPLOY_HEALTH_URL  public liveness address checked from GitHub after the deploy,
+#                      e.g. https://stocks.yourdomain.com/health/live (skipped if empty)
+
+on:
+  # Automatic: every time CI finishes green for a push to main.
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # Manual: still available from the Actions tab (re-deploy, deploy a fix).
+  workflow_dispatch:
+
+# One deploy at a time; a newer push waits for the running one instead of racing it,
+# and an in-progress deploy is never cancelled half way.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    environment: production
+    # Auto-deploy only after a successful CI run of a push to main (never for a pull
+    # request or a failed run). A manual run must be started on main.
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    env:
+      # The commit CI actually tested. For workflow_run, github.sha is just the newest
+      # commit on main, which may not be the one that passed.
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      DEPLOY_PATH: ${{ vars.DEPLOY_PATH || '/var/www/ala-eh' }}
+      DEPLOY_HEALTH_URL: ${{ vars.DEPLOY_HEALTH_URL }}
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      # Refuse to deploy a commit whose CI run has not finished green.
+      - name: Require a successful CI run for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          result="$(gh run list --repo "${{ github.repository }}" --workflow ci.yml \
+            --commit "$DEPLOY_SHA" --json conclusion \
+            --jq '[.[] | select(.conclusion == "success")] | length')"
+          if [ "${result:-0}" -lt 1 ]; then
+            echo "No successful CI run found for $DEPLOY_SHA; refusing to deploy." >&2
+            exit 1
+          fi
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          # The pinned host key is required: trusting the server on first contact would
+          # let someone on the network capture the deploy session.
+          if [ -z "$DEPLOY_KNOWN_HOSTS" ]; then
+            echo "DEPLOY_KNOWN_HOSTS secret is not set; refusing to deploy." >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      # deploy.sh pulls, installs, builds, snapshots + migrates the database, restarts
+      # PM2 and waits for the API. It stops at the first thing that fails.
+      - name: Run deploy.sh on the server
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -p "${DEPLOY_PORT:-22}" \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash '$DEPLOY_PATH/deploy/vps/deploy.sh'"
+
+      - name: Check the public site
+        if: ${{ env.DEPLOY_HEALTH_URL != '' }}
+        run: |
+          for i in $(seq 1 15); do
+            if curl -fsS --max-time 10 "$DEPLOY_HEALTH_URL" | grep -q '"status":"ok"'; then
+              echo "public site is healthy"; exit 0
+            fi
+            sleep 4
+          done
+          echo "the public health address did not answer ok" >&2
+          exit 1
+
+      - name: Clean up SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
