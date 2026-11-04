@@ -642,8 +642,8 @@ export function OnlineEntryPage() {
   return (
     <div>
       <PageHeader
-        title="Online Entry"
-        badges={<EntryBadges date={date} shift={shift} status={entryStatus} />}
+        title={`Daily Online Stock Monitoring - ${formatDateDisplay(date)} - ${shiftWithWord(shift)}`}
+        badges={<EntryBadges status={entryStatus} />}
         subtitle="Stocks In/Out transfers also update the Offline table."
       >
         <EntryToolbar
