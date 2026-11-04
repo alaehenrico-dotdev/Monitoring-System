@@ -322,6 +322,7 @@
 .ae-jumpscare img {
   width: 100vw;
   height: 100vh;
+  height: 100dvh; /* follows the mobile browser bars */
   object-fit: cover;
   user-select: none;
 }

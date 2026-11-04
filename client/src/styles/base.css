@@ -332,6 +332,9 @@
 }
 html {
   font-size: calc(100% * var(--ae-fs, 1));
+  /* Stop phones inflating text when the screen turns to landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 /* Width of the number boxes in the entry and count grids. A fixed 64px box sat in
    a column of 200-300px on a 22-24 inch screen; it grows in steps with the screen
