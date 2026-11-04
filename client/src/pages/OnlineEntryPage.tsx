@@ -643,7 +643,14 @@ export function OnlineEntryPage() {
     <div>
       <PageHeader
         title={`Daily Online Stock Monitoring - ${formatDateDisplay(date)} - ${shiftWithWord(shift)}`}
-        badges={<EntryBadges status={entryStatus} />}
+        badges={
+          <>
+            <EntryBadges status={entryStatus} />
+            {displayRows && (
+              <EntryTotalsStrip rows={displayRows} rowFilter={rowFilter} onRowFilterChange={setRowFilter} changed={pendingCount} />
+            )}
+          </>
+        }
         subtitle="Stocks In/Out transfers also update the Offline table."
       >
         <EntryToolbar
@@ -753,9 +760,6 @@ export function OnlineEntryPage() {
         />
       )}
       <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
-      {displayRows && (
-        <EntryTotalsStrip rows={displayRows} rowFilter={rowFilter} onRowFilterChange={setRowFilter} changed={pendingCount} />
-      )}
       {!rows ? (
         <TableSkeleton
           headers={["SKU", "Product", ...columns.map((c) => c.label)]}
