@@ -1661,8 +1661,27 @@
 .ae-page-header-title-row:has(.ae-entry-totals) .ae-page-header-badges {
   margin-right: auto;
 }
+.ae-page-header-title-row:has(.ae-entry-totals) .ae-page-header-badges {
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  gap: 8px;
+}
+/* Compact, single-row chips inside the header (the grid below no longer needs a roomy strip). */
 .ae-page-header-badges .ae-entry-totals {
+  flex-wrap: nowrap;
+  gap: 6px;
   margin: 0;
+}
+.ae-page-header-badges .ae-entry-total {
+  gap: 6px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.ae-page-header-badges .ae-entry-total-value {
+  font-size: calc(14px * var(--ae-fs, 1));
+}
+.ae-page-header-badges .ae-entry-total-label {
+  font-size: calc(11px * var(--ae-fs, 1));
 }
 @media (max-width: 1100px) {
   .ae-page-header-title-row:has(.ae-entry-totals) {
@@ -1672,6 +1691,10 @@
     order: 3;
     flex-basis: 100%;
     margin-left: 0;
+    flex-wrap: wrap;
+  }
+  .ae-page-header-badges .ae-entry-totals {
+    flex-wrap: wrap;
   }
 }
 
