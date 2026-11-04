@@ -641,7 +641,14 @@ export function OfflineEntryPage() {
   return (
     <div>
       <PageHeader
-        title={`Daily Offline Stock Monitoring - ${formatDateDisplay(date)} - ${shiftWithWord(shift)}`}
+        title={
+          <>
+            Daily Offline Stock Monitoring
+            <span className="ae-title-sub">
+              {formatDateDisplay(date)} - {shiftWithWord(shift)}
+            </span>
+          </>
+        }
         badges={
           <>
             <EntryBadges status={entryStatus} />

@@ -642,7 +642,14 @@ export function OnlineEntryPage() {
   return (
     <div>
       <PageHeader
-        title={`Daily Online Stock Monitoring - ${formatDateDisplay(date)} - ${shiftWithWord(shift)}`}
+        title={
+          <>
+            Daily Online Stock Monitoring
+            <span className="ae-title-sub">
+              {formatDateDisplay(date)} - {shiftWithWord(shift)}
+            </span>
+          </>
+        }
         badges={
           <>
             <EntryBadges status={entryStatus} />

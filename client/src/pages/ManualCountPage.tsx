@@ -1338,8 +1338,10 @@ export function ManualCountPage() {
       <PageHeader
         title={
           <>
-            Manual Counting &amp; Variance - {formatDateDisplay(date)} -{" "}
-            {shiftWithWord(shift)} - {FILTER_LABEL[sourceFilter]}
+            Manual Counting &amp; Variance
+            <span className="ae-title-sub">
+              {formatDateDisplay(date)} - {shiftWithWord(shift)} - {FILTER_LABEL[sourceFilter]}
+            </span>
           </>
         }
         subtitle="Review and correct manual counts."

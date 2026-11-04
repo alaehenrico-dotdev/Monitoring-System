@@ -17,10 +17,10 @@ beforeEach(() => {
 afterEach(() => localStorage.clear());
 
 describe("layout style", () => {
-  it("defaults to classic, and puts it on <html> for the stylesheet", () => {
+  it("defaults to enterprise, and puts it on <html> for the stylesheet", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("classic");
-    expect(root.dataset.ui).toBe("classic");
+    expect(result.current.uiStyle).toBe("enterprise");
+    expect(root.dataset.ui).toBe("enterprise");
   });
 
   it("switches to enterprise, applies it at once and remembers it", () => {
@@ -37,10 +37,10 @@ describe("layout style", () => {
     expect(result.current.uiStyle).toBe("enterprise");
   });
 
-  it("treats anything unrecognised as classic rather than breaking the layout", () => {
+  it("treats anything unrecognised as the default rather than breaking the layout", () => {
     localStorage.setItem("ae-ui", "neon");
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("classic");
+    expect(result.current.uiStyle).toBe("enterprise");
   });
 
   it("is independent of the color mode", () => {
@@ -78,10 +78,10 @@ describe("layout style", () => {
     expect(result.current.uiStyle).toBe(style);
   });
 
-  it.each(["gradient", "ledger", "slate", "card"])("falls back to classic for the retired %s theme", (old) => {
+  it.each(["gradient", "ledger", "slate", "card"])("falls back to the default for the retired %s theme", (old) => {
     localStorage.setItem("ae-ui", old);
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("classic");
+    expect(result.current.uiStyle).toBe("enterprise");
   });
 });
 

@@ -303,7 +303,7 @@
 .ae-choice-card {
   position: relative;
   display: block;
-  padding: 10px;
+  padding: 8px;
   border: 1px solid var(--ae-border);
   border-radius: 6px;
   background: var(--ae-surface);
@@ -493,7 +493,7 @@
    so text never wears a series color and the grid stays recessive. */
 .ae-mm-heading {
   margin: 0;
-  padding: 14px 20px 0;
+  padding: 12px 20px 0;
 }
 .ae-mm-controls {
   display: inline-flex;
@@ -513,7 +513,7 @@
   border-radius: 4px;
 }
 .ae-mm-view-btn {
-  padding: 4px 10px;
+  padding: 4px 8px;
   border: 0;
   background: transparent;
   color: var(--ae-text-muted);
@@ -550,7 +550,7 @@
   color: var(--ae-danger-text);
 }
 .ae-mm-note {
-  margin: 14px 0 0;
+  margin: 12px 0 0;
   font-size: calc(11.5px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
@@ -590,7 +590,7 @@
   display: flex;
   flex: 1;
   min-height: 240px;
-  margin-top: 14px;
+  margin-top: 12px;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -648,7 +648,7 @@
   justify-content: center;
   min-width: 0;
   height: 100%;
-  padding: 0 5px;
+  padding: 0 4px;
   border-radius: 4px;
   transition: background-color var(--ae-dur-micro) var(--ae-ease-out);
 }
@@ -755,7 +755,7 @@
   top: 4px;
   z-index: 3;
   min-width: 190px;
-  padding: 8px 10px;
+  padding: 8px 8px;
   border: 0.3px solid var(--ae-hairline);
   border-radius: 6px;
   background: var(--ae-surface);
@@ -830,7 +830,7 @@
 @media (pointer: coarse) {
   .ae-mm-view-btn {
     min-height: 36px;
-    padding: 6px 14px;
+    padding: 6px 12px;
   }
 }
 /* Phones: fit the whole range on screen instead of scrolling it sideways. The
@@ -842,7 +842,7 @@
     padding: 12px 12px 0;
   }
   .ae-mm-body {
-    padding: 8px 12px 10px;
+    padding: 8px 12px 8px;
   }
   .ae-mm-chart:not(.ae-mm-chart--dense) {
     min-width: 0;
@@ -969,7 +969,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 18px;
-  margin: 4px 0 10px;
+  margin: 4px 0 8px;
   font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-text-muted);
 }
@@ -1072,7 +1072,7 @@
   top: 8px;
   z-index: 3;
   min-width: 160px;
-  padding: 8px 10px;
+  padding: 8px 8px;
   font-size: calc(12px * var(--ae-fs, 1));
   color: var(--ae-text);
   background: var(--ae-surface);
@@ -1118,12 +1118,12 @@
   color: var(--ae-text);
 }
 .ae-fl-split {
-  margin-top: 14px;
+  margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid color-mix(in srgb, var(--ae-text) 9%, transparent);
 }
 .ae-fl-split-title {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   font-size: calc(13px * var(--ae-fs, 1));
   font-weight: 700;
 }
@@ -1185,7 +1185,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 5px 0;
+  padding: 4px 0;
 }
 .ae-donut-name {
   flex: 1;

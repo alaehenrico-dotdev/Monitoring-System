@@ -30,6 +30,9 @@ export type FontSize = "sm" | "md" | "lg" | "xl";
 
 export const FONT_FAMILIES: readonly FontFamily[] = ["inter", "hyperlegible", "plex", "system", "serif", "mono"];
 const FONT_SIZES: readonly FontSize[] = ["sm", "md", "lg", "xl"];
+/// What someone who has not picked a layout in Settings > Appearance gets: the plain, formal
+/// one. A saved choice always wins.
+export const DEFAULT_UI_STYLE: UiStyle = "enterprise";
 export const DEFAULT_FONT: FontFamily = "inter";
 export const DEFAULT_FONT_SIZE: FontSize = "md";
 
@@ -81,9 +84,9 @@ function getInitialTheme(): Theme {
 function getInitialUiStyle(): UiStyle {
   try {
     const stored = localStorage.getItem(UI_STORAGE_KEY);
-    return UI_STYLES.find((u) => u === stored) ?? "classic";
+    return UI_STYLES.find((u) => u === stored) ?? DEFAULT_UI_STYLE;
   } catch {
-    return "classic";
+    return DEFAULT_UI_STYLE;
   }
 }
 

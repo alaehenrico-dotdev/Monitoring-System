@@ -1,0 +1,83 @@
+/* Accessibility polish, loaded last so it holds under every theme.
+   Visual only: no layout, markup or behaviour changes. */
+
+/* A keyboard focus ring appears at once. Several controls fade their box-shadow in on
+   :focus-visible, which delays the ring a keyboard user is looking for. Entering the
+   focused state uses this rule's transition (none); leaving it still fades as before. */
+:root :is(.ae-input, .ae-select, .ae-btn, .ae-account-card, .ae-dash-stat, .ae-dash-quicklink, .ae-page-header):focus-visible,
+:root .ae-subtab:focus-visible::after {
+  transition: none !important;
+}
+
+/* A disabled control says so by more than its opacity: a not-allowed cursor and a muted
+   (desaturated) fill, so it also reads for people who cannot tell a faint control from a
+   normal one. The disabled attribute itself already carries the meaning to assistive tech. */
+:root :is(
+    .ae-pager-btn,
+    .ae-toolbar .ae-input,
+    .ae-toolbar .ae-btn,
+    .ae-toolbar .ae-segment-btn,
+    .ae-mb-btn--warn,
+    .ae-entry-total--action
+  ):disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.7);
+}
+
+/* Entry and manual-count page titles: the page name on the first line, and the date and
+   sheet as a quieter second line inside the same heading (it is still part of the h2). */
+.ae-page-header h2 .ae-title-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ae-glass-text-muted, var(--ae-text-muted));
+}
+
+/* Wide screens: the items at the right of the title row (status chip, totals, search, clock,
+   theme toggle) line up with the title's FIRST line, not the middle of the title plus its
+   date line. Each gets a box exactly one title line tall and centres its content in it. */
+@media (min-width: 1101px) {
+  .ae-page-header-title-row:has(.ae-title-sub) {
+    --ae-title-line: calc(1.2 * clamp(1.05rem, 0.8rem + 1.1vw, 1.5rem));
+    align-items: flex-start;
+  }
+  .ae-page-header-title-row:has(.ae-title-sub) > .ae-page-header-badges,
+  .ae-page-header-title-row:has(.ae-title-sub) > .ae-page-header-extras {
+    display: flex;
+    align-items: center;
+    height: var(--ae-title-line);
+    margin-block: 0;
+  }
+}
+
+/* Header chips (status and totals): plain text, no box or fill, so they read as information
+   and not as buttons. The border stays transparent so sizes do not shift. Only the clickable
+   one ("Below zero") reacts: its text brightens on hover, and it keeps a red underline while
+   it is filtering, since that is how it shows it is on. */
+.ae-page-header-badges .ae-entry-badge,
+.ae-page-header-badges .ae-entry-total {
+  border-color: transparent;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.ae-page-header-badges .ae-entry-total--action {
+  transition: color 120ms ease;
+}
+.ae-page-header-badges .ae-entry-total--action:not(:disabled):hover .ae-entry-total-value,
+.ae-page-header-badges .ae-entry-total--action:not(:disabled):hover .ae-entry-total-label {
+  color: var(--ae-text);
+}
+.ae-page-header-badges .ae-entry-total--action:not(:disabled):hover .ae-entry-total-label {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ae-page-header-badges .ae-entry-total--on {
+  border-bottom: 2px solid var(--ae-danger-text);
+}
+.ae-page-header-badges .ae-entry-total--action:focus-visible {
+  outline: 2px solid var(--ae-focus-ring, #8a6800);
+  outline-offset: 2px;
+}

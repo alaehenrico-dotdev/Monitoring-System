@@ -187,7 +187,7 @@
 .ae-select-trigger-lead {
   display: inline-flex;
   flex-shrink: 0;
-  margin-right: 7px;
+  margin-right: 8px;
   color: var(--tb-text-muted, #a3a3a3);
 }
 .ae-select-trigger-lead svg {
