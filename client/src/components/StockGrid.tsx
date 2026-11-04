@@ -503,6 +503,9 @@ export function StockGrid({
       }
     }
     if (confirmed.length || reEdited.length) {
+      // Deliberate: this reacts to a transition (a staged edit leaving `pending`
+      // and the row catching up), tracked in refs, so it cannot be derived in render.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSavedCells((prev) => {
         const next = new Set(prev);
         confirmed.forEach((id) => next.add(id));
