@@ -375,8 +375,7 @@ ssh deploy@YOUR_SERVER_IP "bash /var/www/ala-eh/deploy/vps/deploy.sh"
 ```
 
 **Automatic updates from GitHub.** Once the steps in `docs/GitHub_Auto_Deploy_Guide.pdf` are done, a push to
-`main` that passes CI runs this same `deploy.sh` for you over SSH (`.github/workflows/deploy.yml`, a copy of the
-file is `docs/deploy.yml.example`). Running `deploy.sh` by hand, as above, keeps working and is still the first
+`main` that passes CI runs this same `deploy.sh` for you over SSH (`.github/workflows/deploy.yml`). Running `deploy.sh` by hand, as above, keeps working and is still the first
 thing to try if an automatic deploy fails.
 
 **Updating to 2.5.0** (Encoder and Admin roles): the deploy takes the usual snapshot first, then runs the

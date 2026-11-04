@@ -101,10 +101,8 @@ caddy_data/
 caddy_config/
 
 # --- Local tooling and test output --------------------------------------------
-# Personal Claude Code settings (the shared agents/skills under .claude/ stay tracked,
-# so .claude/ itself is NOT ignored - a blanket rule would hide any new shared skill).
-.claude/settings.local.json
-.claude/**/*.local.*
+# Claude Code's per-machine folder (settings, skills, agents) is not part of the app.
+.claude/
 # Vite leaves these behind when its config fails to load.
 vite.config.*.timestamp-*
 # Test and process output.
