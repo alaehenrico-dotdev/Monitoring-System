@@ -91,8 +91,16 @@ jobs:
       - name: Check the public site
         if: ${{ env.DEPLOY_HEALTH_URL != '' }}
         run: |
+          # Strip whitespace, line breaks and quotes a pasted variable can carry; curl
+          # rejects such a value as "Malformed input to a URL function".
+          url="$(printf '%s' "$DEPLOY_HEALTH_URL" | tr -d '[:space:]"'"'")"
+          case "$url" in
+            http://*|https://*) ;;
+            *) echo "DEPLOY_HEALTH_URL must start with https:// (got: '$url')" >&2; exit 1 ;;
+          esac
+          echo "checking $url"
           for i in $(seq 1 15); do
-            if curl -fsS --max-time 10 "$DEPLOY_HEALTH_URL" | grep -q '"status":"ok"'; then
+            if curl -fsS --max-time 10 "$url" | grep -q '"status":"ok"'; then
               echo "public site is healthy"; exit 0
             fi
             sleep 4
