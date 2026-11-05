@@ -19,9 +19,9 @@ jobs:
       DATA_RESET_PASSCODE: "ci-only-passcode-not-used-anywhere-real"
       CLIENT_ORIGIN: "http://localhost:5173"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -75,8 +75,8 @@ jobs:
       E2E_ADMIN_PASSWORD: "E2eAdmin-Only-Password-8492"
       E2E_ENCODER_PASSWORD: "E2eEncoder-Only-Password-8492"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -120,8 +120,8 @@ jobs:
       E2E_REAL: "1"
       E2E_ADMIN_PASSWORD: "BrowserAdmin-Only-Password-8492"
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -139,7 +139,7 @@ jobs:
         run: npm run e2e:browser
       - name: Keep the screenshots and the report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: browser-test-output
           path: |
