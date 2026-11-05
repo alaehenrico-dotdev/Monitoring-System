@@ -797,6 +797,8 @@ model MonthClosure {
 model DriveConnection {
   id             Int       @id @default(1)
   accountEmail   String?   @db.VarChar(200)
+  /// The Google account's display name, shown in Settings > Google Drive.
+  accountName    String?   @db.VarChar(200)
   refreshTokenEnc String   @db.Text
   backupFolderId String    @db.VarChar(100)
   exportFolderId String    @db.VarChar(100)

@@ -30,8 +30,8 @@ describe("buildAuthUrl", () => {
   const url = new URL(buildAuthUrl(client, "signed-state"));
   const p = url.searchParams;
 
-  it("asks only for the narrow drive.file scope plus the account's email", () => {
-    expect(p.get("scope")?.split(" ")).toEqual(["https://www.googleapis.com/auth/drive.file", "openid", "email"]);
+  it("asks only for the narrow drive.file scope plus the account's email and name", () => {
+    expect(p.get("scope")?.split(" ")).toEqual(["https://www.googleapis.com/auth/drive.file", "openid", "email", "profile"]);
     expect(p.get("scope")).not.toMatch(/auth\/drive(\s|$)/);
   });
 

@@ -14,7 +14,7 @@ import {
   renameFolder,
   DriveAuthError,
   exchangeCode,
-  fetchAccountEmail,
+  fetchAccountProfile,
   listFolder,
   refreshAccessToken,
   revokeToken,
@@ -123,7 +123,7 @@ export async function completeConnect(code: string, state: string): Promise<void
       "Google Drive access was not granted: the permission to create files and folders was left unticked. Connect again and tick every box on Google's permission screen.",
     );
   }
-  const accountEmail = await fetchAccountEmail(tokens.accessToken);
+  const { email: accountEmail, name: accountName } = await fetchAccountProfile(tokens.accessToken);
 
   // Reconnecting the same account (e.g. after revoking access) keeps its
   // folders and settings, so the backup history stays in one place.
@@ -138,6 +138,7 @@ export async function completeConnect(code: string, state: string): Promise<void
 
   const data = {
     accountEmail,
+    accountName,
     refreshTokenEnc: seal(tokens.refreshToken, tokenSecret()),
     backupFolderId,
     exportFolderId,
@@ -265,6 +266,7 @@ export async function getStatus() {
     redirectUri: env.googleRedirectUri,
     connected: Boolean(conn),
     accountEmail: conn?.accountEmail ?? null,
+    accountName: conn?.accountName ?? null,
     connectedAt: conn?.connectedAt ?? null,
     lastBackupAt: conn?.lastBackupAt ?? null,
     lastReportAt: lastReport?.createdAt ?? null,

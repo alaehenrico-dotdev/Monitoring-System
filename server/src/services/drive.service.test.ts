@@ -34,7 +34,7 @@ vi.mock("../lib/prisma", () => ({
     },
     $queryRaw: vi.fn(async () =>
       (db.columns ?? [
-        "id", "accountEmail", "refreshTokenEnc", "backupFolderId", "exportFolderId", "autoBackup", "backupWeekday",
+        "id", "accountEmail", "accountName", "refreshTokenEnc", "backupFolderId", "exportFolderId", "autoBackup", "backupWeekday",
         "backupHourUtc", "keepBackups", "saveExports", "lastBackupAt", "lastError", "connectedById", "connectedAt", "updatedAt",
       ]).map((Field) => ({ Field })),
     ),
@@ -57,7 +57,7 @@ vi.mock("../lib/googleDrive", async (orig) => ({
   ...(await orig<typeof import("../lib/googleDrive")>()),
   exchangeCode: vi.fn(),
   refreshAccessToken: vi.fn(),
-  fetchAccountEmail: vi.fn(),
+  fetchAccountProfile: vi.fn(),
   createFolder: vi.fn(),
   findFolders: vi.fn(),
   getFolder: vi.fn(),
@@ -107,7 +107,7 @@ const stateFor = (payload: object, secret = stateKey, opts: jwt.SignOptions = { 
 /// "reject once" would fire in the next. These are re-armed below.
 const resettable = [
   google.refreshAccessToken, google.uploadFile, google.listFolder, google.trashFile, google.createFolder, google.findFolders, google.getFolder, google.renameFolder,
-  google.exchangeCode, google.fetchAccountEmail, google.revokeToken, dumpDatabaseToGzipFile, recordBackup,
+  google.exchangeCode, google.fetchAccountProfile, google.revokeToken, dumpDatabaseToGzipFile, recordBackup,
 ];
 
 beforeEach(async () => {
@@ -139,7 +139,7 @@ beforeEach(async () => {
   });
   // A real sealed token, made by a real connect.
   vi.mocked(google.exchangeCode).mockResolvedValue({ accessToken: "a", refreshToken: "1//the-refresh-token", expiresIn: 3600 });
-  vi.mocked(google.fetchAccountEmail).mockResolvedValue("owner@gmail.com");
+  vi.mocked(google.fetchAccountProfile).mockResolvedValue({ email: "owner@gmail.com", name: "Owner Name" });
   vi.mocked(google.createFolder).mockResolvedValueOnce("backups-folder").mockResolvedValueOnce("exports-folder");
   await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
   vi.mocked(google.createFolder).mockReset();
@@ -207,7 +207,7 @@ describe("connecting", () => {
     expect(google.createFolder).not.toHaveBeenCalled();
     expect(db.conn).toMatchObject({ backupFolderId: "backups-folder", keepBackups: 30 });
 
-    vi.mocked(google.fetchAccountEmail).mockResolvedValue("someone-else@gmail.com");
+    vi.mocked(google.fetchAccountProfile).mockResolvedValue({ email: "someone-else@gmail.com", name: "Someone Else" });
     vi.mocked(google.createFolder).mockResolvedValueOnce("new-backups").mockResolvedValueOnce("new-exports");
     await completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }));
     expect(db.conn).toMatchObject({ accountEmail: "someone-else@gmail.com", backupFolderId: "new-backups", exportFolderId: "new-exports" });

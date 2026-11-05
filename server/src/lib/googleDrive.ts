@@ -17,7 +17,7 @@ const USERINFO_URL = "https://openid.googleapis.com/v1/userinfo";
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 
-const DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file", "openid", "email"];
+const DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.file", "openid", "email", "profile"];
 
 export interface OAuthClient {
   clientId: string;
@@ -100,10 +100,15 @@ export function refreshAccessToken(client: OAuthClient, refreshToken: string): P
   return tokenRequest(client, { refresh_token: refreshToken, grant_type: "refresh_token" }, "Refreshing the Google access");
 }
 
-export async function fetchAccountEmail(accessToken: string): Promise<string | null> {
+export async function fetchAccountProfile(accessToken: string): Promise<{ email: string | null; name: string | null }> {
   const res = await fetch(USERINFO_URL, { headers: { Authorization: `Bearer ${accessToken}` } });
-  if (!res.ok) return null;
-  return ((await res.json()) as { email?: string }).email ?? null;
+  if (!res.ok) return { email: null, name: null };
+  const body = (await res.json()) as { email?: string; name?: string };
+  return { email: body.email ?? null, name: body.name ?? null };
+}
+
+export async function fetchAccountEmail(accessToken: string): Promise<string | null> {
+  return (await fetchAccountProfile(accessToken)).email;
 }
 
 /// Best effort: if Google refuses, the token is unusable anyway.

@@ -27,6 +27,8 @@ export interface DriveStatus {
   redirectUri: string;
   connected: boolean;
   accountEmail: string | null;
+  /// The Google account's display name (null for connections made before it was stored).
+  accountName: string | null;
   connectedAt: string | null;
   lastBackupAt: string | null;
   /// When the last Daily Report file was saved to Drive.

@@ -10,6 +10,8 @@ const MAX_RECONNECT_MS = 30000;
 // succession - debouncing here means every page that cares gets one refetch
 // per burst instead of one per cell.
 const VERSION_DEBOUNCE_MS = 400;
+// The longest the header beam shows "connecting" for one attempt.
+const BEAM_MAX_MS = 8000;
 // A tab hidden this long may have missed live updates (browsers and sleeping
 // machines suspend sockets and timers), so coming back to it refetches.
 const STALE_AFTER_HIDDEN_MS = 30_000;
@@ -37,13 +39,24 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 
+    // The beam is for a brief (re)connect, never a permanent state: if the socket
+    // cannot be opened at all (a proxy that does not forward websockets), the
+    // retries carry on quietly instead of leaving the beam spinning forever.
+    let beamTimer: ReturnType<typeof setTimeout> | undefined;
+    function showConnecting() {
+      setConnecting(true);
+      clearTimeout(beamTimer);
+      beamTimer = setTimeout(() => setConnecting(false), BEAM_MAX_MS);
+    }
+
     function connect() {
       // The header seal shows a beam while the live connection is (re)connecting.
-      setConnecting(true);
+      showConnecting();
       socket = new WebSocket(getWsUrl());
 
       socket.onopen = () => {
         if (closedByEffect) return;
+        clearTimeout(beamTimer);
         setConnecting(false);
         reconnectDelay = BASE_RECONNECT_MS;
         socket?.send(JSON.stringify({ type: "auth", token: getToken() }));
@@ -71,8 +84,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
 
       socket.onclose = () => {
         if (closedByEffect) return;
-        // Down until the next attempt succeeds: keep the beam on through the wait.
-        setConnecting(true);
+        // Only a connection that was up and dropped is worth a beam; one that
+        // never opened is retried silently.
+        if (hasConnected) showConnecting();
+        else setConnecting(false);
         reconnectTimer = setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_MS);
       };
@@ -95,6 +110,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       closedByEffect = true;
+      clearTimeout(beamTimer);
       setConnecting(false);
       clearTimeout(reconnectTimer);
       clearTimeout(debounceTimer);

@@ -143,12 +143,21 @@ describe("RealtimeProvider - the connecting signal for the header seal's beam", 
     expect(getActivitySnapshot().connecting).toBe(false);
   });
 
-  it("stays connecting through repeated failures, and clears when the page is left", () => {
+  it("never shows the beam for a socket that cannot connect at all (e.g. a proxy without websockets)", () => {
     const { unmount } = mount();
     act(() => sockets[0].onclose?.());
+    expect(getActivitySnapshot().connecting).toBe(false);
     act(() => void vi.advanceTimersByTime(1100));
     act(() => sockets[1].onclose?.());
+    expect(getActivitySnapshot().connecting).toBe(false);
+    unmount();
+  });
+
+  it("stops the beam after a few seconds even if the socket just hangs, and clears when the page is left", () => {
+    const { unmount } = mount();
     expect(getActivitySnapshot().connecting).toBe(true);
+    act(() => void vi.advanceTimersByTime(8100));
+    expect(getActivitySnapshot().connecting).toBe(false);
     unmount();
     expect(getActivitySnapshot().connecting).toBe(false);
   });

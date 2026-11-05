@@ -22,6 +22,7 @@ const base: DriveStatus = {
   redirectUri: REDIRECT,
   connected: false,
   accountEmail: null,
+  accountName: null,
   connectedAt: null,
   lastBackupAt: null,
   lastReportAt: null,
@@ -34,6 +35,7 @@ const connected = (over: Partial<DriveStatus> = {}): DriveStatus => ({
   ...base,
   connected: true,
   accountEmail: "owner@gmail.com",
+  accountName: "Owner Name",
   settings: { autoBackup: true, backupWeekday: 5, backupHourUtc: 18, keepBackups: 14, saveExports: true },
   ...over,
 });
@@ -116,7 +118,7 @@ describe("coming back from Google", () => {
 describe("once connected", () => {
   it("shows the account and its settings", async () => {
     await show(connected());
-    expect(screen.getByText("owner@gmail.com")).toBeInTheDocument();
+    expect(screen.getByText("Owner Name")).toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: /every week/ })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: /copy of every Excel/ })).toBeChecked();
     expect(screen.getByLabelText("Number of backups to keep")).toHaveValue(14);

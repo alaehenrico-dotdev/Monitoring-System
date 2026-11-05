@@ -251,7 +251,7 @@ export function GoogleDriveSettings() {
         <div style={{ marginTop: 12, display: "grid", gap: 14 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
             <span>
-              Connected as <strong>{status.accountEmail ?? "your Google account"}</strong>
+              Connected as your Google account: <strong>{status.accountName ?? status.accountEmail ?? "unknown"}</strong>
             </span>
             {confirmDisconnect ? (
               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

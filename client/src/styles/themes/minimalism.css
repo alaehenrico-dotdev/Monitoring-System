@@ -221,6 +221,12 @@
   letter-spacing: 0;
   box-shadow: inset 0 -1px 0 var(--ae-border);
 }
+/* Dark mode: column names are plain white. (Light mode keeps the ink scale -
+   white on the white header would not be readable.) */
+:root[data-ui="minimal"][data-theme="dark"] .ae-table th,
+:root[data-ui="minimal"][data-theme="dark"] .ae-table th * {
+  color: #ffffff;
+}
 :root[data-ui="minimal"] .ae-table td {
   box-shadow: inset 0 -1px 0 var(--ae-border-soft);
 }
