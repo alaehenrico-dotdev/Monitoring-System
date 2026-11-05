@@ -102,6 +102,15 @@ describe("Generate asks first", () => {
     await waitFor(() => expect(notices).toEqual([{ level: "success", message: `Daily Report for ${DATE} saved to Google Drive.` }]));
   });
 
+  it("also downloads the report as a PDF to this computer, once, after it has fully loaded", async () => {
+    open();
+    generate();
+    confirm();
+    await waitFor(() => expect(api.downloadTablePdf).toHaveBeenCalledTimes(1));
+    expect(api.downloadTablePdf).toHaveBeenCalledWith(expect.objectContaining({ filename: expect.stringContaining(DATE) }));
+    expect(api.getDailyOut).toHaveBeenCalled();
+  });
+
   it("says so, rather than claiming a save, when Drive already has exactly this report", async () => {
     api.saveDailyReportToDrive.mockResolvedValue({ status: "unchanged" });
     open();

@@ -288,16 +288,23 @@ export function DailyReportPage() {
         }
         setReport(nextReport);
         if (saveToDrive) void saveToDriveAndTell(requestedDate);
-        void getDayExtraNames(requestedDate).then((names) => {
+        const extrasLoaded = getDayExtraNames(requestedDate).then((names) => {
           if (id === requestId.current) setExtraNames(names);
         });
-        void getDailyOut(requestedDate, requestedDate)
+        const dailyOutLoaded = getDailyOut(requestedDate, requestedDate)
           .then((rows) => {
             if (id === requestId.current) setDailyOut(rows[0] ?? null);
           })
           .catch(() => {
             if (id === requestId.current) setDailyOut(null);
           });
+        // A confirmed Generate also hands the person a local PDF, like the copy in
+        // Drive. It waits for the Daily Out and extra columns so the file is complete.
+        if (saveToDrive) {
+          void Promise.allSettled([extrasLoaded, dailyOutLoaded]).then(() => {
+            if (id === requestId.current) setAutoPdf(true);
+          });
+        }
         // Only a fresh Generate remounts the grids (every category expanded
         // again); a silent refresh keeps whatever the person had collapsed.
         if (!silent) setReportVersion((v) => v + 1);
@@ -454,6 +461,16 @@ export function DailyReportPage() {
   // applied - the same rows Export Excel uses, laid out by utils/tablePdf.ts
   // (fixed page format, columns fitted to the page) instead of window.print().
   const pdfAction = useBusyAction();
+
+  // Set by a confirmed Generate once everything the PDF needs has loaded: the
+  // PDF is then downloaded once, from the same data the screen shows.
+  const [autoPdf, setAutoPdf] = useState(false);
+  useEffect(() => {
+    if (!autoPdf || !report) return;
+    setAutoPdf(false);
+    void pdfAction.run(handlePdf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPdf, report]);
 
   async function handlePdf() {
     if (!report) return;
@@ -840,7 +857,7 @@ export function DailyReportPage() {
         >
           Generate the Daily Report for <strong>{formatDateDisplay(date)}</strong>? It covers every entry and the audit
           for that date, and is saved to Google Drive as one file for the date. Generating the same date again replaces
-          that file, or leaves it alone if nothing has changed.
+          that file, or leaves it alone if nothing has changed. A PDF copy is also downloaded to this computer.
         </ConfirmDialog>
       )}
       {unsavedWork && (

@@ -17,43 +17,43 @@ beforeEach(() => {
 afterEach(() => localStorage.clear());
 
 describe("layout style", () => {
-  it("defaults to enterprise, and puts it on <html> for the stylesheet", () => {
+  it("defaults to minimalism, and puts it on <html> for the stylesheet", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("enterprise");
-    expect(root.dataset.ui).toBe("enterprise");
+    expect(result.current.uiStyle).toBe("minimal");
+    expect(root.dataset.ui).toBe("minimal");
   });
 
-  it("switches to enterprise, applies it at once and remembers it", () => {
+  it("switches to classic, applies it at once and remembers it", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
-    act(() => result.current.setUiStyle("enterprise"));
-    expect(result.current.uiStyle).toBe("enterprise");
-    expect(root.dataset.ui).toBe("enterprise");
-    expect(localStorage.getItem("ae-ui")).toBe("enterprise");
+    act(() => result.current.setUiStyle("classic"));
+    expect(result.current.uiStyle).toBe("classic");
+    expect(root.dataset.ui).toBe("classic");
+    expect(localStorage.getItem("ae-ui")).toBe("classic");
   });
 
   it("starts from the remembered choice", () => {
-    localStorage.setItem("ae-ui", "enterprise");
+    localStorage.setItem("ae-ui", "classic");
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("enterprise");
+    expect(result.current.uiStyle).toBe("classic");
   });
 
   it("treats anything unrecognised as the default rather than breaking the layout", () => {
     localStorage.setItem("ae-ui", "neon");
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("enterprise");
+    expect(result.current.uiStyle).toBe("minimal");
   });
 
   it("is independent of the color mode", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => {
-      result.current.setUiStyle("enterprise");
+      result.current.setUiStyle("classic");
       result.current.setTheme("dark");
     });
-    expect(root.dataset.ui).toBe("enterprise");
+    expect(root.dataset.ui).toBe("classic");
     expect(root.dataset.theme).toBe("dark");
     act(() => result.current.toggleTheme());
     expect(root.dataset.theme).toBe("light");
-    expect(root.dataset.ui).toBe("enterprise");
+    expect(root.dataset.ui).toBe("classic");
   });
 
 
@@ -64,7 +64,7 @@ describe("layout style", () => {
 
 
 
-  it.each(["brutal", "flat", "glass", "minimal", "skeuo", "aurora"] as const)("switches to %s, applies it at once and remembers it", (style) => {
+  it.each(["brutal", "glass", "minimal", "skeuo", "studio"] as const)("switches to %s, applies it at once and remembers it", (style) => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setUiStyle(style));
     expect(result.current.uiStyle).toBe(style);
@@ -72,16 +72,16 @@ describe("layout style", () => {
     expect(localStorage.getItem("ae-ui")).toBe(style);
   });
 
-  it.each(["brutal", "flat", "glass", "minimal", "skeuo", "aurora"] as const)("restores a remembered %s theme", (style) => {
+  it.each(["brutal", "glass", "minimal", "skeuo", "studio"] as const)("restores a remembered %s theme", (style) => {
     localStorage.setItem("ae-ui", style);
     const { result } = renderHook(() => useTheme(), { wrapper });
     expect(result.current.uiStyle).toBe(style);
   });
 
-  it.each(["gradient", "ledger", "slate", "card"])("falls back to the default for the retired %s theme", (old) => {
+  it.each(["gradient", "ledger", "slate", "card", "enterprise", "flat", "aurora", "plus", "halloween"])("falls back to the default for the retired %s theme", (old) => {
     localStorage.setItem("ae-ui", old);
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("enterprise");
+    expect(result.current.uiStyle).toBe("minimal");
   });
 });
 
@@ -140,7 +140,7 @@ describe("font settings", () => {
   it("is independent of the theme and the colour mode", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setFontFamily("system"));
-    act(() => result.current.setUiStyle("enterprise"));
+    act(() => result.current.setUiStyle("classic"));
     act(() => result.current.setTheme("dark"));
     expect(root.dataset.font).toBe("system");
     expect(result.current.fontFamily).toBe("system");

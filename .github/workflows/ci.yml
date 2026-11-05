@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies (both workspaces)
         run: npm ci
 
+      - name: Audit production dependencies for known high-severity vulnerabilities
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Lint
         run: npm run lint
 
@@ -87,3 +90,59 @@ jobs:
         run: npm run seed --workspace server
       - name: Exercise login, permissions, stock, and restore workflows
         run: npm run e2e
+
+  # The browser tests get their own database (and job): the API end-to-end script above
+  # resets the seeded accounts' passwords as part of what it checks, and sharing one
+  # database would make the two fight over them.
+  browser-tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: ala_eh_stocks_browser
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/ala_eh_stocks_browser
+      JWT_SECRET: "ci-browser-jwt-secret-not-used-anywhere-real"
+      DATA_RESET_PASSCODE: "482913"
+      # The browser reaches the API through the preview server on 4173 (same origin).
+      CLIENT_ORIGIN: http://localhost:4173
+      SEED_ADMIN_PASSWORD: "BrowserAdmin-Only-Password-8492"
+      SEED_ENCODER_PASSWORD: "BrowserEncoder-Only-Password-8492"
+      E2E_REAL: "1"
+      E2E_ADMIN_PASSWORD: "BrowserAdmin-Only-Password-8492"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Apply schema migrations
+        run: npm run prisma:migrate:deploy --workspace server
+      - name: Seed the browser-test accounts and products
+        run: npm run seed --workspace server
+      - name: Build the API (the tests start it the way production does)
+        run: npm run build --workspace server
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+      - name: Browser tests (every theme, sign-in, every page, the live connection)
+        run: npm run e2e:browser
+      - name: Keep the screenshots and the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-test-output
+          path: |
+            e2e-browser/screenshots
+            e2e-browser/report
+          retention-days: 14

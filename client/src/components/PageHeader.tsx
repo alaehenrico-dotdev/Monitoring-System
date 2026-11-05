@@ -1,4 +1,5 @@
 import {
+  useLayoutEffect,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -100,6 +101,31 @@ export function PageHeader({
   const lastSpinAtRef = useRef(0);
   const logoRef = useRef<HTMLButtonElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
+  const stickyRef = useRef<HTMLDivElement>(null);
+
+  // Publishes where the pinned header (tab strip included) ends, as CSS variables on
+  // <html>. The Studio theme draws its gold page frame from there to the bottom of the
+  // screen (see themes/studio.css), whatever the page holds; no other theme reads them.
+  // They are left in place on unmount: the next page's header sets them again at once.
+  useLayoutEffect(() => {
+    const el = stickyRef.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const publish = () => {
+      const r = el.getBoundingClientRect();
+      root.style.setProperty("--ae-head-bottom", `${r.bottom}px`);
+      root.style.setProperty("--ae-head-left", `${r.left}px`);
+      root.style.setProperty("--ae-head-right", `${Math.max(0, root.clientWidth - r.right)}px`);
+    };
+    publish();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(publish);
+    observer?.observe(el);
+    window.addEventListener("resize", publish);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", publish);
+    };
+  }, []);
 
   // The collapse ribbon follows the pointer along the header's bottom edge
   // instead of sitting at a fixed spot. Written straight to a CSS variable
@@ -135,7 +161,7 @@ export function PageHeader({
   return (
     // One sticky unit (tabs + card): navigation and the page's controls stay on
     // screen however far the page below is scrolled (see .ae-sticky-head).
-    <div className="ae-sticky-head">
+    <div ref={stickyRef} className="ae-sticky-head">
       {/* Office-style tab strip sitting on top of the header card, outside
           it (like the tab row above a ribbon). Not part of the card's
           collapsible content, so navigation stays reachable when the

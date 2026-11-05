@@ -12,7 +12,8 @@ interface Shown extends AppNotice {
 /**
  * Shows every `notify()` message as a toast - mounted once, at the top of the
  * app. Successes leave by themselves like any toast; a failure stays until it is
- * closed, since it is something the person may need to act on.
+ * closed, since it is something the person may need to act on. A notice can
+ * also be `persistent` and carry one `action` button.
  */
 export function NoticeHost() {
   const [shown, setShown] = useState<Shown[]>([]);
@@ -37,7 +38,8 @@ export function NoticeHost() {
           id={String(n.id)}
           message={n.message}
           variant={n.level}
-          duration={n.level === "error" ? null : undefined}
+          duration={n.level === "error" || n.persistent ? null : undefined}
+          action={n.action}
           onDismiss={() => dismiss(n.id)}
         />
       ))}

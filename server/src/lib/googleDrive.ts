@@ -107,10 +107,6 @@ export async function fetchAccountProfile(accessToken: string): Promise<{ email:
   return { email: body.email ?? null, name: body.name ?? null };
 }
 
-export async function fetchAccountEmail(accessToken: string): Promise<string | null> {
-  return (await fetchAccountProfile(accessToken)).email;
-}
-
 /// Best effort: if Google refuses, the token is unusable anyway.
 export async function revokeToken(token: string): Promise<void> {
   try {

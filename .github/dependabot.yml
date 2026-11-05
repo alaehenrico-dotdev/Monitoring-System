@@ -1,0 +1,23 @@
+# Weekly update PRs, so dependency and workflow-action upgrades arrive in small,
+# reviewable steps instead of one risky jump. Minor and patch updates are grouped
+# into one PR per ecosystem; a major version gets its own PR. Each PR runs the
+# normal CI (lint, typecheck, tests, build, end-to-end) before anyone merges it.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions:
+        patterns: ["*"]

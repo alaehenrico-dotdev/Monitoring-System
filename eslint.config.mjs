@@ -91,6 +91,12 @@ export default tseslint.config(
     },
   },
   {
+    // Browser tests: Node for the runner, browser for the callbacks handed to page.evaluate()
+    // and addInitScript(), which run inside the page.
+    files: ["e2e-browser/**/*.mjs", "playwright.config.mjs"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     files: ["scripts/**/*.mjs", "server/scripts/**/*.mjs"],
     languageOptions: { globals: globals.node },
   },

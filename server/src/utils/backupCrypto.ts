@@ -18,7 +18,7 @@ import { HttpError } from "./HttpError";
 /// a wrong key, a flipped bit, reordered frames or a file cut short all fail to
 /// decrypt instead of producing a quietly damaged dump. The final frame is always
 /// written (empty if need be): that is how a truncated file is told from a whole one.
-export const BACKUP_MAGIC = Buffer.from("ALAEBK01", "ascii");
+const BACKUP_MAGIC = Buffer.from("ALAEBK01", "ascii");
 
 const SALT_BYTES = 16;
 const PREFIX_BYTES = 4;

@@ -18,6 +18,7 @@ import logoVideo from "../assets/alaeh-logo-3d.webm";
  * Playback only runs while the logo is on screen and the tab is visible: the
  * video is paused when the tab is hidden or the logo scrolls out of view, and
  * resumed when it comes back, so it doesn't keep decoding frames nobody sees.
+ * With the system "reduce motion" setting on it never plays: the poster stays.
  *
  * `spin` is still accepted so existing callers (PageHeader's hover spin)
  * keep compiling, but it's ignored: the video animates on its own.
@@ -29,8 +30,9 @@ export function LogoMark({ size = 44 }: { size?: number; spin?: number }) {
     const video = videoRef.current;
     if (!video) return;
     let onScreen = true;
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const sync = () => {
-      if (onScreen && !document.hidden) {
+      if (onScreen && !document.hidden && !reduceMotion) {
         // play() returns a promise in browsers; guard for environments
         // (jsdom) where it doesn't, and ignore autoplay-policy rejections.
         const started = video.play() as Promise<void> | undefined;

@@ -7,6 +7,10 @@
 export interface AppNotice {
   level: "success" | "error" | "info";
   message: string;
+  /// One button beside the message (e.g. "Refresh" on a new-version notice).
+  action?: { label: string; onClick: () => void };
+  /// Stays until closed, like an error does, instead of leaving by itself.
+  persistent?: boolean;
 }
 
 type Listener = (notice: AppNotice) => void;

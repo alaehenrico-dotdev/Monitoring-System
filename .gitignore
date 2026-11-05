@@ -176,3 +176,8 @@ yarn-error.log*
 # Per-machine overrides of the committed config (a local client/.env.local is already covered by .env.*).
 *.local
 !*.example
+
+# Browser test output (screenshots, traces, HTML report)
+e2e-browser/screenshots/
+e2e-browser/results/
+e2e-browser/report/

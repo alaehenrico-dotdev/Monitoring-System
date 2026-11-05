@@ -506,7 +506,7 @@ export const MAX_REMARKS_LENGTH = 500;
 /// not listed as an unexplained variance (the Admin Queue only lists counts with NO remark). Audit
 /// rule 2 (see propagateOpeningStock): a product that was not counted is 0. Do not drop the remark
 /// and do not change the wording without checking the places that read it.
-export const NOT_COUNTED_NOTE = "Not counted in this audit - treated as 0.";
+const NOT_COUNTED_NOTE = "Not counted in this audit - treated as 0.";
 
 /**
  * Publishes a sheet's counts (one date + shift, every location): the

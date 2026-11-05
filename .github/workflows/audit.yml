@@ -1,0 +1,22 @@
+name: Dependency audit
+
+# A vulnerability can be published for a package we already ship, with no push of
+# ours to trigger CI. This checks every Monday, and on demand. It is a separate
+# workflow on purpose: CI finishing on main is what triggers the Deploy workflow,
+# and a weekly audit must never cause a deploy.
+on:
+  schedule:
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: npm audit (production dependencies)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Audit
+        run: npm audit --omit=dev --audit-level=high

@@ -1,6 +1,7 @@
 import { createServer } from "http";
 import { createApp } from "./app";
 import { env } from "./config/env";
+import { logKeyWarnings } from "./config/keyChecks";
 import { prisma } from "./lib/prisma";
 import { attachRealtime, closeRealtime } from "./lib/realtime";
 import { startMaintenance } from "./services/maintenance.service";
@@ -10,6 +11,7 @@ const app = createApp();
 const server = createServer(app);
 attachRealtime(server);
 
+logKeyWarnings(env);
 startMaintenance();
 startDriveScheduler();
 

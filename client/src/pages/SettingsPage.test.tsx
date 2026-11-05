@@ -35,24 +35,23 @@ describe("SettingsPage appearance", () => {
     open();
     expect(screen.getByRole("tab", { name: "Appearance", selected: true })).toBeTruthy();
     expect((screen.getByRole("radio", { name: /Light/ }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("radio", { name: /^Enterprise$/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /^Minimalism$/ }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("switching the theme applies at once and is remembered", () => {
     open();
-    fireEvent.click(screen.getByRole("radio", { name: /Enterprise/ }));
-    expect(root.dataset.ui).toBe("enterprise");
-    expect(localStorage.getItem("ae-ui")).toBe("enterprise");
-    expect((screen.getByRole("radio", { name: /Enterprise/ }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole("radio", { name: /Classic/ }));
+    expect(root.dataset.ui).toBe("classic");
+    expect(localStorage.getItem("ae-ui")).toBe("classic");
+    expect((screen.getByRole("radio", { name: /Classic/ }) as HTMLInputElement).checked).toBe(true);
   });
 
   it.each([
     [/Neobrutalism/, "brutal"],
-    [/Flat Design/, "flat"],
     [/Glassmorphism/, "glass"],
     [/Minimalism/, "minimal"],
     [/Skeuomorphism/, "skeuo"],
-    [/Aurora/, "aurora"],
+    [/Studio/, "studio"],
   ] as const)("switching to the %s theme applies at once and is remembered", (name, value) => {
     open();
     fireEvent.click(screen.getByRole("radio", { name }));
@@ -62,7 +61,7 @@ describe("SettingsPage appearance", () => {
 
   it("no longer offers the retired themes", () => {
     open();
-    expect(screen.queryByRole("radio", { name: /Gradient|Ledger|Slate/ })).toBeNull();
+    expect(screen.queryByRole("radio", { name: /Gradient|Ledger|Slate|Enterprise|Flat Design|Aurora|Classic Plus|Halloween/ })).toBeNull();
   });
 
   it("switching the color mode applies at once", () => {
@@ -145,7 +144,7 @@ describe("SettingsPage font settings", () => {
   it("does not disturb the theme and colour mode choices", () => {
     open();
     fireEvent.click(screen.getByRole("radio", { name: "Monospace" }));
-    expect((screen.getByRole("radio", { name: /^Enterprise$/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /^Minimalism$/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("radio", { name: /Light/ }) as HTMLInputElement).checked).toBe(true);
   });
 });

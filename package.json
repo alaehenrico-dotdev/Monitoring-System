@@ -18,22 +18,25 @@
     "backup": "node scripts/backup.mjs backup",
     "backup:snapshot": "node scripts/backup.mjs backup --mode snapshot --label pre-migration",
     "restore": "node scripts/backup.mjs restore",
+    "restore:drill": "bash scripts/restore-drill.sh",
     "backup:docker": "node scripts/docker-backup.mjs backup",
     "restore:docker": "node scripts/docker-backup.mjs restore",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "e2e": "node scripts/e2e.mjs"
+    "e2e": "node scripts/e2e.mjs",
+    "e2e:browser": "playwright test",
+    "e2e:themes": "playwright test themes.spec.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "concurrently": "^9.0.1",
     "eslint": "^10.13.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.7",
     "globals": "^17.13.0",
-    "typescript-eslint": "^8.72.1",
-    "vitest": "^5.0.5"
+    "typescript-eslint": "^8.72.1"
   },
   "allowScripts": {
     "@prisma/client@6.19.3": true,

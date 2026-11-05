@@ -39,25 +39,13 @@ const THEMES: Choice<UiStyle>[] = [
     value: "classic",
     label: "Classic",
     description: "The glass header with gold accents, warm cream surfaces and the Ala Eh! seal behind the page. The look you have been using.",
-    preview: <ThemePreview enterprise={false} />,
-  },
-  {
-    value: "enterprise",
-    label: "Enterprise",
-    description: "A more formal business look: an ink-black header with a gold rule, flat ruled tables and square controls. Same pages and shortcuts as Classic.",
-    preview: <ThemePreview enterprise />,
+    preview: <ClassicPreview />,
   },
   {
     value: "brutal",
     label: "Neobrutalism",
     description: "Loud and graphic, in the Ala Eh! colors: thick black outlines, hard offset shadows, flat gold headers and red actions on the original cream page. Same pages and shortcuts as Classic.",
     preview: <BrutalPreview />,
-  },
-  {
-    value: "flat",
-    label: "Flat Design",
-    description: "Solid colour blocks and nothing else: no shadows, outlines or gradients. Gold header, ink tabs and table headers, red actions. Same pages and shortcuts as Classic.",
-    preview: <FlatPreview />,
   },
   {
     value: "glass",
@@ -78,22 +66,10 @@ const THEMES: Choice<UiStyle>[] = [
     preview: <SkeuoPreview />,
   },
   {
-    value: "aurora",
-    label: "Aurora",
-    description: "A modern indigo-to-violet-to-pink gradient on the header, buttons, active tab and category bars, over cool soft surfaces. Every corner is 4px. Same pages and shortcuts as Classic.",
-    preview: <AuroraPreview />,
-  },
-  {
-    value: "plus",
-    label: "Classic Plus",
-    description: "Classic, refined: the same cream and charcoal with brand gold, but a clearer frosted header and soft layered shadows instead of glow. Same pages and shortcuts as Classic.",
-    preview: <PlusPreview />,
-  },
-  {
-    value: "halloween",
-    label: "Halloween",
-    description: "Spooky season: a pumpkin-orange header with a cobweb and dripping blood, a flickering title, drifting fog and the occasional distant lightning flash. Every effect stops with reduce motion. Same pages and shortcuts as Classic.",
-    preview: <HalloweenPreview />,
+    value: "studio",
+    label: "Studio",
+    description: "An editor-style layout: the navigation tabs sit in their own strip directly under the header, and the current tab is outlined in gold and open at the bottom, joined to the page. Flat and quiet otherwise. Same pages and shortcuts as Classic.",
+    preview: <StudioPreview />,
   },
 ];
 
@@ -160,7 +136,7 @@ function FontSettings() {
 
 /**
  * Settings > Appearance: how the app looks on THIS browser. The color mode
- * (light/dark) and the theme (Classic, Enterprise, Neobrutalism, Flat, Glass, Minimalism, Skeuomorphic, Aurora, Classic Plus, Halloween) and the font are independent, remembered per
+ * (light/dark) and the theme (Classic, Neobrutalism, Glass, Minimalism, Skeuomorphic, Studio) and the font are independent, remembered per
  * browser (ThemeContext), apply immediately, and change only how things are
  * drawn - never the pages, the controls or the data - which is why every role can
  * reach them, unlike the other Settings tabs.
@@ -191,7 +167,7 @@ function ChoiceGroup<T extends string>({
   onChange: (value: T) => void;
 }) {
   // The radio is named by its title alone and described by the sentence under it,
-  // so a screen reader says "Classic" or "Enterprise", not the whole paragraph
+  // so a screen reader says "Classic" or "Minimalism", not the whole paragraph
   // (which can mention the other option).
   const groupId = useId();
   return (
@@ -249,34 +225,38 @@ function ModePreview({ dark }: { dark: boolean }) {
   );
 }
 
-function ThemePreview({ enterprise }: { enterprise: boolean }) {
-  if (!enterprise) {
-    return (
-      <span style={{ display: "block", background: "#fffcf5", padding: 8, height: 86, borderRadius: 4 }}>
-        <span style={{ display: "flex", gap: 6, marginBottom: 4 }}>
-          <span style={bar(26, 4, "#c9c0a8")} />
-          <span style={bar(26, 4, "#f5c000")} />
-          <span style={bar(26, 4, "#c9c0a8")} />
-        </span>
-        <span style={{ display: "block", background: "rgba(245,192,0,0.18)", border: "1px solid #d4a000", borderRadius: 6, height: 22 }} />
-        <span style={{ display: "block", ...bar("100%", 5, "#e7dfc9", { marginTop: 8 }) }} />
-        <span style={{ display: "block", ...bar("100%", 5, "#e7dfc9", { marginTop: 5 }) }} />
-        <span style={{ display: "block", ...bar("100%", 5, "#e7dfc9", { marginTop: 5 }) }} />
-      </span>
-    );
-  }
+function ClassicPreview() {
   return (
-    <span style={{ display: "block", background: "#f4f2ec", height: 86, borderRadius: 4, overflow: "hidden" }}>
-      <span style={{ display: "flex", gap: 6, padding: "5px 8px", background: "#ffffff", borderBottom: "1px solid #d6cfbb" }}>
-        <span style={bar(26, 4, "#b9b19a", { borderRadius: 0 })} />
-        <span style={bar(26, 4, "#d4a000", { borderRadius: 0 })} />
-        <span style={bar(26, 4, "#b9b19a", { borderRadius: 0 })} />
+    <span style={{ display: "block", background: "#fffcf5", padding: 8, height: 86, borderRadius: 4 }}>
+      <span style={{ display: "flex", gap: 6, marginBottom: 4 }}>
+        <span style={bar(26, 4, "#c9c0a8")} />
+        <span style={bar(26, 4, "#f5c000")} />
+        <span style={bar(26, 4, "#c9c0a8")} />
       </span>
-      <span style={{ display: "block", background: "#0c0c0c", borderBottom: "3px solid #f5c000", height: 20 }} />
-      <span style={{ display: "block", padding: "6px 8px" }}>
-        <span style={{ display: "block", ...bar("100%", 6, "#ece6d4", { borderRadius: 0 }) }} />
-        <span style={{ display: "block", ...bar("100%", 5, "#ffffff", { marginTop: 3, border: "1px solid #d6cfbb", borderRadius: 0 }) }} />
-        <span style={{ display: "block", ...bar("100%", 5, "#ffffff", { marginTop: 2, border: "1px solid #d6cfbb", borderRadius: 0 }) }} />
+      <span style={{ display: "block", background: "rgba(245,192,0,0.18)", border: "1px solid #d4a000", borderRadius: 6, height: 22 }} />
+      <span style={{ display: "block", ...bar("100%", 5, "#e7dfc9", { marginTop: 8 }) }} />
+      <span style={{ display: "block", ...bar("100%", 5, "#e7dfc9", { marginTop: 5 }) }} />
+      <span style={{ display: "block", ...bar("100%", 5, "#e7dfc9", { marginTop: 5 }) }} />
+    </span>
+  );
+}
+
+function StudioPreview() {
+  const gold = "#b8860b";
+  return (
+    <span style={{ display: "block", background: "#fbfaf7", height: 86, borderRadius: 4, overflow: "hidden", border: "1px solid #dcd8cc" }}>
+      <span style={{ display: "flex", alignItems: "center", gap: 8, height: 24, padding: "0 8px", background: "#f1efe8", borderBottom: "1px solid #dcd8cc" }}>
+        <span style={bar(48, 6, "#1a1a1a", { borderRadius: 1 })} />
+        <span style={bar(30, 12, gold, { borderRadius: 3, marginLeft: "auto" })} />
+      </span>
+      <span style={{ display: "flex", alignItems: "flex-end", gap: 3, padding: "6px 8px 0", background: "#f1efe8", borderBottom: `1px solid ${gold}` }}>
+        <span style={{ display: "block", width: 30, height: 12, background: "#fbfaf7", border: `1px solid ${gold}`, borderBottom: 0, borderRadius: "4px 4px 0 0", marginBottom: -1 }} />
+        <span style={{ display: "block", width: 30, height: 10, borderRadius: "4px 4px 0 0", ...{ background: "#e4e0d4" } }} />
+        <span style={{ display: "block", width: 30, height: 10, borderRadius: "4px 4px 0 0", ...{ background: "#e4e0d4" } }} />
+      </span>
+      <span style={{ display: "block", padding: "7px 8px" }}>
+        <span style={{ display: "block", ...bar("100%", 5, "#ebe8de", { borderRadius: 1 }) }} />
+        <span style={{ display: "block", ...bar("70%", 5, "#ebe8de", { borderRadius: 1, marginTop: 5 }) }} />
       </span>
     </span>
   );
@@ -294,21 +274,6 @@ function BrutalPreview() {
         </span>
         <span style={{ display: "block", width: 34, height: 18, background: "#c1272d", border: `2px solid ${ink}`, boxShadow: `3px 3px 0 ${ink}` }} />
       </span>
-    </span>
-  );
-}
-
-function FlatPreview() {
-  return (
-    <span style={{ display: "block", background: "#f2eee3", height: 86, borderRadius: 4, overflow: "hidden", padding: 8 }}>
-      <span style={{ display: "block", background: "#f5c000", borderRadius: 4, height: 20 }} />
-      <span style={{ display: "flex", gap: 6, marginTop: 8 }}>
-        <span style={bar(30, 8, "#0c0c0c", { borderRadius: 4 })} />
-        <span style={bar(30, 8, "#e4ddc9", { borderRadius: 4 })} />
-        <span style={bar(30, 8, "#c1272d", { borderRadius: 4, marginLeft: "auto" })} />
-      </span>
-      <span style={{ display: "block", ...bar("100%", 6, "#0c0c0c", { borderRadius: 4, marginTop: 8 }) }} />
-      <span style={{ display: "block", ...bar("100%", 6, "#ffffff", { borderRadius: 4, marginTop: 3 }) }} />
     </span>
   );
 }
@@ -365,45 +330,3 @@ function SkeuoPreview() {
   );
 }
 
-function PlusPreview() {
-  const lift = "0 6px 14px -4px rgba(31,26,18,0.22), 0 1px 2px rgba(31,26,18,0.1)";
-  return (
-    <span style={{ display: "block", background: "#faf7f0", padding: 8, height: 86, borderRadius: 4 }}>
-      <span
-        style={{
-          display: "block",
-          height: 24,
-          borderRadius: 8,
-          background: "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,253,247,0.6))",
-          border: "1px solid rgba(255,255,255,0.8)",
-          boxShadow: `inset 0 1px 0 #fff, 0 0 0 1px rgba(31,26,18,0.08), ${lift}`,
-        }}
-      />
-      <span style={{ display: "block", ...bar("100%", 18, "#ffffff", { marginTop: 10, borderRadius: 6, border: "1px solid #e4dcc6", boxShadow: "0 3px 8px -2px rgba(31,26,18,0.14)" }) }} />
-      <span style={{ display: "block", ...bar(34, 8, "#f5c000", { marginTop: 8, borderRadius: 4 }) }} />
-    </span>
-  );
-}
-
-function HalloweenPreview() {
-  return (
-    <span style={{ display: "block", background: "radial-gradient(90px 60px at 50% 0%, rgba(255,122,0,0.25), transparent 70%), #0b0710", height: 86, borderRadius: 6, padding: 8, overflow: "hidden" }}>
-      <span style={{ display: "block", position: "relative", height: 24, borderRadius: 6, background: "linear-gradient(120deg, #ff9a1f, #ff7a00 50%, #c24e00)", boxShadow: "0 0 14px -2px rgba(255,122,0,0.6)", overflow: "hidden" }}>
-        <span style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 9, background: "radial-gradient(3px 8px at 12% 0, #c8101c 98%, transparent), radial-gradient(3px 5px at 38% 0, #8a0b12 98%, transparent), radial-gradient(3px 9px at 66% 0, #c8101c 98%, transparent), radial-gradient(3px 6px at 88% 0, #8a0b12 98%, transparent)" }} />
-      </span>
-      <span style={{ display: "block", ...bar("100%", 20, "#170e20", { marginTop: 8, borderRadius: 6, border: "1px solid #4d2f69" }) }} />
-      <span style={{ display: "block", ...bar(34, 9, "#ff7a00", { marginTop: 8, borderRadius: 6 }) }} />
-    </span>
-  );
-}
-
-function AuroraPreview() {
-  const grad = "linear-gradient(120deg, #4f46e5, #7c3aed 55%, #c026d3)";
-  return (
-    <span style={{ display: "block", background: "radial-gradient(90px 60px at 0% 0%, rgba(99,102,241,0.25), transparent 70%), radial-gradient(90px 60px at 100% 0%, rgba(217,70,239,0.2), transparent 70%), #f5f5fd", height: 86, borderRadius: 4, padding: 8 }}>
-      <span style={{ display: "block", height: 22, borderRadius: 4, background: grad, boxShadow: "0 6px 14px -6px rgba(79,70,229,0.6)" }} />
-      <span style={{ display: "block", ...bar("100%", 20, "#ffffff", { marginTop: 8, borderRadius: 4, border: "1px solid #dcdbf0", boxShadow: "0 3px 8px -3px rgba(30,27,75,0.2)" }) }} />
-      <span style={{ display: "block", ...bar(34, 9, "#4f46e5", { marginTop: 8, borderRadius: 4, background: grad }) }} />
-    </span>
-  );
-}

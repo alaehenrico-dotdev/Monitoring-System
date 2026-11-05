@@ -9,8 +9,9 @@ import { ShiftModeGate } from "./components/ShiftModeGate";
 import { TopProgressBar } from "./components/TopProgressBar";
 import { NoticeHost } from "./components/NoticeHost";
 import { PasswordPromptHost } from "./components/PasswordPromptHost";
-import { JumpscareHost } from "./components/JumpscareHost";
 import { TopProgressProvider } from "./hooks/useTopProgress";
+import { useDocumentTitle } from "./hooks/useDocumentTitle";
+import { useAnimatedFavicon } from "./hooks/useAnimatedFavicon";
 import { LoadingBlock } from "./components/Spinner";
 import { LoginPage } from "./pages/LoginPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -109,6 +110,8 @@ const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
 export default function App() {
+  useDocumentTitle();
+  useAnimatedFavicon();
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -117,7 +120,6 @@ export default function App() {
             <TopProgressBar />
             <NoticeHost />
             <PasswordPromptHost />
-            <JumpscareHost />
             <Suspense
               fallback={
                 <LoadingBlock label="" minHeight="var(--ae-vh)" size="xxl" />

@@ -5,14 +5,13 @@
 @import "./styles/dashboard.css";
 @import "./styles/feedback.css";
 @import "./styles/toolbar-alignment.css";
-@import "./styles/themes/enterprise.css";
 @import "./styles/themes/neobrutalism.css";
-@import "./styles/themes/flat.css";
 @import "./styles/themes/glassmorphism.css";
 @import "./styles/themes/minimalism.css";
 @import "./styles/themes/skeuomorphism.css";
-@import "./styles/themes/aurora.css";
-@import "./styles/themes/halloween.css";
+@import "./styles/shared-base.css";
 @import "./styles/menu-bar.css";
-@import "./styles/themes/classic-plus.css";
+/* After menu-bar.css: Studio moves the tab strip and repaints the header, and must win there. */
+@import "./styles/themes/studio.css";
+@import "./styles/shared-late.css";
 @import "./styles/a11y-polish.css";

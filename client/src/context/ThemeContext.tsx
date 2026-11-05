@@ -3,23 +3,14 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 export type Theme = "light" | "dark";
 
 /// The visual theme, chosen in Settings > Appearance. "classic" is the original
-/// look (glass header, cream surfaces); "enterprise" is a more formal restyle of
-/// the SAME layout - ink header bar with a gold rule, flat ruled tables, square
-/// controls. Independent of the light/dark color mode, a per-browser preference,
-/// and it changes only how things are drawn, never the pages or the data.
-export type UiStyle =
-  | "classic"
-  | "enterprise"
-  | "brutal"
-  | "flat"
-  | "glass"
-  | "minimal"
-  | "skeuo"
-  | "aurora"
-  | "plus"
-  | "halloween";
+/// look (glass header, cream surfaces); the others restyle the SAME pages ("studio"
+/// also moves the navigation tabs into a strip under the header). Independent of
+/// the light/dark color mode, a per-browser preference, and it changes only how
+/// things are drawn, never the pages or the data. A saved choice that is no longer
+/// in this list (a removed theme) falls back to DEFAULT_UI_STYLE.
+export type UiStyle = "classic" | "brutal" | "glass" | "minimal" | "skeuo" | "studio";
 
-const UI_STYLES: readonly UiStyle[] = ["classic", "enterprise", "brutal", "flat", "glass", "minimal", "skeuo", "aurora", "plus", "halloween"];
+const UI_STYLES: readonly UiStyle[] = ["classic", "brutal", "glass", "minimal", "skeuo", "studio"];
 
 /// The interface typeface and text size (Settings > Appearance > Font). Like the
 /// theme they are a per-browser preference, applied as data attributes on <html>
@@ -30,9 +21,9 @@ export type FontSize = "sm" | "md" | "lg" | "xl";
 
 export const FONT_FAMILIES: readonly FontFamily[] = ["inter", "hyperlegible", "plex", "system", "serif", "mono"];
 const FONT_SIZES: readonly FontSize[] = ["sm", "md", "lg", "xl"];
-/// What someone who has not picked a layout in Settings > Appearance gets: the plain, formal
-/// one. A saved choice always wins.
-export const DEFAULT_UI_STYLE: UiStyle = "enterprise";
+/// What someone who has not picked a layout in Settings > Appearance gets: the plain,
+/// quiet one. A saved choice always wins.
+const DEFAULT_UI_STYLE: UiStyle = "minimal";
 export const DEFAULT_FONT: FontFamily = "inter";
 export const DEFAULT_FONT_SIZE: FontSize = "md";
 
@@ -117,8 +108,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  // The theme is only an attribute too: index.css keys the whole enterprise
-  // look off `:root[data-ui="enterprise"]`, so no component needs to know.
+  // The theme is only an attribute too: index.css keys each
+  // look off `:root[data-ui="..."]`, so no component needs to know.
   useLayoutEffect(() => {
     document.documentElement.dataset.ui = uiStyle;
   }, [uiStyle]);

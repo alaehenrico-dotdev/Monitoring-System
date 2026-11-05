@@ -1,0 +1,484 @@
+/* =========================================================================
+   Studio theme (Settings > Appearance > Theme). An IDE-style layout: the page
+   header sits on top and the navigation tabs run in their own strip directly
+   BELOW it, like the document tabs of a code editor. The current tab is
+   outlined in brand gold and open at the bottom, so it reads as joined to the
+   page underneath; the other tabs are plain text. Everything else is flat and
+   quiet (hairlines, no shadows or blur), with gold as the only accent.
+
+   A pure restyle: only CSS - the tab strip is moved under the header with flex
+   `order`, so the markup, routes and behaviour are the classic ones. Scoped to
+   :root[data-ui="studio"] (ThemeContext sets it). Light and dark are separate
+   token sets, each checked on its own.
+   ========================================================================= */
+:root[data-ui="studio"]:not([data-theme="dark"]) {
+  --ae-bg: #fbfaf7;
+  --ae-bg-alt: #f1efe8;
+  --ae-surface: #ffffff;
+  --ae-surface-hover: #f4f2ec;
+  --ae-surface-glass: transparent;
+  --ae-header-bg: #f1efe8;
+  --ae-header-glass: #f1efe8;
+  --ae-text: #1a1a1a;
+  --ae-text-muted: #6b6b66;
+  --ae-border: #dcd8cc;
+  --ae-border-soft: #ebe8de;
+  /* Outline of fields and buttons: dark enough to be seen (3:1 on white). The
+     panel/row hairlines stay the pale --ae-border. */
+  --ae-border-strong: #8a8a85;
+  --ae-hairline: #dcd8cc;
+  --ae-row-hover: rgba(26, 26, 26, 0.035);
+  /* One flat opaque colour for the grid columns, "-a" and "-b" equal (every theme
+     is flat now - see base.css; here it also stays opaque because sticky columns
+     must still hide what scrolls under them). */
+  --ae-col-a: #fbfaf7;
+  --ae-col-b: #fbfaf7;
+  --ae-colh-a: #fbfaf7;
+  --ae-colh-b: #fbfaf7;
+  --ae-glass-blur: none;
+  --ae-glass-shadow: none;
+  --ae-glass-panel-shadow: none;
+  --ae-st-ink: #1a1a1a;
+  --ae-st-on-ink: #ffffff;
+  --ae-st-wash: rgba(26, 26, 26, 0.05);
+  --ae-st-wash-strong: rgba(26, 26, 26, 0.09);
+  /* The one accent: the current tab's outline and the primary button. Dark enough
+     on cream to be seen (3:1). */
+  --ae-st-gold: #b8860b;
+  --ae-st-on-gold: #1a1a1a;
+}
+:root[data-ui="studio"][data-theme="dark"] {
+  --ae-bg: #111111;
+  --ae-bg-alt: #181818;
+  --ae-surface: #161616;
+  --ae-surface-hover: #1e1e1e;
+  --ae-surface-glass: transparent;
+  --ae-header-bg: #111111;
+  --ae-header-glass: #111111;
+  --ae-text: #ececea;
+  --ae-text-muted: #9a9a95;
+  --ae-border: #2a2a2a;
+  --ae-border-soft: #1f1f1f;
+  --ae-border-strong: #707070;
+  --ae-hairline: #2a2a2a;
+  --ae-row-hover: rgba(255, 255, 255, 0.04);
+  --ae-col-a: #111111;
+  --ae-col-b: #111111;
+  --ae-colh-a: #111111;
+  --ae-colh-b: #111111;
+  --ae-glass-blur: none;
+  --ae-glass-shadow: none;
+  --ae-glass-panel-shadow: none;
+  --ae-st-ink: #ececea;
+  --ae-st-on-ink: #111111;
+  --ae-st-wash: rgba(255, 255, 255, 0.06);
+  --ae-st-wash-strong: rgba(255, 255, 255, 0.11);
+  --ae-st-gold: #f5c000;
+  --ae-st-on-gold: #1a1a1a;
+}
+
+/* The emblem stays behind the page like every theme, only quieter. */
+:root[data-ui="studio"] .app-shell {
+  --ae-watermark-opacity: 0.2;
+}
+:root[data-ui="studio"][data-theme="dark"] .app-shell {
+  --ae-watermark-opacity: 0.4;
+}
+
+/* ---- Page header: a flat bar on the page's alt surface -------------------- */
+/* `:root:root` + loaded after menu-bar.css, which paints each theme's header. */
+:root:root[data-ui="studio"] .ae-page-header {
+  /* Everything inside reads from the page's own ink, not the glass values. */
+  --ae-glass-text: var(--ae-text);
+  --ae-glass-text-muted: var(--ae-text-muted);
+  --ae-glass-accent: var(--ae-st-gold);
+  --ae-glass-divider: var(--ae-border);
+  --ae-tb-field-bg: transparent;
+  --ae-tb-field-bg-hover: var(--ae-st-wash);
+  --ae-tb-hairline: var(--ae-border);
+  --ae-tb-text: var(--ae-text);
+  --ae-tb-text-muted: var(--ae-text-muted);
+  background: var(--ae-bg-alt);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--ae-text);
+  border: 0;
+  border-bottom: 1px solid var(--ae-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+:root[data-ui="studio"] .ae-page-header.ae-page-header--offline {
+  /* Still unmistakable when the server is unreachable: the rule turns red. */
+  border-bottom-color: var(--ae-danger-text);
+  box-shadow: none;
+}
+:root[data-ui="studio"] .ae-page-header h2 {
+  color: var(--ae-text);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+:root[data-ui="studio"] .ae-page-header p {
+  color: var(--ae-text-muted);
+}
+
+/* One height on every page, so the tab strip under it never moves. 110px is the
+   tallest header that occurs (the entry and Audit pages, with their toolbar); it
+   grows with the text-size setting like the rest of the interface. A page with a
+   toolbar and one without (a "bare" header, smaller logo) used to differ, and the
+   collapse button changed it again; here the header is always at least this tall,
+   its content is centred in it, and the collapse button is gone (the toolbar is
+   always shown). Only a toolbar that wraps onto a second line on a narrow window
+   can make it taller. */
+:root:root[data-ui="studio"] .ae-page-header {
+  --ae-st-head-h: calc(110px * var(--ae-fs, 1));
+  box-sizing: border-box;
+  min-height: var(--ae-st-head-h);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+:root:root[data-ui="studio"] .ae-page-header .ae-page-header-collapse-btn {
+  display: none;
+}
+:root:root[data-ui="studio"] .ae-page-header.ae-page-header--collapsed,
+:root:root[data-ui="studio"] .ae-page-header.ae-page-header--bare {
+  padding: 9px 14px 10px;
+}
+:root:root[data-ui="studio"] .ae-page-header--collapsed .ae-page-header-collapsible {
+  grid-template-rows: 1fr;
+}
+:root:root[data-ui="studio"] .ae-page-header--collapsed .ae-page-header-collapsible-inner {
+  opacity: 1;
+}
+
+/* ---- Navigation tabs: a strip BELOW the header, like an editor's tabs -------
+   The pinned unit (.ae-sticky-head) is a column; `order` puts the header card
+   first and the strip second. The strip's bottom rule is the line the current tab
+   opens through: that tab is outlined in gold on three sides, filled with the
+   page colour and pulled down one pixel over the rule, so it joins the page. */
+:root:root[data-ui="studio"] .ae-sticky-head {
+  display: flex;
+  flex-direction: column;
+}
+:root:root[data-ui="studio"] .ae-sticky-head > .ae-page-header {
+  order: 1;
+}
+:root:root[data-ui="studio"] .ae-sticky-head > .ae-header-tabs {
+  order: 2;
+  margin: 0;
+  padding: 6px 12px 0;
+  gap: 2px;
+  align-items: flex-end;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  /* The rule is drawn inside the strip, not as a border: a border sits outside the
+     strip's clipped padding box, where the current tab could never cover it. Inside,
+     the tab (a child, painted on top) can sit over it, so outline and rule are one
+     line. It stops 4px short at each end, where the curved corners below take over. */
+  border: 0;
+  background:
+    linear-gradient(var(--ae-st-gold), var(--ae-st-gold)) 4px 100% / calc(100% - 8px) 1px no-repeat,
+    var(--ae-bg-alt);
+  box-shadow: none;
+}
+:root[data-ui="studio"] .ae-header-tabs-group {
+  align-items: flex-end;
+}
+:root[data-ui="studio"] .ae-header-tabs-divider {
+  align-self: center;
+  height: 12px;
+  margin: 0 6px;
+}
+:root[data-ui="studio"] .ae-header-tab {
+  padding: 6px 14px 7px;
+  /* Labels above the sliding outline; one pixel above the rule. */
+  position: relative;
+  z-index: 1;
+  margin-bottom: 1px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  color: var(--ae-text-muted);
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+}
+:root[data-ui="studio"] .ae-header-tab:hover {
+  color: var(--ae-text);
+  background: var(--ae-st-wash);
+}
+:root[data-ui="studio"] .ae-header-tab:focus-visible {
+  outline: 2px solid var(--ae-st-gold);
+  outline-offset: -2px;
+}
+/* The current tab is only its label: its outline is the sliding shape below. */
+:root[data-ui="studio"] .ae-header-tab[aria-current="page"] {
+  color: var(--ae-text);
+  font-weight: 600;
+  background: transparent;
+}
+:root[data-ui="studio"] .ae-header-tab[aria-current="page"]:hover {
+  background: transparent;
+}
+:root[data-ui="studio"] .ae-header-tab::after {
+  display: none;
+}
+
+/* The current tab's outline: the elastic bar HeaderTabs.tsx already slides from
+   the previous tab to the new one (the strip is rebuilt on every page, so it
+   remembers where the bar was). Here it is the whole tab shape - gold on three
+   sides, the page colour inside - sized to the tab by the script's own left and
+   width (its 10px inset is given back by the padding and margin below), with
+   top and bottom fixed here. Labels sit above it (z-index 1 on the tabs). */
+:root:root[data-ui="studio"] .ae-header-tabs-bar {
+  z-index: 0;
+  top: 6px !important;
+  bottom: 0;
+  height: auto !important;
+  box-sizing: content-box;
+  margin-left: -10px;
+  padding: 0 9px;
+  background: var(--ae-bg);
+  border: 1px solid var(--ae-st-gold);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  box-shadow: none;
+}
+/* The curved feet: where the tab's sides meet the strip's rule they flare out
+   along it, a concave quarter circle (4px, like every corner in this theme) on each side,
+   so outline and rule are one line. Each is a 4px box whose gradient is a 1px
+   gold arc, the page colour between the arc and the tab, and nothing beyond it. Each box spans the tab's own 1px side border, so the arc
+   takes over from the border at the top and the page colour hides the straight
+   border below it: the side curves out instead of ending in a nub. */
+:root[data-ui="studio"] .ae-header-tabs-bar::before,
+:root[data-ui="studio"] .ae-header-tabs-bar::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 4px;
+  height: 4px;
+  pointer-events: none;
+}
+:root[data-ui="studio"] .ae-header-tabs-bar::before {
+  left: -4px;
+  background: radial-gradient(circle at 0 0, color-mix(in srgb, var(--ae-st-gold) 0%, transparent) 2.6px, var(--ae-st-gold) 3.2px, var(--ae-st-gold) 3.9px, var(--ae-bg) 4.4px);
+}
+:root[data-ui="studio"] .ae-header-tabs-bar::after {
+  right: -4px;
+  background: radial-gradient(circle at 100% 0, color-mix(in srgb, var(--ae-st-gold) 0%, transparent) 2.6px, var(--ae-st-gold) 3.2px, var(--ae-st-gold) 3.9px, var(--ae-bg) 4.4px);
+}
+
+/* ---- The page frame -----------------------------------------------------------
+   Every page sits in one gold frame that runs from the tab strip to the bottom of
+   the screen, content or not, so an empty page still reads as a page. PageHeader
+   publishes where the pinned header ends (--ae-head-bottom/-left/-right); the sides
+   and bottom are a fixed box from there (.ae-main::after, 4px bottom corners), the
+   strip's rule is its top, and two 4px arcs under the strip's ends (the header's
+   ::before/::after) round the top corners so the line turns down into the sides.
+   The current tab covers the strip's rule, so tab and frame are one outline. */
+:root[data-ui="studio"] .ae-main::after {
+  content: "";
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  top: calc(var(--ae-head-bottom, 0px) + 4px);
+  left: var(--ae-head-left, 6px);
+  right: var(--ae-head-right, 6px);
+  bottom: 8px;
+  border: 1px solid var(--ae-st-gold);
+  border-top: 0;
+  border-radius: 0 0 4px 4px;
+}
+:root:root[data-ui="studio"] .ae-sticky-head::before,
+:root:root[data-ui="studio"] .ae-sticky-head::after {
+  content: "";
+  position: absolute;
+  box-sizing: border-box;
+  /* Starts on the strip's rule (its last pixel row) and ends where the frame's sides
+     begin. A real rounded border, like the frame's bottom corners, so the curve is
+     drawn the same crisp way as they are. */
+  top: calc(100% - 1px);
+  width: 4px;
+  height: 5px;
+  border: 0 solid var(--ae-st-gold);
+  pointer-events: none;
+}
+:root:root[data-ui="studio"] .ae-sticky-head::before {
+  left: 0;
+  border-width: 1px 0 0 1px;
+  border-top-left-radius: 4px;
+}
+:root:root[data-ui="studio"] .ae-sticky-head::after {
+  right: 0;
+  border-width: 1px 1px 0 0;
+  border-top-right-radius: 4px;
+}
+/* A grid page's table sits flush under the strip and inside the frame, which draws
+   its edge: the table's own border would only double it. */
+:root:root[data-ui="studio"] .ae-sticky-head:has(+ .ae-grid-fill) {
+  margin-bottom: 0;
+}
+:root:root[data-ui="studio"] .ae-sticky-head + .ae-grid-fill .ae-table-scroll {
+  border: 0;
+  border-radius: 0;
+}
+
+/* ---- Areas: no fill, no shadow; a hairline only where one is needed ------ */
+:root[data-ui="studio"] .ae-panel,
+:root[data-ui="studio"] .ae-dash-card,
+:root[data-ui="studio"] .ae-dash-stat,
+:root[data-ui="studio"] .ae-table-scroll,
+:root[data-ui="studio"] .ae-table-wrap,
+:root[data-ui="studio"] .ae-segment-group {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ae-border);
+  border-radius: 2px;
+  box-shadow: none;
+}
+:root[data-ui="studio"] .ae-dash-stat:hover,
+:root[data-ui="studio"] .ae-dash-stat--link:hover {
+  background: var(--ae-st-wash);
+  box-shadow: none;
+  transform: none;
+}
+
+/* ---- Dashboard: tiles lose their fill and shadow, icons their gold wash --- */
+:root[data-ui="studio"] .ae-dash-quicklink {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ae-border);
+  border-radius: 2px;
+  box-shadow: none;
+}
+:root[data-ui="studio"] .ae-dash-quicklink:hover {
+  background: var(--ae-st-wash);
+  border-color: var(--ae-border-strong);
+  box-shadow: none;
+  transform: none;
+}
+:root[data-ui="studio"] .ae-dash-quicklink:hover .ae-dash-quicklink-arrow {
+  color: var(--ae-text);
+}
+:root[data-ui="studio"] .ae-dash-stat-icon,
+:root[data-ui="studio"] .ae-dash-quicklink-icon {
+  background: transparent;
+  color: var(--ae-text-muted);
+}
+:root[data-ui="studio"] .ae-dash-seg {
+  border-color: var(--ae-border-strong);
+  border-radius: 3px;
+}
+:root[data-ui="studio"] .ae-dash-seg button.ae-dash-seg-btn--active {
+  background: var(--ae-st-ink);
+  color: var(--ae-st-on-ink);
+}
+:root[data-ui="studio"] .ae-dash-link {
+  color: var(--ae-text);
+  text-decoration: underline;
+  text-decoration-color: var(--ae-border-strong);
+  text-underline-offset: 3px;
+}
+:root[data-ui="studio"] .ae-dash-link:hover {
+  text-decoration-color: var(--ae-text);
+}
+
+/* ---- Tables: quiet header, one hairline per row -------------------------- */
+:root[data-ui="studio"] .ae-table th {
+  background-image: none;
+  background-color: var(--ae-bg-alt);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  color: var(--ae-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  box-shadow: inset 0 -1px 0 var(--ae-st-gold);
+}
+/* Dark mode: column names are plain white. (Light mode keeps the ink scale -
+   white on the white header would not be readable.) */
+:root[data-ui="studio"][data-theme="dark"] .ae-table th,
+:root[data-ui="studio"][data-theme="dark"] .ae-table th * {
+  color: #ffffff;
+}
+:root[data-ui="studio"] .ae-table td {
+  box-shadow: inset 0 -1px 0 var(--ae-border-soft);
+}
+/* Subtotal and grand-total rows: weight, not a coloured bar. */
+:root[data-ui="studio"] .ae-table tr.ae-row-subtotal td,
+:root[data-ui="studio"] .ae-table tr.ae-row-grand td {
+  background-image: none;
+  background-color: var(--ae-bg-alt);
+  color: var(--ae-text);
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 var(--ae-border), inset 0 -1px 0 var(--ae-border);
+}
+
+/* ---- Controls: ink or outline, never decorated --------------------------- */
+:root[data-ui="studio"] .ae-btn {
+  border-radius: 3px;
+  box-shadow: none;
+  font-weight: 500;
+}
+:root[data-ui="studio"] .ae-btn:hover:not(:disabled) {
+  filter: none;
+}
+:root[data-ui="studio"] .ae-btn-primary {
+  background: var(--ae-st-gold);
+  border-color: var(--ae-st-gold);
+  color: var(--ae-st-on-gold);
+}
+:root[data-ui="studio"] .ae-btn-primary:hover:not(:disabled) {
+  background: var(--ae-st-gold);
+  opacity: 0.88;
+}
+:root[data-ui="studio"] .ae-btn-secondary,
+:root[data-ui="studio"] .ae-btn-ghost,
+:root[data-ui="studio"] .ae-btn-solid {
+  background: transparent;
+  border: 1px solid var(--ae-border-strong);
+  color: var(--ae-text);
+}
+:root[data-ui="studio"] .ae-btn-secondary:hover:not(:disabled),
+:root[data-ui="studio"] .ae-btn-ghost:hover:not(:disabled),
+:root[data-ui="studio"] .ae-btn-solid:hover:not(:disabled) {
+  background: var(--ae-st-wash);
+  filter: none;
+}
+:root[data-ui="studio"] .ae-btn-danger {
+  background: transparent;
+}
+:root[data-ui="studio"] .ae-input:not(.ae-input-cell),
+:root[data-ui="studio"] .ae-select {
+  background: transparent;
+  border: 1px solid var(--ae-border-strong);
+  border-radius: 3px;
+  box-shadow: none;
+}
+:root[data-ui="studio"] .ae-input-cell {
+  border-radius: 2px;
+}
+
+/* ---- Dialogs: a plain sheet with a hairline header ----------------------- */
+:root[data-ui="studio"] .ae-modal-panel {
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  border-radius: 4px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+:root[data-ui="studio"] .ae-modal-border-sweep {
+  display: none;
+}
+:root[data-ui="studio"] .ae-modal-header {
+  background: transparent;
+  color: var(--ae-text);
+  border-bottom: 1px solid var(--ae-border) !important;
+}
+:root[data-ui="studio"] .ae-modal-header h3,
+:root[data-ui="studio"] .ae-modal-header button {
+  color: var(--ae-text) !important;
+}
+

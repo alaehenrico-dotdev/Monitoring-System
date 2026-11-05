@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Tab icon: the seal reduced to what survives at 16px - dark disc, gold rim,
+       red badge, one bold yellow "A". -->
+  <circle cx="32" cy="32" r="30" fill="#1A1A1A" stroke="#E0A526" stroke-width="3.5"/>
+  <ellipse cx="32" cy="33" rx="22" ry="15" fill="#D62828"/>
+  <path fill="#FFD21F" fill-rule="evenodd" d="M32 20.5 45 45.5h-7.2l-2-4.6H28.2l-2 4.6H19ZM32 30.2 29.9 36h4.2Z"/>
+</svg>
