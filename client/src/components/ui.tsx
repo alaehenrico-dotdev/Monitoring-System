@@ -149,10 +149,12 @@ function Label({ children, ...rest }: LabelHTMLAttributes<HTMLLabelElement> & { 
 }
 
 /** Label + control stacked - the "Date" / "Location" / etc. filter-bar pattern used across pages. */
-export function Field({ label, children, style }: { label: string; children: ReactNode; style?: CSSProperties }) {
+export function Field({ label, children, style, htmlFor }: { label: string; children: ReactNode; style?: CSSProperties; htmlFor?: string }) {
   return (
     <div style={style}>
-      <Label>{label}</Label>
+      {/* htmlFor ties the label to its control (the control needs the matching id): clicking the label
+          focuses it and assistive tech reads it. Without it the two are only neighbours. */}
+      <Label htmlFor={htmlFor}>{label}</Label>
       {children}
     </div>
   );

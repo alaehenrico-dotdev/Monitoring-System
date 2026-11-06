@@ -70,8 +70,9 @@ export function LoginPage() {
         subtitle={mfaToken ? "Enter the 6-digit code from your authenticator app, or one of your recovery codes." : "Use your account to open the stock monitor."}
       >
         {mfaToken ? (
-          <Field label="Verification code" style={{ marginBottom: 16 }}>
+          <Field label="Verification code" htmlFor="login-code" style={{ marginBottom: 16 }}>
             <TextInput
+              id="login-code"
               value={code}
               onChange={(e) => {
                 seen();
@@ -85,8 +86,9 @@ export function LoginPage() {
           </Field>
         ) : (
           <>
-            <Field label="Username" style={{ marginBottom: 12 }}>
+            <Field label="Username" htmlFor="login-username" style={{ marginBottom: 12 }}>
               <TextInput
+                id="login-username"
                 value={username}
                 onChange={(e) => {
                   seen();
