@@ -75,10 +75,38 @@ describe("Minimalism theme", () => {
     expect(light["--ae-glass-blur"]).toBe("none");
   });
 
-  it("allows one soft shadow only - on the dialog that has to lift off the page", () => {
-    const shadows = [...block.matchAll(/box-shadow:\s*([^;]+);/g)].map((m) => m[1].trim()).filter((v) => v !== "none" && !v.startsWith("inset"));
-    expect(shadows).toHaveLength(1);
-    expect(rule(":root[data-ui=\"minimal\"] .ae-modal-panel")).toContain(shadows[0]);
+  it("has no drop shadow at all - the dialog lifts off the page by its backdrop and a stronger hairline", () => {
+    const shadows = [...block.matchAll(/box-shadow:\s*([^;]+);/g)]
+      .map((m) => m[1].replace("!important", "").trim())
+      .filter((v) => v !== "none" && !v.startsWith("inset"));
+    expect(shadows).toEqual([]);
+    // The dialog sets its shadow, gradient and radius inline, so the theme must win with !important.
+    const modal = rule(":root[data-ui=\"minimal\"] .ae-modal-panel");
+    expect(modal).toMatch(/box-shadow:\s*none\s*!important/);
+    expect(modal).toMatch(/background:\s*var\(--ae-surface\)\s*!important/);
+  });
+
+  it("uses one corner radius, set by a token, on areas, controls and the dialog", () => {
+    expect(light["--ae-mini-radius"]).toBeDefined();
+    expect(dark["--ae-mini-radius"]).toBe(light["--ae-mini-radius"]);
+    const radii = [...block.matchAll(/border-radius:\s*([^;]+);/g)].map((m) => m[1].replace("!important", "").trim()).filter((v) => v !== "0");
+    for (const r of radii) expect(r).toBe("var(--ae-mini-radius)");
+  });
+
+  it("keeps table column names on the same muted-to-ink scale in dark mode (no hard-coded white)", () => {
+    expect(block).not.toMatch(/\.ae-table th[^{]*\{[^}]*color:\s*#fff/i);
+  });
+
+  it("draws the current tab as a 2px rule and keeps the watermark to a trace", () => {
+    expect(block).toMatch(/\.ae-header-tabs-bar,[^{]*\{[^}]*height:\s*2px/);
+    const shell = (selector: string) => Number(rule(selector).match(/--ae-watermark-opacity:\s*([\d.]+)/)![1]);
+    expect(shell(':root[data-ui="minimal"] .app-shell')).toBeLessThanOrEqual(0.1);
+    expect(shell(':root[data-ui="minimal"][data-theme="dark"] .app-shell')).toBeLessThanOrEqual(0.15);
+  });
+
+  it("does not rely on colour alone for the offline and negative-stock warnings", () => {
+    expect(rule(':root[data-ui="minimal"] .ae-page-header.ae-page-header--offline')).toMatch(/inset 0 -1px 0 var\(--ae-danger-text\)/);
+    expect(rule(':root[data-ui="minimal"] .ae-entry-total--bad .ae-entry-total-value')).toContain("underline");
   });
 
   it("keeps the emblem watermark (quieter) and removes the grid's alternating column tint", () => {

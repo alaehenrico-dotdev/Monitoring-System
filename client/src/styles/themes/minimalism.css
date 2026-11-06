@@ -1,7 +1,7 @@
 /* =========================================================================
    Minimalism theme (Settings > Appearance > Theme). Nothing that is not
    information: no fills behind areas, no shadows, gradients, glow, blur or
-   watermark. The page is one quiet surface; structure comes from hairline rules
+   drop shadow (the dialog included) and only a barely-there emblem. The page is one quiet surface; structure comes from hairline rules
    and whitespace, hierarchy from weight and a muted-to-ink text scale. The brand
    gold is reduced to the focus ring and selection. Primary actions are solid ink
    (white in dark mode), everything else is outlined or plain text.
@@ -27,7 +27,7 @@
      panel/row hairlines stay the pale --ae-border. */
   --ae-border-strong: #8a8a85;
   --ae-hairline: #e6e6e3;
-  --ae-row-hover: rgba(26, 26, 26, 0.035);
+  --ae-row-hover: rgba(26, 26, 26, 0.055);
   /* One flat opaque colour for the grid columns, "-a" and "-b" equal (every theme
      is flat now - see base.css; here it also stays opaque because sticky columns
      must still hide what scrolls under them). */
@@ -42,6 +42,8 @@
   --ae-mini-on-ink: #ffffff;
   --ae-mini-wash: rgba(26, 26, 26, 0.05);
   --ae-mini-wash-strong: rgba(26, 26, 26, 0.09);
+  /* One corner radius for areas, controls and dialogs alike. */
+  --ae-mini-radius: 3px;
 }
 :root[data-ui="minimal"][data-theme="dark"] {
   --ae-bg: #111111;
@@ -57,7 +59,7 @@
   --ae-border-soft: #1f1f1f;
   --ae-border-strong: #707070;
   --ae-hairline: #2a2a2a;
-  --ae-row-hover: rgba(255, 255, 255, 0.04);
+  --ae-row-hover: rgba(255, 255, 255, 0.06);
   --ae-col-a: #111111;
   --ae-col-b: #111111;
   --ae-colh-a: #111111;
@@ -69,14 +71,15 @@
   --ae-mini-on-ink: #111111;
   --ae-mini-wash: rgba(255, 255, 255, 0.06);
   --ae-mini-wash-strong: rgba(255, 255, 255, 0.11);
+  --ae-mini-radius: 3px;
 }
 
-/* The emblem stays behind the page like every theme, only quieter. */
+/* The emblem stays behind the page like every theme, but only just: a trace, not a picture. */
 :root[data-ui="minimal"] .app-shell {
-  --ae-watermark-opacity: 0.2;
+  --ae-watermark-opacity: 0.06;
 }
 :root[data-ui="minimal"][data-theme="dark"] .app-shell {
-  --ae-watermark-opacity: 0.4;
+  --ae-watermark-opacity: 0.1;
 }
 
 /* ---- Page header: plain text on the page, one hairline beneath ---------- */
@@ -101,9 +104,10 @@
   box-shadow: none;
 }
 :root[data-ui="minimal"] .ae-page-header.ae-page-header--offline {
-  /* Still unmistakable when the server is unreachable: the rule turns red. */
+  /* Still unmistakable when the server is unreachable: the rule turns red and doubles
+     (an inset line, so the header does not change height), so it does not rely on colour alone. */
   border-bottom-color: var(--ae-danger-text);
-  box-shadow: none;
+  box-shadow: inset 0 -1px 0 var(--ae-danger-text);
 }
 :root[data-ui="minimal"] .ae-page-header h2 {
   color: var(--ae-text);
@@ -139,11 +143,11 @@
 }
 :root[data-ui="minimal"] .ae-header-tabs-bar,
 :root[data-ui="minimal"] .ae-header-tab::after {
-  /* The sliding current-tab line: one thin ink rule, no glow. */
+  /* The sliding current-tab line: a 2px ink rule over the 1px hairline, no glow. */
   background: var(--ae-text);
   box-shadow: none;
   border-radius: 0;
-  height: 1px;
+  height: 2px;
 }
 
 /* ---- Areas: no fill, no shadow; a hairline only where one is needed ------ */
@@ -157,7 +161,7 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   border: 1px solid var(--ae-border);
-  border-radius: 2px;
+  border-radius: var(--ae-mini-radius);
   box-shadow: none;
 }
 :root[data-ui="minimal"] .ae-dash-stat:hover,
@@ -173,7 +177,7 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   border: 1px solid var(--ae-border);
-  border-radius: 2px;
+  border-radius: var(--ae-mini-radius);
   box-shadow: none;
 }
 :root[data-ui="minimal"] .ae-dash-quicklink:hover {
@@ -192,7 +196,7 @@
 }
 :root[data-ui="minimal"] .ae-dash-seg {
   border-color: var(--ae-border-strong);
-  border-radius: 3px;
+  border-radius: var(--ae-mini-radius);
 }
 :root[data-ui="minimal"] .ae-dash-seg button.ae-dash-seg-btn--active {
   background: var(--ae-mini-ink);
@@ -221,12 +225,6 @@
   letter-spacing: 0;
   box-shadow: inset 0 -1px 0 var(--ae-border);
 }
-/* Dark mode: column names are plain white. (Light mode keeps the ink scale -
-   white on the white header would not be readable.) */
-:root[data-ui="minimal"][data-theme="dark"] .ae-table th,
-:root[data-ui="minimal"][data-theme="dark"] .ae-table th * {
-  color: #ffffff;
-}
 :root[data-ui="minimal"] .ae-table td {
   box-shadow: inset 0 -1px 0 var(--ae-border-soft);
 }
@@ -242,12 +240,28 @@
 
 /* ---- Controls: ink or outline, never decorated --------------------------- */
 :root[data-ui="minimal"] .ae-btn {
-  border-radius: 3px;
+  border-radius: var(--ae-mini-radius);
   box-shadow: none;
   font-weight: 500;
 }
 :root[data-ui="minimal"] .ae-btn:hover:not(:disabled) {
   filter: none;
+}
+/* Pressed: darker than hover, and no scale - nothing bounces in this theme. */
+:root[data-ui="minimal"] .ae-btn:active:not(:disabled) {
+  filter: none;
+  transform: none;
+  opacity: 0.7;
+}
+:root[data-ui="minimal"] .ae-btn-secondary:active:not(:disabled),
+:root[data-ui="minimal"] .ae-btn-ghost:active:not(:disabled),
+:root[data-ui="minimal"] .ae-btn-solid:active:not(:disabled) {
+  background: var(--ae-mini-wash-strong);
+  opacity: 1;
+}
+/* Disabled: faded and dashed, so it is not told apart by fade alone. */
+:root[data-ui="minimal"] .ae-btn:disabled {
+  border-style: dashed;
 }
 :root[data-ui="minimal"] .ae-btn-primary {
   background: var(--ae-mini-ink);
@@ -278,19 +292,25 @@
 :root[data-ui="minimal"] .ae-select {
   background: transparent;
   border: 1px solid var(--ae-border-strong);
-  border-radius: 3px;
+  border-radius: var(--ae-mini-radius);
   box-shadow: none;
 }
 :root[data-ui="minimal"] .ae-input-cell {
-  border-radius: 2px;
+  border-radius: var(--ae-mini-radius);
 }
 
 /* ---- Dialogs: a plain sheet with a hairline header ----------------------- */
+/* The dialog sets its gradient, radius and shadow inline, hence !important. It lifts off the page
+   by the dimmed backdrop and a stronger hairline, not by a shadow. */
 :root[data-ui="minimal"] .ae-modal-panel {
-  background: var(--ae-surface);
-  border: 1px solid var(--ae-border);
-  border-radius: 4px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  background: var(--ae-surface) !important;
+  border: 1px solid var(--ae-border-strong) !important;
+  border-radius: var(--ae-mini-radius) !important;
+  box-shadow: none !important;
+}
+:root[data-ui="minimal"] .ae-modal-overlay {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
 }
 :root[data-ui="minimal"] .ae-modal-border-sweep {
   display: none;
@@ -303,5 +323,13 @@
 :root[data-ui="minimal"] .ae-modal-header h3,
 :root[data-ui="minimal"] .ae-modal-header button {
   color: var(--ae-text) !important;
+}
+
+/* ---- Warnings that do not rely on colour alone ---------------------------- */
+/* The "negative stock" total on the entry pages: bold and underlined as well as red. */
+:root[data-ui="minimal"] .ae-entry-total--bad .ae-entry-total-value {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 

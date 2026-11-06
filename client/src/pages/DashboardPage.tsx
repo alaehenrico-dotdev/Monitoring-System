@@ -37,16 +37,8 @@ import { colors } from "../theme";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useCountUp } from "../hooks/useCountUp";
 import { useRealtimeVersion } from "../context/RealtimeContext";
-import { getCurrentShiftAndDate, SHIFT_LABELS } from "../utils/shift";
-import { useAuth } from "../context/AuthContext";
-
-type Totals = {
-  /// Online and Offline are separate stock pools (Section 2.1) - each gets
-  /// its own card rather than a combined sum, since summing them implies a
-  /// single pool that doesn't really exist.
-  online: number;
-  offline: number;
-};
+import { getCurrentShiftAndDate } from "../utils/shift";
+import { makeDelta, summarize, type Delta } from "../utils/dashboardTotals";
 
 // Fetched 8; CSS shows 5 on short windows and all 8 on tall ones.
 const RECENT_ACTIVITY_LIMIT = 8;
@@ -70,19 +62,6 @@ const QUICK_LINKS: { to: string; label: string; icon: ReactNode }[] = [
   { to: "/daily-report", label: "Daily Report", icon: <ReportIcon /> },
 ];
 
-function summarize(rows: TotalStockRow[]): Totals {
-  return {
-    online: rows.reduce(
-      (sum, row) => sum + Number(row.onlineRemainingStock || 0),
-      0,
-    ),
-    offline: rows.reduce(
-      (sum, row) => sum + Number(row.offlineRemainingStock || 0),
-      0,
-    ),
-  };
-}
-
 /// "YYYY-MM-DD" shifted by whole days, built from local date parts (never
 /// `new Date("YYYY-MM-DD")`, which is UTC midnight and lands on the wrong
 /// day in timezones behind UTC).
@@ -91,24 +70,6 @@ function addDays(iso: string, days: number): string {
   const date = new Date(y, m - 1, d + days);
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-/// "Good morning" / "afternoon" / "evening" from the local clock.
-function greeting(now: Date = new Date()): string {
-  const h = now.getHours();
-  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-}
-
-type Delta = { diff: number };
-
-/// Change since the previous day (stock levels have no good/bad direction,
-/// so it is shown neutrally).
-function makeDelta(
-  current: number,
-  previous: number | undefined,
-): Delta | undefined {
-  if (previous === undefined) return undefined;
-  return { diff: current - previous };
 }
 
 /**
@@ -148,8 +109,6 @@ export function DashboardPage() {
     useDaysOfStock(viewDate);
   const isToday = viewDate === today;
   const realtimeVersion = useRealtimeVersion();
-  const { user } = useAuth();
-  const firstName = user?.name?.trim().split(/\s+/)[0];
 
   // `today` (above) is recomputed on every render, so it's never itself
   // stale - but nothing otherwise re-renders this page as time passes. Left
@@ -341,56 +300,56 @@ export function DashboardPage() {
         duration={null}
       />
 
-      <div className="ae-dash-greeting">
-        <h3 className="ae-dash-greeting-text">
-          {greeting()}
-          {firstName ? `, ${firstName}` : ""}
-        </h3>
-        <span className="ae-dash-chip ae-dash-chip--progress ae-dash-greeting-chip">
-          {SHIFT_LABELS[currentShift]} · {formatDate(today)}
-        </span>
-      </div>
-
-      <div
-        className="ae-dash-stats ae-dash-stats--hero"
-        role={stocks || showStatsError ? undefined : "status"}
-        aria-busy={stocks || showStatsError ? undefined : "true"}
-      >
-        {totals ? (
-          <>
-            <StatCard
-              hero
-              icon={<BoxIcon />}
-              label="Online remaining stock"
-              value={totals.online}
-              to="/total-stocks"
-              delta={makeDelta(totals.online, prevTotals?.online)}
-            />
-            <StatCard
-              hero
-              icon={<BoxIcon />}
-              label="Offline remaining stock"
-              value={totals.offline}
-              to="/total-stocks"
-              delta={makeDelta(totals.offline, prevTotals?.offline)}
-            />
-            <StatCard
-              icon={<TagIcon />}
-              label="Active SKUs"
-              value={activeProducts}
-              to="/products"
-            />
-          </>
-        ) : showStatsError ? (
-          <div className="ae-dash-stats-error" role="alert">
-            <span>Couldn't load the stock figures.</span>
-            <Button variant="ghost" size="sm" onClick={retry}>
-              Retry
-            </Button>
+      {/* Top row: the stock cards and Active SKUs stacked on the left, the Monthly
+          Monitoring graph on the right, stretched to the height of the stack. */}
+      <div className="ae-dash-hero-row">
+        <div className="ae-dash-hero-left">
+          <div
+            className="ae-dash-stats ae-dash-stats--hero"
+            role={stocks || showStatsError ? undefined : "status"}
+            aria-busy={stocks || showStatsError ? undefined : "true"}
+          >
+            {totals ? (
+              <>
+                <StatCard
+                  hero
+                  icon={<BoxIcon />}
+                  label="Online remaining stock"
+                  value={totals.online}
+                  to="/total-stocks"
+                  delta={makeDelta(totals.online, prevTotals?.online)}
+                />
+                <StatCard
+                  hero
+                  icon={<BoxIcon />}
+                  label="Offline remaining stock"
+                  value={totals.offline}
+                  to="/total-stocks"
+                  delta={makeDelta(totals.offline, prevTotals?.offline)}
+                />
+                <StatCard
+                  icon={<TagIcon />}
+                  label="Active SKUs"
+                  value={activeProducts}
+                  to="/products"
+                />
+              </>
+            ) : showStatsError ? (
+              <div className="ae-dash-stats-error" role="alert">
+                <span>Couldn't load the stock figures.</span>
+                <Button variant="ghost" size="sm" onClick={retry}>
+                  Retry
+                </Button>
+              </div>
+            ) : (
+              <StatCardsSkeleton count={3} />
+            )}
           </div>
-        ) : (
-          <StatCardsSkeleton count={3} />
-        )}
+        </div>
+
+        <div className="ae-dash-hero-chart">
+          <StockFlowChart />
+        </div>
       </div>
 
       <h3 className="ae-dash-eyebrow">Needs attention</h3>
@@ -428,76 +387,68 @@ export function DashboardPage() {
         ))}
       </div>
 
-      {/* Recent Activity (left) beside the Monthly Monitoring graph (right, stretched to the
-          full height of the left column). Column widths live in .ae-dash-hero-row. */}
-      <div className="ae-dash-hero-row">
-        <div className="ae-dash-hero-left">
-          {/* Recent Activity: the change_log (Section 5.8) is otherwise only
+      <div className="ae-dash-activity-row">
+        {/* Recent Activity: the change_log (Section 5.8) is otherwise only
             visible on its own dedicated page - surfacing the last few edits
             here means a supervisor can spot something odd (a bulk edit, a
             deletion, an unfamiliar name) without navigating away first.
-            Compact, beside the chart. */}
-          <section className="ae-dash-section ae-dash-hero-activity">
-            <h3 className="ae-dash-heading">
-              Recent Activity
-              <Link to="/change-log" className="ae-dash-link">
-                View full change log →
-              </Link>
-            </h3>
-            <div className="ae-dash-card">
-              {recentActivity === null ? (
-                <TableSkeleton
-                  headers={["Action", "Record"]}
-                  minWidth={320}
-                  rows={5}
-                  cellPadding="8px 12px"
-                  label="Loading recent activity…"
-                />
-              ) : recentActivityError ? (
-                <CardMessage>
-                  Couldn't load recent activity.{" "}
-                  <button
-                    type="button"
-                    className="ae-dash-inline-btn"
-                    onClick={retry}
-                  >
-                    Retry
-                  </button>
-                </CardMessage>
-              ) : recentActivity.length === 0 ? (
-                <CardMessage>No activity recorded yet.</CardMessage>
-              ) : (
-                <div className="ae-dash-table-scroll">
-                  <table
-                    className="ae-table ae-table--left"
-                    style={{ minWidth: 320 }}
-                  >
-                    <thead>
-                      <tr>
-                        {["Action", "Record"].map((h) => (
-                          <th key={h}>{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentActivity.map((entry) => (
-                        <ActivityRow
-                          key={entry.id}
-                          entry={entry}
-                          productsById={productsById}
-                        />
+            Compact, full width under the quick links. */}
+        <section className="ae-dash-section ae-dash-hero-activity">
+          <h3 className="ae-dash-heading">
+            Recent Activity
+            <Link to="/change-log" className="ae-dash-link">
+              View full change log →
+            </Link>
+          </h3>
+          <div className="ae-dash-card">
+            {recentActivity === null ? (
+              <TableSkeleton
+                headers={["Action", "Record"]}
+                minWidth={320}
+                rows={5}
+                cellPadding="8px 12px"
+                label="Loading recent activity…"
+              />
+            ) : recentActivityError ? (
+              <CardMessage>
+                Couldn't load recent activity.{" "}
+                <button
+                  type="button"
+                  className="ae-dash-inline-btn"
+                  onClick={retry}
+                >
+                  Retry
+                </button>
+              </CardMessage>
+            ) : recentActivity.length === 0 ? (
+              <CardMessage>No activity recorded yet.</CardMessage>
+            ) : (
+              <div className="ae-dash-table-scroll">
+                <table
+                  className="ae-table ae-table--left"
+                  style={{ minWidth: 320 }}
+                >
+                  <thead>
+                    <tr>
+                      {["Action", "Record"].map((h) => (
+                        <th key={h}>{h}</th>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-
-        <div className="ae-dash-hero-chart">
-          <StockFlowChart />
-        </div>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentActivity.map((entry) => (
+                      <ActivityRow
+                        key={entry.id}
+                        entry={entry}
+                        productsById={productsById}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       <PeriodMonitoringCard />
@@ -507,7 +458,13 @@ export function DashboardPage() {
 
 function CardMessage({ children }: { children: ReactNode }) {
   return (
-    <div style={{ padding: "16px", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
+    <div
+      style={{
+        padding: "16px",
+        fontSize: "calc(13px * var(--ae-fs, 1))",
+        color: colors.subtleInk,
+      }}
+    >
       {children}
     </div>
   );
@@ -523,7 +480,10 @@ function DeltaBadge({ delta }: { delta: Delta | undefined }) {
       ? "No change"
       : `${dir === "up" ? "▲" : "▼"} ${Math.abs(delta.diff).toLocaleString()} vs prev day`;
   return (
-    <span className={`ae-dash-stat-delta ae-dash-stat-delta--${dir}`} title="Compared with the previous day">
+    <span
+      className={`ae-dash-stat-delta ae-dash-stat-delta--${dir}`}
+      title="Compared with the previous day"
+    >
       {text}
     </span>
   );
@@ -585,7 +545,8 @@ function describeRecord(
 ): string {
   const label = TABLE_LABELS[entry.tableName] ?? entry.tableName;
   const payload = entry.newValue ?? entry.oldValue;
-  if (entry.tableName === "reports" && entry.summary) return `${label} · ${entry.summary}`;
+  if (entry.tableName === "reports" && entry.summary)
+    return `${label} · ${entry.summary}`;
   const fields =
     payload && typeof payload === "object"
       ? (payload as Record<string, unknown>)
@@ -622,7 +583,11 @@ function ActivityRow({
     <tr style={{ cursor: "pointer" }} onClick={() => navigate("/change-log")}>
       <td style={{ fontWeight: 700, whiteSpace: "nowrap" }}>
         <span className="ae-dash-action">
-          <span aria-hidden className="ae-dash-action-dot" style={{ background: ACTION_COLOR[entry.action] }} />
+          <span
+            aria-hidden
+            className="ae-dash-action-dot"
+            style={{ background: ACTION_COLOR[entry.action] }}
+          />
           {entry.action}
         </span>
       </td>
@@ -635,8 +600,12 @@ function ActivityRow({
         >
           {description}
         </Link>
-        <span className="ae-dash-cell-sub" title={new Date(entry.changedAt).toLocaleString()}>
-          by {entry.changedBy?.name ?? "system"} · {formatRelativeTime(entry.changedAt)}
+        <span
+          className="ae-dash-cell-sub"
+          title={new Date(entry.changedAt).toLocaleString()}
+        >
+          by {entry.changedBy?.name ?? "system"} ·{" "}
+          {formatRelativeTime(entry.changedAt)}
         </span>
       </td>
     </tr>

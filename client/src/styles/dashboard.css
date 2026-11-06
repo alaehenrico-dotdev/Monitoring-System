@@ -16,11 +16,10 @@
 :root[data-theme="dark"] .ae-dash-subtitle {
   color: #ffffff;
 }
-/* Hero row: two columns. LEFT (.ae-dash-hero-left): the monitoring stat
-   cards in one 3-up row, with Recent Activity stacked directly underneath on
-   the same grid and width, at a reduced size. RIGHT (.ae-dash-hero-chart):
-   the Monthly Monitoring graph, the largest card - it takes all the
-   remaining width and is stretched to the full height of the left column. */
+/* Hero row, directly under the header: two columns. LEFT (.ae-dash-hero-left):
+   Online stock, Offline stock and Active SKUs stacked in one column.
+   RIGHT (.ae-dash-hero-chart): the Monthly Monitoring graph, the largest card -
+   it takes all the remaining width and is as tall as the stack on the left. */
 .ae-dash-hero-row {
   display: grid;
   /* Proportional columns (5fr : 7fr) instead of a fixed 460px cap, so on a
@@ -30,12 +29,91 @@
   gap: 12px;
   margin: 12px 0 24px;
   align-items: stretch;
-  /* Fill whatever height the viewport has left under the header on a tall
-     desktop screen (the page root is a column flex container), instead of
-     stopping at the content's natural height with a blank band below. */
-  flex: 1 1 auto;
-  /* Never squash below the content (the page root has min-height: 0). */
+  /* Natural height: the sections below (needs attention, quick links, recent
+     activity) follow it, so it must not grow to fill the viewport. */
+  flex: 0 0 auto;
   min-height: min-content;
+}
+/* The stat cards stacked, sharing the height of the chart beside them. */
+.ae-dash-hero-left .ae-dash-stats--hero {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: 1fr;
+  margin: 0;
+  gap: 12px;
+  flex: 1;
+}
+.ae-dash-activity-row {
+  margin: 0 0 24px;
+}
+/* The graph fills whatever height the stacked cards give it. */
+.ae-dash-hero-chart .ae-mm-body > .ae-fl-chart {
+  flex: 1;
+}
+/* Laptops and small desktops (a short window, side-by-side layout): the three cards and the
+   whole graph card have to fit on one screen under the header and tab strip, so the row is
+   compacted by HEIGHT - smaller cards and type, a shorter plot, a smaller donut, and the
+   explanatory note gone. (Selectors start with the hero column so they win whatever order the
+   shared stylesheets load in.) */
+@media (min-width: 901px) and (max-height: 820px) {
+  .ae-dash-hero-row {
+    gap: 10px;
+    margin: 8px 0 14px;
+  }
+  .ae-dash-hero-left .ae-dash-stats--hero {
+    gap: 8px;
+  }
+  .ae-dash-hero-left .ae-dash-stat--hero {
+    padding: 10px 16px;
+    gap: 6px;
+  }
+  .ae-dash-hero-left .ae-dash-stat--hero .ae-dash-stat-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .ae-dash-hero-left .ae-dash-stat--hero .ae-dash-stat-value {
+    font-size: clamp(26px, 5vh, 38px);
+  }
+  .ae-dash-hero-chart .ae-mm-heading {
+    padding-top: 8px;
+  }
+  .ae-dash-hero-chart .ae-mm-body {
+    padding-top: 4px;
+    padding-bottom: 8px;
+  }
+  .ae-dash-hero-chart .ae-fl-chart {
+    grid-template-rows: minmax(120px, 1fr) 20px;
+    min-height: 140px;
+  }
+  .ae-dash-hero-chart .ae-mm-note {
+    display: none;
+  }
+  .ae-dash-hero-chart .ae-fl-split {
+    margin-top: 6px;
+    padding-top: 6px;
+  }
+  .ae-dash-hero-chart .ae-fl-split-title {
+    margin-bottom: 4px;
+  }
+  .ae-dash-hero-chart .ae-donut-ring {
+    width: 84px;
+    height: 84px;
+  }
+  .ae-dash-hero-chart .ae-donut {
+    gap: 8px 20px;
+  }
+}
+/* Very short windows (a 768px-tall laptop with browser toolbars): the channel split goes, so the
+   line chart keeps a usable height next to the three cards. */
+@media (min-width: 901px) and (max-height: 700px) {
+  .ae-dash-hero-chart .ae-fl-split {
+    display: none;
+  }
+  .ae-dash-hero-left .ae-dash-stat--hero {
+    padding: 8px 14px;
+  }
+  .ae-dash-hero-left .ae-dash-stat--hero .ae-dash-stat-value {
+    font-size: clamp(24px, 4.6vh, 32px);
+  }
 }
 /* Large desktops: give the chart a bit more of the row and let the gaps
    breathe. Both "row-level" gaps (hero row's two columns, the left
@@ -304,25 +382,7 @@
   display: none;
 }
 
-/* Greeting row and the small section label above the insights. */
-.ae-dash-greeting {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  margin: 12px 0 0;
-}
-.ae-dash-greeting-text {
-  margin: 0;
-  font-size: calc(20px * var(--ae-fs, 1));
-  font-weight: 700;
-  color: var(--ae-text);
-}
-.ae-dash-greeting-chip {
-  font-size: calc(11.5px * var(--ae-fs, 1));
-  padding: 2px 8px;
-  border-radius: 4px;
-}
+/* The small section label above the insights. */
 .ae-dash-eyebrow {
   margin: 0;
   font-size: calc(11px * var(--ae-fs, 1));
