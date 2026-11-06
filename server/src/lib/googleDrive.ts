@@ -13,7 +13,7 @@ import type { Readable } from "stream";
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
-const USERINFO_URL = "https://openid.googleapis.com/v1/userinfo";
+const USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 
