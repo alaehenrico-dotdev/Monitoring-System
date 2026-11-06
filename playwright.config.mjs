@@ -22,6 +22,8 @@ export default defineConfig({
   outputDir: "./e2e-browser/results",
   timeout: 90_000,
   expect: { timeout: 20_000 },
+  // Signs the seeded admin in and changes its password once, before the workers start (real stack only).
+  globalSetup: "./e2e-browser/global-setup.mjs",
   fullyParallel: true,
   // A page loads the whole app each time, so a few workers share the one preview server well;
   // more only made first loads slow enough to time out.

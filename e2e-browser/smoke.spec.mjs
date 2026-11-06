@@ -1,37 +1,18 @@
 // The real stack (API + database), driven through a browser. Runs only with E2E_REAL=1 and the
 // disposable E2E accounts seeded (the CI "end-to-end" job). It exists to catch what unit tests
 // and the API script cannot: the page, the proxy, the WebSocket and the API working together.
-import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { PAGES, collectProblems, hashUrl } from "./helpers.mjs";
 
 test.skip(process.env.E2E_REAL !== "1", "needs the real stack: set E2E_REAL=1 (see playwright.config.mjs)");
 
-const API = "http://127.0.0.1:4000/api";
 const ADMIN_USER = process.env.E2E_ADMIN_USERNAME ?? "admin";
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "";
 
-/// The seeded admin must choose a new password before anything else works, exactly like a
-/// first sign-in. Do that through the API, once, and hand back a working session.
-let session;
-test.beforeAll(async ({ request }) => {
-  expect(ADMIN_PASSWORD, "set E2E_ADMIN_PASSWORD").not.toBe("");
-  const login = await request.post(`${API}/auth/login`, { data: { username: ADMIN_USER, password: ADMIN_PASSWORD } });
-  expect(login.ok(), "admin login").toBeTruthy();
-  let { token, user } = await login.json();
-  let password = ADMIN_PASSWORD;
-  const me = await (await request.get(`${API}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  if (me.mustChangePassword) {
-    const next = `E2e-Browser-${randomUUID()}`;
-    const changed = await request.post(`${API}/auth/change-password`, {
-      headers: { Authorization: `Bearer ${token}` },
-      data: { currentPassword: ADMIN_PASSWORD, newPassword: next },
-    });
-    expect(changed.ok(), "forced password change").toBeTruthy();
-    ({ token, user } = await changed.json());
-    password = next;
-  }
-  session = { token, user, password };
+/// The seeded admin's forced password change is done once for the whole run, in global-setup.mjs
+/// (doing it per worker invalidated the other workers' sessions). The session arrives here.
+const session = process.env.E2E_SESSION ? JSON.parse(process.env.E2E_SESSION) : { token: "", user: null, password: "" };
+test.beforeAll(() => {
+  expect(session.token, "global-setup did not provide a session (is E2E_ADMIN_PASSWORD set?)").not.toBe("");
 });
 
 test("signing in through the form lands on the app", async ({ page }) => {
