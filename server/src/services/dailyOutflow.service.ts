@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma";
-import { offlineNetOutflow, toNum } from "../utils/stockMath";
+import { offlineDeliveryNet, toNum } from "../utils/stockMath";
 import { toDateOnlyString } from "../utils/date";
 
 /// Longest range one request may cover - a year of daily points is already
@@ -12,9 +12,14 @@ export interface DailyOutflowEntry {
   /// Fulfillment Out, summed over every product and both shifts. Null when
   /// no Online entry exists for the day - "nothing recorded", not "zero".
   onlineOut: number | null;
-  /// Offline Delivery Out + Upsell Out - Backloads, same rule. Null when no
-  /// Offline entry exists for the day.
+  /// Offline Delivery Out less Backloads (same-day returns; upsell is not part of it). Null when
+  /// no Offline entry exists for the day.
   offlineOut: number | null;
+  /// Online RTS and Offline Backloads, shown beside the figures above for information only: RTS is
+  /// NOT netted off Online out, and the backloads are already netted into offlineOut. Null when that
+  /// side has no entry.
+  onlineRts: number | null;
+  offlineBackloads: number | null;
   /// Online + Offline out - what left the company that day. Null only when
   /// neither side has an entry.
   totalOut: number | null;
@@ -30,11 +35,11 @@ function round2(n: number): number {
  * Daily Out: stock leaving the company per calendar day, for the Online pool,
  * the Offline pool and both together.
  *
- * "Out" is the same quantity days-of-stock uses (see offlineNetOutflow): the
- * Online Fulfillment Out and the Offline deliveries and upsells less
- * backloads. Transfers between the pools are excluded - one pool's out is the
- * other's in, so counting them would inflate the combined figure with stock
- * that never left.
+ * "Out" is the Online Fulfillment Out and the Offline Delivery Out less the
+ * day's Backloads (see offlineDeliveryNet). Upsells are not counted here, unlike
+ * days-of-stock (offlineNetOutflow). Transfers between the pools are excluded -
+ * one pool's out is the other's in, so counting them would inflate the combined
+ * figure with stock that never left.
  *
  * Two aggregate queries however many SKUs exist (grouped by date, collapsing
  * products and the Morning/Night shifts server-side). Every date in the range
@@ -44,21 +49,20 @@ function round2(n: number): number {
 export async function getDailyOutflow(from: Date, to: Date): Promise<DailyOutflowEntry[]> {
   const where = { entryDate: { gte: from, lte: to } };
   const [online, offline] = await Promise.all([
-    prisma.dailyOnlineStock.groupBy({ by: ["entryDate"], where, _sum: { fulfillmentOut: true } }),
+    prisma.dailyOnlineStock.groupBy({ by: ["entryDate"], where, _sum: { fulfillmentOut: true, rts: true } }),
     prisma.dailyOfflineStock.groupBy({
       by: ["entryDate"],
       where,
-      _sum: { deliveryOut: true, upsellOut: true, backloads: true },
+      _sum: { deliveryOut: true, backloads: true },
     }),
   ]);
 
   const onlineByDate = new Map(online.map((r) => [toDateOnlyString(r.entryDate), toNum(r._sum.fulfillmentOut)]));
+  const rtsByDate = new Map(online.map((r) => [toDateOnlyString(r.entryDate), toNum(r._sum.rts)]));
   const offlineByDate = new Map(
-    offline.map((r) => [
-      toDateOnlyString(r.entryDate),
-      offlineNetOutflow(toNum(r._sum.deliveryOut), toNum(r._sum.upsellOut), toNum(r._sum.backloads)),
-    ]),
+    offline.map((r) => [toDateOnlyString(r.entryDate), offlineDeliveryNet(toNum(r._sum.deliveryOut), toNum(r._sum.backloads))]),
   );
+  const backloadsByDate = new Map(offline.map((r) => [toDateOnlyString(r.entryDate), toNum(r._sum.backloads)]));
 
   const days = Math.round((to.getTime() - from.getTime()) / DAY_MS) + 1;
   return Array.from({ length: days }, (_, i) => {
@@ -69,6 +73,8 @@ export async function getDailyOutflow(from: Date, to: Date): Promise<DailyOutflo
       date,
       onlineOut,
       offlineOut,
+      onlineRts: rtsByDate.has(date) ? round2(rtsByDate.get(date)!) : null,
+      offlineBackloads: backloadsByDate.has(date) ? round2(backloadsByDate.get(date)!) : null,
       totalOut: onlineOut === null && offlineOut === null ? null : round2((onlineOut ?? 0) + (offlineOut ?? 0)),
     };
   });

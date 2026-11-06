@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+# Least privilege: every job only checks the code out and uploads artifacts, so the workflow token
+# is read-only (a compromised step or dependency cannot write to the repository).
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest

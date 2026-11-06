@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { ThemeProvider, useTheme } from "./ThemeContext";
+import { HEADER_STYLES, ThemeProvider, useHeaderStyle, useTheme } from "./ThemeContext";
 
 const root = document.documentElement;
 const wrapper = ({ children }: { children: ReactNode }) => <ThemeProvider>{children}</ThemeProvider>;
@@ -9,6 +9,7 @@ const wrapper = ({ children }: { children: ReactNode }) => <ThemeProvider>{child
 beforeEach(() => {
   localStorage.clear();
   delete root.dataset.ui;
+  delete root.dataset.header;
   delete root.dataset.theme;
   delete root.dataset.font;
   delete root.dataset.fs;
@@ -159,5 +160,62 @@ describe("font settings", () => {
     act(() => result.current.setFontFamily("inter"));
     act(() => result.current.setFontFamily("plex"));
     expect(links()).toHaveLength(1);
+  });
+});
+
+describe("header layout", () => {
+  it("offers the standard layout and three more, standard first", () => {
+    expect(HEADER_STYLES).toEqual(["standard", "compact", "floating", "centered"]);
+  });
+
+  it("defaults to standard (nobody's header changes until they choose), and puts it on <html>", () => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.headerStyle).toBe("standard");
+    expect(root.dataset.header).toBe("standard");
+  });
+
+  it.each(["compact", "floating", "centered"] as const)("switches to %s, applies it at once and remembers it", (layout) => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => result.current.setHeaderStyle(layout));
+    expect(result.current.headerStyle).toBe(layout);
+    expect(root.dataset.header).toBe(layout);
+    expect(localStorage.getItem("ae-header")).toBe(layout);
+  });
+
+  it("starts from the remembered choice", () => {
+    localStorage.setItem("ae-header", "floating");
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.headerStyle).toBe("floating");
+    expect(root.dataset.header).toBe("floating");
+  });
+
+  it("treats anything unrecognised as standard rather than breaking the header", () => {
+    localStorage.setItem("ae-header", "sidebar");
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    expect(result.current.headerStyle).toBe("standard");
+  });
+
+  it("is independent of the theme and the colour mode", () => {
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    act(() => {
+      result.current.setHeaderStyle("centered");
+      result.current.setUiStyle("brutal");
+      result.current.setTheme("dark");
+    });
+    expect(root.dataset.header).toBe("centered");
+    expect(root.dataset.ui).toBe("brutal");
+    expect(root.dataset.theme).toBe("dark");
+    act(() => result.current.setUiStyle("studio"));
+    expect(result.current.headerStyle).toBe("centered");
+    expect(localStorage.getItem("ae-header")).toBe("centered");
+  });
+
+  it("is readable by the header itself, and is simply standard where there is no provider", () => {
+    const inside = renderHook(() => useHeaderStyle(), { wrapper });
+    act(() => undefined);
+    expect(inside.result.current).toBe("standard");
+    expect(renderHook(() => useHeaderStyle()).result.current).toBe("standard");
+    localStorage.setItem("ae-header", "compact");
+    expect(renderHook(() => useHeaderStyle(), { wrapper }).result.current).toBe("compact");
   });
 });

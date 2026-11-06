@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+- **Header layouts** (Settings > Appearance > **Header and toolbar**). Choose how the pinned header and its toolbar are arranged, independently of the theme and the colour mode: **Standard** (the layout you have been using), **Compact** (a slim title line with the toolbar on a full-width line under it, about a fifth less height), **Floating** (a rounded card inset from the edges, the page tabs as a pill switcher above it, the toolbar in its own tray) and **Centered** (seal, title, toolbar and tabs on the middle line, the clock in the corner). Every layout keeps the header pinned to the top of the page and keeps every control. Saved per browser; nobody's header changes until they pick one. No server change.
+- **Daily Out shows RTS and Backloads.** The table has a two-row header: Online > Out, RTS and Offline > Out, Backloads (also in the CSV, the Daily Report page, its Excel and the Drive PDF). RTS is information only and is not taken off Online. The Daily Report's Offline sheet and the Offline Entry grid now total **Delivery (Out) less Backloads** in their subtotals and grand total, live as backloads are typed.
+
+### Changed
+- **Daily Out's Offline figure is now Delivery (Out) less Backloads, without Upsell.** It used to be deliveries plus upsells less backloads. Where no upsell was ever entered nothing changes; any day that has an upsell now shows a lower Offline figure. Remaining Stocks, the audit and every stored value are unchanged, and the monthly Period Monitoring card and days-of-stock still count upsell. Needs the server and the client deployed together.
+- **Minimalism:** column names are full-contrast (white in dark mode), one corner radius throughout, no drop shadow on dialogs, a quieter emblem, a 2px current-tab line, and a pressed state on buttons.
+- **The Dashboard** puts the three stock cards in a stack on the left and the graph beside them, and fits both on one screen on laptops; Recent Activity is full width underneath. Online and Offline remaining stock now add up with the same rounding as the Consolidated page.
+
 ## 2.5.0 - 2026-10-31
 
 ### Fixed

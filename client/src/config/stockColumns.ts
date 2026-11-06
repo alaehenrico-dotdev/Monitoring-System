@@ -128,3 +128,8 @@ export const offlineStockColumns: GridColumn[] = [
   },
   { key: "remainingStock", label: "Remaining Stocks", editable: false },
 ];
+
+/// Offline's Delivery (Out) TOTALS are net of Backloads (same-day returns): the subtotals, grand total
+/// and selection totals show delivery less backloads and move as backloads are typed. The cells and
+/// Remaining Stocks are untouched - Remaining already adds the backloads back, which is the same number.
+export const OFFLINE_NET_TOTALS: Record<string, string> = { deliveryOut: "backloads" };

@@ -36,13 +36,14 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("dailyReportSheets", () => {
   it("lays out Online, Offline, Consolidated and Daily Out with the entry-page column names", () => {
-    const sheets = dailyReportSheets(report, { onlineOut: 3, offlineOut: 2.5, totalOut: 5.5 });
+    const sheets = dailyReportSheets(report, { onlineOut: 3, onlineRts: 0.5, offlineOut: 2.5, offlineBackloads: 1, totalOut: 5.5 });
     expect(sheets.map((s) => s.name)).toEqual(["Summary", "Online", "Offline", "Consolidated", "Daily Out", "Audit"]);
     expect(sheets[1].columns).toEqual(["Category", "SKU", "Product", "Stocks (Opening)", "Stocks In (Off→Ol)", "Stocks Out (Ol→Off)", "Online Stocks", "Production (In)", "Fulfillment (Out)", "RTS", "Remaining Stocks"]);
     expect(sheets[1].rows[0]).toEqual(["Class A", "A1", "Alpha", 10, 0, 0, 10, 5, 3, 1, 13]);
     expect(sheets[2].rows[0]).toEqual(["Class A", "", "Alpha", 4, 0, 0, 4, 0, 2, 0.5, 1.5]);
     expect(sheets[3].rows[0]).toEqual(["Class A", "A1", "Alpha", 13, 1.5, 14.5, null, null]);
-    expect(sheets[4].rows).toEqual([[3, 2.5, 5.5]]);
+    expect(sheets[4].columns).toEqual(["Online Out", "RTS", "Offline Out", "Backloads", "Combined Out"]);
+    expect(sheets[4].rows).toEqual([[3, 0.5, 2.5, 1, 5.5]]);
   });
 
   it("does not print an Upsell (Out) column, even for a row that has an upsell amount", () => {

@@ -1,0 +1,254 @@
+/* =========================================================================
+   Header layouts (Settings > Appearance > Header)
+   =========================================================================
+   How the pinned header - the tab strip, the title card and the page's toolbar - is ARRANGED.
+   ThemeContext puts the choice on <html> as data-header. It is independent of the visual theme
+   (data-ui) and the colour mode (data-theme): the theme paints, this places. Every rule below reads
+   the same colour tokens the themes already define, so any layout looks right in any theme.
+
+   "standard" is the original layout and has no rules here.
+
+   Every layout keeps the header PINNED to the top (.ae-sticky-head stays position: sticky) and keeps
+   every control. Only the arrangement and the amount of room differ.
+
+   Specificity: `:root:root:root[data-header=...]` out-ranks the theme files' `:root:root[data-ui=...]`
+   rules (Studio in particular moves the tab strip), so a header layout wins whichever theme is on,
+   whatever order the files load in.
+   ========================================================================= */
+
+/* ---- Compact ------------------------------------------------------------
+   A dense header: the seal, title, badges and clock share ONE slim line, and the toolbar sits on
+   a full-width line of its own right under it. The seal is title-sized, the card's padding is
+   trimmed and the tab strip is slimmer, so the header takes about a third less height and the
+   toolbar starts at the page's own left edge instead of after the seal. The collapse toggle still
+   works: collapsed, only the slim title line is left.
+   (A single line was tried and does not fit: the toolbar alone is wider than the space beside the
+   title on any ordinary screen, so it would have had to wrap or hide controls.) */
+:root:root:root[data-header="compact"] .ae-page-header,
+:root:root:root[data-header="compact"] .ae-page-header.ae-page-header--collapsed,
+:root:root:root[data-header="compact"] .ae-page-header.ae-page-header--bare {
+  padding: 4px 12px 8px;
+}
+/* The card's top row, the titles column and the title row all stop being boxes: their contents
+   become items of one wrapping row, so the toolbar can drop to a line of its own while the seal
+   stays on the title line. */
+:root:root:root[data-header="compact"] .ae-page-header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+}
+:root:root:root[data-header="compact"] .ae-page-header-titles,
+:root:root:root[data-header="compact"] .ae-page-header--collapsed .ae-page-header-titles,
+:root:root:root[data-header="compact"] .ae-page-header-title-row,
+:root:root:root[data-header="compact"] .ae-page-header.ae-page-header--collapsed .ae-page-header-title-row {
+  display: contents;
+}
+:root:root:root[data-header="compact"] .ae-page-header-logo {
+  order: 0;
+}
+:root:root:root[data-header="compact"] .ae-page-header .ae-page-header-title-row h2,
+:root:root:root[data-header="compact"] .ae-page-header.ae-page-header--bare h2,
+:root:root:root[data-header="compact"] .ae-page-header.ae-page-header--collapsed h2 {
+  order: 1;
+  flex: 0 1 auto;
+  margin: 0;
+  min-width: 0;
+  font-size: clamp(0.95rem, 0.75rem + 0.45vw, 1.12rem);
+}
+:root:root:root[data-header="compact"] .ae-page-header-badges {
+  order: 2;
+  flex: none;
+}
+/* The clock and colour toggle take the free space on the title line, pushing them to the right. */
+:root:root:root[data-header="compact"] .ae-page-header-title-row .ae-page-header-extras {
+  order: 3;
+  flex: none;
+  margin: 0 0 0 auto;
+}
+:root:root:root[data-header="compact"] .ae-page-header-collapsible--toolbar {
+  order: 4;
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 0;
+}
+:root:root:root[data-header="compact"] .ae-page-header .ae-page-header-toolbar-slot .ae-toolbar,
+:root:root:root[data-header="compact"] .ae-page-header .ae-toolbar {
+  padding: 0;
+}
+/* The tab strip slims down to match. */
+:root:root:root[data-header="compact"] .ae-sticky-head {
+  margin-bottom: 6px;
+}
+:root:root:root[data-header="compact"] .ae-sticky-head > .ae-header-tabs {
+  padding-top: 3px;
+  padding-bottom: 8px;
+}
+:root:root:root[data-header="compact"] .ae-header-tab {
+  padding-top: 2px;
+  padding-bottom: 5px;
+}
+
+/* ---- Floating -----------------------------------------------------------
+   The header is lifted off the edges: inset on every side, rounded, with a soft shadow. The page
+   tabs become a pill switcher floating above it (a pill slides under the current tab), and the
+   toolbar sits in its own tray inside the card. Still pinned to the top - the gap above it is part
+   of the pinned unit, so the page scrolls beneath the floating panel. */
+/* The inset is PADDING on the pinned unit, not a margin: the unit keeps the same edge-to-edge box as
+   every other layout (Studio draws its gold page frame from that box's edges), and only what is inside
+   it is lifted off them. */
+:root:root:root[data-header="floating"] .ae-sticky-head {
+  top: 0;
+  margin-bottom: 14px;
+  padding: 8px 12px 0;
+  display: flex;
+  flex-direction: column;
+}
+:root:root:root[data-header="floating"] .ae-sticky-head > .ae-header-tabs {
+  order: 0;
+  align-self: flex-start;
+  max-width: 100%;
+  margin: 0 0 8px;
+  padding: 4px;
+  gap: 2px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--ae-text) 12%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ae-surface) 88%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+}
+:root:root:root[data-header="floating"] .ae-header-tabs-group {
+  align-items: center;
+}
+:root:root:root[data-header="floating"] .ae-header-tabs-divider {
+  align-self: center;
+  height: 14px;
+  margin: 0 4px;
+}
+:root:root:root[data-header="floating"] .ae-header-tab {
+  z-index: 1; /* labels above the sliding pill */
+  margin: 0;
+  padding: 5px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ae-text-muted);
+  font-weight: 500;
+}
+:root:root:root[data-header="floating"] .ae-header-tab:hover {
+  color: var(--ae-text);
+  background: color-mix(in srgb, var(--ae-text) 7%, transparent);
+}
+:root:root:root[data-header="floating"] .ae-header-tab[aria-current="page"],
+:root:root:root[data-header="floating"] .ae-header-tab[aria-current="page"]:hover {
+  color: var(--ae-text);
+  font-weight: 600;
+  background: transparent;
+}
+:root:root:root[data-header="floating"] .ae-header-tab::after {
+  display: none;
+}
+/* The current tab's pill: the elastic bar HeaderTabs already slides from tab to tab, drawn as a
+   filled pill behind the label. The script sets its left and width (and a 2px height and top,
+   which are overridden here); its 10px inset is given back by the margin and padding. */
+:root:root:root[data-header="floating"] .ae-header-tabs-bar {
+  z-index: 0;
+  top: 4px !important;
+  bottom: 4px;
+  height: auto !important;
+  box-sizing: content-box;
+  margin-left: -10px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ae-focus-ring) 24%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ae-focus-ring) 55%, transparent);
+}
+/* Studio draws curved feet on its bar; a pill has none. */
+:root:root:root[data-header="floating"] .ae-header-tabs-bar::before,
+:root:root:root[data-header="floating"] .ae-header-tabs-bar::after {
+  display: none;
+}
+:root:root:root[data-header="floating"] .ae-sticky-head > .ae-page-header {
+  order: 1;
+  border-radius: 16px;
+  box-shadow:
+    0 14px 34px rgba(0, 0, 0, 0.16),
+    0 2px 6px rgba(0, 0, 0, 0.08);
+}
+:root:root:root[data-header="floating"] .ae-page-header.ae-page-header--collapsed {
+  border-radius: 16px;
+}
+/* The toolbar's tray: a soft inset panel, so the controls read as one group on the card. */
+:root:root:root[data-header="floating"] .ae-page-header-collapsible--toolbar {
+  margin: 4px 0 0;
+}
+:root:root:root[data-header="floating"] .ae-page-header-toolbar-slot {
+  padding: 3px 6px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ae-text) 6%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ae-text) 9%, transparent);
+}
+:root:root:root[data-header="floating"] .ae-page-header .ae-page-header-toolbar-slot .ae-toolbar {
+  padding-left: 0;
+}
+
+/* ---- Centered -----------------------------------------------------------
+   Everything on the middle axis: the page tabs centered across the top, then the seal, the title
+   and the toolbar stacked and centered in the card, with the clock and colour toggle tucked into
+   the card's corner. A calm, symmetrical layout that reads well on a wide screen. */
+:root:root:root[data-header="centered"] .ae-sticky-head > .ae-header-tabs {
+  justify-content: safe center;
+}
+:root:root:root[data-header="centered"] .ae-header-tabs-group {
+  justify-content: center;
+}
+:root:root:root[data-header="centered"] .ae-page-header,
+:root:root:root[data-header="centered"] .ae-page-header.ae-page-header--collapsed {
+  padding-inline: 14px;
+  text-align: center;
+}
+:root:root:root[data-header="centered"] .ae-page-header-top {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+:root:root:root[data-header="centered"] .ae-page-header-titles,
+:root:root:root[data-header="centered"] .ae-page-header--collapsed .ae-page-header-titles {
+  width: 100%;
+  align-items: center;
+  align-self: auto;
+  justify-content: flex-start;
+}
+:root:root:root[data-header="centered"] .ae-page-header-title-row,
+:root:root:root[data-header="centered"] .ae-page-header.ae-page-header--collapsed .ae-page-header-title-row {
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+:root:root:root[data-header="centered"] .ae-page-header .ae-page-header-title-row h2 {
+  flex: 0 1 auto;
+  text-align: center;
+}
+:root:root:root[data-header="centered"] .ae-page-header-collapsible--toolbar {
+  width: 100%;
+  margin: 0;
+}
+:root:root:root[data-header="centered"] .ae-page-header .ae-page-header-toolbar-slot .ae-toolbar,
+:root:root:root[data-header="centered"] .ae-page-header .ae-toolbar {
+  padding: 2px 0;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+/* On a wide window the clock and colour toggle leave the title line for the card's top-right
+   corner, so the title stays truly centered; on a narrow one they stay beside the title. */
+@media (min-width: 900px) {
+  :root:root:root[data-header="centered"] .ae-page-header-title-row .ae-page-header-extras {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    margin: 0;
+  }
+}

@@ -40,7 +40,7 @@ import {
   detectConflicts,
   usePendingEntryChanges,
 } from "../hooks/usePendingEntryChanges";
-import { offlineStockColumns as columns } from "../config/stockColumns";
+import { offlineStockColumns as columns, OFFLINE_NET_TOTALS } from "../config/stockColumns";
 import {
   columnsWithExtras,
   extraColumnList,
@@ -791,6 +791,7 @@ export function OfflineEntryPage() {
             pending={pending}
             focusStorageKey={`ala-eh-focus:offline:${date}:${shift}`}
             percentOfTotalKey="remainingStock"
+            netTotals={OFFLINE_NET_TOTALS}
             onCommitMany={canEdit ? handleCommitMany : undefined}
             getSavedValue={getSavedValue}
             expandAllCommand={catCommand}

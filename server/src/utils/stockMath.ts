@@ -59,6 +59,14 @@ export function offlineNetOutflow(deliveryOut: number, upsellOut: number, backlo
   return round2(deliveryOut + upsellOut - backloads);
 }
 
+/// Daily Out's Offline figure: deliveries less same-day backloads. Upsell (Out) is NOT part of it.
+/// Remaining Stocks is untouched: it still subtracts the delivery and adds the backloads back, which
+/// is this same number (remaining = ... - (delivery - backloads) - upsell). Deliberately separate
+/// from offlineNetOutflow above, which days-of-stock and the monthly card keep using.
+export function offlineDeliveryNet(deliveryOut: number, backloads: number): number {
+  return round2(deliveryOut - backloads);
+}
+
 export function calculateOfflineRemaining(
   offlineStock: number,
   productionIn: number,

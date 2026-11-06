@@ -525,6 +525,29 @@
 .ae-mm-datecell {
   white-space: nowrap;
 }
+/* Daily Out's two-row header: group names (Online / Offline) over their Out + RTS / Backloads
+   figures. Both rows stick; the second sits under the first, so the first row's height is pinned
+   (30px) and the second's `top` is that same number. A hairline starts each group so the pairs
+   read as pairs. Scoped to .ae-table--grouped-head: the Period Monitoring table on the Dashboard
+   shares .ae-mm-tablewrap and must keep its own single-row header untouched. */
+.ae-mm-tablewrap .ae-table--grouped-head thead tr:nth-child(1) th {
+  box-sizing: border-box;
+  height: 30px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  vertical-align: middle;
+}
+.ae-mm-tablewrap .ae-table--grouped-head thead tr:nth-child(2) th {
+  top: 30px;
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+.ae-mm-tablewrap .ae-table--grouped-head th.ae-mm-group {
+  text-align: center;
+}
+.ae-mm-tablewrap .ae-table--grouped-head .ae-mm-subgroup-start {
+  border-left: 1px solid var(--ae-border-soft);
+}
 .ae-mm-tablewrap {
   flex: 1;
   min-height: 240px;

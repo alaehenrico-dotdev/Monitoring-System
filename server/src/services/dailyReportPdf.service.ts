@@ -136,7 +136,13 @@ interface ReportInput {
 /// Pure: the sheets for one report and its Daily Out figures.
 export function dailyReportSheets(
   report: ReportInput,
-  out: { onlineOut: number | null; offlineOut: number | null; totalOut: number | null } | null,
+  out: {
+    onlineOut: number | null;
+    onlineRts: number | null;
+    offlineOut: number | null;
+    offlineBackloads: number | null;
+    totalOut: number | null;
+  } | null,
   extraNames?: DayExtraNames,
   hide: HideOptions = SHOW_ALL,
 ): PdfTable[] {
@@ -183,8 +189,9 @@ export function dailyReportSheets(
     consolidated.table,
     {
       name: "Daily Out",
-      columns: ["Online Out", "Offline Out", "Combined Out"],
-      rows: out ? [[out.onlineOut, out.offlineOut, out.totalOut]] : [],
+      // RTS and Backloads are information beside their pool's Out; only the Offline Out is net of them.
+      columns: ["Online Out", "RTS", "Offline Out", "Backloads", "Combined Out"],
+      rows: out ? [[out.onlineOut, out.onlineRts, out.offlineOut, out.offlineBackloads, out.totalOut]] : [],
     },
     {
       name: "Audit",

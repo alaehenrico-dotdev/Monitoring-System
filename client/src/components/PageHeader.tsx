@@ -11,9 +11,13 @@ import { ChevronIcon } from "./icons";
 import { ActivityBeam } from "./ActivityBeam";
 import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
+import { useHeaderStyle, type HeaderStyle } from "../context/ThemeContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
 const LOGO_SIZE = 56;
+// The seal's size in each header layout (Settings > Appearance > Header): the compact header keeps it
+// title-sized on its one slim title line, and it does not change when the header collapses.
+const LOGO_SIZE_BY_HEADER: Record<HeaderStyle, number> = { standard: LOGO_SIZE, compact: 30, floating: 44, centered: 42 };
 // Collapsed header: the logo shrinks to roughly the title's own height so
 // the h2 lines up with it and the card gets shorter.
 const LOGO_SIZE_COLLAPSED = 32;
@@ -95,6 +99,9 @@ export function PageHeader({
   // No toolbar means nothing to collapse: the header is the compact card from the start.
   const bare = !children;
   const compact = collapsed || bare;
+  const headerStyle = useHeaderStyle();
+  // Collapsed (or toolbar-less) headers use the small seal, except the compact bar, which always does.
+  const logoSize = compact && headerStyle !== "compact" ? LOGO_SIZE_COLLAPSED : LOGO_SIZE_BY_HEADER[headerStyle];
   const { open, toggle } = useNavDrawer();
   const { online } = useOnlineStatus();
   const [logoSpin, setLogoSpin] = useState(0);
@@ -183,12 +190,9 @@ export function PageHeader({
             aria-label={open ? "Close navigation" : "Open navigation"}
             title={open ? "Close navigation" : "Open navigation"}
           >
-            <LogoMark
-              size={compact ? LOGO_SIZE_COLLAPSED : LOGO_SIZE}
-              spin={logoSpin}
-            />
+            <LogoMark size={logoSize} spin={logoSpin} />
             {/* A gold beam circles the seal while the system saves, loads or connects. */}
-            <ActivityBeam size={compact ? LOGO_SIZE_COLLAPSED : LOGO_SIZE} />
+            <ActivityBeam size={logoSize} />
           </button>
           <div className="ae-page-header-titles">
             <div className="ae-page-header-title-row">

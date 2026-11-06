@@ -13,5 +13,7 @@
 @import "./styles/menu-bar.css";
 /* After menu-bar.css: Studio moves the tab strip and repaints the header, and must win there. */
 @import "./styles/themes/studio.css";
+/* After every theme: a header layout (Settings > Appearance > Header) arranges the header whichever theme paints it. */
+@import "./styles/header-styles.css";
 @import "./styles/shared-late.css";
 @import "./styles/a11y-polish.css";

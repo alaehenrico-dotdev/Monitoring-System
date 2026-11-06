@@ -6,7 +6,12 @@ import { http } from "./http";
 export interface DailyOutEntry {
   date: string; // YYYY-MM-DD
   onlineOut: number | null;
+  /// Online RTS - shown beside onlineOut for information; it is not netted off it.
+  onlineRts: number | null;
+  /// Offline Delivery (Out) less Backloads (upsell is not part of it).
   offlineOut: number | null;
+  /// The day's Backloads, already netted into offlineOut.
+  offlineBackloads: number | null;
   totalOut: number | null;
 }
 

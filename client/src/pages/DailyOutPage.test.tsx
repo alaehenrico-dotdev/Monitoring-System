@@ -14,10 +14,12 @@ vi.mock("../context/RealtimeContext", () => ({ useRealtimeVersion: () => 0 }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "SUPERVISOR_ADMIN" } }) }));
 vi.mock("../api/reportHistory", () => ({ recordReportHistory: vi.fn().mockResolvedValue({}) }));
 
-const day = (date: string, onlineOut: number | null, offlineOut: number | null): DailyOutEntry => ({
+const day = (date: string, onlineOut: number | null, offlineOut: number | null, onlineRts: number | null = null, offlineBackloads: number | null = null): DailyOutEntry => ({
   date,
   onlineOut,
+  onlineRts,
   offlineOut,
+  offlineBackloads,
   totalOut: onlineOut === null && offlineOut === null ? null : (onlineOut ?? 0) + (offlineOut ?? 0),
 });
 
@@ -49,7 +51,7 @@ describe("DailyOutPage", () => {
   it("opens on the table, with the chart one click away", async () => {
     open();
     await screen.findByText(/Over 13 days/);
-    expect(screen.getAllByRole("row")).toHaveLength(1 + 14 + 1);
+    expect(screen.getAllByRole("row")).toHaveLength(2 + 14 + 1);
     expect(document.querySelector(".ae-mm-chart")).toBeNull();
     expect(screen.getByRole("button", { name: "Table" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "Chart" }));
@@ -99,8 +101,15 @@ describe("DailyOutPage", () => {
     open();
     await screen.findByText(/Over 13 days/);
     const rows = screen.getAllByRole("row");
-    expect(rows).toHaveLength(1 + 14 + 1); // header, 14 days, total
+    expect(rows).toHaveLength(2 + 14 + 1); // two header rows, 14 days, total
     expect(within(rows[rows.length - 1]).getByText("Total")).toBeInTheDocument();
-    expect(within(rows[4]).getAllByText("—")).toHaveLength(3); // the empty day
+    expect(within(rows[5]).getAllByText("—")).toHaveLength(5); // the empty day: every figure
+  });
+
+  it("groups Online (Out, RTS) and Offline (Out, Backloads) under a two-row header", async () => {
+    open();
+    await screen.findByText(/Over 13 days/);
+    const heads = screen.getAllByRole("columnheader").map((h) => h.textContent);
+    expect(heads).toEqual(["Date", "Online", "Offline", "Combined", "Fulfillment", "RTS", "Out", "Backloads"]);
   });
 });

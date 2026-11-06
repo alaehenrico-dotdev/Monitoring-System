@@ -7,6 +7,7 @@ import {
   useTheme,
   type FontFamily,
   type FontSize,
+  type HeaderStyle,
   type Theme,
   type UiStyle,
 } from "../context/ThemeContext";
@@ -73,6 +74,35 @@ const THEMES: Choice<UiStyle>[] = [
   },
 ];
 
+/// How the pinned header and its toolbar are arranged. Independent of the theme above: the theme paints,
+/// these arrange. Every layout keeps the header pinned to the top and keeps every control.
+const HEADERS: Choice<HeaderStyle>[] = [
+  {
+    value: "standard",
+    label: "Standard",
+    description: "The layout you have been using: the page tabs along the top, then a card with the seal and title, and the toolbar under the title.",
+    preview: <HeaderPreview kind="standard" />,
+  },
+  {
+    value: "compact",
+    label: "Compact",
+    description: "Dense and slim: the seal, title and clock share one thin line, with the toolbar on a full-width line right under it. Takes about a fifth less height, so more of the table shows.",
+    preview: <HeaderPreview kind="compact" />,
+  },
+  {
+    value: "floating",
+    label: "Floating",
+    description: "Lifted off the edges: the page tabs become a pill switcher floating above a rounded card, and the toolbar sits in its own tray. The page scrolls beneath it.",
+    preview: <HeaderPreview kind="floating" />,
+  },
+  {
+    value: "centered",
+    label: "Centered",
+    description: "Everything on the middle line: the seal, the title and the toolbar stacked and centered, the page tabs centered across the top, and the clock tucked into the corner.",
+    preview: <HeaderPreview kind="centered" />,
+  },
+];
+
 
 const FONT_CHOICES: Choice<FontFamily>[] = [
   { value: "inter", label: "Inter", description: "The default: clean and easy to read at small sizes.", preview: <FontPreview family="'Inter', system-ui, sans-serif" /> },
@@ -136,17 +166,19 @@ function FontSettings() {
 
 /**
  * Settings > Appearance: how the app looks on THIS browser. The color mode
- * (light/dark) and the theme (Classic, Neobrutalism, Glass, Minimalism, Skeuomorphic, Studio) and the font are independent, remembered per
+ * (light/dark), the theme (Classic, Neobrutalism, Glass, Minimalism, Skeuomorphic, Studio), the header
+ * layout (Standard, Compact, Floating, Centered) and the font are independent, remembered per
  * browser (ThemeContext), apply immediately, and change only how things are
- * drawn - never the pages, the controls or the data - which is why every role can
+ * drawn and arranged - never the pages, the controls or the data - which is why every role can
  * reach them, unlike the other Settings tabs.
  */
 export function AppearanceSettings() {
-  const { theme, setTheme, uiStyle, setUiStyle } = useTheme();
+  const { theme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle } = useTheme();
   return (
     <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", display: "grid", gap: 22 }}>
       <ChoiceGroup legend="Color mode" choices={MODES} value={theme} onChange={setTheme} />
       <ChoiceGroup legend="Theme" choices={THEMES} value={uiStyle} onChange={setUiStyle} />
+      <ChoiceGroup legend="Header and toolbar" choices={HEADERS} value={headerStyle} onChange={setHeaderStyle} />
       <FontSettings />
       <p style={{ margin: 0, fontSize: 12.5, color: colors.subtleInk }}>
         These are saved in this browser only. Another computer, or another person signing in here after you, keeps their own choice.
@@ -330,3 +362,99 @@ function SkeuoPreview() {
   );
 }
 
+
+/// A tiny drawing of one header layout: the page tabs, the title card and the toolbar row, in neutral
+/// colours so it shows the ARRANGEMENT whatever theme is on.
+function HeaderPreview({ kind }: { kind: HeaderStyle }) {
+  const ink = "#2b2b2b";
+  const soft = "#cfcfca";
+  const gold = "#d4a000";
+  const page = "#f7f6f1";
+  const card = "#ffffff";
+  const line = "#d9d8d0";
+  const dot = (size: number): CSSProperties => ({ width: size, height: size, borderRadius: "50%", background: gold, flex: "none" });
+  const tabs = (extra: CSSProperties = {}) => (
+    <span style={{ display: "flex", gap: 5, alignItems: "center", ...extra }}>
+      <span style={bar(22, 3, ink)} />
+      <span style={bar(22, 3, soft)} />
+      <span style={bar(22, 3, soft)} />
+      <span style={bar(22, 3, soft)} />
+    </span>
+  );
+  const toolbar = (justify: CSSProperties["justifyContent"] = "flex-start") => (
+    <span style={{ display: "flex", gap: 4, alignItems: "center", justifyContent: justify }}>
+      <span style={bar(16, 5, soft)} />
+      <span style={bar(16, 5, soft)} />
+      <span style={bar(26, 5, soft)} />
+      <span style={bar(18, 7, gold, { borderRadius: 3 })} />
+    </span>
+  );
+  const frame: CSSProperties = { display: "block", background: page, height: 86, borderRadius: 4, overflow: "hidden", border: `1px solid ${line}` };
+
+  if (kind === "compact") {
+    return (
+      <span style={{ ...frame, padding: "5px 6px" }}>
+        {tabs({ marginBottom: 4 })}
+        <span style={{ display: "block", background: card, border: `1px solid ${line}`, borderRadius: 3, padding: "3px 5px" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={dot(7)} />
+            <span style={bar(46, 5, ink)} />
+            <span style={bar(14, 5, "#3a8a4f", { marginLeft: 4 })} />
+            <span style={{ ...bar(18, 6, soft, { borderRadius: 3 }), marginLeft: "auto" }} />
+          </span>
+          <span style={{ display: "block", marginTop: 4 }}>{toolbar()}</span>
+        </span>
+        <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 5 }) }} />
+        <span style={{ display: "block", ...bar("80%", 5, "#e8e7e0", { marginTop: 4 }) }} />
+        <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 4 }) }} />
+      </span>
+    );
+  }
+  if (kind === "floating") {
+    return (
+      <span style={{ ...frame, padding: 6 }}>
+        <span style={{ display: "inline-flex", gap: 4, alignItems: "center", background: card, border: `1px solid ${line}`, borderRadius: 999, padding: "3px 5px", boxShadow: "0 2px 5px rgba(0,0,0,0.12)" }}>
+          <span style={{ ...bar(22, 7, "rgba(212,160,0,0.35)", { borderRadius: 999 }) }} />
+          <span style={bar(18, 3, soft)} />
+          <span style={bar(18, 3, soft)} />
+        </span>
+        <span style={{ display: "block", background: card, border: `1px solid ${line}`, borderRadius: 9, padding: "4px 6px 5px", marginTop: 5, boxShadow: "0 5px 10px rgba(0,0,0,0.16)" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <span style={dot(9)} />
+            <span style={bar(52, 6, ink)} />
+          </span>
+          <span style={{ display: "block", background: "#efeee8", borderRadius: 6, padding: "3px 5px", marginTop: 4 }}>{toolbar()}</span>
+        </span>
+      </span>
+    );
+  }
+  if (kind === "centered") {
+    return (
+      <span style={{ ...frame, padding: "5px 6px" }}>
+        {tabs({ justifyContent: "center", marginBottom: 4 })}
+        <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: card, border: `1px solid ${line}`, borderRadius: 3, padding: "4px 5px", position: "relative" }}>
+          <span style={{ ...bar(18, 6, soft, { borderRadius: 3 }), position: "absolute", right: 4, top: 4 }} />
+          <span style={dot(9)} />
+          <span style={bar(58, 6, ink)} />
+          {toolbar("center")}
+        </span>
+        <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 5 }) }} />
+        <span style={{ display: "block", ...bar("80%", 5, "#e8e7e0", { marginTop: 4 }) }} />
+      </span>
+    );
+  }
+  return (
+    <span style={{ ...frame, padding: "6px 6px" }}>
+      {tabs({ marginBottom: 5 })}
+      <span style={{ display: "flex", alignItems: "flex-start", gap: 6, background: card, border: `1px solid ${line}`, borderRadius: 4, padding: "5px 6px" }}>
+        <span style={dot(15)} />
+        <span style={{ display: "block", flex: 1 }}>
+          <span style={{ display: "block", ...bar(60, 6, ink) }} />
+          <span style={{ display: "block", marginTop: 5 }}>{toolbar()}</span>
+        </span>
+      </span>
+      <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 6 }) }} />
+      <span style={{ display: "block", ...bar("80%", 5, "#e8e7e0", { marginTop: 4 }) }} />
+    </span>
+  );
+}

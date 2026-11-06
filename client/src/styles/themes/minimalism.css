@@ -44,6 +44,9 @@
   --ae-mini-wash-strong: rgba(26, 26, 26, 0.09);
   /* One corner radius for areas, controls and dialogs alike. */
   --ae-mini-radius: 3px;
+  /* Column names: full contrast, so they read at a glance. Near-black here (white on a white
+     header would vanish); pure white in dark mode below. */
+  --ae-mini-colhead: #1a1a1a;
 }
 :root[data-ui="minimal"][data-theme="dark"] {
   --ae-bg: #111111;
@@ -72,6 +75,7 @@
   --ae-mini-wash: rgba(255, 255, 255, 0.06);
   --ae-mini-wash-strong: rgba(255, 255, 255, 0.11);
   --ae-mini-radius: 3px;
+  --ae-mini-colhead: #ffffff;
 }
 
 /* The emblem stays behind the page like every theme, but only just: a trace, not a picture. */
@@ -218,12 +222,19 @@
   background-color: var(--ae-bg);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  color: var(--ae-text-muted);
+  color: var(--ae-mini-colhead);
   font-size: 12px;
   font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
   box-shadow: inset 0 -1px 0 var(--ae-border);
+}
+/* Whatever sits inside a column name (sort buttons, labels, arrows) reads the same. Cells with an
+   inline colour of their own (a column's tone) keep it - inline styles win. */
+:root[data-ui="minimal"] .ae-table th *,
+/* Daily Out's second header row (Out / RTS / Backloads) is muted in the other themes. */
+:root[data-ui="minimal"] .ae-mm-tablewrap .ae-table--grouped-head thead tr:nth-child(2) th {
+  color: var(--ae-mini-colhead);
 }
 :root[data-ui="minimal"] .ae-table td {
   box-shadow: inset 0 -1px 0 var(--ae-border-soft);

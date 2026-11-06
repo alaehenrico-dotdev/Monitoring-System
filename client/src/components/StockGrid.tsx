@@ -165,6 +165,13 @@ interface StockGridProps {
    */
   percentOfTotalKey?: string;
   /**
+   * Columns whose TOTALS (category subtotals, grand total, selection) are net of another
+   * column: `{ deliveryOut: "backloads" }` totals Delivery (Out) as the sum of delivery less the
+   * sum of backloads, and moves live as backloads are typed. Only the totals change - the cells,
+   * the stored values and anything computed from them (Remaining Stocks) stay as entered.
+   */
+  netTotals?: Record<string, string>;
+  /**
    * Stages a batch of cell edits as one step - what Quick Fill commits (fill
    * a value down a column, zero a whole category). Without it the Quick Fill
    * controls are hidden, since there'd be nowhere to send the result.
@@ -449,6 +456,7 @@ export function StockGrid({
   pending,
   focusStorageKey,
   percentOfTotalKey,
+  netTotals,
   onCommitMany,
   getSavedValue,
   historyTable,
@@ -618,6 +626,18 @@ export function StockGrid({
     [rows, percentOfTotalKey],
   );
   const showPercent = !!percentOfTotalKey;
+
+  /// A column's total over `list`, net of its `netTotals` partner when it has one.
+  const totalOf = (col: GridColumn, list: GridRow[]) => {
+    const own = sumRounded(list.map((r) => toNum(r.entry[col.key])));
+    const less = netTotals?.[col.key];
+    return less ? sumRounded([own, -sumRounded(list.map((r) => toNum(r.entry[less])))]) : own;
+  };
+  /// Tooltip on a netted total, so the number's meaning is one hover away.
+  const netTitle = (col: GridColumn) => {
+    const less = netTotals?.[col.key];
+    return less ? `${col.label} total, less ${columns.find((c) => c.key === less)?.label ?? less}` : undefined;
+  };
 
   // Quick Fill needs somewhere to send a batch and a baseline to compare
   // each filled cell against, so it's only offered when the page wired both.
@@ -1504,13 +1524,12 @@ export function StockGrid({
                       Subtotal - {category}
                     </td>
                     {columns.map((col) => {
-                      const sum = groupRows.reduce(
-                        (acc, r) => acc + toNum(r.entry[col.key]),
-                        0,
-                      );
+                      const sum = totalOf(col, groupRows);
                       return (
                         <Fragment key={col.key}>
-                          <td style={tint(col)}>{sum.toLocaleString()}</td>
+                          <td style={tint(col)} title={netTitle(col)}>
+                            {sum.toLocaleString()}
+                          </td>
                           {trailingKeys(col).map((key, i) => (
                             <td
                               key={key}
@@ -1543,9 +1562,8 @@ export function StockGrid({
               </td>
               {columns.map((col) => (
                 <Fragment key={col.key}>
-                  <td style={tint(col)}>
-                    {sumRounded(rows.map((r) => toNum(r.entry[col.key])))
-                      .toLocaleString()}
+                  <td style={tint(col)} title={netTitle(col)}>
+                    {totalOf(col, rows).toLocaleString()}
                   </td>
                   {trailingKeys(col).map((key, i) => (
                     <td
@@ -1581,7 +1599,9 @@ export function StockGrid({
                     sumRounded(selectedRows.map((r) => toNum(r.entry[key])));
                   return (
                     <Fragment key={col.key}>
-                      <td style={tint(col)}>{sum(col.key).toLocaleString()}</td>
+                      <td style={tint(col)} title={netTitle(col)}>
+                        {totalOf(col, selectedRows).toLocaleString()}
+                      </td>
                       {trailingKeys(col).map((key, i) => (
                         <td
                           key={key}

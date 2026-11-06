@@ -50,7 +50,10 @@ export function dailyOutPoints(rows: DailyOutEntry[], today: string): ComboPoint
 
 export interface DailyOutTotals {
   onlineOut: number;
+  /// Information beside onlineOut / offlineOut, not netted into them (the backloads already are, in offlineOut).
+  onlineRts: number;
   offlineOut: number;
+  offlineBackloads: number;
   totalOut: number;
   /// Days that have at least one entry - the days the figures are summed over.
   days: number;
@@ -61,7 +64,9 @@ export function dailyOutTotals(rows: DailyOutEntry[]): DailyOutTotals {
     Math.round(rows.reduce((acc, e) => acc + (pick(e) ?? 0), 0) * 100) / 100;
   return {
     onlineOut: sum((e) => e.onlineOut),
+    onlineRts: sum((e) => e.onlineRts),
     offlineOut: sum((e) => e.offlineOut),
+    offlineBackloads: sum((e) => e.offlineBackloads),
     totalOut: sum((e) => e.totalOut),
     days: rows.filter((e) => e.totalOut !== null).length,
   };
@@ -70,7 +75,7 @@ export function dailyOutTotals(rows: DailyOutEntry[]): DailyOutTotals {
 export function dailyOutCsv(rows: DailyOutEntry[]): string {
   const cell = (v: number | null) => (v === null ? "" : v);
   return toCsv(
-    ["Date", "Online Out", "Offline Out", "Combined Out"],
-    rows.map((e) => [e.date, cell(e.onlineOut), cell(e.offlineOut), cell(e.totalOut)]),
+    ["Date", "Online Out", "Online RTS", "Offline Out", "Offline Backloads", "Combined Out"],
+    rows.map((e) => [e.date, cell(e.onlineOut), cell(e.onlineRts), cell(e.offlineOut), cell(e.offlineBackloads), cell(e.totalOut)]),
   );
 }

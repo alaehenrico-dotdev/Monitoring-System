@@ -12,10 +12,10 @@ import { getDailyOutflow } from "./dailyOutflow.service";
 
 const d = (s: string) => new Date(`${s}T00:00:00Z`);
 
-const online = (date: string, fulfillmentOut: number) => ({ entryDate: d(date), _sum: { fulfillmentOut } });
-const offline = (date: string, deliveryOut: number, upsellOut = 0, backloads = 0) => ({
+const online = (date: string, fulfillmentOut: number, rts = 0) => ({ entryDate: d(date), _sum: { fulfillmentOut, rts } });
+const offline = (date: string, deliveryOut: number, backloads = 0) => ({
   entryDate: d(date),
-  _sum: { deliveryOut, upsellOut, backloads },
+  _sum: { deliveryOut, backloads },
 });
 
 beforeEach(() => {
@@ -33,7 +33,7 @@ describe("getDailyOutflow", () => {
     seed([online("2026-10-01", 100)], [offline("2026-10-03", 40)]);
     const rows = await getDailyOutflow(d("2026-10-01"), d("2026-10-03"));
     expect(rows.map((r) => r.date)).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
-    expect(rows[1]).toEqual({ date: "2026-10-02", onlineOut: null, offlineOut: null, totalOut: null });
+    expect(rows[1]).toEqual({ date: "2026-10-02", onlineOut: null, offlineOut: null, onlineRts: null, offlineBackloads: null, totalOut: null });
   });
 
   it("adds Online and Offline into the combined figure", async () => {
@@ -42,23 +42,42 @@ describe("getDailyOutflow", () => {
     expect(row).toMatchObject({ onlineOut: 120, offlineOut: 80, totalOut: 200 });
   });
 
-  it("nets backloads off the Offline figure and counts upsells in it", async () => {
-    // 100 delivered + 10 upsold, 30 came back on a route: 80 actually left.
-    seed([], [offline("2026-10-01", 100, 10, 30)]);
+  it("nets the day's backloads off the Offline delivery, and shows the backloads beside it", async () => {
+    // 100 delivered, 30 came back on a route the same day: 70 actually left.
+    seed([], [offline("2026-10-01", 100, 30)]);
     const [row] = await getDailyOutflow(d("2026-10-01"), d("2026-10-01"));
-    expect(row.offlineOut).toBe(80);
+    expect(row).toMatchObject({ offlineOut: 70, offlineBackloads: 30, totalOut: 70 });
+  });
+
+  it("does not count upsells in the Offline figure (the query does not even ask for them)", async () => {
+    seed([], [offline("2026-10-01", 100, 0)]);
+    await getDailyOutflow(d("2026-10-01"), d("2026-10-01"));
+    expect(vi.mocked(prisma.dailyOfflineStock.groupBy).mock.calls[0][0]).toMatchObject({ _sum: { deliveryOut: true, backloads: true } });
+    expect(vi.mocked(prisma.dailyOfflineStock.groupBy).mock.calls[0][0]).not.toMatchObject({ _sum: { upsellOut: true } });
+  });
+
+  it("shows a negative Offline figure when backloads exceed the delivery, so the totals still add up", async () => {
+    seed([], [offline("2026-10-01", 20, 30)]);
+    const [row] = await getDailyOutflow(d("2026-10-01"), d("2026-10-01"));
+    expect(row).toMatchObject({ offlineOut: -10, offlineBackloads: 30, totalOut: -10 });
+  });
+
+  it("shows Online RTS beside the Online figure without netting it off", async () => {
+    seed([online("2026-10-01", 50, 7)], [offline("2026-10-01", 40, 0)]);
+    const [row] = await getDailyOutflow(d("2026-10-01"), d("2026-10-01"));
+    expect(row).toMatchObject({ onlineOut: 50, onlineRts: 7, offlineOut: 40, totalOut: 90 });
   });
 
   it("reports a day with only one side recorded as that side, not as zero for the other", async () => {
     seed([online("2026-10-01", 50)], []);
     const [row] = await getDailyOutflow(d("2026-10-01"), d("2026-10-01"));
-    expect(row).toEqual({ date: "2026-10-01", onlineOut: 50, offlineOut: null, totalOut: 50 });
+    expect(row).toEqual({ date: "2026-10-01", onlineOut: 50, onlineRts: 0, offlineOut: null, offlineBackloads: null, totalOut: 50 });
   });
 
   it("keeps a recorded zero as zero", async () => {
     seed([online("2026-10-01", 0)], [offline("2026-10-01", 0)]);
     const [row] = await getDailyOutflow(d("2026-10-01"), d("2026-10-01"));
-    expect(row).toEqual({ date: "2026-10-01", onlineOut: 0, offlineOut: 0, totalOut: 0 });
+    expect(row).toEqual({ date: "2026-10-01", onlineOut: 0, onlineRts: 0, offlineOut: 0, offlineBackloads: 0, totalOut: 0 });
   });
 
   it("sums once per query however many products there are", async () => {

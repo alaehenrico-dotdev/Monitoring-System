@@ -30,6 +30,7 @@ import {
 import {
   onlineStockColumns,
   offlineStockColumns,
+  OFFLINE_NET_TOTALS,
 } from "../config/stockColumns";
 import { toExcelTable, downloadExcel } from "../utils/excel";
 import { formatDateDisplay } from "../utils/dateFormat";
@@ -754,6 +755,7 @@ export function DailyReportPage() {
                   onCommit={noop}
                   expandAllCommand={catCommand}
                   onAnyExpandedChange={onOfflineExpanded}
+                  netTotals={OFFLINE_NET_TOTALS}
                   readOnly
                 />
               </div>
@@ -878,10 +880,11 @@ export function DailyReportPage() {
   );
 }
 
-const DAILY_OUT_COLUMNS = ["Online Out", "Offline Out", "Combined Out"];
+// Same order as the Daily Out page: Online > Out, RTS; Offline > Out (delivery less backloads), Backloads.
+const DAILY_OUT_COLUMNS = ["Online Out", "RTS", "Offline Out", "Backloads", "Combined Out"];
 
 function dailyOutCells(e: DailyOutEntry): (number | null)[] {
-  return [e.onlineOut, e.offlineOut, e.totalOut];
+  return [e.onlineOut, e.onlineRts, e.offlineOut, e.offlineBackloads, e.totalOut];
 }
 
 function dailyOutExcel(date: string, e: DailyOutEntry | null): string {

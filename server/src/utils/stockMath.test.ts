@@ -6,6 +6,7 @@ import {
   calculateOnlineStock,
   calculateVariance,
   isNegativeStock,
+  offlineDeliveryNet,
   resolveOpeningStock,
   toNum,
 } from "./stockMath";
@@ -131,5 +132,23 @@ describe("isNegativeStock", () => {
     expect(isNegativeStock(calculateOnlineRemaining(0.7, 0.1, 0.8, 0))).toBe(false);
     expect(calculateOfflineRemaining(0.7, 0.1, 0.8, 0, 0)).toBe(0);
     expect(isNegativeStock(calculateOfflineRemaining(0.7, 0.1, 0.8, 0, 0))).toBe(false);
+  });
+});
+
+describe("offlineDeliveryNet (Daily Out's Offline figure)", () => {
+  it("is the delivery less the same-day backloads, negative when more came back than went out", () => {
+    expect(offlineDeliveryNet(100, 30)).toBe(70);
+    expect(offlineDeliveryNet(20, 30)).toBe(-10);
+    expect(offlineDeliveryNet(0.7, 0.1)).toBe(0.6);
+  });
+
+  it("leaves Remaining Stocks exactly as it was: remaining = stock + production - net delivery - upsell", () => {
+    // The pinned real-report example: 3554 + 804 - 752 + 29 = 3635, with 4 upsold.
+    for (const [stock, production, delivery, backloads, upsell] of [[3554, 804, 752, 29, 0], [3554, 804, 752, 29, 4], [10, 0, 5, 9, 2], [0.7, 0.1, 0.8, 0, 0]]) {
+      expect(calculateOfflineRemaining(stock, production, delivery, backloads, upsell)).toBe(
+        Math.round((stock + production - offlineDeliveryNet(delivery, backloads) - upsell + Number.EPSILON) * 100) / 100,
+      );
+    }
+    expect(calculateOfflineRemaining(3554, 804, 752, 29, 0)).toBe(3635);
   });
 });

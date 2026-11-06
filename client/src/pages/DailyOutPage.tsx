@@ -215,8 +215,9 @@ export function DailyOutPage() {
               {totals.days === 0
                 ? "Nothing was recorded in this period."
                 : `Over ${totals.days} ${totals.days === 1 ? "day" : "days"} with entries: ${fullNumber.format(totals.onlineOut)} out of Online, ${fullNumber.format(totals.offlineOut)} out of Offline, ${fullNumber.format(totals.totalOut)} combined. `}
-              Offline is deliveries and upsells less backloads; moving stock
-              between Online and Offline is not counted as out.
+              Offline is deliveries less backloads (upsells are not counted); RTS is shown for
+              information and is not taken off Online. Moving stock between Online and Offline
+              is not counted as out.
               {view === "chart" && points && totals.days > 0 && !hasLines(points) &&
                 " A line needs two consecutive days with entries, so until then each day shows as a dot."}
             </p>
@@ -236,13 +237,30 @@ function DailyOutTable({
 }) {
   return (
     <div className="ae-mm-tablewrap">
-      <table className="ae-table ae-table--center-head ae-table--compact">
+      <table className="ae-table ae-table--center-head ae-table--compact ae-table--grouped-head">
         <thead>
+          {/* The card is titled "Out per day", so the columns need not repeat "out". Online and
+              Offline each get a second figure beside their Out: Online > RTS, Offline > Backloads.
+              Only the Offline Out is net of its sub-column (backloads); RTS is information. */}
           <tr>
-            {/* The card is titled "Out per day", so the columns need not repeat "out". */}
-            {["Date", "Online", "Offline", "Combined"].map((h) => (
-              <th key={h}>{h}</th>
-            ))}
+            <th rowSpan={2}>Date</th>
+            <th colSpan={2} className="ae-mm-group">
+              Online
+            </th>
+            <th colSpan={2} className="ae-mm-group ae-mm-subgroup-start">
+              Offline
+            </th>
+            <th rowSpan={2} className="ae-mm-subgroup-start">
+              Combined
+            </th>
+          </tr>
+          <tr>
+            <th title="Online Fulfillment (Out)">Fulfillment</th>
+            <th title="Returned to stock. Shown for information; not netted off Online out.">RTS</th>
+            <th className="ae-mm-subgroup-start" title="Delivery (Out) less Backloads">
+              Out
+            </th>
+            <th title="Same-day returns, already netted off Offline out">Backloads</th>
           </tr>
         </thead>
         <tbody>
@@ -250,15 +268,19 @@ function DailyOutTable({
             <tr key={e.date}>
               <td className="ae-mm-datecell">{tableDate(e.date)}</td>
               <td>{cell(e.onlineOut)}</td>
-              <td>{cell(e.offlineOut)}</td>
-              <td>{cell(e.totalOut)}</td>
+              <td>{cell(e.onlineRts)}</td>
+              <td className="ae-mm-subgroup-start">{cell(e.offlineOut)}</td>
+              <td>{cell(e.offlineBackloads)}</td>
+              <td className="ae-mm-subgroup-start">{cell(e.totalOut)}</td>
             </tr>
           ))}
           <tr className="ae-row-grand">
             <td>Total</td>
             <td>{fullNumber.format(totals.onlineOut)}</td>
-            <td>{fullNumber.format(totals.offlineOut)}</td>
-            <td>{fullNumber.format(totals.totalOut)}</td>
+            <td>{fullNumber.format(totals.onlineRts)}</td>
+            <td className="ae-mm-subgroup-start">{fullNumber.format(totals.offlineOut)}</td>
+            <td>{fullNumber.format(totals.offlineBackloads)}</td>
+            <td className="ae-mm-subgroup-start">{fullNumber.format(totals.totalOut)}</td>
           </tr>
         </tbody>
       </table>

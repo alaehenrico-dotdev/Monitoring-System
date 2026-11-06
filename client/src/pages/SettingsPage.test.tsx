@@ -25,6 +25,7 @@ beforeEach(() => {
   localStorage.clear();
   localStorage.setItem("ae-theme", "light");
   delete root.dataset.font;
+  delete root.dataset.header;
   delete root.dataset.fs;
   auth.role = "SUPERVISOR_ADMIN";
 });
@@ -146,5 +147,36 @@ describe("SettingsPage font settings", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Monospace" }));
     expect((screen.getByRole("radio", { name: /^Minimalism$/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("radio", { name: /Light/ }) as HTMLInputElement).checked).toBe(true);
+  });
+});
+
+describe("SettingsPage header layout", () => {
+  it("offers four header layouts, with Standard selected until one is chosen", () => {
+    open();
+    for (const name of ["Standard", "Compact", "Floating", "Centered"]) {
+      expect(screen.getByRole("radio", { name: new RegExp(`^${name}$`) })).toBeTruthy();
+    }
+    expect((screen.getByRole("radio", { name: /^Standard$/ }) as HTMLInputElement).checked).toBe(true);
+    expect(root.dataset.header).toBe("standard");
+  });
+
+  it.each([
+    [/^Compact$/, "compact"],
+    [/^Floating$/, "floating"],
+    [/^Centered$/, "centered"],
+  ] as const)("choosing %s applies at once and is remembered", (name, value) => {
+    open();
+    fireEvent.click(screen.getByRole("radio", { name }));
+    expect(root.dataset.header).toBe(value);
+    expect(localStorage.getItem("ae-header")).toBe(value);
+    expect((screen.getByRole("radio", { name }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /^Standard$/ }) as HTMLInputElement).checked).toBe(false);
+  });
+
+  it("does not change the theme or the colour mode", () => {
+    open();
+    fireEvent.click(screen.getByRole("radio", { name: /^Floating$/ }));
+    expect(root.dataset.ui).toBe("minimal");
+    expect(root.dataset.theme).toBe("light");
   });
 });

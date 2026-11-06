@@ -93,8 +93,14 @@ describe("Minimalism theme", () => {
     for (const r of radii) expect(r).toBe("var(--ae-mini-radius)");
   });
 
-  it("keeps table column names on the same muted-to-ink scale in dark mode (no hard-coded white)", () => {
-    expect(block).not.toMatch(/\.ae-table th[^{]*\{[^}]*color:\s*#fff/i);
+  it("shows column names at full contrast - white in dark mode, near-black in light - through one token", () => {
+    expect(light["--ae-mini-colhead"]).toBeDefined();
+    expect(dark["--ae-mini-colhead"]).toBe("#ffffff");
+    for (const t of [light, dark]) expect(contrast(t["--ae-mini-colhead"], t["--ae-bg"])).toBeGreaterThanOrEqual(7);
+    // The header rule reads the token (no colour typed into it), including what sits inside a header
+    // and Daily Out's second header row, which the other themes mute.
+    expect(rule(':root[data-ui="minimal"] .ae-table th')).toContain("color: var(--ae-mini-colhead)");
+    expect(block).toMatch(/\.ae-table th \*,[\s\S]*?thead tr:nth-child\(2\) th \{\s*color: var\(--ae-mini-colhead\)/);
   });
 
   it("draws the current tab as a 2px rule and keeps the watermark to a trace", () => {

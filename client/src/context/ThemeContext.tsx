@@ -12,6 +12,20 @@ export type UiStyle = "classic" | "brutal" | "glass" | "minimal" | "skeuo" | "st
 
 const UI_STYLES: readonly UiStyle[] = ["classic", "brutal", "glass", "minimal", "skeuo", "studio"];
 
+/// How the pinned header and its toolbar are LAID OUT (Settings > Appearance > Header). Separate
+/// from the visual theme above, so any header layout works with any theme and either color mode:
+/// the theme paints, this arranges. Every layout keeps the header pinned to the top of the page and
+/// every control reachable; they differ in how much room they take and where things sit.
+///  - standard: the original - tabs strip on top, then a card with the title and the toolbar under it.
+///  - compact:  dense - one slim line (seal, title, clock) and the toolbar on a full-width line under
+///              it - about a third less height, to leave more room for the data.
+///  - floating: a rounded panel inset from the edges, tabs as a pill switcher, toolbar in a tray.
+///  - centered: everything centered - logo, title, toolbar and tabs - with the clock in the corner.
+/// Stored per browser like the theme. A saved value no longer in this list falls back to standard.
+export type HeaderStyle = "standard" | "compact" | "floating" | "centered";
+export const HEADER_STYLES: readonly HeaderStyle[] = ["standard", "compact", "floating", "centered"];
+export const DEFAULT_HEADER_STYLE: HeaderStyle = "standard";
+
 /// The interface typeface and text size (Settings > Appearance > Font). Like the
 /// theme they are a per-browser preference, applied as data attributes on <html>
 /// that index.css keys off. The data tables are not scaled by the text size - they
@@ -47,6 +61,7 @@ export function ensureWebFont(font: FontFamily) {
 
 const STORAGE_KEY = "ae-theme";
 const UI_STORAGE_KEY = "ae-ui";
+const HEADER_STORAGE_KEY = "ae-header";
 const FONT_STORAGE_KEY = "ae-font";
 const FONT_SIZE_STORAGE_KEY = "ae-font-size";
 
@@ -56,6 +71,8 @@ interface ThemeContextValue {
   setTheme: (theme: Theme) => void;
   uiStyle: UiStyle;
   setUiStyle: (style: UiStyle) => void;
+  headerStyle: HeaderStyle;
+  setHeaderStyle: (style: HeaderStyle) => void;
   fontFamily: FontFamily;
   setFontFamily: (font: FontFamily) => void;
   fontSize: FontSize;
@@ -93,6 +110,7 @@ function readChoice<T extends string>(key: string, allowed: readonly T[], fallba
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [uiStyle, setUiStyle] = useState<UiStyle>(getInitialUiStyle);
+  const [headerStyle, setHeaderStyle] = useState<HeaderStyle>(() => readChoice(HEADER_STORAGE_KEY, HEADER_STYLES, DEFAULT_HEADER_STYLE));
   const [fontFamily, setFontFamily] = useState<FontFamily>(() => readChoice(FONT_STORAGE_KEY, FONT_FAMILIES, DEFAULT_FONT));
   const [fontSize, setFontSize] = useState<FontSize>(() => readChoice(FONT_SIZE_STORAGE_KEY, FONT_SIZES, DEFAULT_FONT_SIZE));
 
@@ -113,6 +131,19 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useLayoutEffect(() => {
     document.documentElement.dataset.ui = uiStyle;
   }, [uiStyle]);
+
+  // The header layout is an attribute as well (styles/header-styles.css keys off it).
+  useLayoutEffect(() => {
+    document.documentElement.dataset.header = headerStyle;
+  }, [headerStyle]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HEADER_STORAGE_KEY, headerStyle);
+    } catch {
+      // Not remembered, still applied for this session.
+    }
+  }, [headerStyle]);
 
   // Typeface and size are attributes on <html> too (index.css reads them). A web
   // font is requested only once it is picked; until it arrives the fallback shows.
@@ -170,8 +201,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ theme, toggleTheme, setTheme, uiStyle, setUiStyle, fontFamily, setFontFamily, fontSize, setFontSize, resetFont }),
-    [theme, toggleTheme, uiStyle, fontFamily, fontSize, resetFont],
+    () => ({ theme, toggleTheme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle, fontFamily, setFontFamily, fontSize, setFontSize, resetFont }),
+    [theme, toggleTheme, uiStyle, headerStyle, fontFamily, fontSize, resetFont],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -181,4 +212,11 @@ export function useTheme() {
   const ctx = useContext(ThemeContext);
   if (!ctx) throw new Error("useTheme must be used within a ThemeProvider");
   return ctx;
+}
+
+/// The header layout for a component that only needs to adapt to it (the page header sizes its logo
+/// by it). Unlike useTheme it does not throw outside a ThemeProvider - a header rendered on its own
+/// (a test, a print view) is simply the standard layout.
+export function useHeaderStyle(): HeaderStyle {
+  return useContext(ThemeContext)?.headerStyle ?? DEFAULT_HEADER_STYLE;
 }
