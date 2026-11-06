@@ -10,6 +10,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { PageHeader } from "../components/PageHeader";
+import { SubTabPanel } from "../components/SubTabPanel";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { Pager } from "../components/Pager";
@@ -94,7 +95,7 @@ export function CorrectionsPage() {
         title="Corrections"
         subtitle="Requests to change a recorded figure - with the reason, the before/after values and who approved it."
       />
-      <div className="ae-subtabs" role="tablist" aria-label="Correction status">
+      <div className="ae-subtabs ae-subtabs--framed" role="tablist" aria-label="Correction status">
         {FILTERS.map((f) => (
           <button
             key={f.key}
@@ -109,6 +110,7 @@ export function CorrectionsPage() {
         ))}
       </div>
 
+      <SubTabPanel label={FILTERS.find((f) => f.key === filter)?.label}>
       <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
         {!rows ? (
           pager.error ? <p role="alert" style={{ color: colors.danger }}>{pager.error}</p> : <InlineLoading label="Loading…" />
@@ -182,6 +184,7 @@ export function CorrectionsPage() {
         )}
         <Pager page={pager.page} pageSize={pager.pageSize} total={pager.total} onPage={pager.goToPage} onPageSize={pager.setPageSize} loading={pager.loading} label="Correction pages" />
       </div>
+      </SubTabPanel>
 
       {approving && (
         <Modal title="Approve correction" onClose={busyOn ? () => {} : () => setApproving(null)} width={460}>

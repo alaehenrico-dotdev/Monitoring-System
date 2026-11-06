@@ -1630,3 +1630,21 @@ table input[type="number"] {
   cursor: not-allowed;
 }
 
+
+/* The boxed sub-tab outline (components/SubTabPanel.tsx) belongs to the Minimalism theme alone; every other
+   theme keeps the underline above and hides it. */
+.ae-subtab-outline {
+  display: none;
+}
+
+/* Choosing another sub-page tab eases its colour (and the hover tint) instead of snapping. */
+.ae-subtab {
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-subtab {
+    transition: none;
+  }
+}

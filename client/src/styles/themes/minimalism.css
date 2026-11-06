@@ -44,6 +44,9 @@
   --ae-mini-wash-strong: rgba(26, 26, 26, 0.09);
   /* One corner radius for areas, controls and dialogs alike. */
   --ae-mini-radius: 3px;
+  /* The sub-page tab outline's own radius: 4px, so a 1px outline is a clean quarter circle of 3.5px at its
+     centre, the same for the tab corners, the feet and the frame (see the sub-page tabs section). */
+  --ae-mini-tab-radius: 4px;
   /* Column names: full contrast, so they read at a glance. Near-black here (white on a white
      header would vanish); pure white in dark mode below. */
   --ae-mini-colhead: #1a1a1a;
@@ -75,6 +78,7 @@
   --ae-mini-wash: rgba(255, 255, 255, 0.06);
   --ae-mini-wash-strong: rgba(255, 255, 255, 0.11);
   --ae-mini-radius: 3px;
+  --ae-mini-tab-radius: 4px;
   --ae-mini-colhead: #ffffff;
 }
 
@@ -152,6 +156,89 @@
   box-shadow: none;
   border-radius: 0;
   height: 2px;
+}
+
+/* ---- Sub-page tabs (Settings, Admin Queue, Corrections): one boxed outline ----------------------
+   Studio's tab strip and page frame, in ink: the content area is a box, and the current tab is open
+   into it, so the tab and its content read as one outline.
+   The outline is NOT made of CSS borders. It used to be about ten pieces (the tab's borders, gradient
+   feet, the frame's sides, corner pieces, the strip's rule), and a browser snaps and anti-aliases each
+   piece on its own, so at fractional display scaling the joins never lined up. It is ONE continuous
+   vector path (<svg class="ae-subtab-outline"> inside .ae-subtab-panel, see components/SubTabPanel.tsx and
+   utils/subTabOutline.ts): the rule along the strip's bottom edge, up and round the current tab, and
+   down and round the whole content box, every corner the same 4px quarter circle and every straight edge
+   snapped to a device pixel. This stylesheet only gives it its colour and keeps the tabs themselves
+   plain text of the right size.
+   The strip scrolls sideways rather than wrapping, because a wrapped first row would have no rule to open
+   onto. Only strips marked --framed: Awaiting Release uses the same tab buttons as a small status filter
+   in a toolbar row, with no content panel under it, and keeps its own look. */
+:root[data-ui="minimal"] .ae-subtabs--framed {
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0;
+  margin-bottom: 0; /* the frame starts right at the strip */
+  padding: 4px 10px 0; /* the side room keeps the first tab (and its foot) clear of the frame's corner */
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  border-bottom: 0;
+}
+:root[data-ui="minimal"] .ae-subtabs--framed::-webkit-scrollbar {
+  display: none;
+}
+:root[data-ui="minimal"] .ae-subtabs--framed .ae-subtab {
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin: 0;
+  /* 8 + 9px of height and 15px a side: the same for every tab, so the labels never move when the current tab
+     changes. (The outline's own line is drawn over the tab's edge, not in its box.) */
+  padding: 8px 15px 9px;
+  color: var(--ae-text-muted);
+  background: transparent;
+  border: 0;
+  /* !important because a global rule gives every <button> a 4px radius on all four corners with
+     !important; the higher specificity here then decides it. Rounded on top only, for the hover tint. */
+  border-radius: var(--ae-mini-tab-radius) var(--ae-mini-tab-radius) 0 0 !important;
+}
+/* The underline the other themes draw (and its glow) is replaced by the outline. */
+:root[data-ui="minimal"] .ae-subtabs--framed .ae-subtab::after {
+  display: none;
+}
+:root[data-ui="minimal"] .ae-subtabs--framed .ae-subtab:hover {
+  color: var(--ae-text);
+  background: var(--ae-mini-wash);
+}
+:root[data-ui="minimal"] .ae-subtabs--framed .ae-subtab[aria-selected="true"],
+:root[data-ui="minimal"] .ae-subtabs--framed .ae-subtab[aria-selected="true"]:hover {
+  color: var(--ae-text);
+  font-weight: 600;
+  background: transparent;
+}
+/* The keyboard ring sits INSIDE the tab: the strip clips sideways, and a ring drawn outside the
+   tab would be cut off at its edges. */
+:root[data-ui="minimal"] .ae-subtabs--framed .ae-subtab:focus-visible {
+  outline: 2px solid var(--ae-focus-ring);
+  outline-offset: -3px;
+  border-radius: var(--ae-mini-tab-radius) var(--ae-mini-tab-radius) 0 0 !important;
+}
+/* The content area. It has no border of its own: the outline is drawn over its edge, so the padding is
+   what keeps the content clear of the line. */
+:root[data-ui="minimal"] .ae-subtabs--framed + .ae-subtab-panel {
+  position: relative; /* the outline is positioned against it */
+  /* 22px on a desk, easing down to 14px on a phone. */
+  padding: clamp(14px, 4vw, 22px);
+  margin-bottom: 8px;
+}
+/* The outline: shown in this theme only (every other theme hides it, see base.css), coloured by the theme's ink.
+   It may extend above the content box, over the tab strip, so nothing clips it. */
+:root[data-ui="minimal"] .ae-subtab-outline {
+  display: block;
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+:root[data-ui="minimal"] .ae-subtab-outline path {
+  stroke: var(--ae-mini-ink);
 }
 
 /* ---- Areas: no fill, no shadow; a hairline only where one is needed ------ */

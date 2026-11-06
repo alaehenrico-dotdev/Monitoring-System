@@ -40,7 +40,8 @@ function tableDate(date: string): string {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-const cell = (v: number | null) => (v === null ? "—" : fullNumber.format(v));
+// `== null`, not `=== null`: a figure the server did not send is "nothing recorded", never NaN.
+const cell = (v: number | null | undefined) => (v == null ? "—" : fullNumber.format(v));
 
 /**
  * Daily Out - how much stock left the company each day: what Online

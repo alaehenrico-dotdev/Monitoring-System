@@ -73,7 +73,7 @@ export function dailyOutTotals(rows: DailyOutEntry[]): DailyOutTotals {
 }
 
 export function dailyOutCsv(rows: DailyOutEntry[]): string {
-  const cell = (v: number | null) => (v === null ? "" : v);
+  const cell = (v: number | null | undefined) => (v == null ? "" : v);
   return toCsv(
     ["Date", "Online Out", "Online RTS", "Offline Out", "Offline Backloads", "Combined Out"],
     rows.map((e) => [e.date, cell(e.onlineOut), cell(e.onlineRts), cell(e.offlineOut), cell(e.offlineBackloads), cell(e.totalOut)]),

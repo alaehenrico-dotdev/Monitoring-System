@@ -15,7 +15,23 @@ export interface DailyOutEntry {
   totalOut: number | null;
 }
 
+/// A server that predates the RTS and Backloads figures does not send them at all (the field is
+/// missing, not null). The page would format that as "NaN", so a missing figure is read as "nothing
+/// recorded" - the same as null - and every consumer can rely on number | null. This matters during a
+/// deploy, when the browser can be running newer code than the server it talks to.
+export function normalizeDailyOutEntry(e: Partial<DailyOutEntry> & { date: string }): DailyOutEntry {
+  return {
+    date: e.date,
+    onlineOut: e.onlineOut ?? null,
+    onlineRts: e.onlineRts ?? null,
+    offlineOut: e.offlineOut ?? null,
+    offlineBackloads: e.offlineBackloads ?? null,
+    totalOut: e.totalOut ?? null,
+  };
+}
+
 /// Every date from `from` to `to` inclusive, in order.
-export function getDailyOut(from: string, to: string) {
-  return http.get<DailyOutEntry[]>(`/total-stocks/daily-out?from=${from}&to=${to}`);
+export async function getDailyOut(from: string, to: string): Promise<DailyOutEntry[]> {
+  const rows = await http.get<(Partial<DailyOutEntry> & { date: string })[]>(`/total-stocks/daily-out?from=${from}&to=${to}`);
+  return rows.map(normalizeDailyOutEntry);
 }

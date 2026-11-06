@@ -17,6 +17,7 @@ import {
 } from "../api/ops";
 import type { Shift } from "../types";
 import { PageHeader } from "../components/PageHeader";
+import { SubTabPanel } from "../components/SubTabPanel";
 import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { Pager } from "../components/Pager";
@@ -83,7 +84,7 @@ export function AdminQueuePage() {
         title="Admin queue"
         subtitle="Everything that needs an admin's attention, in one place."
       />
-      <div className="ae-subtabs" role="tablist" aria-label="Admin queue sections">
+      <div className="ae-subtabs ae-subtabs--framed" role="tablist" aria-label="Admin queue sections">
         {TABS.map((t) => (
           <button
             key={t.key}
@@ -97,13 +98,15 @@ export function AdminQueuePage() {
           </button>
         ))}
       </div>
-      <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
-        {tab === "queue" && <QueueTab />}
-        {tab === "closing" && <ClosingTab />}
-        {tab === "months" && <MonthCloseTab />}
-        {tab === "errors" && <ErrorsTab />}
-        {tab === "archive" && <ArchiveTab />}
-      </div>
+      <SubTabPanel label={TABS.find((t) => t.key === tab)?.label}>
+        <div style={{ width: "100%", maxWidth: 1280, margin: "0 auto" }}>
+          {tab === "queue" && <QueueTab />}
+          {tab === "closing" && <ClosingTab />}
+          {tab === "months" && <MonthCloseTab />}
+          {tab === "errors" && <ErrorsTab />}
+          {tab === "archive" && <ArchiveTab />}
+        </div>
+      </SubTabPanel>
     </div>
   );
 }

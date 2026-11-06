@@ -113,3 +113,19 @@ describe("DailyOutPage", () => {
     expect(heads).toEqual(["Date", "Online", "Offline", "Combined", "Fulfillment", "RTS", "Out", "Backloads"]);
   });
 });
+
+describe("DailyOutPage against a server that sends no RTS or Backloads figures", () => {
+  it("shows a dash, never NaN, in those columns", async () => {
+    api.getDailyOut.mockImplementation(async () =>
+      // The old server's shape: the new fields are absent altogether (not null).
+      [{ date: "2026-10-01", onlineOut: 120, offlineOut: 80, totalOut: 200 }] as unknown as DailyOutEntry[],
+    );
+    open();
+    await screen.findByText(/Over 1 day/);
+    expect(document.body.textContent).not.toContain("NaN");
+    const row = screen.getAllByRole("row").find((r) => r.textContent?.includes("120"))!;
+    const cells = within(row).getAllByRole("cell").map((c) => c.textContent);
+    // Date, Fulfillment, RTS, Out, Backloads, Combined
+    expect(cells.slice(1)).toEqual(["120", "—", "80", "—", "200"]);
+  });
+});

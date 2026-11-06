@@ -7,6 +7,7 @@ import { AppearanceSettings } from "./AppearanceSettings";
 import { GoogleDriveSettings } from "./GoogleDriveSettings";
 import { EntryRulesSettings } from "./EntryRulesSettings";
 import { PageHeader } from "../components/PageHeader";
+import { SubTabPanel } from "../components/SubTabPanel";
 import { useAuth } from "../context/AuthContext";
 
 type Tab = "appearance" | "account" | "entry" | "backup" | "drive" | "reset" | "passwords";
@@ -47,7 +48,7 @@ export function SettingsPage() {
         subtitle={isAdmin ? "How the app looks, plus admin tools: backups, data reset, and passwords." : "How the app looks on this computer."}
       />
 
-      <div className="ae-subtabs" role="tablist" aria-label="Settings sections">
+      <div className="ae-subtabs ae-subtabs--framed" role="tablist" aria-label="Settings sections">
         {tabs.map((t) => (
           <button
             key={t.key}
@@ -62,13 +63,15 @@ export function SettingsPage() {
         ))}
       </div>
 
-      {tab === "appearance" && <AppearanceSettings />}
-      {tab === "account" && <AccountSettings />}
-      {isAdmin && tab === "entry" && <EntryRulesSettings />}
-      {isAdmin && tab === "backup" && <DatabaseBackupPage />}
-      {isAdmin && tab === "drive" && <GoogleDriveSettings />}
-      {isAdmin && tab === "reset" && <DataResetPage />}
-      {isAdmin && tab === "passwords" && <UserPasswordsPage />}
+      <SubTabPanel label={tabs.find((t) => t.key === tab)?.label}>
+        {tab === "appearance" && <AppearanceSettings />}
+        {tab === "account" && <AccountSettings />}
+        {isAdmin && tab === "entry" && <EntryRulesSettings />}
+        {isAdmin && tab === "backup" && <DatabaseBackupPage />}
+        {isAdmin && tab === "drive" && <GoogleDriveSettings />}
+        {isAdmin && tab === "reset" && <DataResetPage />}
+        {isAdmin && tab === "passwords" && <UserPasswordsPage />}
+      </SubTabPanel>
     </div>
   );
 }
