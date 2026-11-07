@@ -149,18 +149,47 @@ export function HeaderTabs() {
   useEffect(() => {
     const nav = navRef.current;
     if (!nav) return;
+    // Smoothed: each wheel notch moves a TARGET, and a frame loop eases the strip toward it, so a
+    // notched wheel glides instead of jumping. Reduced-motion users get the instant jump.
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let target = nav.scrollLeft;
+    let raf = 0;
+    function step() {
+      if (!nav) return;
+      const diff = target - nav.scrollLeft;
+      if (Math.abs(diff) < 0.5) {
+        nav.scrollLeft = target;
+        raf = 0;
+        return;
+      }
+      nav.scrollLeft += diff * 0.2;
+      raf = requestAnimationFrame(step);
+    }
     function onWheel(e: WheelEvent) {
       if (!nav || Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
       const max = nav.scrollWidth - nav.clientWidth;
       if (max <= 0) return;
-      const atStart = nav.scrollLeft <= 0 && e.deltaY < 0;
-      const atEnd = nav.scrollLeft >= max - 1 && e.deltaY > 0;
-      if (atStart || atEnd) return;
+      if (!raf) target = nav.scrollLeft; // pick up wherever the strip is now (drag, tab change)
+      const atStart = target <= 0 && e.deltaY < 0;
+      const atEnd = target >= max - 1 && e.deltaY > 0;
+      if (atStart || atEnd) {
+        // Still easing toward the end: keep the notch from also scrolling the page.
+        if (raf) e.preventDefault();
+        return;
+      }
       e.preventDefault();
-      nav.scrollLeft += e.deltaY;
+      target = Math.min(max, Math.max(0, target + e.deltaY));
+      if (reduce) {
+        nav.scrollLeft = target;
+      } else if (!raf) {
+        raf = requestAnimationFrame(step);
+      }
     }
     nav.addEventListener("wheel", onWheel, { passive: false });
-    return () => nav.removeEventListener("wheel", onWheel);
+    return () => {
+      nav.removeEventListener("wheel", onWheel);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, [user?.role]);
 
   // Keep the active tab in view: with more tabs than fit, navigating (or

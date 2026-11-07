@@ -15,12 +15,11 @@ import { useHeaderStyle, type HeaderStyle } from "../context/ThemeContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
 
 const LOGO_SIZE = 56;
-// The seal's size in each header layout (Settings > Appearance > Header): the compact header keeps it
-// title-sized on its one slim title line, and it does not change when the header collapses.
-const LOGO_SIZE_BY_HEADER: Record<HeaderStyle, number> = { standard: LOGO_SIZE, compact: 30, floating: 44, centered: 42 };
 // Collapsed header: the logo shrinks to roughly the title's own height so
 // the h2 lines up with it and the card gets shorter.
 const LOGO_SIZE_COLLAPSED = 32;
+// The one-line layouts (Inline, Ribbon) keep the seal title-sized; it does not change when the header collapses.
+const LOGO_SIZE_BY_HEADER: Record<HeaderStyle, number> = { standard: LOGO_SIZE, inline: 32, ribbon: 32, dock: LOGO_SIZE };
 // Same hover-triggered spin cooldown the logo had inside the sidebar
 // itself - so hovering back and forth doesn't restart the animation
 // mid-spin.
@@ -99,9 +98,9 @@ export function PageHeader({
   // No toolbar means nothing to collapse: the header is the compact card from the start.
   const bare = !children;
   const compact = collapsed || bare;
+    // Collapsed (or toolbar-less) headers use the small seal, except the compact bar, which always does.
   const headerStyle = useHeaderStyle();
-  // Collapsed (or toolbar-less) headers use the small seal, except the compact bar, which always does.
-  const logoSize = compact && headerStyle !== "compact" ? LOGO_SIZE_COLLAPSED : LOGO_SIZE_BY_HEADER[headerStyle];
+  const logoSize = compact && (headerStyle === "standard" || headerStyle === "dock") ? LOGO_SIZE_COLLAPSED : LOGO_SIZE_BY_HEADER[headerStyle];
   const { open, toggle } = useNavDrawer();
   const { online } = useOnlineStatus();
   const [logoSpin, setLogoSpin] = useState(0);

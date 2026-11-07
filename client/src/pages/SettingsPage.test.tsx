@@ -153,7 +153,7 @@ describe("SettingsPage font settings", () => {
 describe("SettingsPage header layout", () => {
   it("offers four header layouts, with Standard selected until one is chosen", () => {
     open();
-    for (const name of ["Standard", "Compact", "Floating", "Centered"]) {
+    for (const name of ["Standard", "Inline", "Ribbon", "Dock"]) {
       expect(screen.getByRole("radio", { name: new RegExp(`^${name}$`) })).toBeTruthy();
     }
     expect((screen.getByRole("radio", { name: /^Standard$/ }) as HTMLInputElement).checked).toBe(true);
@@ -161,9 +161,9 @@ describe("SettingsPage header layout", () => {
   });
 
   it.each([
-    [/^Compact$/, "compact"],
-    [/^Floating$/, "floating"],
-    [/^Centered$/, "centered"],
+    [/^Inline$/, "inline"],
+    [/^Ribbon$/, "ribbon"],
+    [/^Dock$/, "dock"],
   ] as const)("choosing %s applies at once and is remembered", (name, value) => {
     open();
     fireEvent.click(screen.getByRole("radio", { name }));
@@ -175,7 +175,7 @@ describe("SettingsPage header layout", () => {
 
   it("does not change the theme or the colour mode", () => {
     open();
-    fireEvent.click(screen.getByRole("radio", { name: /^Floating$/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Ribbon$/ }));
     expect(root.dataset.ui).toBe("minimal");
     expect(root.dataset.theme).toBe("light");
   });

@@ -19,7 +19,7 @@ const allSelectors = rules.flatMap((r) => r.selectors);
 
 describe("header layouts stylesheet", () => {
   it("has rules, and every selector is scoped to a header layout", () => {
-    expect(allSelectors.length).toBeGreaterThan(30);
+    expect(allSelectors.length).toBeGreaterThan(10);
     for (const s of allSelectors) expect(s).toContain('[data-header="');
   });
 
@@ -35,7 +35,7 @@ describe("header layouts stylesheet", () => {
 
   it("never moves the pinned unit: nothing sets `position` on .ae-sticky-head, and it stays sticky", () => {
     const sticky = rules.filter((r) => r.selectors.some((s) => /\.ae-sticky-head$/.test(s)));
-    expect(sticky.length).toBeGreaterThan(0); // floating insets it
+    expect(sticky.length).toBeGreaterThan(0); // dock lays it out as a column
     for (const r of sticky) expect(r.body).not.toMatch(/(^|[;\s])position\s*:/);
     // The top offset is never negative or large: the header stays at the very top.
     for (const r of sticky) {

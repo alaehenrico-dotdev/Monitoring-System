@@ -17,13 +17,12 @@ const UI_STYLES: readonly UiStyle[] = ["classic", "brutal", "glass", "minimal", 
 /// the theme paints, this arranges. Every layout keeps the header pinned to the top of the page and
 /// every control reachable; they differ in how much room they take and where things sit.
 ///  - standard: the original - tabs strip on top, then a card with the title and the toolbar under it.
-///  - compact:  dense - one slim line (seal, title, clock) and the toolbar on a full-width line under
-///              it - about a third less height, to leave more room for the data.
-///  - floating: a rounded panel inset from the edges, tabs as a pill switcher, toolbar in a tray.
-///  - centered: everything centered - logo, title, toolbar and tabs - with the clock in the corner.
+///  - inline:   title and toolbar share one wrapping line; no card chrome.
+///  - ribbon:   a slim title line, with the toolbar as a full-width ruled band under it.
+///  - dock:     the page tabs sit in a strip docked under the card instead of above it.
 /// Stored per browser like the theme. A saved value no longer in this list falls back to standard.
-export type HeaderStyle = "standard" | "compact" | "floating" | "centered";
-export const HEADER_STYLES: readonly HeaderStyle[] = ["standard", "compact", "floating", "centered"];
+export type HeaderStyle = "standard" | "inline" | "ribbon" | "dock";
+export const HEADER_STYLES: readonly HeaderStyle[] = ["standard", "inline", "ribbon", "dock"];
 export const DEFAULT_HEADER_STYLE: HeaderStyle = "standard";
 
 /// The interface typeface and text size (Settings > Appearance > Font). Like the

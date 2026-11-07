@@ -324,7 +324,12 @@
   color: var(--ae-mini-colhead);
 }
 :root[data-ui="minimal"] .ae-table td {
-  box-shadow: inset 0 -1px 0 var(--ae-border-soft);
+  box-shadow: inset 0 -0.5px 0 var(--ae-border-strong);
+}
+/* The category bar (charcoal, gold-gradient name) is styled for every theme in shared-late.css. */
+/* Column lines in the header (the body's come from shared-late.css, for every theme). */
+:root[data-ui="minimal"] .ae-table th:not(:last-child) {
+  border-right: 1px solid var(--ae-border-soft);
 }
 /* Subtotal and grand-total rows: weight, not a coloured bar. */
 :root[data-ui="minimal"] .ae-table tr.ae-row-subtotal td,

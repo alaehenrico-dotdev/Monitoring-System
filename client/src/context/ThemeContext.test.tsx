@@ -79,7 +79,7 @@ describe("layout style", () => {
     expect(result.current.uiStyle).toBe(style);
   });
 
-  it.each(["gradient", "ledger", "slate", "card", "enterprise", "flat", "aurora", "plus", "halloween"])("falls back to the default for the retired %s theme", (old) => {
+  it.each(["gradient", "ledger", "slate", "card", "enterprise", "inline", "aurora", "plus", "halloween"])("falls back to the default for the retired %s theme", (old) => {
     localStorage.setItem("ae-ui", old);
     const { result } = renderHook(() => useTheme(), { wrapper });
     expect(result.current.uiStyle).toBe("minimal");
@@ -165,7 +165,7 @@ describe("font settings", () => {
 
 describe("header layout", () => {
   it("offers the standard layout and three more, standard first", () => {
-    expect(HEADER_STYLES).toEqual(["standard", "compact", "floating", "centered"]);
+    expect(HEADER_STYLES).toEqual(["standard", "inline", "ribbon", "dock"]);
   });
 
   it("defaults to standard (nobody's header changes until they choose), and puts it on <html>", () => {
@@ -174,7 +174,7 @@ describe("header layout", () => {
     expect(root.dataset.header).toBe("standard");
   });
 
-  it.each(["compact", "floating", "centered"] as const)("switches to %s, applies it at once and remembers it", (layout) => {
+  it.each(["inline", "ribbon", "dock"] as const)("switches to %s, applies it at once and remembers it", (layout) => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => result.current.setHeaderStyle(layout));
     expect(result.current.headerStyle).toBe(layout);
@@ -183,10 +183,10 @@ describe("header layout", () => {
   });
 
   it("starts from the remembered choice", () => {
-    localStorage.setItem("ae-header", "floating");
+    localStorage.setItem("ae-header", "ribbon");
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.headerStyle).toBe("floating");
-    expect(root.dataset.header).toBe("floating");
+    expect(result.current.headerStyle).toBe("ribbon");
+    expect(root.dataset.header).toBe("ribbon");
   });
 
   it("treats anything unrecognised as standard rather than breaking the header", () => {
@@ -198,16 +198,16 @@ describe("header layout", () => {
   it("is independent of the theme and the colour mode", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
     act(() => {
-      result.current.setHeaderStyle("centered");
+      result.current.setHeaderStyle("dock");
       result.current.setUiStyle("brutal");
       result.current.setTheme("dark");
     });
-    expect(root.dataset.header).toBe("centered");
+    expect(root.dataset.header).toBe("dock");
     expect(root.dataset.ui).toBe("brutal");
     expect(root.dataset.theme).toBe("dark");
     act(() => result.current.setUiStyle("studio"));
-    expect(result.current.headerStyle).toBe("centered");
-    expect(localStorage.getItem("ae-header")).toBe("centered");
+    expect(result.current.headerStyle).toBe("dock");
+    expect(localStorage.getItem("ae-header")).toBe("dock");
   });
 
   it("is readable by the header itself, and is simply standard where there is no provider", () => {
@@ -215,7 +215,7 @@ describe("header layout", () => {
     act(() => undefined);
     expect(inside.result.current).toBe("standard");
     expect(renderHook(() => useHeaderStyle()).result.current).toBe("standard");
-    localStorage.setItem("ae-header", "compact");
-    expect(renderHook(() => useHeaderStyle(), { wrapper }).result.current).toBe("compact");
+    localStorage.setItem("ae-header", "inline");
+    expect(renderHook(() => useHeaderStyle(), { wrapper }).result.current).toBe("inline");
   });
 });

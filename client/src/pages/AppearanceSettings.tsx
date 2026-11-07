@@ -84,22 +84,22 @@ const HEADERS: Choice<HeaderStyle>[] = [
     preview: <HeaderPreview kind="standard" />,
   },
   {
-    value: "compact",
-    label: "Compact",
-    description: "Dense and slim: the seal, title and clock share one thin line, with the toolbar on a full-width line right under it. Takes about a fifth less height, so more of the table shows.",
-    preview: <HeaderPreview kind="compact" />,
+    value: "inline",
+    label: "Inline",
+    description: "Title and toolbar share one line: the seal, the title, then the toolbar and the clock beside it, with no card around them. The toolbar wraps under the title only when the window is too narrow. Shows the most rows - best for data entry.",
+    preview: <HeaderPreview kind="inline" />,
   },
   {
-    value: "floating",
-    label: "Floating",
-    description: "Lifted off the edges: the page tabs become a pill switcher floating above a rounded card, and the toolbar sits in its own tray. The page scrolls beneath it.",
-    preview: <HeaderPreview kind="floating" />,
+    value: "ribbon",
+    label: "Ribbon",
+    description: "A slim title line, with the toolbar below it as a full-width band ruled above and below, like an office-app ribbon. The controls read as one strip, apart from the title.",
+    preview: <HeaderPreview kind="ribbon" />,
   },
   {
-    value: "centered",
-    label: "Centered",
-    description: "Everything on the middle line: the seal, the title and the toolbar stacked and centered, the page tabs centered across the top, and the clock tucked into the corner.",
-    preview: <HeaderPreview kind="centered" />,
+    value: "dock",
+    label: "Dock",
+    description: "The page tabs move from the top to a strip docked under the title and toolbar, next to the data, like the sheet tabs at the bottom of a spreadsheet.",
+    preview: <HeaderPreview kind="dock" />,
   },
 ];
 
@@ -391,55 +391,57 @@ function HeaderPreview({ kind }: { kind: HeaderStyle }) {
   );
   const frame: CSSProperties = { display: "block", background: page, height: 86, borderRadius: 4, overflow: "hidden", border: `1px solid ${line}` };
 
-  if (kind === "compact") {
+  const lines = (
+    <>
+      <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 5 }) }} />
+      <span style={{ display: "block", ...bar("80%", 5, "#e8e7e0", { marginTop: 4 }) }} />
+    </>
+  );
+  const titleRow = (
+    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      <span style={dot(11)} />
+      <span style={bar(52, 6, ink)} />
+    </span>
+  );
+  if (kind === "inline") {
     return (
-      <span style={{ ...frame, padding: "5px 6px" }}>
-        {tabs({ marginBottom: 4 })}
-        <span style={{ display: "block", background: card, border: `1px solid ${line}`, borderRadius: 3, padding: "3px 5px" }}>
+      <span style={{ ...frame, padding: "6px 6px" }}>
+        {tabs({ marginBottom: 5 })}
+        <span style={{ display: "flex", alignItems: "center", gap: 5, borderBottom: `1px solid ${line}`, padding: "2px 0 5px" }}>
+          <span style={dot(9)} />
+          <span style={bar(30, 6, ink)} />
+          <span style={{ display: "flex", flex: 1, justifyContent: "center" }}>{toolbar()}</span>
+          <span style={bar(14, 6, soft, { borderRadius: 3 })} />
+        </span>
+        {lines}
+      </span>
+    );
+  }
+  if (kind === "ribbon") {
+    return (
+      <span style={{ ...frame, padding: "6px 6px" }}>
+        {tabs({ marginBottom: 5 })}
+        <span style={{ display: "block", background: card, border: `1px solid ${line}`, borderRadius: 3, padding: "4px 5px 0", overflow: "hidden" }}>
           <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={dot(7)} />
-            <span style={bar(46, 5, ink)} />
-            <span style={bar(14, 5, "#3a8a4f", { marginLeft: 4 })} />
-            <span style={{ ...bar(18, 6, soft, { borderRadius: 3 }), marginLeft: "auto" }} />
+            <span style={dot(9)} />
+            <span style={bar(40, 5, ink)} />
+            <span style={{ ...bar(14, 6, soft, { borderRadius: 3 }), marginLeft: "auto" }} />
           </span>
+          <span style={{ display: "block", margin: "4px -5px 0", padding: "3px 5px", background: "#efeee8", borderTop: `1px solid ${line}`, borderBottom: `1px solid ${line}` }}>{toolbar()}</span>
+        </span>
+        {lines}
+      </span>
+    );
+  }
+  if (kind === "dock") {
+    return (
+      <span style={{ ...frame, padding: "6px 6px" }}>
+        <span style={{ display: "block", background: card, border: `1px solid ${line}`, borderRadius: 3, padding: "4px 5px 5px" }}>
+          {titleRow}
           <span style={{ display: "block", marginTop: 4 }}>{toolbar()}</span>
         </span>
-        <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 5 }) }} />
-        <span style={{ display: "block", ...bar("80%", 5, "#e8e7e0", { marginTop: 4 }) }} />
-        <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 4 }) }} />
-      </span>
-    );
-  }
-  if (kind === "floating") {
-    return (
-      <span style={{ ...frame, padding: 6 }}>
-        <span style={{ display: "inline-flex", gap: 4, alignItems: "center", background: card, border: `1px solid ${line}`, borderRadius: 999, padding: "3px 5px", boxShadow: "0 2px 5px rgba(0,0,0,0.12)" }}>
-          <span style={{ ...bar(22, 7, "rgba(212,160,0,0.35)", { borderRadius: 999 }) }} />
-          <span style={bar(18, 3, soft)} />
-          <span style={bar(18, 3, soft)} />
-        </span>
-        <span style={{ display: "block", background: card, border: `1px solid ${line}`, borderRadius: 9, padding: "4px 6px 5px", marginTop: 5, boxShadow: "0 5px 10px rgba(0,0,0,0.16)" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <span style={dot(9)} />
-            <span style={bar(52, 6, ink)} />
-          </span>
-          <span style={{ display: "block", background: "#efeee8", borderRadius: 6, padding: "3px 5px", marginTop: 4 }}>{toolbar()}</span>
-        </span>
-      </span>
-    );
-  }
-  if (kind === "centered") {
-    return (
-      <span style={{ ...frame, padding: "5px 6px" }}>
-        {tabs({ justifyContent: "center", marginBottom: 4 })}
-        <span style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, background: card, border: `1px solid ${line}`, borderRadius: 3, padding: "4px 5px", position: "relative" }}>
-          <span style={{ ...bar(18, 6, soft, { borderRadius: 3 }), position: "absolute", right: 4, top: 4 }} />
-          <span style={dot(9)} />
-          <span style={bar(58, 6, ink)} />
-          {toolbar("center")}
-        </span>
-        <span style={{ display: "block", ...bar("100%", 5, "#e8e7e0", { marginTop: 5 }) }} />
-        <span style={{ display: "block", ...bar("80%", 5, "#e8e7e0", { marginTop: 4 }) }} />
+        {tabs({ marginTop: 4, paddingTop: 4, borderTop: `1px solid ${line}` })}
+        {lines}
       </span>
     );
   }
