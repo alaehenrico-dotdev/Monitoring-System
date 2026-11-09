@@ -52,10 +52,10 @@ describe("DailyOutPage", () => {
     open();
     await screen.findByText(/Over 13 days/);
     expect(screen.getAllByRole("row")).toHaveLength(2 + 14 + 1);
-    expect(document.querySelector(".ae-mm-chart")).toBeNull();
+    expect(document.querySelector(".ae-fl-chart")).toBeNull();
     expect(screen.getByRole("button", { name: "Table" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "Chart" }));
-    expect(document.querySelector(".ae-mm-chart")).not.toBeNull();
+    expect(document.querySelector(".ae-fl-chart")).not.toBeNull();
   });
 
   it("uses the same date stepper as the other pages, ending the window on the chosen day", async () => {
@@ -79,7 +79,7 @@ describe("DailyOutPage", () => {
     expect((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000).toBe(13);
   });
 
-  it("plots one column per day, with a gap for a day nobody encoded", async () => {
+  it("plots one column per day, and a day nobody encoded reads as no entries", async () => {
     open();
     await showChart();
     expect(screen.getAllByRole("img")).toHaveLength(14);
@@ -90,7 +90,7 @@ describe("DailyOutPage", () => {
     open();
     await showChart();
     fireEvent.pointerEnter(screen.getAllByRole("img")[0]);
-    const tip = document.querySelector<HTMLElement>(".ae-mm-tip")!;
+    const tip = document.querySelector<HTMLElement>(".ae-fl-tip")!;
     expect(within(tip).getByText("Combined out")).toBeInTheDocument();
     expect(within(tip).getByText("Online out")).toBeInTheDocument();
     expect(within(tip).getByText("Offline out")).toBeInTheDocument();
