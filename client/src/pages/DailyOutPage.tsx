@@ -3,8 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { getDailyOut, type DailyOutEntry } from "../api/dailyOut";
 import { recordReportHistory } from "../api/reportHistory";
 import { useAuth } from "../context/AuthContext";
-import { ComboChart } from "../components/ComboChart";
-import { hasLines } from "../utils/comboChartData";
+import { FlowLineChart } from "../components/FlowLineChart";
 import { DateStepper } from "../components/DateStepper";
 import { Dropdown } from "../components/Dropdown";
 import { DownloadIcon, HistoryIcon } from "../components/icons";
@@ -16,7 +15,7 @@ import { Toast } from "../components/Toast";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { fullNumber } from "../utils/chartFormat";
 import { downloadCsv } from "../utils/csv";
-import { dailyOutCsv, dailyOutPoints, dailyOutTotals } from "../utils/dailyOut";
+import { DAILY_OUT_SERIES, dailyOutCsv, dailyOutFlowPoints, dailyOutTotals } from "../utils/dailyOut";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { getCurrentShiftAndDate } from "../utils/shift";
 
@@ -91,7 +90,7 @@ export function DailyOutPage() {
     };
   }, [from, to, realtimeVersion]);
 
-  const points = useMemo(() => (rows ? dailyOutPoints(rows, today) : null), [rows, today]);
+  const points = useMemo(() => (rows ? dailyOutFlowPoints(rows, today) : null), [rows, today]);
   const totals = useMemo(() => (rows ? dailyOutTotals(rows) : null), [rows]);
 
   // Listed in Daily Out History once actually exported, not merely viewed. An
@@ -204,11 +203,7 @@ export function DailyOutPage() {
         ) : (
           <div className="ae-mm-body">
             {view === "chart" ? (
-              <ComboChart
-                points={points}
-                barLabel="Combined out"
-                lineLabels={{ online: "Online out", offline: "Offline out" }}
-              />
+              <FlowLineChart points={points} series={DAILY_OUT_SERIES} zeroFill />
             ) : (
               <DailyOutTable rows={rows} totals={totals} />
             )}
@@ -219,8 +214,8 @@ export function DailyOutPage() {
               Offline is deliveries less backloads (upsells are not counted); RTS is shown for
               information and is not taken off Online. Moving stock between Online and Offline
               is not counted as out.
-              {view === "chart" && points && totals.days > 0 && !hasLines(points) &&
-                " A line needs two consecutive days with entries, so until then each day shows as a dot."}
+              {view === "chart" && totals.days > 0 &&
+                " In the chart, days without entries are drawn at 0; hover or focus a day for the figures."}
             </p>
           </div>
         )}

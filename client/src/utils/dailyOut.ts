@@ -1,4 +1,5 @@
 import type { DailyOutEntry } from "../api/dailyOut";
+import type { FlowPoint, FlowSeries } from "../components/FlowLineChart";
 import type { ComboPoint, ComboTooltip } from "./comboChartData";
 import { fullNumber } from "./chartFormat";
 import { formatDateDisplay } from "./dateFormat";
@@ -45,6 +46,26 @@ export function dailyOutPoints(rows: DailyOutEntry[], today: string): ComboPoint
     offline: e.offlineOut,
     current: e.date === today,
     tooltip: dayTooltip(e),
+  }));
+}
+
+/// The same figures for the dashboard-style line chart (FlowLineChart): Combined,
+/// Online and Offline as three smooth lines. A null stays null here; the chart
+/// decides whether to draw it as 0 (zeroFill) or leave a gap.
+export const DAILY_OUT_SERIES: FlowSeries[] = [
+  { key: "total", label: "Combined out", color: "var(--ae-viz-bar-key)" },
+  { key: "online", label: "Online out", color: "var(--ae-viz-online)" },
+  { key: "offline", label: "Offline out", color: "var(--ae-viz-offline)" },
+];
+
+export function dailyOutFlowPoints(rows: DailyOutEntry[], today: string): FlowPoint[] {
+  return rows.map((e) => ({
+    key: e.date,
+    label: shortDate(e.date),
+    title: formatDateDisplay(e.date),
+    ariaLabel: describeDay(e),
+    values: { total: e.totalOut, online: e.onlineOut, offline: e.offlineOut },
+    current: e.date === today,
   }));
 }
 

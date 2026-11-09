@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailyOutEntry } from "../api/dailyOut";
-import { dailyOutCsv, dailyOutPoints, dailyOutTotals } from "./dailyOut";
+import { DAILY_OUT_SERIES, dailyOutCsv, dailyOutFlowPoints, dailyOutPoints, dailyOutTotals } from "./dailyOut";
 
 const day = (date: string, onlineOut: number | null, offlineOut: number | null, onlineRts: number | null = null, offlineBackloads: number | null = null): DailyOutEntry => ({
   date,
@@ -33,6 +33,20 @@ describe("dailyOutPoints", () => {
   });
 
   it("marks only today as current", () => {
+    expect(points.map((p) => p.current)).toEqual([false, false, true]);
+  });
+});
+
+describe("dailyOutFlowPoints", () => {
+  const points = dailyOutFlowPoints(ROWS, "2026-10-03");
+
+  it("maps combined, online and offline onto the dashboard chart's series keys", () => {
+    expect(DAILY_OUT_SERIES.map((s) => s.key)).toEqual(["total", "online", "offline"]);
+    expect(points[0].values).toEqual({ total: 200, online: 120, offline: 80 });
+  });
+
+  it("keeps a day with nothing recorded as null, and marks only today as current", () => {
+    expect(points[1].values).toEqual({ total: null, online: null, offline: null });
     expect(points.map((p) => p.current)).toEqual([false, false, true]);
   });
 });
