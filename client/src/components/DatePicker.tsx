@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "./icons";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { addDays, addMonths, parseISO, sameDay, toISO } from "../utils/calendar";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { formatShortDay } from "../utils/dateFormat";
 
 /**
  * Themed replacement for `<input type="date">`.
@@ -210,7 +212,9 @@ export function DatePicker({ value, onChange, className = "", style, disabled, t
   const gridStart = addDays(firstOfMonth, -firstOfMonth.getDay());
   const cells = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 
-  const longLabel = selected ? selected.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "Select date";
+  // A phone shows just "Nov 10" (the year only when it is not this one): the arrows beside it do the stepping.
+  const phone = useReadOnlyPhone();
+  const longLabel = selected ? formatShortDay(selected, !phone || selected.getFullYear() !== new Date().getFullYear()) : "Select date";
   const dialogLabel = ariaLabel ? `Choose ${ariaLabel.toLowerCase()}` : "Choose date";
 
   return (

@@ -18,6 +18,8 @@ import { Button } from "./ui";
 import { DatePicker } from "./DatePicker";
 import { DownloadIcon } from "./icons";
 import { BarsSkeleton } from "./Skeleton";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { formatShortDay } from "../utils/dateFormat";
 
 const KIND_LABEL: Record<PeriodKind, string> = { week: "Weekly", month: "Monthly" };
 
@@ -41,6 +43,16 @@ const TILES: Tile[] = [
 
 const fmt = (v: number) => fullNumber.format(v);
 
+/// "Nov 9 – Nov 15, 2026" on a phone (a month keeps its own title).
+function shortPeriodTitle(kind: PeriodKind, from: string, to: string): string {
+  if (kind === "month") return periodTitle(kind, from, to);
+  const d = (iso: string) => {
+    const [y, m, day] = iso.split("-").map(Number);
+    return new Date(y, m - 1, day);
+  };
+  return `${formatShortDay(d(from), false)} – ${formatShortDay(d(to), false)}, ${d(to).getFullYear()}`;
+}
+
 /**
  * Dashboard > Weekly / Monthly Monitoring - what moved over a week (Mon-Sun) or
  * a calendar month: stock out, backloads, RTS, production and audit variance, in
@@ -50,6 +62,7 @@ const fmt = (v: number) => fullNumber.format(v);
  * how many there were.
  */
 export function PeriodMonitoringCard() {
+  const phone = useReadOnlyPhone();
   const today = getCurrentShiftAndDate().date;
   const [kind, setKind] = useState<PeriodKind>("week");
   const [anchor, setAnchor] = useState(today);
@@ -113,7 +126,7 @@ export function PeriodMonitoringCard() {
     <section className="ae-dash-section">
       <div className="ae-dash-card">
         <h3 className="ae-dash-heading ae-mm-heading">
-          {KIND_LABEL[kind]} Monitoring · {periodTitle(kind, from, to)}
+          {KIND_LABEL[kind]} Monitoring · {phone ? shortPeriodTitle(kind, from, to) : periodTitle(kind, from, to)}
           <span className="ae-mm-controls">
             <span className="ae-mm-view" role="group" aria-label="Period">
               {(Object.keys(KIND_LABEL) as PeriodKind[]).map((k) => (
@@ -186,7 +199,7 @@ export function PeriodMonitoringCard() {
               <p className="ae-mm-note">Nothing was recorded in this period.</p>
             ) : (
               <div className="ae-mm-tablewrap">
-                <table className="ae-table ae-table--center-head ae-table--compact">
+                <table className="ae-table ae-table--center-head ae-table--compact ae-pm-table">
                   <thead>
                     <tr>
                       {["SKU", "Product", "Online out", "Offline out", "Total out", "Backloads", "RTS", "Production in", "Net var.", "Abs. var."].map((h) => (
@@ -233,16 +246,18 @@ export function PeriodMonitoringCard() {
               </div>
             )}
 
-            <p className="ae-mm-note">
-              {data.totals.countedDays === 0
-                ? "No audit counts were saved in this period, so there is no variance to report. "
-                : `Variance covers the ${data.totals.countedDays} ${data.totals.countedDays === 1 ? "day" : "days"} with an audit count out of ${data.days}. `}
-              {(() => {
-                const rate = backloadRate(data.totals);
-                return rate === null ? "" : `Backloads were ${rate}% of everything that went out. `;
-              })()}
-              Totals add up each product in its own unit; transfers between Online and Offline are not counted as out.
-            </p>
+            <ul className="ae-mm-notelist">
+                <li>
+                  {data.totals.countedDays === 0
+                    ? "No audit counts this period, so no variance"
+                    : `Variance: ${data.totals.countedDays} of ${data.days} days had an audit count`}
+                </li>
+                {(() => {
+                  const rate = backloadRate(data.totals);
+                  return rate === null ? null : <li>Backloads were {rate}% of all out</li>;
+                })()}
+                <li>Each product in its own unit; Online ↔ Offline transfers not counted</li>
+              </ul>
           </div>
         )}
       </div>
@@ -251,9 +266,19 @@ export function PeriodMonitoringCard() {
 }
 
 function DeltaText({ delta, unit }: { delta: Delta | null; unit: PeriodKind }) {
+  const phone = useReadOnlyPhone();
   if (!delta) return null;
-  if (delta.diff === 0) return <span className="ae-dash-stat-delta">No change vs previous {unit}</span>;
+  // A phone tile is small: only a change is shown, as "▲ 12" (the full wording is the tooltip).
   const arrow = delta.diff > 0 ? "▲" : "▼";
+  if (phone) {
+    if (delta.diff === 0) return null;
+    return (
+      <span className="ae-dash-stat-delta" title={`Compared with the previous ${unit}`}>
+        {arrow} {fmt(Math.abs(delta.diff))}
+      </span>
+    );
+  }
+  if (delta.diff === 0) return <span className="ae-dash-stat-delta">No change vs previous {unit}</span>;
   const pct = delta.pct === null ? "" : ` (${delta.pct > 0 ? "+" : ""}${delta.pct}%)`;
   return (
     <span className="ae-dash-stat-delta" title={`Compared with the previous ${unit}`}>

@@ -39,6 +39,8 @@ import { useCountUp } from "../hooks/useCountUp";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { getCurrentShiftAndDate } from "../utils/shift";
 import { makeDelta, summarize, type Delta } from "../utils/dashboardTotals";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { PhoneSafeLink } from "../components/PhoneSafeLink";
 
 // Fetched 8; CSS shows 5 on short windows and all 8 on tall ones.
 const RECENT_ACTIVITY_LIMIT = 8;
@@ -80,6 +82,8 @@ function addDays(iso: string, days: number): string {
  * styling lives in the .ae-dash-* rules in index.css.
  */
 export function DashboardPage() {
+  // On a phone only the pages it can open are linked.
+  const phone = useReadOnlyPhone();
   const [stocks, setStocks] = useState<TotalStockRow[] | null>(null);
   // The previous day's rows, only used for the "vs prev day" deltas - a
   // failed fetch just means no deltas are shown.
@@ -331,7 +335,7 @@ export function DashboardPage() {
                   icon={<TagIcon />}
                   label="Active SKUs"
                   value={activeProducts}
-                  to="/products"
+                  to={phone ? undefined : "/products"}
                 />
               </>
             ) : showStatsError ? (
@@ -375,7 +379,7 @@ export function DashboardPage() {
 
       <div className="ae-dash-quicklinks" aria-label="Quick links">
         {QUICK_LINKS.map((l) => (
-          <Link key={l.to} to={l.to} className="ae-dash-quicklink">
+          <PhoneSafeLink key={l.to} to={l.to} className="ae-dash-quicklink">
             <span aria-hidden className="ae-dash-quicklink-icon">
               {l.icon}
             </span>
@@ -383,7 +387,7 @@ export function DashboardPage() {
             <span aria-hidden className="ae-dash-quicklink-arrow">
               <ChevronRightIcon />
             </span>
-          </Link>
+          </PhoneSafeLink>
         ))}
       </div>
 

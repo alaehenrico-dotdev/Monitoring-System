@@ -285,7 +285,7 @@ describe("ChangeLogPage - paging and export", () => {
 
     expect(await screen.findByText("Row 45")).toBeTruthy();
     const pager = screen.getByRole("navigation", { name: "Manual Count pages" });
-    expect(pager.textContent).toContain("Showing 1–20 of 45 records");
+    expect(pager.textContent).toContain("1–20 of 45");
     expect(pager.textContent).toContain("1 / 3");
     // The pager sits in the category's header row.
     expect(pager.closest("tr")?.textContent).toContain("Manual Count");
@@ -294,7 +294,7 @@ describe("ChangeLogPage - paging and export", () => {
     expect(await screen.findByText("Row 25")).toBeTruthy();
     expect(api.listChangeLogPage.mock.calls.at(-1)![1]).toMatchObject({ offset: 20, limit: 20, withTotal: true });
     expect(screen.queryByText("Row 45")).toBeNull();
-    expect(screen.getByRole("navigation", { name: "Manual Count pages" }).textContent).toContain("Showing 21–40 of 45 records");
+    expect(screen.getByRole("navigation", { name: "Manual Count pages" }).textContent).toContain("21–40 of 45");
 
     fireEvent.click(screen.getByRole("button", { name: "First page" }));
     expect(await screen.findByText("Row 45")).toBeTruthy();

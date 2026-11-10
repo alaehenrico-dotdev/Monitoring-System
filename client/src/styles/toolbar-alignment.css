@@ -80,10 +80,10 @@
 
 /* Numbers are centered on their columns (header and cells alike). .ae-table
    already sets tabular-nums, so the glyphs are the same width too. The two
-   identity columns keep their own left alignment - the :not() pair is what
+   identity columns (and the Subtotal / Grand total label that spans them) keep their own left alignment - the :not() pair is what
    gives this the specificity to beat the generic `.ae-table th { text-align:
    left }` above. */
-.ae-table--sticky-id td:not(.ae-cell-sku):not(.ae-cell-name),
+.ae-table--sticky-id td:not(.ae-cell-sku):not(.ae-cell-name):not(.ae-sticky-subtotal),
 .ae-table--sticky-id th:not(.ae-sticky-sku):not(.ae-sticky-name) {
   text-align: center;
 }

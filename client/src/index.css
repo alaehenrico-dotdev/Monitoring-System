@@ -17,3 +17,5 @@
 @import "./styles/header-styles.css";
 @import "./styles/shared-late.css";
 @import "./styles/a11y-polish.css";
+/* Last: the phone view rearranges the header whichever theme and header layout are on. */
+@import "./styles/phone.css";

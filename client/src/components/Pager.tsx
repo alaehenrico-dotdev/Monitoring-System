@@ -60,12 +60,12 @@ export function Pager({
       }}
     >
       <span aria-live="polite">
-        Showing <span style={strong}>{from.toLocaleString()}–{to.toLocaleString()}</span> of{" "}
-        <span style={strong}>{total.toLocaleString()}</span> records
+        <span style={strong}>{from.toLocaleString()}–{to.toLocaleString()}</span> of{" "}
+        <span style={strong}>{total.toLocaleString()}</span>
       </span>
       {onPageSize && (
         <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-          Rows per page:
+          Rows:
           <Select
             aria-label="Rows per page"
             value={pageSize}

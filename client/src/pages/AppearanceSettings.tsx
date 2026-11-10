@@ -175,7 +175,7 @@ function FontSettings() {
 export function AppearanceSettings() {
   const { theme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle } = useTheme();
   return (
-    <div style={{ width: "100%", maxWidth: 880, margin: "0 auto", display: "grid", gap: 22 }}>
+    <div className="ae-appearance" style={{ width: "100%", maxWidth: 880, margin: "0 auto", display: "grid", gap: 22 }}>
       <ChoiceGroup legend="Color mode" choices={MODES} value={theme} onChange={setTheme} />
       <ChoiceGroup legend="Theme" choices={THEMES} value={uiStyle} onChange={setUiStyle} />
       <ChoiceGroup legend="Header and toolbar" choices={HEADERS} value={headerStyle} onChange={setHeaderStyle} />
@@ -205,7 +205,7 @@ function ChoiceGroup<T extends string>({
   return (
     <fieldset style={{ border: "none", margin: 0, padding: 0, minWidth: 0 }}>
       <legend style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, padding: 0, color: colors.ink }}>{legend}</legend>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 14 }}>
+      <div className="ae-choice-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 14 }}>
         {choices.map((c) => {
           const selected = c.value === value;
           return (
@@ -222,10 +222,10 @@ function ChoiceGroup<T extends string>({
               <span className="ae-choice-card-preview" aria-hidden>
                 {c.preview}
               </span>
-              <span id={`${groupId}-${c.value}-title`} style={{ display: "block", fontWeight: 600, marginTop: 8 }}>
+              <span id={`${groupId}-${c.value}-title`} className="ae-choice-title" style={{ display: "block", fontWeight: 600, marginTop: 8 }}>
                 {c.label}
               </span>
-              <span id={`${groupId}-${c.value}-desc`} style={{ display: "block", fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+              <span id={`${groupId}-${c.value}-desc`} className="ae-choice-desc" style={{ display: "block", fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
                 {c.description}
               </span>
             </label>

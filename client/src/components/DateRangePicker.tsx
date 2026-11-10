@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "./icons";
 import { addDays, addMonths, parseISO, rangeLabels, sameDay, toISO } from "../utils/calendar";
 
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { phoneLabel } from "../utils/phoneLabel";
 /**
  * One field for a date range: a single trigger ("Oct 1 – Oct 9, 2026") that
  * opens one calendar. The first click picks the start, the second the end
@@ -176,6 +178,7 @@ export function DateRangePicker({ from, to, onChange, className = "", style, "ar
   const [lo, hi] =
     anchor && hover ? (hover < anchor ? [hover, anchor] : [anchor, hover]) : anchor ? [anchor, anchor] : [start, end ?? start];
 
+  const phone = useReadOnlyPhone();
   const labels = rangeLabels(from, to);
   const monthLabel = `${MONTH_NAMES[focus.getMonth()]} ${focus.getFullYear()}`;
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -192,7 +195,7 @@ export function DateRangePicker({ from, to, onChange, className = "", style, "ar
         aria-expanded={open}
         onClick={() => (open ? closePicker() : openPicker())}
       >
-        <span className="ae-date-trigger-text">{labels.long}</span>
+        <span className="ae-date-trigger-text">{phone ? phoneLabel(labels.long) : labels.long}</span>
         <span className="ae-date-trigger-icon" aria-hidden>
           <CalendarIcon />
         </span>

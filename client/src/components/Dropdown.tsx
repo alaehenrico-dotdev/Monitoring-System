@@ -11,7 +11,8 @@ import {
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronIcon } from "./icons";
-
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { phoneLabel } from "../utils/phoneLabel";
 /**
  * Themed replacement for a bare `<select>` (see `Select` in ui.tsx).
  *
@@ -264,7 +265,9 @@ export function Dropdown({
     setActiveIndex(next);
   }
 
-  const triggerLabel = selected ? (labelPrefix ? (selected.shortLabel ?? selected.label) : selected.label) : placeholder;
+  const phone = useReadOnlyPhone();
+  const fullLabel = selected ? (labelPrefix ? (selected.shortLabel ?? selected.label) : selected.label) : placeholder;
+  const triggerLabel = phone ? phoneLabel(fullLabel) : fullLabel;
   const dialogLabel = ariaLabel
     ? `Choose ${ariaLabel.toLowerCase()}`
     : "Choose option";
@@ -281,7 +284,7 @@ export function Dropdown({
         // With a visible prefix the accessible name is the visible text itself
         // ("Category: All"): a name that does not contain what is on screen is a
         // mismatch for voice control and screen readers alike.
-        aria-label={labelPrefix ? `${labelPrefix}: ${triggerLabel}` : ariaLabel}
+        aria-label={labelPrefix ? `${labelPrefix}: ${fullLabel}` : ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => (open ? closeMenu() : openMenu())}

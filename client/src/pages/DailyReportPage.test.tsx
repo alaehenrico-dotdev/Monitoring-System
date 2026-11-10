@@ -28,6 +28,8 @@ vi.mock("../components/TotalStocksTable", () => ({ TotalStocksTable: () => <div>
 vi.mock("../context/RealtimeContext", () => ({ useRealtimeVersion: () => 0 }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, role: "SUPERVISOR_ADMIN" } }) }));
 vi.mock("../hooks/useTopProgress", () => ({ useTopProgress: () => ({ track: (fn: () => Promise<unknown>) => fn() }) }));
+const phone = vi.hoisted(() => ({ on: false }));
+vi.mock("../hooks/useReadOnlyPhone", () => ({ useReadOnlyPhone: () => phone.on }));
 vi.mock("../utils/unsavedWork", () => ({ findUnsavedWork: () => [] }));
 
 const DATE = "2026-10-22";
@@ -50,6 +52,7 @@ let stop = () => {};
 
 beforeEach(() => {
   vi.clearAllMocks();
+  phone.on = false;
   notices = [];
   stop();
   stop = subscribeNotices((n) => notices.push(n));
@@ -324,3 +327,48 @@ describe("View > Hide products with no figures / Hide empty columns", () => {
   });
 });
 
+
+describe("on a phone", () => {
+  beforeEach(() => {
+    phone.on = true;
+  });
+
+  it("opens the report by itself, with no Generate button, and never saves to Drive or downloads a PDF", async () => {
+    open();
+    await waitFor(() => expect(screen.getAllByText("stock grid").length).toBeGreaterThan(0));
+    expect(api.getDailyReport).toHaveBeenCalledWith(DATE);
+    expect(screen.queryByRole("button", { name: /^Generate$/ })).toBeNull();
+    expect(api.saveDailyReportToDrive).not.toHaveBeenCalled();
+    expect(api.downloadTablePdf).not.toHaveBeenCalled();
+  });
+
+  it("puts PDF, Refresh and History on the toolbar and leaves Excel and the Export menu to the desktop", async () => {
+    open();
+    await waitFor(() => expect(screen.getAllByText("stock grid").length).toBeGreaterThan(0));
+    expect(screen.getByRole("button", { name: "Download PDF" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Daily History" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Export Excel/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Export$/ })).toBeNull();
+  });
+
+  it("says No report today. when today has nothing saved, with no dialog", async () => {
+    api.getDailyReport.mockImplementation(async (d: string) => report({ date: d, online: [], offline: [], audit: [] }));
+    open("/daily-report");
+    expect(await screen.findByText("No report today.")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("names the date when an earlier date has nothing saved", async () => {
+    api.getDailyReport.mockImplementation(async (d: string) => report({ date: d, online: [], offline: [], audit: [] }));
+    open();
+    expect(await screen.findByText(/^No report for /)).toBeInTheDocument();
+  });
+
+  it("shows another date's report as soon as the date is stepped", async () => {
+    open();
+    await waitFor(() => expect(screen.getAllByText("stock grid").length).toBeGreaterThan(0));
+    fireEvent.click(screen.getByRole("button", { name: "Previous day" }));
+    await waitFor(() => expect(api.getDailyReport).toHaveBeenCalledWith("2026-10-21"));
+  });
+});

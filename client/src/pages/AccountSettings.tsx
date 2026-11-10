@@ -62,7 +62,10 @@ export function AccountSettings() {
           </div>
         </div>
 
-        <Setting title="Password" description="Change the password you sign in with. Your other devices are signed out when you do.">
+        <Setting
+          title="Password"
+          description="Change your sign-in password. Other devices are signed out."
+        >
           <Button {...actionButton} onClick={() => setDialog("password")}>
             Change password
           </Button>
@@ -71,11 +74,7 @@ export function AccountSettings() {
         <Setting
           title="Two-step verification"
           status={<span className={`ae-account-role${enabled ? " ae-account-role--on" : ""}`}>{enabled ? "On" : "Off"}</span>}
-          description={
-            enabled
-              ? "Signing in needs your password and a code from your authenticator app."
-              : "Adds a code from your phone to signing in, so a stolen or guessed password is not enough. Strongly recommended for administrators."
-          }
+          description={enabled ? "Sign-in needs your password and an app code." : "Adds an app code at sign-in. Recommended for admins."}
         >
           <Button {...actionButton} onClick={() => setDialog(enabled ? "mfa-off" : "mfa-on")}>
             {enabled ? "Turn off" : "Set up"}
@@ -84,7 +83,7 @@ export function AccountSettings() {
 
         <Setting
           title="Signed-in devices"
-          description="Lost a device, or left yourself signed in on a shared computer? Sign out everywhere else, including devices you chose to remember. This browser stays signed in."
+          description="Sign out all other devices, including remembered ones. This one stays signed in."
         >
           <Button {...actionButton} onClick={handleSignOutEverywhere} loading={signingOut} loadingLabel="Signing out…">
             Sign out everywhere else
@@ -176,14 +175,14 @@ function SetUpTwoStep({ onClose }: { onClose: () => void }) {
       {step === "scan" && secret && (
         <form onSubmit={confirm} style={{ display: "grid", gap: 14 }} autoComplete="off">
           <p style={note}>
-            1. In an authenticator app (Google Authenticator, Microsoft Authenticator, Authy, 1Password…) add an account and scan this code.
+            1. Scan this code in an authenticator app.
           </p>
           <QrCode value={secret.url} label="QR code to add this account to your authenticator app" />
           <p style={note}>
-            Can&apos;t scan it? Type this key instead, or on a phone <a href={secret.url}>open it in your authenticator app</a>.
+            Can&apos;t scan? Type this key or <a href={secret.url}>open it in the app</a>.
           </p>
           <div className="ae-code-block">{secret.key.match(/.{1,4}/g)?.join(" ")}</div>
-          <p style={note}>2. Type the 6-digit code the app shows now.</p>
+          <p style={note}>2. Enter the 6-digit code.</p>
           <Field label="6-digit code">
             <TextInput value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" autoFocus style={{ width: "100%" }} />
           </Field>
@@ -197,7 +196,8 @@ function SetUpTwoStep({ onClose }: { onClose: () => void }) {
       {step === "codes" && (
         <div style={{ display: "grid", gap: 14 }}>
           <p style={note}>
-            <strong style={{ color: colors.ink }}>Two-step verification is on.</strong> Save these recovery codes somewhere safe, such as a password manager. Each works once if you lose your phone, and they are shown only now.
+            <strong style={{ color: colors.ink }}>Two-step verification is on.</strong>{" "}
+            Save these recovery codes safely. Each works once. Shown only now.
           </p>
           <div className="ae-code-block ae-recovery-grid">
             {recovery.map((c) => (
@@ -250,7 +250,7 @@ function TurnOffTwoStep({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="Turn off two-step verification" width={400} onClose={onClose}>
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: 14 }} autoComplete="off">
-        <p style={note}>Needs your password and a current code from your authenticator app (or a recovery code).</p>
+        <p style={note}>Needs your password and an app or recovery code.</p>
         <Field label="Password">
           <TextInput type="password" autoComplete="current-password" autoFocus value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%" }} />
         </Field>

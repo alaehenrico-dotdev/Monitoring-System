@@ -11,7 +11,7 @@ import {
 } from "../api/drive";
 import { getReportOptions, updateReportOptions, type ReportOptions } from "../api/appSettings";
 import { Button } from "../components/ui";
-import { InlineLoading } from "../components/Spinner";
+import { InlineLoading, Spinner } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { resetDriveCopyConfig } from "../utils/driveCopy";
 import { formatHour, localSlotToUtc, utcSlotToLocal, WEEKDAYS, wholeHourOffset } from "../utils/driveTime";
@@ -34,6 +34,31 @@ const FILTERS: { id: KindFilter; label: string }[] = [
   { id: "backup", label: "Backups" },
   { id: "export", label: "Exports" },
 ];
+
+/// Google Drive's own mark (its six-colour triangle), so the button reads as Google's.
+function DriveLogo() {
+  return (
+    <svg viewBox="0 0 87.3 78" width="20" height="18" aria-hidden="true" focusable="false">
+      <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
+      <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47" />
+      <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
+      <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" />
+      <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" />
+      <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
+    </svg>
+  );
+}
+
+/// The Connect / Reconnect button in Google's button style (white, thin grey outline, the Drive
+/// mark, dark grey text; the dark variant is in styles/shared-late.css).
+function GoogleDriveButton({ label, loadingLabel, loading, disabled, onClick }: { label: string; loadingLabel: string; loading: boolean; disabled?: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className="ae-gdrive-btn" disabled={disabled || loading} aria-busy={loading || undefined} onClick={onClick}>
+      {loading ? <Spinner size="sm" /> : <DriveLogo />}
+      <span>{loading ? loadingLabel : label}</span>
+    </button>
+  );
+}
 
 /// Google only accepts a plain-http redirect address for localhost, so Connect
 /// can only complete from the PC that runs the server (or from an https address).
@@ -243,9 +268,7 @@ export function GoogleDriveSettings() {
               accepts a plain-http return address for localhost. Once connected, everything works from any PC.
             </div>
           )}
-          <Button loading={busy === "connect"} loadingLabel="Opening Google…" onClick={() => void connect()}>
-            Connect Google Drive
-          </Button>
+          <GoogleDriveButton label="Connect Google Drive" loadingLabel="Opening Google…" loading={busy === "connect"} onClick={() => void connect()} />
         </div>
       ) : (
         <div style={{ marginTop: 12, display: "grid", gap: 14 }}>
@@ -273,9 +296,7 @@ export function GoogleDriveSettings() {
           {status.lastError && (
             <div role="alert" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.danger }}>
               {status.lastError}{" "}
-              <Button className="ae-btn-solid" size="sm" loading={busy === "connect"} onClick={() => void connect()}>
-                Reconnect
-              </Button>
+              <GoogleDriveButton label="Reconnect" loadingLabel="Opening Google…" loading={busy === "connect"} onClick={() => void connect()} />
             </div>
           )}
 

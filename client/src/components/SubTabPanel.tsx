@@ -38,6 +38,17 @@ export function SubTabPanel({ label, children }: { label?: string; children: Rea
   const clipId = useId();
   const [outline, setOutline] = useState<{ d: string; stroke: number; width: number; height: number; left: number; top: number } | null>(null);
 
+  // The strip scrolls sideways on a phone: keep the chosen tab in view (it may have been tapped half off the edge).
+  const lastSelected = useRef<Element | null>(null);
+  useEffect(() => {
+    const strip = panelRef.current?.previousElementSibling;
+    const selected = strip?.querySelector('[aria-selected="true"]') ?? null;
+    if (selected && selected !== lastSelected.current && strip instanceof HTMLElement && strip.scrollWidth > strip.clientWidth) {
+      selected.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+    lastSelected.current = selected;
+  });
+
   const gliding = useRef(false);
   const measureAgain = useRef<(animate?: boolean) => void>(() => undefined);
 

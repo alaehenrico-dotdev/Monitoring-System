@@ -121,11 +121,16 @@ export function StockFlowChart() {
         ) : (
           <div className="ae-mm-body">
             <FlowLineChart points={points} series={SERIES} zeroFill />
-            <p className="ae-mm-note">
-              {anyData
-                ? `Units per day, each product counted in its own unit. ${daysWithData} of ${days} days have entries; days without entries are drawn at 0. Hover or focus a day for the figures.`
-                : "Nothing was recorded in this period."}
-            </p>
+            <ul className="ae-mm-notelist">
+                {anyData ? (
+                  <>
+                    <li>Units per day, each product in its own unit</li>
+                    <li>{daysWithData} of {days} days have entries (others drawn at 0)</li>
+                  </>
+                ) : (
+                  <li>Nothing was recorded in this period</li>
+                )}
+              </ul>
             {anyData && (
               <div className="ae-fl-split">
                 <h4 className="ae-fl-split-title">

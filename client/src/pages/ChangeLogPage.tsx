@@ -30,7 +30,7 @@ import {
   recordLabel,
   startOfDayIso,
 } from "../utils/changeLogLabel";
-import { localDateStamp } from "../utils/dateFormat";
+import { formatStamp, localDateStamp } from "../utils/dateFormat";
 import { copyExportToDrive } from "../utils/driveCopy";
 import { saveBlob } from "../utils/saveBlob";
 import { TABLE_LABELS, ACTION_COLOR } from "../config/changeLog";
@@ -39,6 +39,7 @@ import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 const SYSTEM_TABLE = "system";
 /// Rows per category: with every table showing, each category is a short
@@ -46,6 +47,15 @@ const SYSTEM_TABLE = "system";
 const ROWS_ALL_TABLES = 20;
 const ROWS_ONE_TABLE = 100;
 const REFRESH_DEBOUNCE_MS = 400;
+/// On a phone the product name goes last, so when the line is cut it is the name that loses
+/// its tail, not the date or shift: "AFP067 · Nov 7 · Night · CHILI POWDER 1KG". The group
+/// heading already says Online / Offline, so that part is dropped.
+function phoneRecordLabel(label: string): string {
+  const parts = label.replace(/ · (Online|Offline|Total)$/, "").split(" · ");
+  // SKU, product, date, shift: only then is there a name to move to the end.
+  return parts.length >= 4 ? [parts[0], ...parts.slice(2), parts[1]].join(" · ") : parts.join(" · ");
+}
+
 const COLUMNS = ["When", "Record", "Action", "What changed", "Changed By", ""];
 
 const SOURCE_TAG: Record<"import" | "reset", string> = {
@@ -382,7 +392,7 @@ export function ChangeLogPage() {
           table scrolls inside it and the page header stays put above. */}
       <div className="ae-grid-fill" style={!anyLoaded || nothingToShow ? { display: "none" } : undefined}>
         <RowGlowScroll>
-          <table className="ae-table" style={{ minWidth: 720 }}>
+          <table className="ae-table ae-cl-table" style={{ minWidth: 720 }}>
             <thead>
               <tr>
                 {COLUMNS.map((h) => (
@@ -559,20 +569,23 @@ function SystemChangeRow({
     entry.newValue as { deleted?: Record<string, number> } | null
   )?.deleted ?? {}) as Record<string, number>;
   const counts = Object.entries(deleted);
+  const phone = useReadOnlyPhone();
   return (
     <>
       <tr
+        className="ae-cl-row"
         style={{ cursor: counts.length ? "pointer" : undefined }}
         onClick={counts.length ? onToggle : undefined}
         onKeyDown={counts.length ? toggleOnKey(onToggle) : undefined}
         tabIndex={counts.length ? 0 : undefined}
         aria-expanded={counts.length ? expanded : undefined}
       >
-        <td style={{ whiteSpace: "nowrap" }}>
-          {new Date(entry.changedAt).toLocaleString()}
+        <td className="ae-cl-when" style={{ whiteSpace: "nowrap" }}>
+          {formatStamp(entry.changedAt, phone)}
         </td>
-        <td style={{ whiteSpace: "nowrap", color: colors.subtleInk }}>—</td>
+        <td className="ae-cl-record" style={{ whiteSpace: "nowrap", color: colors.subtleInk }}>—</td>
         <td
+          className="ae-cl-action"
           style={{
             textAlign: "left",
             fontWeight: 700,
@@ -580,19 +593,21 @@ function SystemChangeRow({
           }}
         >
           {changeEventLabel(entry)}
-          <SourceTag source={entry.source} />
+          {!phone && <SourceTag source={entry.source} />}
         </td>
-        <td style={summaryCellStyle}>
+        <td className="ae-cl-what" style={summaryCellStyle}>
+          {phone && entry.source ? `${SOURCE_TAG[entry.source]} · ` : null}
           {counts.length
             ? `Removed ${counts.reduce((sum, [, n]) => sum + n, 0)} rows`
             : "—"}
         </td>
         <td
+          className="ae-cl-by"
           style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.ink }}
         >
           {entry.changedBy?.name ?? "system"}
         </td>
-        <td style={{ color: colors.subtleInk }}>
+        <td className="ae-cl-toggle" style={{ color: colors.subtleInk }}>
           {counts.length ? (expanded ? "▲" : "▼") : ""}
         </td>
       </tr>
@@ -653,27 +668,32 @@ function ChangeLogRow({
 }) {
   // The server's friendly-named diff; diffFields only for a row without one.
   const diffs = entry.changes ?? diffFields(entry.oldValue, entry.newValue);
+  const phone = useReadOnlyPhone();
 
   return (
     <>
       <tr
+        className="ae-cl-row"
         style={{ cursor: "pointer" }}
         onClick={onToggle}
         onKeyDown={toggleOnKey(onToggle)}
         tabIndex={0}
         aria-expanded={expanded}
       >
-        <td style={{ whiteSpace: "nowrap" }}>
-          {new Date(entry.changedAt).toLocaleString()}
+        <td className="ae-cl-when" style={{ whiteSpace: "nowrap" }}>
+          {formatStamp(entry.changedAt, phone)}
         </td>
-        <td style={{ textAlign: "left" }}>
+        <td className="ae-cl-record" style={{ textAlign: "left" }}>
           {entry.tableName === REPORTS_TABLE
             ? "Generated report"
             : entry.tableName === "users"
               ? `User · ${accountName(entry)}`
-              : recordLabel(entry.context, entry.recordId)}
+              : phone
+                ? phoneRecordLabel(recordLabel(entry.context, entry.recordId))
+                : recordLabel(entry.context, entry.recordId)}
         </td>
         <td
+          className="ae-cl-action"
           style={{
             textAlign: "left",
             fontWeight: 700,
@@ -681,8 +701,8 @@ function ChangeLogRow({
           }}
         >
           {entry.action}
-          <SourceTag source={entry.source} />
-          {entry.causedById != null && (
+          {!phone && <SourceTag source={entry.source} />}
+          {!phone && entry.causedById != null && (
             <span
               style={sourceTagStyle}
               title={`Made by the system as a consequence of change #${entry.causedById} (the carried-forward opening stock was re-derived)`}
@@ -691,13 +711,19 @@ function ChangeLogRow({
             </span>
           )}
         </td>
-        <td style={summaryCellStyle}>{entry.summary ?? ""}</td>
+        <td className="ae-cl-what" style={summaryCellStyle}>
+          {phone && (entry.source || entry.causedById != null) ? (
+            <span style={{ color: colors.subtleInk }}>{entry.source ? SOURCE_TAG[entry.source] : "Auto"} · </span>
+          ) : null}
+          {entry.summary ?? ""}
+        </td>
         <td
+          className="ae-cl-by"
           style={{ textAlign: "left", whiteSpace: "nowrap", color: colors.ink }}
         >
           {entry.changedBy?.name ?? "system"}
         </td>
-        <td style={{ color: colors.subtleInk }}>{expanded ? "▲" : "▼"}</td>
+        <td className="ae-cl-toggle" style={{ color: colors.subtleInk }}>{expanded ? "▲" : "▼"}</td>
       </tr>
       {expanded && (
         <tr>

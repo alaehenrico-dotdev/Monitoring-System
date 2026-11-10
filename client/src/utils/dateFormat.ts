@@ -49,3 +49,14 @@ export function formatClock(ms: number): string {
   const pad = (v: number) => String(v).padStart(2, "0");
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/// "11/9, 10:23" (24-hour, no seconds or year) when `compact`, the full local stamp otherwise.
+export function formatStamp(iso: string, compact = true): string {
+  const d = new Date(iso);
+  return compact ? d.toLocaleString(undefined, { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false }) : d.toLocaleString();
+}
+
+/// "Nov 9", or "Nov 9, 2026" when `withYear`.
+export function formatShortDay(date: Date, withYear: boolean): string {
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", ...(withYear ? { year: "numeric" as const } : {}) });
+}

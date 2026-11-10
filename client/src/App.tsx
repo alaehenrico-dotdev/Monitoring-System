@@ -4,6 +4,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { RealtimeProvider } from "./context/RealtimeContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { ProtectedRoute } from "./routes/ProtectedRoute";
+import { HomeRedirect, PhoneGate } from "./routes/PhoneGate";
 import { Layout } from "./components/Layout";
 import { ShiftModeGate } from "./components/ShiftModeGate";
 import { TopProgressBar } from "./components/TopProgressBar";
@@ -132,7 +133,8 @@ export default function App() {
                 <Route element={<ProtectedRoute />}>
                   <Route element={<ShiftModeGate />}>
                   <Route element={<Layout />}>
-                    <Route index element={<Navigate to="/online" replace />} />
+                  <Route element={<PhoneGate />}>
+                    <Route index element={<HomeRedirect />} />
                     <Route path="/online" element={<OnlineEntryPage />} />
                     <Route path="/offline" element={<OfflineEntryPage />} />
                     <Route path="/total-stocks" element={<TotalStocksPage />} />
@@ -177,6 +179,7 @@ export default function App() {
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
                     </Route>
+                  </Route>
                   </Route>
                   </Route>
                 </Route>

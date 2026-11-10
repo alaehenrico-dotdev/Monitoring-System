@@ -13,6 +13,8 @@ import { LogoMark } from "./LogoMark";
 import { useNavDrawer } from "../context/NavDrawerContext";
 import { useHeaderStyle, type HeaderStyle } from "../context/ThemeContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { phoneTitle } from "../utils/phoneLabel";
 
 const LOGO_SIZE = 56;
 // Collapsed header: the logo shrinks to roughly the title's own height so
@@ -103,6 +105,7 @@ export function PageHeader({
   const logoSize = compact && (headerStyle === "standard" || headerStyle === "dock") ? LOGO_SIZE_COLLAPSED : LOGO_SIZE_BY_HEADER[headerStyle];
   const { open, toggle } = useNavDrawer();
   const { online } = useOnlineStatus();
+  const phone = useReadOnlyPhone();
   const [logoSpin, setLogoSpin] = useState(0);
   const lastSpinAtRef = useRef(0);
   const logoRef = useRef<HTMLButtonElement>(null);
@@ -196,7 +199,7 @@ export function PageHeader({
           <div className="ae-page-header-titles">
             <div className="ae-page-header-title-row">
               <h2 aria-label={typeof title === "string" ? title : undefined}>
-                {typeof title === "string" ? <GlowLetters text={title} /> : title}
+                {typeof title === "string" ? <GlowLetters text={phone ? phoneTitle(title) : title} /> : title}
               </h2>
               {badges && <span className="ae-page-header-badges">{badges}</span>}
               <HeaderExtras />

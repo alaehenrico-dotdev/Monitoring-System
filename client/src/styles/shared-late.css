@@ -128,3 +128,62 @@ input[type="reset"],
   padding: 5px 32px 5px 8px;
   background: linear-gradient(90deg, color-mix(in srgb, #f5c000 45%, var(--ae-cat-charcoal)) 0%, var(--ae-cat-charcoal) 100%);
 }
+
+/* ---- Google Drive Connect / Reconnect button (pages/GoogleDriveSettings.tsx) --------------
+   Google's own button style, so it reads as "sign in with Google" and not as one of this app's
+   buttons: white, a thin grey outline, the six-colour Drive mark and dark grey text; in dark mode
+   Google's dark variant (#131314 with a light outline). The same in every theme. */
+:root:root .ae-gdrive-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1f1f1f;
+  font-family: "Google Sans", Roboto, "Segoe UI", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.25px;
+  line-height: 1;
+  box-shadow: none;
+  text-transform: none;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+:root:root .ae-gdrive-btn:hover:not(:disabled) {
+  background: #f1f4f9;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
+:root:root .ae-gdrive-btn:active:not(:disabled) {
+  background: #e3e8ef;
+}
+:root:root .ae-gdrive-btn:focus-visible {
+  outline: 2px solid #1a73e8;
+  outline-offset: 2px;
+}
+:root:root .ae-gdrive-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+:root:root .ae-gdrive-btn svg {
+  flex: none;
+}
+:root[data-theme="dark"]:root .ae-gdrive-btn {
+  border-color: #8e918f;
+  background: #131314;
+  color: #e3e3e3;
+}
+:root[data-theme="dark"]:root .ae-gdrive-btn:hover:not(:disabled) {
+  background: #2a2c2e;
+  box-shadow: none;
+}
+:root[data-theme="dark"]:root .ae-gdrive-btn:active:not(:disabled) {
+  background: #38393a;
+}

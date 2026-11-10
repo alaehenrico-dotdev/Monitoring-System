@@ -43,14 +43,14 @@ const open = () =>
   );
 
 const showChart = async () => {
-  await screen.findByText(/Over 13 days/);
+  await screen.findByText(/13 days with entries/);
   fireEvent.click(screen.getByRole("button", { name: "Chart" }));
 };
 
 describe("DailyOutPage", () => {
   it("opens on the table, with the chart one click away", async () => {
     open();
-    await screen.findByText(/Over 13 days/);
+    await screen.findByText(/13 days with entries/);
     expect(screen.getAllByRole("row")).toHaveLength(2 + 14 + 1);
     expect(document.querySelector(".ae-fl-chart")).toBeNull();
     expect(screen.getByRole("button", { name: "Table" })).toHaveAttribute("aria-pressed", "true");
@@ -60,10 +60,10 @@ describe("DailyOutPage", () => {
 
   it("uses the same date stepper as the other pages, ending the window on the chosen day", async () => {
     open();
-    await screen.findByText(/Over 13 days/);
+    await screen.findByText(/13 days with entries/);
     const [from0, to0] = api.getDailyOut.mock.calls[0];
     fireEvent.click(screen.getByRole("button", { name: "Previous day" }));
-    await screen.findByText(/Over 13 days/);
+    await screen.findByText(/13 days with entries/);
     const [from1, to1] = api.getDailyOut.mock.calls.at(-1)!;
     const shift = (a: string, b: string) => (new Date(a).getTime() - new Date(b).getTime()) / 86_400_000;
     expect(shift(to0, to1)).toBe(1);
@@ -73,7 +73,7 @@ describe("DailyOutPage", () => {
 
   it("asks for the last 14 days, oldest first", async () => {
     open();
-    await screen.findByText(/Over 13 days/);
+    await screen.findByText(/13 days with entries/);
     const [from, to] = api.getDailyOut.mock.calls[0];
     expect(from <= to).toBe(true);
     expect((new Date(to).getTime() - new Date(from).getTime()) / 86_400_000).toBe(13);
@@ -99,7 +99,7 @@ describe("DailyOutPage", () => {
 
   it("offers the same days as a table with a total row", async () => {
     open();
-    await screen.findByText(/Over 13 days/);
+    await screen.findByText(/13 days with entries/);
     const rows = screen.getAllByRole("row");
     expect(rows).toHaveLength(2 + 14 + 1); // two header rows, 14 days, total
     expect(within(rows[rows.length - 1]).getByText("Total")).toBeInTheDocument();
@@ -108,7 +108,7 @@ describe("DailyOutPage", () => {
 
   it("groups Online (Out, RTS) and Offline (Out, Backloads) under a two-row header", async () => {
     open();
-    await screen.findByText(/Over 13 days/);
+    await screen.findByText(/13 days with entries/);
     const heads = screen.getAllByRole("columnheader").map((h) => h.textContent);
     expect(heads).toEqual(["Date", "Online", "Offline", "Combined", "Fulfillment", "RTS", "Out", "Backloads"]);
   });
@@ -121,7 +121,7 @@ describe("DailyOutPage against a server that sends no RTS or Backloads figures",
       [{ date: "2026-10-01", onlineOut: 120, offlineOut: 80, totalOut: 200 }] as unknown as DailyOutEntry[],
     );
     open();
-    await screen.findByText(/Over 1 day/);
+    await screen.findByText(/1 day with entries/);
     expect(document.body.textContent).not.toContain("NaN");
     const row = screen.getAllByRole("row").find((r) => r.textContent?.includes("120"))!;
     const cells = within(row).getAllByRole("cell").map((c) => c.textContent);

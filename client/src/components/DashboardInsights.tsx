@@ -9,6 +9,7 @@ import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { SHIFTS, SHIFT_LABELS, SHIFT_SHORT_LABELS, isWholeDayMode } from "../utils/shift";
 import { RowsSkeleton } from "./Skeleton";
 import { CheckIcon } from "./icons";
+import { PhoneSafeLink } from "./PhoneSafeLink";
 
 /**
  * The dashboard's "what needs attention" row (all styling in the
@@ -166,7 +167,7 @@ export function EntryStatusCard({
                 ? Math.round((count.saved / count.total) * 100)
                 : 0;
             return (
-              <Link key={row.key} to={row.to} className="ae-dash-entry">
+              <PhoneSafeLink plain key={row.key} to={row.to} className="ae-dash-entry">
                 <span className="ae-dash-entry-top">
                   {row.label}
                   <span className={`ae-dash-chip ae-dash-chip--${tone}`}>
@@ -186,7 +187,7 @@ export function EntryStatusCard({
                 >
                   <span style={{ width: `${pct}%` }} />
                 </span>
-              </Link>
+              </PhoneSafeLink>
             );
           })
         )}
@@ -231,9 +232,9 @@ export function VarianceTopCard({
     <section className="ae-dash-section ae-dash-insight">
       <h3 className="ae-dash-heading">
         Top variances
-        <Link to={reportLink} className="ae-dash-link">
+        <PhoneSafeLink to={reportLink} className="ae-dash-link">
           Variance report →
-        </Link>
+        </PhoneSafeLink>
       </h3>
       <div className="ae-dash-card">
         {rows === null && failed ? (
@@ -276,9 +277,9 @@ export function VarianceTopCard({
             </ul>
             {flagged.length > LIST_LIMIT && (
               <div className="ae-dash-list-more">
-                <Link to={reportLink} className="ae-dash-link">
+                <PhoneSafeLink to={reportLink} className="ae-dash-link">
                   +{flagged.length - LIST_LIMIT} more →
-                </Link>
+                </PhoneSafeLink>
               </div>
             )}
           </>

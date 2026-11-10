@@ -9,6 +9,8 @@ import { Button } from "../components/ui";
 import { InlineLoading } from "../components/Spinner";
 import { Toast } from "../components/Toast";
 import { colors } from "../theme";
+import { formatStamp } from "../utils/dateFormat";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 function formatBytes(bytes: number | null): string {
   if (bytes === null) return "—";
@@ -23,6 +25,8 @@ const TRIGGER_LABEL = { manual: "Download", scheduled: "Scheduled", "pre-restore
 /// copy was checked and found complete, and whether a backup is overdue. Files
 /// the scheduled backup script leaves in BACKUP_DIR can be verified in place.
 export function BackupHistoryCard() {
+  const phone = useReadOnlyPhone();
+  const when = (iso: string) => formatStamp(iso, phone);
   const [history, setHistory] = useState<BackupHistory | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -56,19 +60,20 @@ export function BackupHistoryCard() {
   const cell = { padding: "6px 10px", fontSize: "calc(12.5px * var(--ae-fs, 1))", textAlign: "left" as const, borderBottom: `1px solid ${colors.border}` };
 
   return (
-    <div className="ae-panel" style={{ maxWidth: 640, marginTop: 16, padding: "14px 18px" }}>
+    <div className="ae-panel ae-bk" style={{ maxWidth: 640, marginTop: 16, padding: "14px 18px" }}>
       <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>Backup history</div>
       <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
         {health?.lastBackupAt
-          ? `Last good backup: ${new Date(health.lastBackupAt).toLocaleString()}.`
+          ? `Last good backup: ${when(health.lastBackupAt)}.`
           : "No good backup has been recorded yet."}{" "}
         {health?.overdue && (
-          <strong style={{ color: colors.danger }}>Overdue - expected at least every {health.overdueHours} hours.</strong>
+          <strong style={{ color: colors.danger }}>{`Overdue (over ${health.overdueHours} h).`}</strong>
         )}
       </div>
       {health?.failedSince && (
         <div role="alert" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.danger, marginTop: 6 }}>
-          A backup failed or was invalid after the last good one: {health.failedSince.fileName}
+          A backup failed after the last good one: 
+          {health.failedSince.fileName}
           {health.failedSince.error ? ` - ${health.failedSince.error}` : ""}
         </div>
       )}
@@ -79,7 +84,7 @@ export function BackupHistoryCard() {
         <p style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>Nothing recorded yet. Downloads from this page appear here.</p>
       ) : (
         <div style={{ overflowX: "auto", marginTop: 10 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", color: colors.ink }}>
+          <table className="ae-bk-table" style={{ width: "100%", borderCollapse: "collapse", color: colors.ink }}>
             <thead>
               <tr>
                 <th style={cell}>When</th>
@@ -91,12 +96,12 @@ export function BackupHistoryCard() {
             </thead>
             <tbody>
               {history.records.slice(0, 20).map((r) => (
-                <tr key={r.id} title={r.sha256 ? `SHA-256 ${r.sha256}` : undefined}>
-                  <td style={cell}>{new Date(r.createdAt).toLocaleString()}</td>
-                  <td style={{ ...cell, overflowWrap: "anywhere" }}>{r.fileName}</td>
-                  <td style={cell}>{TRIGGER_LABEL[r.trigger]}</td>
-                  <td style={cell}>{formatBytes(r.sizeBytes)}</td>
-                  <td style={cell}>
+                <tr key={r.id} className="ae-bk-row" title={r.sha256 ? `SHA-256 ${r.sha256}` : undefined}>
+                  <td className="ae-bk-when" style={cell}>{when(r.createdAt)}</td>
+                  <td className="ae-bk-file" style={{ ...cell, overflowWrap: "anywhere" }}>{r.fileName}</td>
+                  <td className="ae-bk-source" style={cell}>{TRIGGER_LABEL[r.trigger]}</td>
+                  <td className="ae-bk-size" style={cell}>{formatBytes(r.sizeBytes)}</td>
+                  <td className="ae-bk-check" style={cell}>
                     <span className={`ae-dash-chip ae-dash-chip--${STATUS_TONE[r.status]}`} title={r.error ?? undefined}>
                       {r.status === "OK" ? "Complete" : r.status === "INVALID" ? "Incomplete" : "Failed"}
                     </span>
@@ -114,7 +119,7 @@ export function BackupHistoryCard() {
           {history.files.slice(0, 10).map((f) => (
             <div key={f.name} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink, padding: "4px 0" }}>
               <span style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
-                {f.name} · {formatBytes(f.sizeBytes)} · {new Date(f.modifiedAt).toLocaleString()}
+                {f.name} · {formatBytes(f.sizeBytes)} · {when(f.modifiedAt)}
               </span>
               <Button className="ae-btn-solid" size="sm" disabled={verifying !== null} onClick={() => void verify(f.name)}>
                 {verifying === f.name ? "Checking…" : "Verify"}

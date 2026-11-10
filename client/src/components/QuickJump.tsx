@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { listProducts, PRODUCTS_CHANGED_EVENT } from "../api/products";
 import {
   defaultGridPageFor,
@@ -141,7 +142,8 @@ export function QuickJump() {
     };
   }, [open]);
 
-  const pages = useMemo(() => pagesForRole(user?.role), [user?.role]);
+  const phone = useReadOnlyPhone();
+  const pages = useMemo(() => pagesForRole(user?.role, phone), [user?.role, phone]);
 
   // Filtering a few hundred rows is a sub-millisecond string scan, so there
   // is nothing here worth debouncing - a debounce would only add latency to
@@ -173,7 +175,7 @@ export function QuickJump() {
     // role's own grid.
     const destination = isGridPage(pathname)
       ? pathname
-      : defaultGridPageFor(user?.role);
+      : defaultGridPageFor(user?.role, phone);
     requestQuickJump(result.productId);
     if (destination !== pathname) navigate(destination);
   }

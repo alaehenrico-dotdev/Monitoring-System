@@ -101,6 +101,7 @@ export function DatabaseBackupPage() {
       }}
     >
       <div
+        className="ae-bk ae-bk-backup-row"
         style={{
           position: "relative",
           display: "flex",

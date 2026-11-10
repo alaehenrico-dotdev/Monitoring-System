@@ -30,8 +30,8 @@ export function EntryRulesSettings() {
       setRules(await updateEntryRules({ requireEarlierDaysFinished }));
       setNotice(
         requireEarlierDaysFinished
-          ? "Days must now be finished in order before a later day can be entered."
-          : "People can now fill in the present day while earlier days are still open.",
+          ? "Days must be finished in order."
+          : "Today can be entered while earlier days are open.",
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save the entry rule.");
@@ -42,14 +42,8 @@ export function EntryRulesSettings() {
 
   async function setUseShifts(useShifts: boolean) {
     const message = useShifts
-      ? [
-          "Switch Morning and Night shifts back on?",
-          "Entry pages will show the shift picker again, and the 4pm cutoff applies. Days already entered as a whole day stay as the Night sheet.",
-        ].join("\n\n")
-      : [
-          "Switch off Morning and Night shifts?",
-          "A day becomes one whole sheet, saved under the calendar date, so 4pm no longer cuts the entry and the date changes at midnight. Days that were already entered by shift stay as they are and show combined, read-only. Everyone's page will reload.",
-        ].join("\n\n");
+      ? "Switch Morning and Night shifts back on?\n\nThe shift picker returns and the 4pm cutoff applies."
+      : "Switch off shifts?\n\nEach day becomes one whole sheet by calendar date. Earlier shift days stay as they are, read-only. Everyone's page reloads.";
     if (!window.confirm(message)) return;
     setSaving(true);
     setError(null);
@@ -64,10 +58,10 @@ export function EntryRulesSettings() {
   }
 
   return (
-    <div className="ae-panel" style={{ maxWidth: 640, padding: "14px 18px" }}>
+    <div className="ae-panel ae-rules" style={{ maxWidth: 640, padding: "14px 18px" }}>
       <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>Entry rules</div>
       <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
-        How the Online and Offline entry pages behave for everyone.
+        How the entry pages behave for everyone.
       </div>
 
       {!rules ? (
@@ -86,11 +80,9 @@ export function EntryRulesSettings() {
             />
             <span>
               <strong>Finish days in order</strong>
-              <span style={{ display: "block", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
-                On: an entry page stays read-only while an earlier day with saved entries is still unfinished, and
-                shows "Finish that day first".
-                <br />
-                Off: people can fill in the present day even if earlier days have not been finished yet.
+              <span className="ae-rule-desc" style={{ display: "block", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
+                <span style={{ display: "block" }}>On: earlier days must be finished first.</span>
+                <span style={{ display: "block" }}>Off: today can be entered while earlier days are open.</span>
               </span>
             </span>
           </label>
@@ -105,21 +97,16 @@ export function EntryRulesSettings() {
             />
             <span>
               <strong>Use Morning and Night shifts</strong>
-              <span style={{ display: "block", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
-                On: each day has a Morning (7am–4pm) and a Night (4pm–1am) sheet, and the entry pages open on the one
-                the clock says.
-                <br />
-                Off: each day is one whole sheet, however late it is. Entries are saved under the calendar date, which
-                changes at midnight. Days already entered by shift stay as they are and show combined, read-only.
+              <span className="ae-rule-desc" style={{ display: "block", fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
+                <span style={{ display: "block" }}>On: Morning (7am–4pm) and Night (4pm–1am) sheets.</span>
+                <span style={{ display: "block" }}>Off: one whole sheet per day, by calendar date.</span>
               </span>
             </span>
           </label>
 
           {!rules.requireEarlierDaysFinished && (
-            <div role="status" style={{ marginTop: 10, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink }}>
-              While earlier days are open, their figures can still change, and the opening stock that carries forward
-              into later days follows them. <strong>Finishing a day still goes in order</strong> - a later day cannot
-              be finished until the earlier ones are - so locked days never move.
+            <div role="status" className="ae-rule-desc" style={{ marginTop: 10, fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.ink }}>
+              Open earlier days can still change the opening stock of later days. <strong>Finishing days still goes in order.</strong>
             </div>
           )}
         </div>

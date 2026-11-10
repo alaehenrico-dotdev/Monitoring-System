@@ -159,8 +159,9 @@ export function DatabaseRestoreCard() {
   const stage = !resetToken ? "lock" : file ? "restore" : "choose";
 
   return (
-    <div style={{ padding: "14px 18px" }}>
+    <div className="ae-bk" style={{ padding: "14px 18px" }}>
       <div
+        className="ae-bk-restore-row"
         style={{
           display: "flex",
           alignItems: "center",
@@ -175,8 +176,7 @@ export function DatabaseRestoreCard() {
           <div
             style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}
           >
-            Replaces all live data with a <code>.sql</code> backup. Current data
-            is saved to this device first.
+            Replaces all data with a <code>.sql</code> backup. Current data is saved first.
           </div>
         </div>
 
@@ -184,7 +184,7 @@ export function DatabaseRestoreCard() {
             unlock) -> Choose file -> Restore. All three share one size. */}
         <div
           key={stage}
-          className={leaving ? "ae-fade-out" : "ae-fade-in"}
+          className={`ae-bk-slot ${leaving ? "ae-fade-out" : "ae-fade-in"}`}
           style={{ display: "flex", alignItems: "center", gap: 16, flexShrink: 0 }}
         >
         {!resetToken ? (

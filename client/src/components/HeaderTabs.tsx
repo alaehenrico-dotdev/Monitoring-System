@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import { animate } from "motion/react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { navGroups } from "../config/navigation";
+import { isPhonePage, navGroups } from "../config/navigation";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 // Horizontal extent (px from the strip's left edge) of the gold underline.
 // Kept at module level because every page renders its own HeaderTabs (inside
@@ -31,6 +32,7 @@ const TAB_INSET = 10;
 /// link list that used to live in the floating sidebar drawer.
 export function HeaderTabs() {
   const { user } = useAuth();
+  const phone = useReadOnlyPhone();
   const { pathname } = useLocation();
   const navRef = useRef<HTMLElement>(null);
   const barRef = useRef<HTMLSpanElement>(null);
@@ -206,7 +208,7 @@ export function HeaderTabs() {
   const visibleGroups = navGroups
     .map((g) => ({
       ...g,
-      links: g.links.filter((l) => !user || l.roles.includes(user.role)),
+      links: g.links.filter((l) => (!user || l.roles.includes(user.role)) && (!phone || isPhonePage(l.to))),
     }))
     .filter((g) => g.links.length > 0);
 

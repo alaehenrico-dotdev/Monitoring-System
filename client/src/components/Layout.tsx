@@ -9,6 +9,7 @@ import { SessionExpiredDialog } from "./SessionExpiredDialog";
 import { NavDrawerProvider } from "../context/NavDrawerContext";
 import { useAuth } from "../context/AuthContext";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { usePhoneAttribute } from "../hooks/useReadOnlyPhone";
 import { useUnsavedWorkGuard } from "../hooks/useUnsavedWorkGuard";
 import { useSessionExpiryWatch } from "../hooks/useSessionExpiryWatch";
 import { countAllUnsavedWork } from "../utils/unsavedWork";
@@ -17,6 +18,8 @@ import { colors, fonts } from "../theme";
 export function Layout() {
   const mainRef = useRef<HTMLElement>(null);
   const { online } = useOnlineStatus();
+  const phone = usePhoneAttribute();
+  const [phoneNoteDismissed, setPhoneNoteDismissed] = useState(false);
   const [offlineDismissed, setOfflineDismissed] = useState(false);
   const {
     user,
@@ -85,6 +88,17 @@ export function Layout() {
           variant="warning"
           duration={null}
           onDismiss={() => setOfflineDismissed(true)}
+        />
+        <Toast
+          id="phone-readonly"
+          message={
+            phone && !phoneNoteDismissed
+              ? "Phone view is read-only. To enter or edit stock, use your browser's \"Desktop site\" option."
+              : null
+          }
+          variant="info"
+          duration={null}
+          onDismiss={() => setPhoneNoteDismissed(true)}
         />
         <Toast
           id="session-expiring"

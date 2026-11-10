@@ -1,0 +1,817 @@
+/* =========================================================================
+   Phone view (hooks/useReadOnlyPhone.ts puts data-phone="true" on <html>)
+   =========================================================================
+   The pinned header was built for a desk: a seal beside a column holding the title, the toolbar
+   and the clock. At phone width that column is ~280px wide, so the title wraps, the filters fall
+   into a ragged heap and the buttons sit wherever they land.
+
+   Here it is rearranged into two clear bands, whatever theme or header layout is chosen:
+     1. seal + title (up to two lines) + search + theme toggle   (the clock is dropped)
+     2. the toolbar: actions first, then the filters, on one line that scrolls sideways
+   Nothing is hidden: every control is still there, only the arrangement changes.
+
+   The header is not pinned on a phone: it is too tall to keep on a screen this short.
+
+   Loaded last, and `:root:root:root[data-phone]` out-ranks the theme and header-layout rules. */
+
+:root:root:root[data-phone="true"] .ae-sticky-head {
+  position: static;
+  margin: 0 -6px 8px;
+}
+:root:root:root[data-phone="true"] .ae-page-header,
+:root:root:root[data-phone="true"] .ae-page-header.ae-page-header--collapsed,
+:root:root:root[data-phone="true"] .ae-page-header.ae-page-header--bare {
+  margin: 0;
+  padding: 8px 10px 8px;
+  overflow: visible;
+}
+
+/* Seal, title, extras. The titles column and the title row dissolve, so the toolbar can
+   take a full-width line of its own under them. */
+:root:root:root[data-phone="true"] .ae-page-header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+}
+:root:root:root[data-phone="true"] .ae-page-header-titles,
+:root:root:root[data-phone="true"] .ae-page-header-title-row {
+  display: contents;
+}
+:root:root:root[data-phone="true"] .ae-page-header-logo {
+  order: 0;
+}
+:root:root:root[data-phone="true"] .ae-page-header-logo .ae-logo-mark {
+  width: 34px !important;
+  height: 34px !important;
+}
+:root:root:root[data-phone="true"] .ae-page-header .ae-page-header-title-row h2,
+:root:root:root[data-phone="true"] .ae-page-header.ae-page-header--bare h2,
+:root:root:root[data-phone="true"] .ae-page-header.ae-page-header--collapsed h2 {
+  order: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  font-size: calc(17px * var(--ae-fs, 1));
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+:root:root:root[data-phone="true"] .ae-page-header-badges {
+  order: 2;
+  flex: none;
+}
+:root:root:root[data-phone="true"] .ae-page-header-title-row .ae-page-header-extras {
+  order: 3;
+  flex: none;
+  margin: 0;
+  gap: 6px;
+}
+:root:root:root[data-phone="true"] .ae-live-clock {
+  display: none !important;
+}
+
+/* The collapse tab is a hover affordance; a phone has no hover, and the header is not pinned. */
+:root:root:root[data-phone="true"] .ae-page-header-collapse-btn {
+  display: none;
+}
+
+/* The toolbar, on its own full-width line. */
+:root:root:root[data-phone="true"] .ae-page-header-collapsible--toolbar {
+  order: 4;
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 0;
+}
+:root:root:root[data-phone="true"] .ae-page-header-collapsible-inner {
+  overflow: visible;
+}
+:root:root:root[data-phone="true"] .ae-page-header .ae-toolbar,
+:root:root:root[data-phone="true"] .ae-page-header .ae-page-header-toolbar-slot .ae-toolbar {
+  padding: 0;
+}
+/* The toolbar: one compact line. The actions come first (so the main button is always on screen), then
+   the filters and the date. When they do not fit, the line scrolls sideways (the right edge fades to
+   say so) instead of wrapping into extra rows. */
+:root:root:root[data-phone="true"] .ae-mb {
+  --ae-mb-h: 38px;
+  --ae-mb-gap: 6px;
+  min-height: 0;
+}
+:root:root:root[data-phone="true"] .ae-mb--page {
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px;
+  margin: 0 -2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+}
+:root:root:root[data-phone="true"] .ae-mb--page::-webkit-scrollbar {
+  display: none;
+}
+:root:root:root[data-phone="true"] .ae-mb--page > .ae-mb-menus,
+:root:root:root[data-phone="true"] .ae-mb--page > .ae-mb-divider,
+:root:root:root[data-phone="true"] .ae-mb--page > .ae-mb-spacer {
+  display: none !important;
+}
+
+/* The filters. The closed search is just an icon and keeps its own size. */
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: stretch;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters > * {
+  min-width: 0;
+  white-space: nowrap;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-select-trigger,
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-date-trigger {
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: var(--ae-mb-h);
+  justify-content: space-between;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters > :is(.ae-select-trigger, .ae-date-trigger) {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 150px;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-select-trigger-text,
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-date-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters > :is(.ae-datestep, label, .ae-segment-group, .ae-mb-form, .ae-clear-filters, .ae-search--open) {
+  flex: 0 0 auto;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-search--open input[type="search"] {
+  width: 160px;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-datestep {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-datestep .ae-date-trigger {
+  flex: 0 0 auto;
+  width: auto;
+  justify-content: center;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-filters .ae-datestep .ae-mb-btn--icon {
+  flex: 0 0 34px;
+  width: 34px;
+}
+:root:root:root[data-phone="true"] .ae-datestep-today {
+  display: none;
+}
+
+/* The actions. Everything but the page's main action is an icon (its words stay for screen readers); the
+   main action keeps its label. */
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-actions {
+  order: -1;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 6px;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-actions .ae-mb-btn:not(.ae-mb-btn--primary),
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-actions .ae-segment-btn {
+  flex: 0 0 auto;
+  width: var(--ae-mb-h);
+  height: var(--ae-mb-h);
+  padding: 0;
+  justify-content: center;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-actions .ae-mb-btn:not(.ae-mb-btn--primary) > span,
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-actions .ae-segment-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-actions > .ae-mb-btn--primary {
+  flex: 0 0 auto;
+  justify-content: center;
+  padding: 0 12px;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-overflow {
+  display: inline-flex;
+}
+:root:root:root[data-phone="true"] .ae-mb--page .ae-mb-zoom {
+  display: none;
+}
+
+/* The date stepper on a phone is just arrows and the date: no calendar icon, no box. */
+:root:root:root[data-phone="true"] .ae-datestep .ae-date-trigger-icon {
+  display: none;
+}
+:root:root:root[data-phone="true"] .ae-datestep .ae-date-trigger {
+  border-color: transparent;
+  background: transparent;
+  padding: 0 4px;
+  font-weight: 700;
+}
+
+/* ---- Tables --------------------------------------------------------------------
+   SKU and Product stay pinned while the figures scroll sideways. On a desk they take ~290px; on a
+   phone that left one sliver for the numbers. Here they are narrow (the product name wraps), the
+   labels are left-aligned (the Subtotal / Grand total labels were centred in a wide cell) and
+   the figures keep the rest of the screen. */
+:root:root:root[data-phone="true"] .ae-table--sticky-id .ae-sticky-sku {
+  left: 0;
+  width: 58px;
+  min-width: 58px;
+  max-width: 58px;
+  padding: 3px 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  text-align: left;
+}
+:root:root:root[data-phone="true"] .ae-table--sticky-id .ae-sticky-name {
+  left: 58px;
+  width: 108px;
+  min-width: 108px;
+  max-width: 108px;
+  padding: 3px 4px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  font-size: 12px;
+  text-align: left;
+}
+:root:root:root[data-phone="true"] .ae-table--sticky-id .ae-sticky-subtotal {
+  left: 0;
+  width: 166px;
+  min-width: 166px;
+  max-width: 166px;
+  padding: 4px 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  font-size: 11.5px;
+  text-align: left;
+}
+:root:root:root[data-phone="true"] .ae-table tr.ae-row-subtotal td:first-child,
+:root:root:root[data-phone="true"] .ae-table tr.ae-row-grand td:first-child {
+  text-align: left;
+}
+
+/* ---- Change Log: two lines per entry --------------------------------------------
+   The six-column table needs ~720px. On a phone each entry becomes a two-line card:
+     UPDATE  AFP067 · CHILI POWDER 1KG · Nov 7 · Night · Online      v
+     11/9, 10:23   what changed ..............................  Changed by
+   The detail you open with the arrow is unchanged. */
+:root:root:root[data-phone="true"] .ae-cl-table {
+  min-width: 0 !important;
+  display: block;
+}
+:root:root:root[data-phone="true"] .ae-cl-table thead {
+  display: none;
+}
+:root:root:root[data-phone="true"] .ae-cl-table tbody {
+  display: block;
+}
+:root:root:root[data-phone="true"] .ae-cl-table tbody > tr:not(.ae-cl-row),
+:root:root:root[data-phone="true"] .ae-cl-table tbody > tr:not(.ae-cl-row) > td {
+  display: block;
+  width: 100%;
+}
+:root:root:root[data-phone="true"] .ae-cl-table tr.ae-cl-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "action record toggle"
+    "when what by";
+  align-items: center;
+  gap: 3px 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ae-border);
+}
+:root:root:root[data-phone="true"] .ae-cl-table tr.ae-cl-row > td {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none;
+  font-size: 12px;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-action {
+  grid-area: action;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-record {
+  grid-area: record;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-toggle {
+  grid-area: toggle;
+  text-align: right;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-when {
+  grid-area: when;
+  color: var(--ae-text-muted);
+  font-size: 11px;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-what {
+  grid-area: what;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-by {
+  grid-area: by;
+  color: var(--ae-text-muted) !important;
+  font-size: 11px;
+}
+
+/* A table's heading row (name, count and pager): the name on one line, the pager on a full-width
+   line under it, spaced out evenly. */
+:root:root:root[data-phone="true"] .ae-cl-table tbody > tr:not(.ae-cl-row) > td > div {
+  flex-wrap: wrap;
+  gap: 2px 8px !important;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-pager {
+  flex: 1 1 100%;
+  justify-content: space-between !important;
+  gap: 4px 8px !important;
+  padding: 0 0 6px 6px;
+}
+:root:root:root[data-phone="true"] .ae-pager .ae-pager-btn {
+  min-width: 26px;
+  padding: 2px 4px;
+}
+:root:root:root[data-phone="true"] .ae-pager select {
+  min-height: 30px;
+  padding-block: 2px;
+  width: 58px !important;
+}
+:root:root:root[data-phone="true"] .ae-pager label {
+  gap: 4px !important;
+}
+
+/* ---- Dashboard: square tiles -------------------------------------------------------
+   The three stock cards were full-width bars (each ~110px tall) and the quick links a loose
+   wrap of pills. On a phone they are square tiles in an even grid: icon at the top, the figure
+   big in the middle, its label under it, the change badge in the corner. */
+:root:root:root[data-phone="true"] .ae-dash-hero-left .ae-dash-stats--hero,
+:root:root:root[data-phone="true"] .ae-dash-stats--hero {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: auto;
+  gap: 8px;
+  margin: 0;
+}
+:root:root:root[data-phone="true"] .ae-dash-stats--hero > :nth-child(3) {
+  grid-column: auto;
+}
+:root:root:root[data-phone="true"] .ae-dash-hero-row {
+  margin: 8px 0 14px;
+  gap: 10px;
+}
+:root:root:root[data-phone="true"] .ae-dash-stat,
+:root:root:root[data-phone="true"] .ae-dash-stat--hero {
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  padding: 10px 8px 8px;
+  gap: 4px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+:root:root:root[data-phone="true"] .ae-dash-stat-head {
+  display: contents;
+}
+:root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-icon,
+:root:root:root[data-phone="true"] .ae-dash-stat--hero .ae-dash-stat-icon {
+  order: 0;
+  width: 28px;
+  height: 28px;
+}
+:root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-value,
+:root:root:root[data-phone="true"] .ae-dash-stat--hero .ae-dash-stat-value {
+  order: 1;
+  font-size: clamp(20px, 6.4vw, 26px);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+:root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-label {
+  order: 2;
+  font-size: 11px;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+:root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-delta {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  margin: 0;
+  font-size: 10.5px;
+}
+
+/* Quick links: the same square tiles, icon over label. */
+:root:root:root[data-phone="true"] .ae-dash-quicklinks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+:root:root:root[data-phone="true"] .ae-dash-quicklink {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 1 / 1;
+  min-width: 0;
+  padding: 8px 4px;
+  text-align: center;
+}
+:root:root:root[data-phone="true"] .ae-dash-quicklink-icon {
+  width: 30px;
+  height: 30px;
+}
+:root:root:root[data-phone="true"] .ae-dash-quicklink-label {
+  font-size: 11.5px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+/* ---- Dashboard: Weekly / Monthly Monitoring card ---------------------------------------
+   Nine figures as a 3 x 3 grid of square tiles (they were nine full-width bars), the title and
+   the period controls on their own tidy lines, and the product table without its SKU column and
+   with the product name pinned while the figures scroll. */
+:root:root:root[data-phone="true"] .ae-mm-heading {
+  padding: 10px 10px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  font-size: calc(14px * var(--ae-fs, 1));
+}
+:root:root:root[data-phone="true"] .ae-mm-controls {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+:root:root:root[data-phone="true"] .ae-mm-year {
+  gap: 2px;
+}
+:root:root:root[data-phone="true"] .ae-mm-body {
+  padding: 8px 10px 10px;
+}
+:root:root:root[data-phone="true"] .ae-mm-body .ae-dash-stats {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+:root:root:root[data-phone="true"] .ae-mm-body .ae-dash-stat .ae-dash-stat-value {
+  font-size: clamp(18px, 5.4vw, 24px);
+}
+:root:root:root[data-phone="true"] .ae-mm-body .ae-dash-stat .ae-dash-stat-delta {
+  top: 6px;
+  right: 6px;
+  padding: 0;
+  background: none;
+  font-size: 10px;
+}
+:root:root:root[data-phone="true"] .ae-mm-tablewrap {
+  overflow-x: auto;
+  margin: 0 -10px;
+}
+:root:root:root[data-phone="true"] .ae-pm-table tr:not(.ae-row-category) > :first-child {
+  display: none;
+}
+:root:root:root[data-phone="true"] .ae-pm-table td:nth-child(2),
+:root:root:root[data-phone="true"] .ae-pm-table th:nth-child(2) {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 104px;
+  min-width: 104px;
+  max-width: 104px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
+  text-align: left;
+  background: var(--ae-header-glass, var(--ae-surface));
+}
+:root:root:root[data-phone="true"] .ae-mm-view {
+  flex: 0 0 auto;
+}
+:root:root:root[data-phone="true"] .ae-mm-view-btn {
+  padding: 6px 8px;
+  white-space: nowrap;
+}
+:root:root:root[data-phone="true"] .ae-mm-year .ae-date-trigger {
+  min-width: 0;
+  max-width: 96px;
+  padding: 0 6px;
+}
+:root:root:root[data-phone="true"] .ae-mm-year .ae-date-trigger-icon {
+  display: none;
+}
+/* CSV: the icon alone. */
+:root:root:root[data-phone="true"] .ae-mm-controls > button {
+  flex: 0 0 auto;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 0;
+  justify-content: center;
+}
+:root:root:root[data-phone="true"] .ae-mm-controls > button svg {
+  width: 16px;
+  height: 16px;
+}
+:root:root:root[data-phone="true"] .ae-pm-table .ae-row-category td {
+  text-align: left;
+  padding-left: 10px;
+}
+
+/* ---- Daily Out: the six columns fit the screen -------------------------------------------
+   Date, Online (Fulfillment, RTS), Offline (Out, Backloads) and Combined side by side, with tight
+   padding and small type, so nothing scrolls sideways. */
+:root:root:root[data-phone="true"] .ae-mm-tablewrap .ae-table--grouped-head {
+  width: 100%;
+  table-layout: auto;
+}
+:root:root:root[data-phone="true"] .ae-mm-tablewrap .ae-table--grouped-head th,
+:root:root:root[data-phone="true"] .ae-mm-tablewrap .ae-table--grouped-head td {
+  padding: 5px 3px;
+  font-size: 11.5px;
+  line-height: 1.2;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:root:root:root[data-phone="true"] .ae-mm-tablewrap .ae-table--grouped-head th {
+  font-size: 10.5px;
+}
+:root:root:root[data-phone="true"] .ae-mm-tablewrap .ae-table--grouped-head td.ae-mm-datecell {
+  text-align: left;
+  white-space: nowrap;
+}
+/* Daily Out / Stock flow: the title and its Table | Chart switch share one line. */
+:root:root:root[data-phone="true"] .ae-mm-heading:has(> .ae-mm-view) {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+/* The table boxes on the Dashboard and Daily Out were capped at 360px and scrolled inside
+   themselves (hiding the Total row and leaving the rest of the screen empty). On a phone they
+   grow with the page instead. */
+:root:root:root[data-phone="true"] .ae-mm-tablewrap {
+  flex: 0 0 auto;
+  min-height: 0;
+  max-height: none;
+  overflow-y: visible;
+  overflow-x: auto;
+}
+
+/* The explanatory notes under the Dashboard and Daily Out cards: a short bullet list instead of a paragraph. */
+:root:root:root[data-phone="true"] .ae-mm-notelist {
+  margin: 10px 0 0;
+  padding: 0 0 0 16px;
+  list-style: disc;
+  text-align: left;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  line-height: 1.45;
+  color: var(--ae-text-muted);
+}
+:root:root:root[data-phone="true"] .ae-mm-notelist li {
+  margin: 0 0 3px;
+}
+:root:root:root[data-phone="true"] .ae-mm-notelist li::marker {
+  color: var(--ae-glass-accent, #d4a000);
+}
+
+/* ---- Settings > Appearance: compact cards -------------------------------------------------
+   Each choice was a full-width card with a large drawing and a paragraph, five long stacks in all.
+   On a phone they are small two-up cards: a reduced drawing and the name. The description is still
+   there for screen readers (the radio is described by it). */
+:root:root:root[data-phone="true"] .ae-appearance {
+  gap: 16px !important;
+}
+:root:root:root[data-phone="true"] .ae-appearance legend {
+  font-size: 12px !important;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ae-text-muted) !important;
+  margin-bottom: 8px !important;
+}
+:root:root:root[data-phone="true"] .ae-choice-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: 8px !important;
+}
+:root:root:root[data-phone="true"] .ae-choice-card {
+  padding: 6px;
+  border-radius: 4px;
+}
+:root:root:root[data-phone="true"] .ae-choice-card-preview {
+  zoom: 0.62;
+  pointer-events: none;
+}
+:root:root:root[data-phone="true"] .ae-choice-title {
+  margin-top: 6px !important;
+  font-size: 12.5px;
+  line-height: 1.2;
+}
+:root:root:root[data-phone="true"] .ae-choice-desc {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+:root:root:root[data-phone="true"] .ae-choice-card--selected {
+  box-shadow: 0 0 0 1px #d4a000;
+}
+:root:root:root[data-phone="true"] .ae-choice-card--selected::after {
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+:root:root:root[data-phone="true"] .ae-appearance > p {
+  font-size: 11px !important;
+  line-height: 1.4;
+}
+
+/* ---- Settings > My Account ------------------------------------------------------------
+   The descriptions are shorter on a phone (AccountSettings.tsx) and justified, so each setting
+   reads as a tidy block; the action sits under it at full width. */
+:root:root:root[data-phone="true"] .ae-setting {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+}
+:root:root:root[data-phone="true"] .ae-setting-title {
+  font-size: calc(13.5px * var(--ae-fs, 1));
+}
+:root:root:root[data-phone="true"] .ae-setting-desc {
+  margin-top: 3px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  line-height: 1.45;
+  text-align: justify;
+  hyphens: auto;
+}
+:root:root:root[data-phone="true"] .ae-account-list {
+  gap: 8px;
+}
+:root:root:root[data-phone="true"] .ae-modal-panel p {
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* ---- Settings > Entry Rules: short, justified text ------------------------------------- */
+:root:root:root[data-phone="true"] .ae-rules {
+  padding: 10px 12px !important;
+}
+:root:root:root[data-phone="true"] .ae-rule-desc {
+  text-align: justify;
+  hyphens: auto;
+  line-height: 1.45;
+  font-size: calc(12px * var(--ae-fs, 1)) !important;
+}
+:root:root:root[data-phone="true"] .ae-rule-desc > span + span {
+  margin-top: 2px;
+}
+
+/* ---- Settings > Backup & Restore ----------------------------------------------------------
+   Backup and Restore stack (text, then the control at full width). Each history entry is a
+   two-line card instead of a five-column table whose file name broke one letter per line:
+     ala-eh-backup-2026-11-06-1803.sql.gz.enc                 [Complete]
+     11/7, 02:03                          Scheduled      246.2 KB                      */
+:root:root:root[data-phone="true"] .ae-bk {
+  padding: 10px 12px !important;
+}
+:root:root:root[data-phone="true"] .ae-bk-backup-row,
+:root:root:root[data-phone="true"] .ae-bk-restore-row {
+  flex-wrap: wrap;
+  gap: 8px !important;
+}
+:root:root:root[data-phone="true"] .ae-bk-backup-row > div:first-child,
+:root:root:root[data-phone="true"] .ae-bk-restore-row > div:first-child {
+  flex: 1 1 100% !important;
+}
+:root:root:root[data-phone="true"] .ae-bk-backup-row > button,
+:root:root:root[data-phone="true"] .ae-bk-slot,
+:root:root:root[data-phone="true"] .ae-bk-slot > *,
+:root:root:root[data-phone="true"] .ae-bk-slot form {
+  flex: 1 1 100%;
+  width: 100%;
+}
+:root:root:root[data-phone="true"] .ae-bk-slot input.ae-input {
+  width: 100% !important;
+}
+:root:root:root[data-phone="true"] .ae-bk-table {
+  display: block;
+}
+:root:root:root[data-phone="true"] .ae-bk-table thead {
+  display: none;
+}
+:root:root:root[data-phone="true"] .ae-bk-table tbody {
+  display: block;
+}
+:root:root:root[data-phone="true"] .ae-bk-table tr.ae-bk-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 66px;
+  grid-template-areas:
+    "file file check"
+    "when source size";
+  align-items: center;
+  gap: 2px 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--ae-border);
+}
+:root:root:root[data-phone="true"] .ae-bk-table tr.ae-bk-row > td {
+  display: block;
+  min-width: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  font-size: 11px !important;
+  color: var(--ae-text-muted);
+}
+:root:root:root[data-phone="true"] .ae-bk-table .ae-bk-file {
+  grid-area: file;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal !important;
+  font-size: 12px !important;
+  font-weight: 600;
+  color: var(--ae-text);
+}
+:root:root:root[data-phone="true"] .ae-bk-table .ae-bk-check {
+  grid-area: check;
+  justify-self: end;
+}
+:root:root:root[data-phone="true"] .ae-bk-table .ae-bk-when {
+  grid-area: when;
+}
+:root:root:root[data-phone="true"] .ae-bk-table .ae-bk-source {
+  grid-area: source;
+}
+:root:root:root[data-phone="true"] .ae-bk-table .ae-bk-size {
+  grid-area: size;
+  text-align: right;
+}
+/* Change Log: a long name gives way before the record does. */
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-by {
+  max-width: 84px;
+  text-align: right;
+}
+:root:root:root[data-phone="true"] .ae-cl-table .ae-cl-toggle {
+  justify-self: end;
+}
+
+/* ---- Sub-page tabs (Settings, Admin queue, Corrections) -------------------------------------
+   One line that scrolls sideways, as Minimalism already does, instead of wrapping into several
+   rows in the other themes. Applies on a phone and on any window narrower than 520px; Minimalism
+   keeps its own rules (its framed outline needs the strip not to wrap). */
+@media (max-width: 520px) {
+  :root:not([data-ui="minimal"]):root:root .ae-subtabs--framed {
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 10px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  :root:not([data-ui="minimal"]):root:root .ae-subtabs--framed::-webkit-scrollbar {
+    display: none;
+  }
+  :root:not([data-ui="minimal"]):root:root .ae-subtabs--framed .ae-subtab {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}

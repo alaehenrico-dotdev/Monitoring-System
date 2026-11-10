@@ -4,6 +4,7 @@ import { getDaysOfStock, type DaysOfStockRow } from "../api/dashboard";
 import { useAuth } from "../context/AuthContext";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { defaultGridPageFor } from "../config/navigation";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { requestQuickJump } from "../utils/quickJumpTarget";
 import { RowsSkeleton } from "./Skeleton";
 
@@ -92,9 +93,10 @@ export function useDaysOfStock(date?: string) {
 function useJumpToProduct() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const phone = useReadOnlyPhone();
   return (productId: number) => {
     requestQuickJump(productId);
-    navigate(defaultGridPageFor(user?.role));
+    navigate(defaultGridPageFor(user?.role, phone));
   };
 }
 

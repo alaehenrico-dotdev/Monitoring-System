@@ -934,3 +934,20 @@
   }
 }
 
+
+/* The short notes under the Dashboard and Daily Out cards: a few bullets, not a paragraph. */
+.ae-mm-notelist {
+  margin: 12px 0 0;
+  padding: 0 0 0 18px;
+  list-style: disc;
+  text-align: left;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  line-height: 1.5;
+  color: var(--ae-text-muted);
+}
+.ae-mm-notelist li {
+  margin: 0 0 3px;
+}
+.ae-mm-notelist li::marker {
+  color: var(--ae-glass-accent, #d4a000);
+}

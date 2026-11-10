@@ -1820,7 +1820,7 @@ export function ManualCountPage() {
                         );
                       })}
                       <tr className="ae-row-subtotal">
-                        <td colSpan={2}>Subtotal - {category}</td>
+                        <td colSpan={2} className="ae-cell-name">Subtotal - {category}</td>
                         {renderTotals(groupRows)}
                         <td />
                       </tr>
@@ -1828,7 +1828,7 @@ export function ManualCountPage() {
                   );
                 })}
                 <tr className="ae-row-grand">
-                  <td colSpan={2}>GRAND TOTAL</td>
+                  <td colSpan={2} className="ae-cell-name">GRAND TOTAL</td>
                   {renderTotals(visibleRows ?? [])}
                   <td />
                 </tr>

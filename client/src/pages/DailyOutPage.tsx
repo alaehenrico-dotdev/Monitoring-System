@@ -18,6 +18,8 @@ import { downloadCsv } from "../utils/csv";
 import { DAILY_OUT_SERIES, dailyOutCsv, dailyOutFlowPoints, dailyOutTotals } from "../utils/dailyOut";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { getCurrentShiftAndDate } from "../utils/shift";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { formatShortDay } from "../utils/dateFormat";
 
 type View = "chart" | "table";
 
@@ -34,9 +36,10 @@ function daysBefore(date: string, n: number): string {
 
 /// "2026-10-08" -> "Oct 8, 2026": short enough to stay on one line in a phone-width
 /// table column (the page title already carries the long form).
-function tableDate(date: string): string {
+function tableDate(date: string, phone = false): string {
   const [y, m, d] = date.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  // A phone drops the year when it is this one.
+  return formatShortDay(new Date(y, m - 1, d), !phone || y !== new Date().getFullYear());
 }
 
 // `== null`, not `=== null`: a figure the server did not send is "nothing recorded", never NaN.
@@ -207,16 +210,23 @@ export function DailyOutPage() {
             ) : (
               <DailyOutTable rows={rows} totals={totals} />
             )}
-            <p className="ae-mm-note">
-              {totals.days === 0
-                ? "Nothing was recorded in this period."
-                : `Over ${totals.days} ${totals.days === 1 ? "day" : "days"} with entries: ${fullNumber.format(totals.onlineOut)} out of Online, ${fullNumber.format(totals.offlineOut)} out of Offline, ${fullNumber.format(totals.totalOut)} combined. `}
-              Offline is deliveries less backloads (upsells are not counted); RTS is shown for
-              information and is not taken off Online. Moving stock between Online and Offline
-              is not counted as out.
-              {view === "chart" && totals.days > 0 &&
-                " In the chart, days without entries are drawn at 0; hover or focus a day for the figures."}
-            </p>
+            <ul className="ae-mm-notelist">
+                {totals.days === 0 ? (
+                  <li>Nothing was recorded in this period.</li>
+                ) : (
+                  <>
+                    <li>{totals.days} {totals.days === 1 ? "day" : "days"} with entries</li>
+                    <li>
+                      Online {fullNumber.format(totals.onlineOut)} · Offline {fullNumber.format(totals.offlineOut)} · Combined{" "}
+                      {fullNumber.format(totals.totalOut)}
+                    </li>
+                  </>
+                )}
+                <li>Offline = deliveries less backloads</li>
+                <li>RTS is information only (not taken off Online)</li>
+                <li>Online ↔ Offline transfers are not counted</li>
+                {view === "chart" && totals.days > 0 && <li>Days without entries are drawn at 0</li>}
+              </ul>
           </div>
         )}
       </div>
@@ -231,6 +241,7 @@ function DailyOutTable({
   rows: DailyOutEntry[];
   totals: ReturnType<typeof dailyOutTotals>;
 }) {
+  const phone = useReadOnlyPhone();
   return (
     <div className="ae-mm-tablewrap">
       <table className="ae-table ae-table--center-head ae-table--compact ae-table--grouped-head">
@@ -262,7 +273,7 @@ function DailyOutTable({
         <tbody>
           {rows.map((e) => (
             <tr key={e.date}>
-              <td className="ae-mm-datecell">{tableDate(e.date)}</td>
+              <td className="ae-mm-datecell">{tableDate(e.date, phone)}</td>
               <td>{cell(e.onlineOut)}</td>
               <td>{cell(e.onlineRts)}</td>
               <td className="ae-mm-subgroup-start">{cell(e.offlineOut)}</td>

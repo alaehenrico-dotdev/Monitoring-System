@@ -27,8 +27,8 @@ describe("EntryRulesSettings", () => {
     api.updateEntryRules.mockResolvedValue({ requireEarlierDaysFinished: false });
     fireEvent.click(await open());
     await waitFor(() => expect(api.updateEntryRules).toHaveBeenCalledWith({ requireEarlierDaysFinished: false }));
-    expect(await screen.findByText(/People can now fill in the present day/)).toBeInTheDocument();
-    expect(screen.getByText(/While earlier days are open/)).toHaveTextContent(/Finishing a day still goes in order/);
+    expect(await screen.findByText(/Today can be entered while earlier days are open/)).toBeInTheDocument();
+    expect(screen.getByText(/Open earlier days can still change/)).toHaveTextContent(/Finishing days still goes in order/);
     expect(await find()).not.toBeChecked();
   });
 
@@ -37,7 +37,7 @@ describe("EntryRulesSettings", () => {
     api.updateEntryRules.mockResolvedValue({ requireEarlierDaysFinished: true });
     fireEvent.click(await open());
     await waitFor(() => expect(api.updateEntryRules).toHaveBeenCalledWith({ requireEarlierDaysFinished: true }));
-    expect(await screen.findByText(/must now be finished in order/)).toBeInTheDocument();
+    expect(await screen.findByText(/Days must be finished in order/)).toBeInTheDocument();
     await waitFor(() => expect(screen.queryByText(/While earlier days are open/)).toBeNull());
   });
 

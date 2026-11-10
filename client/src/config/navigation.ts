@@ -83,10 +83,25 @@ export const navGroups: NavGroup[] = [
 /// missing/not-yet-loaded user gets everything, matching HeaderTabs' own
 /// `!user ||` behavior - the router still guards each route, so an
 /// unauthenticated render can't actually reach any of them.
-export function pagesForRole(role: Role | undefined): NavLinkDef[] {
+export function pagesForRole(role: Role | undefined, phone = false): NavLinkDef[] {
   return navGroups.flatMap((g) =>
-    g.links.filter((l) => !role || l.roles.includes(role)),
+    g.links.filter((l) => (!role || l.roles.includes(role)) && (!phone || isPhonePage(l.to))),
   );
+}
+
+/// The only pages a phone shows (hooks/useReadOnlyPhone.ts): the ones that just
+/// read. Everything else - entry grids, audits, approvals, admin - needs the
+/// desktop layout (a phone browser's "Desktop site" option gets it).
+export const PHONE_PAGES = ["/dashboard", "/daily-report", "/total-stocks", "/daily-out", "/change-log", "/settings"] as const;
+
+export function isPhonePage(path: string): boolean {
+  return PHONE_PAGES.some((p) => path === p || path.startsWith(p + "/"));
+}
+
+/// Where a phone lands: the Dashboard for an admin (the only role allowed it),
+/// the Daily Report for everyone else.
+export function phoneHomeFor(role: Role | undefined): string {
+  return role === "SUPERVISOR_ADMIN" ? "/dashboard" : "/daily-report";
 }
 
 /// The entry grids, which are the only pages a product result can sensibly
@@ -95,6 +110,6 @@ export function pagesForRole(role: Role | undefined): NavLinkDef[] {
 export const GRID_PAGES = ["/online", "/offline", "/total-stocks"] as const;
 
 /// Where a product result goes when the user isn't already on a grid page.
-export function defaultGridPageFor(_role: Role | undefined): string {
-  return "/online";
+export function defaultGridPageFor(_role: Role | undefined, phone = false): string {
+  return phone ? "/total-stocks" : "/online";
 }
