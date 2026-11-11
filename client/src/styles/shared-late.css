@@ -187,3 +187,51 @@ input[type="reset"],
 :root[data-theme="dark"]:root .ae-gdrive-btn:active:not(:disabled) {
   background: #38393a;
 }
+
+/* ---- Back to top (components/BackToTop.tsx) ---------------------------------------------------
+   A glass circle with a gold ring, so it stands out on any page and theme: a translucent fill that
+   blurs what scrolls under it, a soft shadow, the arrow in the page's text colour. It is round through
+   the shared .ae-round class (every other button is 4px). */
+:root:root .ae-backtotop {
+  position: fixed;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ae-glass-accent, #d4a000) 65%, transparent);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.04)), color-mix(in srgb, var(--ae-surface) 55%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  backdrop-filter: blur(14px) saturate(160%);
+  color: var(--ae-text);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+:root:root .ae-backtotop:hover {
+  border-color: var(--ae-glass-accent, #d4a000);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.34), 0 0 14px rgba(245, 192, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transform: translateY(-1px);
+}
+:root:root .ae-backtotop:active {
+  transform: scale(0.92);
+}
+:root:root .ae-backtotop:focus-visible {
+  outline: 2px solid var(--ae-focus-ring, #8a6800);
+  outline-offset: 2px;
+}
+:root:root:root[data-phone="true"] .ae-backtotop {
+  right: 14px;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+@media print {
+  .ae-backtotop {
+    display: none;
+  }
+}

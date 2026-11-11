@@ -120,7 +120,7 @@ export function StockFlowChart() {
           <BarsSkeleton count={Math.min(days, 14)} chartHeight={CHART_HEIGHT} label="Loading stock flow…" />
         ) : (
           <div className="ae-mm-body">
-            <FlowLineChart points={points} series={SERIES} zeroFill />
+            <FlowLineChart points={points} series={SERIES} zeroFill scrollOnPhone />
             <ul className="ae-mm-notelist">
                 {anyData ? (
                   <>

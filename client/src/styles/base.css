@@ -109,6 +109,7 @@
      --ae-danger-text as --ae-warning-bg has to --ae-warning-text. */
   --ae-danger-bg: #f7d9da;
   --ae-success-text: #2f6b3c;
+  --ae-info-text: #1d5fb8;
   /* Category group-header bar inside data tables (StockGrid,
      TotalStocksTable, ManualCountPage) - warm espresso ink in every theme.
      Green is already the edited-cell colour, gold marks the grand total and
@@ -236,6 +237,7 @@
      the dark-mode danger hue rather than light mode's tint verbatim. */
   --ae-danger-bg: #3a1518;
   --ae-success-text: #79c987;
+  --ae-info-text: #6cb0ff;
   /* One step lighter than the charcoal rows: an ink as dark as the light-mode
      value would vanish against the near-black page. */
   --ae-category-bg: #35302a;
@@ -1646,5 +1648,43 @@ table input[type="number"] {
 @media (prefers-reduced-motion: reduce) {
   .ae-subtab {
     transition: none;
+  }
+}
+
+/* Change Log record cell: SKU, name, date, shift and page each get a fixed track, sized in
+   em to hug the text, so they line up down the column without pushing the columns to the
+   right. A row whose date carries a year gets a wider date track. */
+.ae-cl-rec {
+  --ae-cl-date-w: 3.4em;
+  display: grid;
+  grid-template-columns: 4.4em minmax(6em, 1fr) var(--ae-cl-date-w) 3.7em 3.4em;
+  column-gap: 8px;
+  align-items: baseline;
+  text-align: left;
+}
+.ae-cl-rec--year {
+  --ae-cl-date-w: 6em;
+}
+.ae-cl-rec-sku {
+  color: var(--ae-text-muted);
+}
+.ae-cl-rec-sku,
+.ae-cl-rec-meta > span {
+  white-space: nowrap;
+}
+.ae-cl-rec-meta {
+  display: contents;
+}
+/* Narrow window: date / shift / page fold onto a line under the name. */
+@media (max-width: 1280px) {
+  .ae-cl-rec {
+    grid-template-columns: 4.4em minmax(0, 1fr);
+  }
+  .ae-cl-rec-meta {
+    grid-column: 2;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 8px;
+    font-size: 0.92em;
   }
 }

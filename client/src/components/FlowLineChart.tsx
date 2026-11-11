@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { niceScale } from "../utils/chartScale";
 import { compactNumber, fullNumber } from "../utils/chartFormat";
 import { smoothPath } from "../utils/smoothPath";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 export interface FlowSeries {
   key: string;
@@ -30,12 +31,16 @@ export interface FlowPoint {
  * on keyboard focus and screen readers get the aria label. Days with no entry
  * either join across (default) or are drawn as 0 (`zeroFill`).
  */
+/// Narrowest a day's column gets on a phone before the plot scrolls sideways instead.
+const PHONE_DAY_WIDTH = 44;
+
 const hasData = (p: FlowPoint) => Object.values(p.values).some((v) => v !== null && v !== undefined);
 
 export function FlowLineChart({
   points,
   series,
   zeroFill = false,
+  scrollOnPhone = false,
 }: {
   points: FlowPoint[];
   series: FlowSeries[];
@@ -43,10 +48,36 @@ export function FlowLineChart({
   /// window from the baseline. Markers and the tooltip still only show real
   /// readings, so a drawn zero is never presented as a recorded one.
   zeroFill?: boolean;
+  /// On a phone, keep every day a readable width and scroll the plot sideways (the y axis
+  /// stays put) rather than squeezing a long period into the screen.
+  scrollOnPhone?: boolean;
 }) {
   const [active, setActive] = useState<number | null>(null);
   const count = points.length;
   const labelEvery = Math.max(1, Math.ceil(count / 7));
+  const phone = useReadOnlyPhone();
+  // A phone is too narrow for a label under every day: label every few days, counted back from the latest
+  // day so that one is always named, and the current day only when no label sits next to it.
+  // A scrolling plot has room for a label on every other day.
+  const scrolls = phone && scrollOnPhone;
+  const phoneEvery = scrolls ? Math.min(2, count) : Math.max(1, Math.ceil(count / 6));
+  const chartRef = useRef<HTMLDivElement>(null);
+  const lastKey = points[count - 1]?.key;
+  // Open on the latest days: that end of the period is the one being watched.
+  useEffect(() => {
+    const el = chartRef.current;
+    if (scrolls && el) el.scrollLeft = el.scrollWidth;
+  }, [scrolls, count, lastKey]);
+  const labelled = (i: number, p: FlowPoint): boolean => {
+    if (!phone) return i % labelEvery === 0 || p.current || (count <= 14 && hasData(p));
+    const onGrid = (j: number) => (count - 1 - j) % phoneEvery === 0;
+    if (onGrid(i)) return true;
+    if (!p.current) return false;
+    // Name the current day only when it is at least two days from the nearest grid label (a label is wider than
+    // one day's column, so a closer one would run into it).
+    const gap = (count - 1 - i) % phoneEvery;
+    return Math.min(gap, phoneEvery - gap) >= 2;
+  };
 
   const scale = useMemo(
     () => niceScale(Math.max(0, ...points.flatMap((p) => series.map((s) => p.values[s.key] ?? 0)))),
@@ -85,7 +116,12 @@ export function FlowLineChart({
           </span>
         ))}
       </div>
-      <div className="ae-fl-chart" onPointerLeave={() => setActive(null)}>
+      <div
+        ref={chartRef}
+        className={scrolls ? "ae-fl-chart ae-fl-chart--scroll" : "ae-fl-chart"}
+        style={scrolls ? ({ "--ae-fl-min": `${count * PHONE_DAY_WIDTH}px` } as CSSProperties) : undefined}
+        onPointerLeave={() => setActive(null)}
+      >
         <div aria-hidden className="ae-fl-yaxis">
           {scale.ticks.map((t) => (
             <span key={t} style={{ bottom: pct(t) }}>
@@ -166,7 +202,7 @@ export function FlowLineChart({
         <div aria-hidden className="ae-fl-xaxis">
           {points.map((p, i) => (
             <span key={p.key} className={p.current ? "ae-fl-xlabel ae-fl-xlabel--current" : "ae-fl-xlabel"}>
-              {i % labelEvery === 0 || p.current || (count <= 14 && hasData(p)) ? p.label : ""}
+              {labelled(i, p) ? p.label : ""}
             </span>
           ))}
         </div>

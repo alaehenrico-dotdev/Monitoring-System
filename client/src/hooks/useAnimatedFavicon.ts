@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useActivity, type ActivityState } from "../utils/activity";
+import { useReadOnlyPhone } from "./useReadOnlyPhone";
 
 /// The tab icon mirrors the header beam: while the system is saving, loading or
 /// reconnecting, a bright arc orbits the icon's rim; at rest it is the plain
@@ -45,13 +46,14 @@ function buildFrame(step: number, state: Exclude<ActivityState, "idle">): string
 
 export function useAnimatedFavicon(): void {
   const state = useActivity();
+  const phone = useReadOnlyPhone();
 
   useEffect(() => {
     const link = document.querySelector<HTMLLinkElement>('link[rel="icon"][type="image/svg+xml"]');
     if (!link) return;
     const rest = link.getAttribute("href") ?? "/favicon.svg";
     const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (state === "idle" || reduceMotion) {
+    if (state === "idle" || reduceMotion || phone) {
       link.setAttribute("href", rest);
       return;
     }
@@ -74,5 +76,5 @@ export function useAnimatedFavicon(): void {
       document.removeEventListener("visibilitychange", sync);
       link.setAttribute("href", rest);
     };
-  }, [state]);
+  }, [state, phone]);
 }

@@ -11,7 +11,7 @@ import {
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { ChevronIcon } from "./icons";
-import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { isPhoneView, useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { phoneLabel } from "../utils/phoneLabel";
 /**
  * Themed replacement for a bare `<select>` (see `Select` in ui.tsx).
@@ -73,6 +73,7 @@ interface DropdownProps {
 type Position = {
   left: number;
   minWidth: number;
+  maxWidth: number;
   top?: number;
   bottom?: number;
 };
@@ -113,13 +114,17 @@ export function Dropdown({
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const minWidth = Math.min(Math.max(rect.width, PANEL_MIN_WIDTH), vw - 16);
-    const left = Math.max(8, Math.min(rect.left, vw - minWidth - 8));
+    // On a phone the list can be as wide as its longest option (up to PANEL_MAX_WIDTH), so keep room for that
+    // much, not just the trigger's width - a trigger near the right edge used to open a list that ran off it.
+    // Everywhere else the placement is exactly as it always was.
+    const maxWidth = Math.min(PANEL_MAX_WIDTH, vw - 16);
+    const left = Math.max(8, Math.min(rect.left, vw - (isPhoneView() ? Math.max(minWidth, maxWidth) : minWidth) - 8));
     const spaceBelow = vh - rect.bottom - 8;
     const openUp = spaceBelow < PANEL_MAX_HEIGHT && rect.top - 8 > spaceBelow;
     setPos(
       openUp
-        ? { left, minWidth, bottom: vh - rect.top + 6 }
-        : { left, minWidth, top: rect.bottom + 6 },
+        ? { left, minWidth, maxWidth, bottom: vh - rect.top + 6 }
+        : { left, minWidth, maxWidth, top: rect.bottom + 6 },
     );
   }, []);
 
@@ -317,7 +322,7 @@ export function Dropdown({
               style={{
                 left: pos.left,
                 minWidth: pos.minWidth,
-                maxWidth: PANEL_MAX_WIDTH,
+                maxWidth: pos.maxWidth,
                 top: pos.top,
                 bottom: pos.bottom,
               }}

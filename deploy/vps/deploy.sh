@@ -34,7 +34,17 @@ die() { printf '\nERROR: %s\n' "$1" >&2; exit 1; }
 command -v pm2 >/dev/null || die "pm2 is not installed (sudo npm install -g pm2)."
 
 step "Pulling the latest code"
-git pull --ff-only
+branch="$(git rev-parse --abbrev-ref HEAD)"
+git fetch origin "$branch"
+# The server's copy must be an ancestor of what is on GitHub. It stops being one when a commit
+# that was already deployed is amended or rebased and force-pushed: say so, instead of git's
+# "Not possible to fast-forward".
+if ! git merge-base --is-ancestor HEAD "origin/$branch"; then
+  die "This copy ($(git rev-parse --short HEAD)) is not part of origin/$branch any more - a deployed commit was rewritten (amend / rebase + force-push), or someone committed on the server.
+If nothing was edited here on purpose (check: git status, git log origin/$branch..HEAD), line it up once, then deploy again:
+    git reset --hard origin/$branch"
+fi
+git merge --ff-only "origin/$branch"
 
 step "Installing dependencies"
 npm ci

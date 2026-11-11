@@ -794,24 +794,90 @@
 
 /* ---- Sub-page tabs (Settings, Admin queue, Corrections) -------------------------------------
    One line that scrolls sideways, as Minimalism already does, instead of wrapping into several
-   rows in the other themes. Applies on a phone and on any window narrower than 520px; Minimalism
-   keeps its own rules (its framed outline needs the strip not to wrap). */
-@media (max-width: 520px) {
-  :root:not([data-ui="minimal"]):root:root .ae-subtabs--framed {
-    flex-wrap: nowrap;
-    align-items: flex-end;
-    gap: 2px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    padding-bottom: 10px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  :root:not([data-ui="minimal"]):root:root .ae-subtabs--framed::-webkit-scrollbar {
-    display: none;
-  }
-  :root:not([data-ui="minimal"]):root:root .ae-subtabs--framed .ae-subtab {
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
+   rows in the other themes. Phone view only; Minimalism keeps its own rules (its framed outline
+   needs the strip not to wrap). */
+:root:not([data-ui="minimal"]):root:root[data-phone="true"] .ae-subtabs--framed {
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 10px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+:root:not([data-ui="minimal"]):root:root[data-phone="true"] .ae-subtabs--framed::-webkit-scrollbar {
+  display: none;
+}
+:root:not([data-ui="minimal"]):root:root[data-phone="true"] .ae-subtabs--framed .ae-subtab {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* ---- Smoothness on a phone ---------------------------------------------------------------
+   No visible scrollbars anywhere (every scroller still scrolls by touch). The big glass surfaces lose
+   their backdrop blur, which a phone's GPU pays for on every frame it scrolls under them; the fills
+   are translucent already, so they read the same. The scroll area keeps its overscroll to itself,
+   so a hard swipe at the end does not bounce or pull the whole page. */
+:root:root:root[data-phone="true"] * {
+  scrollbar-width: none;
+}
+:root:root:root[data-phone="true"] *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+/* Every blur goes, not just the big surfaces: the sticky SKU / name cells of a table carry one
+   each, so a long table was hundreds of blurred layers recomposited on every scrolled frame. */
+:root:root:root[data-phone="true"] *,
+:root:root:root[data-phone="true"] *::before,
+:root:root:root[data-phone="true"] *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* With no blur behind them the glass fills are made near-solid, so rows passing under a sticky
+   header or column, or the page under a toast, do not show through the text. */
+:root:root:root[data-phone="true"] {
+  --ae-glass-blur: none;
+  --ae-surface-glass: color-mix(in srgb, var(--ae-surface) 88%, transparent);
+  --ae-header-glass: var(--ae-header-bg);
+  /* A tap acts at once: no wait to see whether it is the first half of a double-tap zoom
+     (pinch zoom still works). */
+  touch-action: manipulation;
+}
+/* A fixed page background (Glass and Skeuo themes) is repainted in full on every scrolled frame
+   on a phone; scrolling with the shell looks the same, as the shell itself does not scroll. */
+:root:root:root[data-phone="true"] .app-shell {
+  background-attachment: scroll !important;
+}
+/* Long lists: an entry that is off screen is not laid out or painted until it is scrolled near.
+   The remembered size keeps the scroll length steady. */
+:root:root:root[data-phone="true"] .ae-cl-table tr.ae-cl-row,
+:root:root:root[data-phone="true"] .ae-bk-table tr.ae-bk-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
+  /* Paint containment clips anything drawn outside the row, so the focus outline moves inside. */
+  outline-offset: -2px;
+}
+/* Decorative loops stop: an endlessly animated glow keeps the compositor busy while scrolling. */
+:root:root:root[data-phone="true"] .ae-input-cell--saved {
+  animation: none !important;
+}
+:root:root:root[data-phone="true"] .ae-main {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Change Log, system events (Signed in, Failed sign-in, Database backup ...): there is no record to name,
+   so the event takes the whole first line instead of the narrow action column. */
+:root:root:root[data-phone="true"] .ae-cl-table tr.ae-cl-row--system {
+  grid-template-areas:
+    "action action toggle"
+    "when what by";
+}
+:root:root:root[data-phone="true"] .ae-cl-table tr.ae-cl-row--system .ae-cl-record {
+  display: none;
+}
+:root:root:root[data-phone="true"] .ae-cl-table tr.ae-cl-row--system .ae-cl-action {
+  font-size: 12px;
 }

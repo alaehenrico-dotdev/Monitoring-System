@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -28,6 +29,7 @@ import { matchesSearch } from "../utils/search";
 import {
   endOfDayIso,
   recordLabel,
+  recordParts,
   startOfDayIso,
 } from "../utils/changeLogLabel";
 import { formatStamp, localDateStamp } from "../utils/dateFormat";
@@ -49,11 +51,44 @@ const ROWS_ONE_TABLE = 100;
 const REFRESH_DEBOUNCE_MS = 400;
 /// On a phone the product name goes last, so when the line is cut it is the name that loses
 /// its tail, not the date or shift: "AFP067 · Nov 7 · Night · CHILI POWDER 1KG". The group
-/// heading already says Online / Offline, so that part is dropped.
-function phoneRecordLabel(label: string): string {
-  const parts = label.replace(/ · (Online|Offline|Total)$/, "").split(" · ");
-  // SKU, product, date, shift: only then is there a name to move to the end.
-  return parts.length >= 4 ? [parts[0], ...parts.slice(2), parts[1]].join(" · ") : parts.join(" · ");
+/// heading already says Online / Offline, so that part is dropped (RecordCell does this).
+const DATE_COLOR = "var(--ae-success-text)";
+const LOCATION_COLOR: Record<string, string> = {
+  Online: "var(--ae-info-text, #3b8eea)",
+  Offline: "var(--ae-warning-text)",
+};
+
+function RecordCell({ entry, phone }: { entry: ChangeLogEntry; phone: boolean }) {
+  const p = recordParts(entry.context);
+  if (!p) return <>{recordLabel(entry.context, entry.recordId)}</>;
+  const date = p.date && <span style={{ color: DATE_COLOR }}>{p.date}</span>;
+  if (phone) {
+    // SKU, date, shift, then the name: see the note above.
+    const items = [p.sku, date, p.shift, p.name].filter(Boolean);
+    return (
+      <>
+        {items.map((item, i) => (
+          <Fragment key={i}>
+            {i > 0 && " · "}
+            {item}
+          </Fragment>
+        ))}
+      </>
+    );
+  }
+  return (
+    // Laid out by .ae-cl-rec (base.css): fixed tracks so the parts line up down the column,
+    // folding date / shift / page under the name on a narrow window.
+    <div className={p.date?.includes(",") ? "ae-cl-rec ae-cl-rec--year" : "ae-cl-rec"}>
+      <span className="ae-cl-rec-sku">{p.sku}</span>
+      <span className="ae-cl-rec-name">{p.name}</span>
+      <div className="ae-cl-rec-meta">
+        <span style={{ color: DATE_COLOR }}>{p.date}</span>
+        <span>{p.shift}</span>
+        <span style={{ fontWeight: 600, color: p.location ? LOCATION_COLOR[p.location] : undefined }}>{p.location}</span>
+      </div>
+    </div>
+  );
 }
 
 const COLUMNS = ["When", "Record", "Action", "What changed", "Changed By", ""];
@@ -573,7 +608,7 @@ function SystemChangeRow({
   return (
     <>
       <tr
-        className="ae-cl-row"
+        className="ae-cl-row ae-cl-row--system"
         style={{ cursor: counts.length ? "pointer" : undefined }}
         onClick={counts.length ? onToggle : undefined}
         onKeyDown={counts.length ? toggleOnKey(onToggle) : undefined}
@@ -688,9 +723,7 @@ function ChangeLogRow({
             ? "Generated report"
             : entry.tableName === "users"
               ? `User · ${accountName(entry)}`
-              : phone
-                ? phoneRecordLabel(recordLabel(entry.context, entry.recordId))
-                : recordLabel(entry.context, entry.recordId)}
+              : <RecordCell entry={entry} phone={phone} />}
         </td>
         <td
           className="ae-cl-action"

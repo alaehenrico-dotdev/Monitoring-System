@@ -720,6 +720,23 @@
   grid-template-rows: minmax(200px, 1fr) 22px;
   min-height: 240px;
 }
+/* Phone, long period: the plot keeps a readable width per day and scrolls sideways, with the
+   y axis pinned over it. --ae-fl-min is set by FlowLineChart from the number of days. */
+.ae-fl-chart--scroll {
+  grid-template-columns: 40px minmax(var(--ae-fl-min, 0px), 1fr);
+  padding-top: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+.ae-fl-chart--scroll .ae-fl-yaxis {
+  position: sticky;
+  left: 0;
+  z-index: 4;
+  background: var(--ae-surface);
+}
 .ae-fl-yaxis {
   position: relative;
   grid-row: 1;

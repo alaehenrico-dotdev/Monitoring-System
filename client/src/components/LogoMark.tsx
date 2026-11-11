@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import logoVideo from "../assets/alaeh-logo-3d.webm";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 /**
  * The animated Ala Eh! 3D logo (src/assets/alaeh-logo-3d.webm), used in the
@@ -24,13 +25,14 @@ import logoVideo from "../assets/alaeh-logo-3d.webm";
  * keep compiling, but it's ignored: the video animates on its own.
  */
 export function LogoMark({ size = 44 }: { size?: number; spin?: number }) {
+  const phone = useReadOnlyPhone();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
     let onScreen = true;
-    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const reduceMotion = phone || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const sync = () => {
       if (onScreen && !document.hidden && !reduceMotion) {
         // play() returns a promise in browsers; guard for environments
@@ -54,7 +56,7 @@ export function LogoMark({ size = 44 }: { size?: number; spin?: number }) {
       observer?.disconnect();
       document.removeEventListener("visibilitychange", sync);
     };
-  }, []);
+  }, [phone]);
 
   return (
     <span
@@ -70,7 +72,7 @@ export function LogoMark({ size = 44 }: { size?: number; spin?: number }) {
         ref={videoRef}
         src={logoVideo}
         poster="/alaeh-logo-3d-poster.png"
-        autoPlay
+        autoPlay={!phone}
         loop
         muted
         playsInline

@@ -66,7 +66,15 @@ describe("ChangeLogPage - readable rows", () => {
   it("shows a readable record label and a one-line summary instead of the raw id", async () => {
     render(<ChangeLogPage />);
 
-    expect(await screen.findByText("AFP007 · Soy Sauce 1L · Oct 9 · Night · Online")).toBeTruthy();
+    // Each part sits in its own column, so the label is read off the cell as a whole.
+    const record = (await screen.findByText("Soy Sauce 1L")).closest("td")!;
+    expect(Array.from(record.querySelectorAll("span"), (s) => s.textContent).filter(Boolean)).toEqual([
+      "AFP007",
+      "Soy Sauce 1L",
+      "Oct 9",
+      "Night",
+      "Online",
+    ]);
     expect(screen.getByText("Manual count 12 → 10")).toBeTruthy();
     expect(screen.queryByText("#4821")).toBeNull();
   });

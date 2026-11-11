@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
@@ -20,6 +20,12 @@ export function Layout() {
   const { online } = useOnlineStatus();
   const phone = usePhoneAttribute();
   const [phoneNoteDismissed, setPhoneNoteDismissed] = useState(false);
+  // The read-only note is shown once, then gets out of the way by itself (it sat over the page until closed).
+  useEffect(() => {
+    if (!phone || phoneNoteDismissed) return;
+    const timer = setTimeout(() => setPhoneNoteDismissed(true), 7000);
+    return () => clearTimeout(timer);
+  }, [phone, phoneNoteDismissed]);
   const [offlineDismissed, setOfflineDismissed] = useState(false);
   const {
     user,

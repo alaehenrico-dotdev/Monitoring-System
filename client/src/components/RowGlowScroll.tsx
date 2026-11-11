@@ -7,6 +7,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { isPhoneView } from "../hooks/useReadOnlyPhone";
 
 interface RingRect {
   top: number;
@@ -111,6 +112,9 @@ export function RowGlowScroll({
   );
 
   function handleMouseOver(e: ReactMouseEvent<HTMLDivElement>) {
+    // A phone has no pointer to follow and its pages are read-only: a tap would only measure
+    // the row (a forced layout) and re-render for a highlight nobody uses.
+    if (isPhoneView()) return;
     const row = (e.target as Element).closest("tbody tr");
     // mouseover re-fires on every child element the pointer crosses while
     // moving around inside the same row (it bubbles, unlike mouseenter) -
@@ -133,6 +137,7 @@ export function RowGlowScroll({
   // `null` (clicking the scroll container's own background, outside any
   // row) clears it.
   function pinRow(row: Element | null) {
+    if (isPhoneView()) return;
     if (row === focusedRowRef.current) return;
     focusedRowRef.current = row;
     setFocusRing(rectOf(row));

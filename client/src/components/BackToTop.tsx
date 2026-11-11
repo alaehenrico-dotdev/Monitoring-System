@@ -43,31 +43,10 @@ export function BackToTop({ containerRef }: { containerRef: RefObject<HTMLElemen
   return (
     <button
       type="button"
-      className="no-print ae-tap-target"
+      className="no-print ae-tap-target ae-round ae-backtotop"
       onClick={() => scrolledElRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
-      onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
       title="Back to top"
       aria-label="Back to top"
-      style={{
-        position: "fixed",
-        bottom: 24,
-        right: 24,
-        zIndex: 900,
-        width: 40,
-        height: 40,
-        borderRadius: "50%",
-        border: "1px solid var(--ae-border)",
-        background: "var(--ae-surface)",
-        color: "var(--ae-text)",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: "0 2px 8px rgba(12, 12, 12,0.2)",
-        transition: "background-color 120ms ease, transform 120ms ease",
-      }}
-      onMouseDown={(e) => (e.currentTarget.style.transform = "scale(0.92)")}
-      onMouseUp={(e) => (e.currentTarget.style.transform = "scale(1)")}
     >
       <ArrowUpIcon />
     </button>
