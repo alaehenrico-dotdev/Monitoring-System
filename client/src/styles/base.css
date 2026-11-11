@@ -774,6 +774,44 @@ table input[type="number"] {
   box-shadow: none;
 }
 
+/* Compact pager (a category heading's line, e.g. the Change Log): everything stays on one line
+   and takes as little of it as it can. The rows box has no border or fill at all in any theme,
+   just the number and its arrow; the step buttons are smaller. */
+.ae-pager--compact {
+  flex: none;
+  white-space: nowrap;
+}
+:root:root .ae-pager--compact .ae-select,
+:root:root .ae-pager--compact .ae-select:hover:not(:disabled):not(:focus),
+:root:root .ae-pager--compact .ae-select:focus {
+  width: auto;
+  min-height: 0;
+  height: 24px;
+  padding: 0 2px;
+  border: 0 !important;
+  background-color: transparent;
+  box-shadow: none;
+  font-size: inherit;
+  font-weight: 700;
+}
+:root:root .ae-pager--compact .ae-select:hover:not(:disabled) {
+  background-color: var(--ae-row-hover);
+}
+:root:root .ae-pager--compact .ae-select:focus-visible {
+  box-shadow: 0 0 0 2px var(--ae-glass-accent);
+}
+.ae-pager--compact .ae-pager-btn {
+  width: 24px;
+  height: 24px;
+  font-size: calc(16px * var(--ae-fs, 1));
+}
+/* Below a laptop's width the heading already shows the total, so "of 1,498" is dropped. */
+@media (max-width: 900px) {
+  .ae-pager--compact .ae-pager-of {
+    display: none;
+  }
+}
+
 .ae-pager-btn {
   width: 32px;
   height: 32px;

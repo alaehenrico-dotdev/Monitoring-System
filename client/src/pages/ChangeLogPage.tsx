@@ -548,11 +548,12 @@ function CategorySection({
     <>
       <tr>
         <td colSpan={COLUMNS.length} style={groupHeadingStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "0 8px 0 0" }}>
+          {/* Always one line: the name gives way (cut with an ellipsis) before the pager does. */}
+          <div className="ae-cl-grouphead" style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 6px 0 0", whiteSpace: "nowrap" }}>
             <button type="button" onClick={onToggle} aria-expanded={!collapsed} style={groupToggleStyle}>
               <span aria-hidden="true">{collapsed ? "▶" : "▼"}</span>
-              {tableLabel(table)}
-              <span style={{ fontWeight: 500, color: colors.subtleInk }}>({list.total.toLocaleString()})</span>
+              <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{tableLabel(table)}</span>
+              <span style={{ flex: "none", fontWeight: 500, color: colors.subtleInk }}>({list.total.toLocaleString()})</span>
             </button>
             <Pager
               compact
@@ -886,10 +887,10 @@ const groupHeadingStyle: CSSProperties = {
 const groupToggleStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: 8,
+  gap: 6,
   flex: 1,
   minWidth: 0,
-  padding: "10px 6px 6px",
+  padding: "6px 6px",
   border: "none",
   background: "transparent",
   color: "inherit",
