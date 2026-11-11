@@ -511,7 +511,7 @@
 :root:root:root[data-phone="true"] .ae-pm-table tr:not(.ae-row-category) > :first-child {
   display: none;
 }
-:root:root:root[data-phone="true"] .ae-pm-table td:nth-child(2),
+:root:root:root[data-phone="true"] .ae-pm-table tr:not(.ae-row-category) > td:nth-child(2),
 :root:root:root[data-phone="true"] .ae-pm-table th:nth-child(2) {
   position: sticky;
   left: 0;
@@ -554,9 +554,52 @@
   width: 16px;
   height: 16px;
 }
-:root:root:root[data-phone="true"] .ae-pm-table .ae-row-category td {
+/* Each category is one row: its name (tap to open) pinned on the left, its subtotals across. */
+:root:root:root[data-phone="true"] .ae-pm-table .ae-pm-cat td {
+  padding-block: 0;
+  font-weight: 700;
+  /* Solid, so the figures scrolling sideways pass behind the pinned name, not through it. */
+  background: var(--ae-bg-alt);
+}
+:root:root:root[data-phone="true"] .ae-pm-table .ae-pm-cat td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 104px;
+  min-width: 104px;
+  max-width: 104px;
+  padding: 0;
   text-align: left;
-  padding-left: 10px;
+}
+:root:root:root[data-phone="true"] .ae-pm-cat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 6px 4px 8px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.2;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+:root:root:root[data-phone="true"] .ae-pm-cat-toggle > :first-child {
+  flex: none;
+  font-size: 9px;
+}
+/* A product is one line: a long name is cut short and opens in full on a tap. */
+:root:root:root[data-phone="true"] .ae-pm-table tbody td {
+  padding-block: 6px;
+}
+:root:root:root[data-phone="true"] .ae-pm-table td.ae-pm-name:not(.ae-pm-name--full) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
 }
 
 /* ---- Daily Out: the six columns fit the screen -------------------------------------------

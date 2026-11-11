@@ -43,6 +43,9 @@ const TILES: Tile[] = [
 
 const fmt = (v: number) => fullNumber.format(v);
 
+/// The figure columns of the product table, in order (after SKU and Product).
+const COLUMNS = ["onlineOut", "offlineOut", "totalOut", "backloads", "rts", "productionIn", "netVariance", "absVariance"] as const;
+
 /// "Nov 9 – Nov 15, 2026" on a phone (a month keeps its own title).
 function shortPeriodTitle(kind: PeriodKind, from: string, to: string): string {
   if (kind === "month") return periodTitle(kind, from, to);
@@ -121,6 +124,17 @@ export function PeriodMonitoringCard() {
   }, [data]);
 
   const atCurrent = to >= today && from <= today;
+
+  // Phone: the table would run to several screens, so each category is one row with its own
+  // subtotals and opens on a tap; a long product name is one line until tapped.
+  const [openCategories, setOpenCategories] = useState<ReadonlySet<string>>(() => new Set());
+  const [fullName, setFullName] = useState<number | null>(null);
+  const toggleCategory = (category: string) =>
+    setOpenCategories((cur) => {
+      const next = new Set(cur);
+      if (!next.delete(category)) next.add(category);
+      return next;
+    });
 
   return (
     <section className="ae-dash-section">
@@ -210,13 +224,39 @@ export function PeriodMonitoringCard() {
                   <tbody>
                     {groups.map(([category, rows]) => (
                       <Fragment key={category}>
-                        <tr className="ae-row-category">
-                          <td colSpan={10}>{category || "Uncategorised"}</td>
-                        </tr>
-                        {rows.map((p) => (
+                        {phone ? (
+                          <tr className="ae-row-category ae-pm-cat">
+                            <td colSpan={2}>
+                              <button
+                                type="button"
+                                className="ae-pm-cat-toggle"
+                                aria-expanded={openCategories.has(category)}
+                                onClick={() => toggleCategory(category)}
+                              >
+                                <span aria-hidden="true">{openCategories.has(category) ? "▼" : "▶"}</span>
+                                <span>{category || "Uncategorised"}</span>
+                              </button>
+                            </td>
+                            {COLUMNS.map((c) => (
+                              <td key={c}>{fmt(rows.reduce((sum, r) => sum + r[c], 0))}</td>
+                            ))}
+                          </tr>
+                        ) : (
+                          <tr className="ae-row-category">
+                            <td colSpan={10}>{category || "Uncategorised"}</td>
+                          </tr>
+                        )}
+                        {(!phone || openCategories.has(category)) && rows.map((p) => (
                           <tr key={p.productId}>
                             <td>{p.sku ?? ""}</td>
-                            <td style={{ textAlign: "left" }}>{p.name}</td>
+                            <td
+                              className={phone && fullName === p.productId ? "ae-pm-name ae-pm-name--full" : "ae-pm-name"}
+                              style={{ textAlign: "left" }}
+                              title={phone ? p.name : undefined}
+                              onClick={phone ? () => setFullName((cur) => (cur === p.productId ? null : p.productId)) : undefined}
+                            >
+                              {p.name}
+                            </td>
                             <td>{fmt(p.onlineOut)}</td>
                             <td>{fmt(p.offlineOut)}</td>
                             <td>{fmt(p.totalOut)}</td>
