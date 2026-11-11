@@ -1,8 +1,9 @@
 name: Deploy
 
-# Deploys to the VPS over SSH by running deploy/vps/deploy.sh there (git pull, npm ci,
-# build, database snapshot + migrations, pm2 reload, wait for /health/live). The server
-# runs under PM2 + Nginx, not Docker; see docs/DEPLOY-VPS.md section 13.
+# Deploys to the VPS over SSH by running deploy/vps/deploy.sh there (fast-forward to the
+# commit CI tested, npm ci, build, database snapshot + migrations, pm2 reload, wait for
+# /health/live; if a step fails it puts the previous version back). The server runs
+# under PM2 + Nginx, not Docker; see docs/DEPLOY-VPS.md section 13.
 #
 # Optional environment VARIABLES (Settings -> Environments -> production -> Variables):
 #   DEPLOY_PATH        app folder on the server        (default /var/www/ala-eh)
@@ -76,8 +77,10 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      # deploy.sh pulls, installs, builds, snapshots + migrates the database, restarts
-      # PM2 and waits for the API. It stops at the first thing that fails.
+      # deploy.sh updates to DEPLOY_SHA (the commit CI tested, not whatever was pushed
+      # after it), installs, builds, snapshots + migrates the database, restarts PM2 and
+      # waits for the API. It stops at the first thing that fails and goes back to the
+      # version that was running; this step then fails, so the bad release is noticed.
       - name: Run deploy.sh on the server
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -86,7 +89,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -p "${DEPLOY_PORT:-22}" \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "bash '$DEPLOY_PATH/deploy/vps/deploy.sh'"
+            "bash '$DEPLOY_PATH/deploy/vps/deploy.sh' '$DEPLOY_SHA'"
 
       - name: Check the public site
         if: ${{ env.DEPLOY_HEALTH_URL != '' }}

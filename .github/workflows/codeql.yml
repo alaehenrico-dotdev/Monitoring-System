@@ -1,0 +1,40 @@
+name: CodeQL
+
+# Static security analysis of the TypeScript / JavaScript (server, client, scripts): injection,
+# unsafe use of request input, weak crypto, path handling and the like. Findings appear under
+# Security -> Code scanning. Runs on every push and pull request to main, and weekly so newly
+# published checks are applied to code that has not changed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 2 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: javascript-typescript
+          # The default checks plus the extended security set.
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:javascript-typescript"

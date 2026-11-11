@@ -384,7 +384,14 @@ enter on both the Online and Offline sheets). No new required settings. Do **not
 server: it would add a new `encoder` account. After the deploy, open Settings > User Passwords and check the
 accounts; the old `online.encoder` and `offline.encoder` still work, now as Encoders.
 
-**Rolling back** a bad release: find the last good commit with `git log --oneline -5`, then
+**If a deploy fails,** `deploy.sh` puts the previous version back by itself (code, dependencies, build,
+restart) and checks that the API answers again; it still ends with an error and prints `ROLLED BACK`, so you
+know the new release did not go out. The exception is a release with database migrations that failed at or after
+the migration step: it stops and tells you, because old code on a changed database is your call. Started from
+GitHub, it deploys the exact commit CI tested; a deploy queued behind a newer one does nothing.
+
+**Rolling back by hand** (a release that deployed fine but is wrong, or the exception above): find the last good
+commit with `git log --oneline -5`, then
 `git reset --hard abc1234 && npm ci && npm run build && pm2 restart alaeh-stocks`. A rollback does **not**
 undo database migrations. If a migration has to be undone, restore the snapshot the deploy took
 (`/var/backups/alaeh-stocks/snapshots`, newest first) with `restore.sh` as in step 11.
