@@ -17,6 +17,7 @@ import {
   FileChartColumnIncreasing,
   History,
   Layers,
+  LayoutDashboard,
   Lock,
   Moon,
   Package,
@@ -25,9 +26,11 @@ import {
   RefreshCw,
   Save,
   Search,
+  Settings,
   Sun,
   Tag,
   TriangleAlert,
+  Truck,
   Undo2,
   UnfoldHorizontal,
   Upload,
@@ -220,4 +223,32 @@ export function LockIcon({ size = 16 }: { size?: number }) {
 /// Upload, which is already the Export icon on the same toolbar.
 export function PublishIcon() {
   return <ArrowUpFromLine {...look(16, 1.6)} />;
+}
+
+/// The phone's bottom navigation bar (PhoneBottomNav.tsx): one per page, larger than the toolbar
+/// icons because each stands above a one-word label as the main thing to aim a thumb at.
+const nav = { size: 21, strokeWidth: 1.7, "aria-hidden": true as const };
+
+export function NavDashboardIcon() {
+  return <LayoutDashboard {...nav} />;
+}
+
+export function NavReportIcon() {
+  return <FileChartColumnIncreasing {...nav} />;
+}
+
+export function NavStocksIcon() {
+  return <Layers {...nav} />;
+}
+
+export function NavOutIcon() {
+  return <Truck {...nav} />;
+}
+
+export function NavLogIcon() {
+  return <History {...nav} />;
+}
+
+export function NavSettingsIcon() {
+  return <Settings {...nav} />;
 }

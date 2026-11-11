@@ -931,3 +931,89 @@
 :root:root:root[data-phone="true"] .ae-cl-table tr.ae-cl-row--system .ae-cl-action {
   font-size: 12px;
 }
+
+/* ---- Bottom navigation (components/PhoneBottomNav.tsx) -------------------------------------
+   The page tabs are a bar along the bottom of the screen, not a strip in the header: under the
+   thumb, and in view however far the page is scrolled. The shell becomes a column - the page
+   scrolling in the space above, the bar as its last row - so nothing is ever hidden behind the
+   bar and no page needs padding to clear it. Icon over a one-word label, six across at most;
+   the open page is gold with a line along its top edge. Solid, from the theme's own surface and
+   text colours, so it reads the same in every theme and header layout.
+   --ae-bottomnav-h is the bar's full height (home-indicator area included), for the floating
+   things that must sit above it: the Back to top button and the toasts. */
+:root:root:root[data-phone="true"] {
+  --ae-bottomnav-h: calc(56px + env(safe-area-inset-bottom, 0px));
+}
+:root:root:root[data-phone="true"] .app-shell {
+  flex-direction: column;
+}
+:root:root:root[data-phone="true"] .app-shell > .ae-main {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  height: var(--ae-bottomnav-h);
+  padding: 0 4px env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+  background: var(--ae-surface);
+  border-top: 1px solid var(--ae-border);
+  /* Above the page and its pinned table headers; under the account panel (50) and dialogs (200). */
+  position: relative;
+  z-index: 40;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0 2px;
+  color: var(--ae-text-muted);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item svg {
+  flex: none;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0.01em;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"] {
+  color: var(--ae-warning-text);
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 22%;
+  right: 22%;
+  height: 2px;
+  border-radius: 0 0 2px 2px;
+  background: currentColor;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item:active {
+  background: var(--ae-row-hover);
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item:focus-visible {
+  outline: 2px solid var(--ae-focus-ring, #8a6800);
+  outline-offset: -3px;
+  border-radius: 6px;
+}
+/* The toasts (Toast.tsx sets their place inline) rise above the bar. */
+:root:root:root[data-phone="true"] #ae-toast-stack {
+  bottom: calc(var(--ae-bottomnav-h) + 10px) !important;
+}

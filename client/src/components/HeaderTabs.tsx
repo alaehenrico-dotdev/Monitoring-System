@@ -212,7 +212,8 @@ export function HeaderTabs() {
     }))
     .filter((g) => g.links.length > 0);
 
-  if (visibleGroups.length === 0) return null;
+  // A phone has its page navigation in a bar along the bottom instead (PhoneBottomNav.tsx).
+  if (phone || visibleGroups.length === 0) return null;
 
   return (
     <nav

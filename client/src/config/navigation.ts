@@ -94,6 +94,33 @@ export function pagesForRole(role: Role | undefined, phone = false): NavLinkDef[
 /// desktop layout (a phone browser's "Desktop site" option gets it).
 export const PHONE_PAGES = ["/dashboard", "/daily-report", "/total-stocks", "/daily-out", "/change-log", "/settings"] as const;
 
+/// What the phone's bottom bar (components/PhoneBottomNav.tsx) calls each page: six items share
+/// the width of a phone, so each gets one short word. The full name stays the accessible name.
+const PHONE_NAV_LABELS: Record<string, string> = {
+  // "Dashboard" is cut short at six across on a 360px phone.
+  "/dashboard": "Home",
+  "/daily-report": "Report",
+  "/total-stocks": "Stocks",
+  "/daily-out": "Out",
+  "/change-log": "Log",
+};
+
+export function phoneNavLabel(link: NavLinkDef): string {
+  return PHONE_NAV_LABELS[link.to] ?? link.label;
+}
+
+/// The pages on the phone's bottom bar, in ribbon order. It always includes the page a phone
+/// opens on (phoneHomeFor): an Encoder lands on the Daily Report, which every role may read but
+/// which the desktop ribbon lists for admins only, and a bar without it would leave them on a
+/// page they could not get back to.
+export function phoneNavPages(role: Role | undefined): NavLinkDef[] {
+  const pages = pagesForRole(role, true);
+  const home = phoneHomeFor(role);
+  if (pages.some((p) => p.to === home)) return pages;
+  const link = navGroups.flatMap((g) => g.links).find((l) => l.to === home);
+  return link ? [link, ...pages] : pages;
+}
+
 export function isPhonePage(path: string): boolean {
   return PHONE_PAGES.some((p) => path === p || path.startsWith(p + "/"));
 }

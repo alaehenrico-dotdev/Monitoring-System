@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+- **Phone: the page tabs are a bar along the bottom of the screen** (Home, Stocks, Out, Report, Log, Settings - an icon over a one-word label), under the thumb and in view however far the page is scrolled, instead of a strip at the top that scrolled away. The open page is gold. An Encoder's bar now includes the Daily Report, the page a phone opens on for them (the old strip did not list it). The Back to top button and the notices sit above the bar. Desktop, and a phone using "Desktop site", keep the header tabs.
+- **Phone: the Dashboard's Weekly / Monthly table is one row per category**, closed, with that category's subtotals; tap a category to open its products. A long product name is one line, cut short, and shows in full on a tap.
+
 ## 2.5.1 - 2026-11-11
 
 **Upgrading a running server:** run the normal deploy (it snapshots the database first). One small migration since 2.5.0, `20261105090000_drive_account_name`, adds the Google account name to the Drive connection; a server that has been following `main` already has it. No new settings. The server runs its current `deploy.sh` one last time for this release; the tested-commit and roll-back behaviour below starts with the deploy after it.

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
+import { PhoneBottomNav } from "./PhoneBottomNav";
 import { Toast, ToastHost } from "./Toast";
 import { QuickJump } from "./QuickJump";
 import { ConfirmDialog } from "./ConfirmDialog";
@@ -84,6 +85,8 @@ export function Layout() {
         >
           <Outlet />
         </main>
+        {/* Phone: the page tabs live here, under the page (styles/phone.css stacks the shell). */}
+        {phone && <PhoneBottomNav />}
         <Toast
           id="server-offline"
           message={

@@ -226,9 +226,10 @@ input[type="reset"],
   outline: 2px solid var(--ae-focus-ring, #8a6800);
   outline-offset: 2px;
 }
+/* --ae-bottomnav-h (styles/phone.css) is the phone's bottom navigation bar, safe area included. */
 :root:root:root[data-phone="true"] .ae-backtotop {
   right: 14px;
-  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(14px + var(--ae-bottomnav-h, env(safe-area-inset-bottom, 0px)));
 }
 @media print {
   .ae-backtotop {
