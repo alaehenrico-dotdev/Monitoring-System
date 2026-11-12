@@ -236,3 +236,204 @@ input[type="reset"],
     display: none;
   }
 }
+
+/* ---- Google Drive settings, minimal (pages/GoogleDriveSettings.tsx) --------------------------
+   One quiet panel: no boxes inside boxes. The things saved to Drive are plain sections divided by a
+   hairline, each a title with a small status dot, then its folder and last run on lines of their
+   own. Everything may shrink and wrap (grid tracks are minmax(0, 1fr) and long names break), so a
+   long account name, folder or sentence can no longer push the page wider than a phone. */
+.ae-gd {
+  min-width: 0;
+  padding: 18px 20px;
+  overflow-wrap: anywhere;
+}
+.ae-gd-title {
+  font-size: calc(15px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text);
+}
+.ae-gd-lead {
+  margin-top: 4px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  line-height: 1.5;
+  color: var(--ae-text-muted);
+}
+.ae-gd-body,
+.ae-gd-secs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 14px;
+}
+.ae-gd-secs {
+  margin-top: 0;
+}
+.ae-gd-body > *,
+.ae-gd-secs > * {
+  min-width: 0;
+}
+.ae-gd-acct {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+  padding-bottom: 14px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  color: var(--ae-text);
+}
+.ae-gd-acct-name {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ae-gd-acct-label {
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-gd-acct-actions {
+  display: inline-flex;
+  gap: 14px;
+}
+.ae-gd-link {
+  min-height: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 35%, transparent);
+  cursor: pointer;
+}
+.ae-gd-link:hover:not(:disabled) {
+  color: var(--ae-text);
+}
+.ae-gd-link--danger {
+  color: var(--ae-danger-text, #b3202a);
+}
+.ae-gd-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ae-gd-sec {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 1px solid var(--ae-border-soft, rgba(128, 128, 128, 0.2));
+  min-width: 0;
+}
+.ae-gd-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ae-gd-head strong {
+  font-size: calc(13.5px * var(--ae-fs, 1));
+  color: var(--ae-text);
+}
+.ae-gd-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-gd-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #2f9e5b;
+}
+.ae-gd-status--off::before {
+  background: color-mix(in srgb, var(--ae-text-muted) 60%, transparent);
+}
+.ae-gd-meta {
+  display: grid;
+  gap: 2px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  line-height: 1.45;
+  color: var(--ae-text-muted);
+}
+.ae-gd-meta strong {
+  font-weight: 600;
+  color: var(--ae-text);
+}
+/* Checkbox rows: the box stays at the first line when the sentence wraps. */
+.ae-gd label {
+  align-items: flex-start !important;
+  line-height: 1.45;
+}
+.ae-gd label > input[type="checkbox"] {
+  flex: none;
+  margin-top: 3px;
+}
+.ae-gd .ae-select,
+.ae-gd .ae-input {
+  max-width: 100%;
+}
+.ae-gd section[aria-label="Recent activity"] {
+  padding-top: 16px;
+  border-top: 1px solid var(--ae-border-soft, rgba(128, 128, 128, 0.2));
+}
+@media (max-width: 480px) {
+  .ae-gd {
+    padding: 14px 14px;
+  }
+}
+
+/* Recent activity: a plain list, not a table. A table of five columns cannot fit a phone, so the
+   file name (which wraps one letter per line in a narrow column) got the squeeze. Each entry is the
+   file name on top, then type, size and time on one quiet line, with the result at the right. */
+.ae-gd-acts {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+.ae-gd-act {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--ae-border-soft, rgba(128, 128, 128, 0.2));
+}
+.ae-gd-act:first-child {
+  border-top: 0;
+}
+.ae-gd-act-main {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ae-gd-act-file {
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  font-weight: 500;
+  color: var(--ae-text);
+  overflow-wrap: anywhere;
+}
+.ae-gd-act-meta {
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-gd-act-err {
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  color: var(--ae-danger-text, #b3202a);
+}
+.ae-gd-status--bad::before {
+  background: #d1343f;
+}
+.ae-gd-act .ae-gd-status {
+  padding-top: 1px;
+}
+/* The filter pills wrap under the heading instead of running off the panel. */
+.ae-gd section[aria-label="Recent activity"] .ae-dash-seg {
+  max-width: 100%;
+  overflow-x: auto;
+}

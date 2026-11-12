@@ -153,3 +153,123 @@
   color: var(--ae-text) !important;
 }
 
+
+/* ---- Enhancements: lit glass, depth, softer states --------------------------------------
+   Gradients, shadows and transforms only: no extra backdrop blur is added, so the theme costs
+   no more to paint than before (and a phone, which drops the blur, still gets the rest). */
+
+/* Light falls from the top-left: a faint sheen across every pane, a bright edge on the lit
+   sides and a dim one on the shaded sides, instead of one even outline. */
+:root[data-ui="glass"] {
+  --ae-gl-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.08) 38%, rgba(255, 255, 255, 0) 62%);
+  --ae-gl-lit: inset 1px 1px 0 rgba(255, 255, 255, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.18);
+  --ae-gl-shadow:
+    0 1px 2px rgba(90, 60, 0, 0.10),
+    0 10px 30px rgba(90, 60, 0, 0.16),
+    0 24px 60px -12px rgba(150, 100, 0, 0.22),
+    var(--ae-gl-lit);
+}
+:root[data-ui="glass"][data-theme="dark"] {
+  --ae-gl-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(255, 255, 255, 0) 62%);
+  --ae-gl-lit: inset 1px 1px 0 rgba(255, 255, 255, 0.2), inset -1px -1px 0 rgba(255, 255, 255, 0.04);
+  --ae-gl-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 12px 34px rgba(0, 0, 0, 0.45),
+    0 24px 60px -12px rgba(245, 192, 0, 0.10),
+    var(--ae-gl-lit);
+}
+:root[data-ui="glass"] .ae-page-header,
+:root[data-ui="glass"] .ae-panel,
+:root[data-ui="glass"] .ae-dash-stat,
+:root[data-ui="glass"] .ae-table-scroll,
+:root[data-ui="glass"] .ae-table-wrap,
+:root[data-ui="glass"] .ae-modal-panel {
+  background-image: var(--ae-gl-sheen);
+}
+:root[data-ui="glass"] .ae-modal-panel {
+  box-shadow:
+    0 2px 4px rgba(60, 40, 0, 0.14),
+    0 24px 70px rgba(60, 40, 0, 0.38),
+    var(--ae-gl-lit);
+}
+
+/* The stat cards lift a little under the pointer; it is the one place a card invites a touch. */
+@media (hover: hover) {
+  :root[data-ui="glass"] .ae-dash-stat {
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease;
+  }
+  :root[data-ui="glass"] .ae-dash-stat:hover {
+    transform: translateY(-3px);
+    box-shadow:
+      0 2px 4px rgba(90, 60, 0, 0.12),
+      0 18px 44px rgba(90, 60, 0, 0.22),
+      0 0 34px -8px rgba(245, 192, 0, 0.35),
+      var(--ae-gl-lit);
+  }
+}
+
+/* Buttons: a bright top edge and a press-down. */
+:root[data-ui="glass"] .ae-btn {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+:root[data-ui="glass"] .ae-btn-primary {
+  box-shadow: 0 4px 14px rgba(193, 39, 45, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+:root[data-ui="glass"] .ae-btn-secondary {
+  box-shadow: 0 4px 14px rgba(200, 150, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+:root[data-ui="glass"] .ae-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+}
+
+/* Fields sink slightly into the glass, and a focused one lights up gold. */
+:root[data-ui="glass"] .ae-input:not(.ae-input-cell),
+:root[data-ui="glass"] .ae-select {
+  box-shadow: inset 0 1px 3px rgba(90, 60, 0, 0.12);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+:root[data-ui="glass"] .ae-input:not(.ae-input-cell):focus-visible,
+:root[data-ui="glass"] .ae-select:focus-visible {
+  border-color: rgba(245, 192, 0, 0.9);
+  box-shadow: inset 0 1px 3px rgba(90, 60, 0, 0.1), 0 0 0 3px rgba(245, 192, 0, 0.3);
+  outline: none;
+}
+
+/* The open tab glows a little gold, as if lit from within. */
+:root[data-ui="glass"] .ae-header-tab[aria-current="page"] {
+  box-shadow:
+    inset 0 0 0 1px var(--ae-gl-edge),
+    0 4px 14px rgba(90, 60, 0, 0.18),
+    0 0 18px -4px rgba(245, 192, 0, 0.45);
+}
+
+/* Table header: glass with a bright lower edge. */
+:root[data-ui="glass"] .ae-table thead th {
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.5);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-table thead th {
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Scrollbars and text selection in the theme's own colours. */
+:root[data-ui="glass"] * {
+  scrollbar-color: rgba(150, 110, 10, 0.4) transparent;
+}
+:root[data-ui="glass"][data-theme="dark"] * {
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+}
+:root[data-ui="glass"] ::selection {
+  background: rgba(245, 192, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root[data-ui="glass"] .ae-dash-stat,
+  :root[data-ui="glass"] .ae-btn {
+    transition: none;
+  }
+  :root[data-ui="glass"] .ae-dash-stat:hover,
+  :root[data-ui="glass"] .ae-btn:active:not(:disabled) {
+    transform: none;
+  }
+}

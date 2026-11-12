@@ -82,14 +82,6 @@ function readOutcome(): { message: string; error: boolean } | null {
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : null);
 
-const card = {
-  border: `1px solid ${colors.border}`,
-  borderRadius: 4,
-  padding: "12px 14px",
-  display: "grid",
-  gap: 8,
-} as const;
-
 /// One thing that is saved to Drive, with the folder it goes to and when it last did.
 function AutoCard({
   title,
@@ -105,15 +97,16 @@ function AutoCard({
   children?: ReactNode;
 }) {
   return (
-    <section style={card} aria-label={title}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <strong style={{ fontSize: "calc(13.5px * var(--ae-fs, 1))", color: colors.ink }}>{title}</strong>
-        <span className="ae-dash-chip ae-dash-chip--done">{badge}</span>
+    <section className="ae-gd-sec" aria-label={title}>
+      <div className="ae-gd-head">
+        <strong>{title}</strong>
+        <span className={`ae-gd-status${badge === "Off" ? " ae-gd-status--off" : ""}`}>{badge}</span>
       </div>
-      <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
-        Folder: <strong style={{ color: colors.ink, fontWeight: 600 }}>{folder}</strong>
-        <span aria-hidden> · </span>
-        {last}
+      <div className="ae-gd-meta">
+        <span>
+          Folder: <strong>{folder}</strong>
+        </span>
+        <span>{last}</span>
       </div>
       {children}
     </section>
@@ -219,7 +212,6 @@ export function GoogleDriveSettings() {
   const shown = useMemo(() => (filter === "all" ? recent : recent.filter((u) => u.kind === filter)), [recent, filter]);
   const failed = recent.filter((u) => u.status === "FAILED").length;
 
-  const cell = { padding: "6px 10px", fontSize: "calc(12.5px * var(--ae-fs, 1))", textAlign: "left" as const, borderBottom: `1px solid ${colors.border}` };
   const settings = status?.settings;
   const hourOptions = Array.from({ length: 24 }, (_, h) => h);
   // The weekly slot as this browser's clock shows it (plain UTC in a half-hour zone).
@@ -240,9 +232,9 @@ export function GoogleDriveSettings() {
   }
 
   return (
-    <div className="ae-panel" style={{ maxWidth: 720, padding: "14px 18px" }}>
-      <div style={{ fontSize: "calc(14px * var(--ae-fs, 1))", fontWeight: 600, color: colors.ink }}>Google Drive</div>
-      <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk, marginTop: 2 }}>
+    <div className="ae-panel ae-gd" style={{ maxWidth: 720 }}>
+      <div className="ae-gd-title">Google Drive</div>
+      <div className="ae-gd-lead">
         Reports and backups are saved to Google Drive automatically - nobody has to click anything. The system can
         only see the files it puts there, never the rest of the Drive.
       </div>
@@ -271,25 +263,25 @@ export function GoogleDriveSettings() {
           <GoogleDriveButton label="Connect Google Drive" loadingLabel="Opening Google…" loading={busy === "connect"} onClick={() => void connect()} />
         </div>
       ) : (
-        <div style={{ marginTop: 12, display: "grid", gap: 14 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.ink }}>
-            <span>
-              Connected as your Google account: <strong>{status.accountName ?? status.accountEmail ?? "unknown"}</strong>
+        <div className="ae-gd-body">
+          <div className="ae-gd-acct">
+            <span className="ae-gd-acct-name">
+              <span className="ae-gd-acct-label">Connected as</span>
+              <strong>{status.accountName ?? status.accountEmail ?? "unknown"}</strong>
             </span>
             {confirmDisconnect ? (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                Disconnect?
-                <Button className="ae-btn-solid" size="sm" loading={busy === "disconnect"} onClick={() => void disconnect()}>
-                  Yes, disconnect
-                </Button>
-                <Button className="ae-btn-solid" size="sm" disabled={busy !== null} onClick={() => setConfirmDisconnect(false)}>
+              <span className="ae-gd-acct-actions">
+                <button type="button" className="ae-gd-link ae-gd-link--danger" disabled={busy !== null} onClick={() => void disconnect()}>
+                  {busy === "disconnect" ? "Disconnecting…" : "Yes, disconnect"}
+                </button>
+                <button type="button" className="ae-gd-link" disabled={busy !== null} onClick={() => setConfirmDisconnect(false)}>
                   Cancel
-                </Button>
+                </button>
               </span>
             ) : (
-              <Button className="ae-btn-solid" size="sm" disabled={busy !== null} onClick={() => setConfirmDisconnect(true)}>
+              <button type="button" className="ae-gd-link" disabled={busy !== null} onClick={() => setConfirmDisconnect(true)}>
                 Disconnect
-              </Button>
+              </button>
             )}
           </div>
 
@@ -301,7 +293,7 @@ export function GoogleDriveSettings() {
           )}
 
           {settings && (
-            <div style={{ display: "grid", gap: 10 }}>
+            <div className="ae-gd-secs">
               <AutoCard
                 title="Daily reports"
                 badge="Automatic"
@@ -483,37 +475,22 @@ export function GoogleDriveSettings() {
                 {recent.length === 0 ? "Nothing has been sent to Drive yet." : "Nothing of this kind in the recent activity."}
               </p>
             ) : (
-              <div style={{ overflowX: "auto", marginTop: 4 }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", color: colors.ink }}>
-                  <thead>
-                    <tr>
-                      <th style={cell}>When</th>
-                      <th style={cell}>Type</th>
-                      <th style={cell}>File</th>
-                      <th style={cell}>Size</th>
-                      <th style={cell}>Result</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shown.map((u) => (
-                      <tr key={u.id}>
-                        <td style={cell}>{new Date(u.createdAt).toLocaleString()}</td>
-                        <td style={cell}>{KIND_LABEL[u.kind]}</td>
-                        <td style={{ ...cell, overflowWrap: "anywhere" }}>{u.fileName}</td>
-                        <td style={cell}>{formatBytes(u.sizeBytes)}</td>
-                        <td style={cell}>
-                          <span className={`ae-dash-chip ae-dash-chip--${u.status === "OK" ? "done" : "bad"}`} title={u.error ?? undefined}>
-                            {u.status === "OK" ? "Saved" : "Failed"}
-                          </span>
-                          {u.status === "FAILED" && u.error && (
-                            <div style={{ fontSize: "calc(11.5px * var(--ae-fs, 1))", color: colors.danger, marginTop: 2, overflowWrap: "anywhere" }}>{u.error}</div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="ae-gd-acts">
+                {shown.map((u) => (
+                  <li key={u.id} className="ae-gd-act">
+                    <div className="ae-gd-act-main">
+                      <span className="ae-gd-act-file">{u.fileName}</span>
+                      <span className="ae-gd-act-meta">
+                        {KIND_LABEL[u.kind]} · {formatBytes(u.sizeBytes)} · {new Date(u.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}
+                      </span>
+                      {u.status === "FAILED" && u.error && <span className="ae-gd-act-err">{u.error}</span>}
+                    </div>
+                    <span className={`ae-gd-status${u.status === "OK" ? "" : " ae-gd-status--bad"}`} title={u.error ?? undefined}>
+                      {u.status === "OK" ? "Saved" : "Failed"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </section>
         </div>
