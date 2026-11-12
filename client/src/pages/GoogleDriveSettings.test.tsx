@@ -245,11 +245,11 @@ describe("once connected", () => {
         ],
       }),
     );
-    const rows = screen.getAllByRole("row");
-    expect(within(rows[1]).getByText("Failed")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("2.0 KB")).toBeInTheDocument();
-    expect(within(rows[2]).getByText("Saved")).toBeInTheDocument();
-    expect(within(rows[2]).getByText("3.0 MB")).toBeInTheDocument();
+    const rows = within(screen.getByRole("region", { name: "Recent activity" })).getAllByRole("listitem");
+    expect(within(rows[0]).getByText("Failed")).toBeInTheDocument();
+    expect(within(rows[0]).getByText(/2.0 KB/)).toBeInTheDocument();
+    expect(within(rows[1]).getByText("Saved")).toBeInTheDocument();
+    expect(within(rows[1]).getByText(/3.0 MB/)).toBeInTheDocument();
   });
 
   it("says the backup is weekly, and when the next one is due", async () => {
@@ -300,17 +300,17 @@ describe("once connected", () => {
         ],
       }),
     );
-    expect(screen.getAllByRole("row")).toHaveLength(4); // header + 3
+    expect(within(screen.getByRole("region", { name: "Recent activity" })).getAllByRole("listitem")).toHaveLength(3);
     fireEvent.click(screen.getByRole("button", { name: "Reports" }));
-    const rows = screen.getAllByRole("row");
-    expect(rows).toHaveLength(2);
-    expect(within(rows[1]).getByText("Report")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("daily-report-2026-10-22.xlsx")).toBeInTheDocument();
+    const rows = within(screen.getByRole("region", { name: "Recent activity" })).getAllByRole("listitem");
+    expect(rows).toHaveLength(1);
+    expect(within(rows[0]).getByText(/^Report ·/)).toBeInTheDocument();
+    expect(within(rows[0]).getByText("daily-report-2026-10-22.xlsx")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Backups" }));
     expect(screen.getByText("ala-eh-backup.sql.gz")).toBeInTheDocument();
     expect(screen.queryByText("daily-out.csv")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "All" }));
-    expect(screen.getAllByRole("row")).toHaveLength(4);
+    expect(within(screen.getByRole("region", { name: "Recent activity" })).getAllByRole("listitem")).toHaveLength(3);
   });
 
   it("says so when a filter has nothing, and counts failed uploads up top with the reason in the row", async () => {
