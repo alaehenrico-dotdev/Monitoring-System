@@ -20,6 +20,7 @@ import { CategoryFilter } from "../components/CategoryFilter";
 import { StockSourceFilter } from "../components/StockSourceFilter";
 import { TableSkeleton } from "../components/Skeleton";
 import { matchesSearch } from "../utils/search";
+import { useSearchHandoff } from "../hooks/useSearchHandoff";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
@@ -62,6 +63,16 @@ export function TotalStocksPage() {
   const [fit, setFit] = useFitWidth("total-stocks");
   const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  // A product or category picked in the phone's search arrives as this page's own filter, so it
+  // shows in the toolbar and clears like any other. Each replaces the other.
+  useSearchHandoff("stocks-query", (value) => {
+    setQuery(value);
+    setCategoryFilter("");
+  });
+  useSearchHandoff("stocks-category", (value) => {
+    setCategoryFilter(value);
+    setQuery("");
+  });
   const [source, setSource] = useState<StockLocation>("TOTAL");
   const [rowFilter, setRowFilter] = useState<StockRowFilter>("all");
   // Bumped by View > Refresh to re-read the figures from the server.

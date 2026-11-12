@@ -1,19 +1,21 @@
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Request } from "express";
 import { env } from "../config/env";
+import { PrismaRateLimitStore } from "./rateLimitStore";
 
-/// All three limiters use express-rate-limit's default in-memory store.
-/// That is deliberate while the API runs as a single pm2 process, but it
-/// carries two consequences worth knowing before tuning any of this:
-///   - Counters live in process memory, so every restart/deploy clears
-///     them. A brute-force attempt can resume from zero after a restart.
-///   - Nothing is shared between processes. Running a second API instance
-///     (pm2 cluster mode, a second host behind a load balancer) would give
-///     each one its own independent counters, effectively multiplying every
-///     limit below by the number of instances.
-/// Moving to a shared store (Redis, or a Prisma-backed store) is the fix for
-/// both, and is only worth doing once more than one process actually runs.
+/// The global apiLimiter uses express-rate-limit's default in-memory store: it runs on every
+/// request, is only a backstop, and losing its counts on a restart does no harm. Every
+/// login-related limiter (login, failed-login-per-IP, two-step, forgot-password, data-reset
+/// passcode) keeps its counters in the database (rateLimitStore.ts), so a restart or deploy
+/// does not give a brute-force attempt a fresh start, and a second API process would share them.
 ///
+/// How long a locked-out person should wait, for the messages below. Derived from the window
+/// so it stays true when RATE_LIMIT_LOGIN_WINDOW_MS is tuned.
+const waitText = () => {
+  const mins = Math.max(1, Math.ceil(env.rateLimit.loginWindowMs / 60000));
+  return mins === 1 ? "about a minute" : `about ${mins} minutes`;
+};
+
 /// Thresholds come from config/env.ts so a deployment can tune them without
 /// a code change; the defaults are the values this shipped with.
 
@@ -45,11 +47,14 @@ export const apiLimiter = rateLimit({
 /// username-spray guard for not denying service to real staff; apiLimiter
 /// above is the ceiling that case runs into.
 export const authLimiter = rateLimit({
+  store: new PrismaRateLimitStore("login"),
+  // Database unreachable: let the request through (sign-in itself needs the database anyway).
+  passOnStoreError: true,
   windowMs: env.rateLimit.loginWindowMs,
   limit: env.rateLimit.loginLimit,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many login attempts - please wait a few minutes and try again." },
+  message: { error: `Too many login attempts - please wait ${waitText()} and try again.` },
   // `ipKeyGenerator` (not a bare req.ip) normalizes IPv6 to its /56 subnet,
   // so a client with a whole v6 range can't take a new key per request.
   keyGenerator: (req: Request) => {
@@ -76,23 +81,32 @@ export const authLimiter = rateLimit({
 /// global limiter would notice. Only failures count (`skipSuccessfulRequests`), so an
 /// office behind one address signing in normally never reaches it.
 export const loginIpLimiter = rateLimit({
+  store: new PrismaRateLimitStore("loginip"),
+  // Database unreachable: let the request through (sign-in itself needs the database anyway).
+  passOnStoreError: true,
   windowMs: env.rateLimit.loginWindowMs,
   limit: env.rateLimit.loginIpLimit,
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  message: { error: "Too many failed login attempts from this address - please wait a few minutes and try again." },
+  message: { error: `Too many failed login attempts from this address - please wait ${waitText()} and try again.` },
   keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ""),
 });
 
 /// Second step of a two-step login. A code is only six digits, so this is tighter than
 /// the password limiter; the per-account counter in services/mfa.service.ts backs it up.
+/// Only FAILED codes count: this office shares one address, so several people signing in
+/// correctly must not use up the bucket and block the next person at the code step.
 export const mfaLimiter = rateLimit({
+  store: new PrismaRateLimitStore("mfa"),
+  // Database unreachable: let the request through (sign-in itself needs the database anyway).
+  passOnStoreError: true,
   windowMs: env.rateLimit.loginWindowMs,
   limit: env.rateLimit.loginLimit,
+  skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many verification attempts - please wait a few minutes and try again." },
+  message: { error: `Too many verification attempts - please wait ${waitText()} and try again.` },
   keyGenerator: (req: Request) => ipKeyGenerator(req.ip ?? ""),
 });
 
@@ -100,11 +114,14 @@ export const mfaLimiter = rateLimit({
 /// account, so guesses are limited per address AND per username, on top of the 5 wrong guesses
 /// each code absorbs before it is cancelled (services/users.service.ts).
 export const resetCodeLimiter = rateLimit({
+  store: new PrismaRateLimitStore("reset"),
+  // Database unreachable: let the request through (sign-in itself needs the database anyway).
+  passOnStoreError: true,
   windowMs: env.rateLimit.loginWindowMs,
   limit: env.rateLimit.loginLimit,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many attempts - please wait a few minutes and try again." },
+  message: { error: `Too many attempts - please wait ${waitText()} and try again.` },
   keyGenerator: (req: Request) => {
     const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
     return `${ipKeyGenerator(req.ip ?? "")}:reset:${username}`;
@@ -112,6 +129,9 @@ export const resetCodeLimiter = rateLimit({
 });
 
 export const passcodeLimiter = rateLimit({
+  store: new PrismaRateLimitStore("passcode"),
+  // Database unreachable: let the request through (sign-in itself needs the database anyway).
+  passOnStoreError: true,
   windowMs: env.rateLimit.passcodeWindowMs,
   limit: env.rateLimit.passcodeLimit,
   standardHeaders: true,

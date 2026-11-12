@@ -4,6 +4,9 @@ import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import type { AddressInfo } from "net";
 
+// The login limiters keep their counters in the database; use an in-memory stand-in here.
+vi.mock("../lib/prisma", async () => (await import("./rateLimitStore.fake.js")).fakePrismaModule);
+
 /**
  * Covers the two things that decide whether the limiters actually bind to a
  * real client:

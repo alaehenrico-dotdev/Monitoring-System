@@ -80,6 +80,17 @@
 :root:root:root[data-header="inline"] .ae-sticky-head {
   margin-bottom: 8px;
 }
+/* Two themes colour their header text for the block they draw behind it, and this layout removes
+   that block. Where the page is the wrong shade for that text, the block stays:
+     Neobrutalism, dark mode  - near-black text, which was left on the dark page;
+     Skeuomorphism, light mode - cream text, which was left on the cream page.
+   (The other mode of each reads fine on the page and is left as it is.) */
+:root:root:root[data-header="inline"][data-ui="brutal"][data-theme="dark"] .ae-page-header:not(.ae-page-header--offline) {
+  background: color-mix(in srgb, var(--ae-nb-gold) 70%, transparent);
+}
+:root:root:root[data-header="inline"][data-ui="skeuo"]:not([data-theme="dark"]) .ae-page-header:not(.ae-page-header--offline) {
+  background: linear-gradient(180deg, rgba(74, 56, 38, 0.76), rgba(51, 38, 26, 0.76));
+}
 
 /* ---- Ribbon -------------------------------------------------------------
    A slim title line (small seal, title, badges, clock at the right) with the toolbar below it as a

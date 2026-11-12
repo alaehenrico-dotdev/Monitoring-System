@@ -42,6 +42,7 @@ import { TableSkeleton } from "../components/Skeleton";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { useSearchHandoff } from "../hooks/useSearchHandoff";
 
 const SYSTEM_TABLE = "system";
 /// Rows per category: with every table showing, each category is a short
@@ -148,6 +149,8 @@ export function ChangeLogPage() {
   const [users, setUsers] = useState<{ id: number; name: string }[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState("");
+  // "Search the Change Log for ..." on the phone's search fills this box.
+  useSearchHandoff("changelog-query", setQuery);
   const [expanded, setExpanded] = useState<number | null>(null);
   // Tables whose group is collapsed - every group starts open.
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
@@ -657,7 +660,7 @@ function SystemChangeRow({
               borderBottom: `1px solid ${colors.border}`,
             }}
           >
-            <table className="ae-table" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
+            <table className="ae-table ae-cl-detail" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
               <thead>
                 <tr>
                   {["Removed", "Rows"].map((h) => (
@@ -776,7 +779,7 @@ function ChangeLogRow({
                   : "No field-level differences recorded."}
               </span>
             ) : (
-              <table className="ae-table" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
+              <table className="ae-table ae-cl-detail" style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))" }}>
                 <thead>
                   <tr>
                     {["Field", "Before", "After"].map((h) => (

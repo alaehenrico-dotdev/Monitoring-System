@@ -61,6 +61,7 @@ import { useTopProgress } from "../hooks/useTopProgress";
 import { useAuth } from "../context/AuthContext";
 import { getCurrentShiftAndDate } from "../utils/shift";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { useSearchHandoff } from "../hooks/useSearchHandoff";
 
 // The business date the entry pages are working on right now (local time, and
 // a Night shift after midnight still belongs to the previous day). The old
@@ -131,6 +132,8 @@ export function DailyReportPage() {
   const progress = useTopProgress();
   const [searchParams] = useSearchParams();
   const [date, setDate] = useState(searchParams.get("date") ?? today());
+  // A date typed into the phone's search ("nov 9") opens that day's report.
+  useSearchHandoff("report-date", setDate);
   const [report, setReport] = useState<DailyReport | null>(null);
   // The shown date's Daily Out figures (stock that left the company). Fetched
   // beside the report; a failure leaves it null and the section says so rather

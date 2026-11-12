@@ -10,13 +10,27 @@
      2. the toolbar: actions first, then the filters, on one line that scrolls sideways
    Nothing is hidden: every control is still there, only the arrangement changes.
 
-   The header is not pinned on a phone: it is too tall to keep on a screen this short.
+   The header stays pinned to the top while the page scrolls under it, as on a desktop. (It used
+   to scroll away: with the tab strip on top of it, it was too tall to keep on a screen this
+   short. The tabs are now the bar along the bottom, components/PhoneBottomNav.tsx.)
 
    Loaded last, and `:root:root:root[data-phone]` out-ranks the theme and header-layout rules. */
 
 :root:root:root[data-phone="true"] .ae-sticky-head {
-  position: static;
-  margin: 0 -6px 8px;
+  position: sticky;
+  /* A small gap above the card, so it does not sit flush against the screen's top edge (below
+     the status bar / notch on a phone that has one), at rest and while pinned. */
+  top: max(6px, env(safe-area-inset-top, 0px));
+  z-index: 30;
+  margin: max(6px, env(safe-area-inset-top, 0px)) -6px 8px;
+}
+/* The header card is translucent in every theme, and frosted so the rows passing behind it do
+   not show through its text. A phone drops every other blur (see Smoothness, below), but keeps
+   this one: it is a single small layer, and the alternative - a solid block behind the card -
+   showed as a dark rectangle around a rounded or inset header on a theme with a coloured page. */
+:root:root:root[data-phone="true"] .ae-sticky-head > .ae-page-header {
+  -webkit-backdrop-filter: blur(18px) saturate(150%) !important;
+  backdrop-filter: blur(18px) saturate(150%) !important;
 }
 :root:root:root[data-phone="true"] .ae-page-header,
 :root:root:root[data-phone="true"] .ae-page-header.ae-page-header--collapsed,
@@ -228,6 +242,13 @@
   padding: 0 4px;
   font-weight: 700;
 }
+/* In the header the date then sits straight on the header's surface, not on a field of its own,
+   so it takes the header's text colour. (The field's colour was dark on Skeuomorphism's brown
+   header in light mode, and white on Neobrutalism's gold in dark mode.) */
+:root:root:root[data-phone="true"] .ae-page-header .ae-datestep .ae-date-trigger,
+:root:root:root[data-phone="true"] .ae-page-header .ae-datestep .ae-date-trigger-text {
+  color: var(--ae-glass-text);
+}
 
 /* ---- Tables --------------------------------------------------------------------
    SKU and Product stay pinned while the figures scroll sideways. On a desk they take ~290px; on a
@@ -278,19 +299,21 @@
    The six-column table needs ~720px. On a phone each entry becomes a two-line card:
      UPDATE  AFP067 · CHILI POWDER 1KG · Nov 7 · Night · Online      v
      11/9, 10:23   what changed ..............................  Changed by
-   The detail you open with the arrow is unchanged. */
+   The detail you open with the arrow is unchanged: a Field / Before / After table. These rules
+   use the child combinator (`>`) so they reach only the list's own rows, never that table's
+   (without it the detail's cells were stacked one per line and its heading was hidden). */
 :root:root:root[data-phone="true"] .ae-cl-table {
   min-width: 0 !important;
   display: block;
 }
-:root:root:root[data-phone="true"] .ae-cl-table thead {
+:root:root:root[data-phone="true"] .ae-cl-table > thead {
   display: none;
 }
-:root:root:root[data-phone="true"] .ae-cl-table tbody {
+:root:root:root[data-phone="true"] .ae-cl-table > tbody {
   display: block;
 }
-:root:root:root[data-phone="true"] .ae-cl-table tbody > tr:not(.ae-cl-row),
-:root:root:root[data-phone="true"] .ae-cl-table tbody > tr:not(.ae-cl-row) > td {
+:root:root:root[data-phone="true"] .ae-cl-table > tbody > tr:not(.ae-cl-row),
+:root:root:root[data-phone="true"] .ae-cl-table > tbody > tr:not(.ae-cl-row) > td {
   display: block;
   width: 100%;
 }
@@ -485,7 +508,7 @@
   gap: 6px;
 }
 :root:root:root[data-phone="true"] .ae-mm-year {
-  gap: 2px;
+  gap: 0;
 }
 :root:root:root[data-phone="true"] .ae-mm-body {
   padding: 8px 10px 10px;
@@ -529,7 +552,7 @@
   flex: 0 0 auto;
 }
 :root:root:root[data-phone="true"] .ae-mm-view-btn {
-  padding: 6px 8px;
+  padding: 0 10px;
   white-space: nowrap;
 }
 :root:root:root[data-phone="true"] .ae-mm-year .ae-date-trigger {
@@ -543,9 +566,9 @@
 /* CSV: the icon alone. */
 :root:root:root[data-phone="true"] .ae-mm-controls > button {
   flex: 0 0 auto;
-  width: 36px;
-  min-width: 36px;
-  height: 36px;
+  width: var(--ae-mm-ctl-h);
+  min-width: var(--ae-mm-ctl-h);
+  height: var(--ae-mm-ctl-h);
   padding: 0;
   font-size: 0;
   justify-content: center;
@@ -1016,4 +1039,145 @@
 /* The toasts (Toast.tsx sets their place inline) rise above the bar. */
 :root:root:root[data-phone="true"] #ae-toast-stack {
   bottom: calc(var(--ae-bottomnav-h) + 10px) !important;
+}
+
+/* Out by channel: a smaller ring, so the legend has room beside it on a phone. */
+:root:root:root[data-phone="true"] .ae-donut {
+  gap: 14px;
+}
+:root:root:root[data-phone="true"] .ae-donut-ring {
+  width: 108px;
+  height: 108px;
+}
+
+/* Change Log, an opened entry: the Field / Before / After table fills the card, the field name
+   on the left (wrapping if long) and the two values in narrow columns beside it. */
+:root:root:root[data-phone="true"] .ae-cl-detail {
+  width: 100%;
+  table-layout: auto;
+}
+:root:root:root[data-phone="true"] .ae-cl-detail :is(th, td) {
+  padding: 4px 8px !important;
+  font-size: 12px;
+}
+:root:root:root[data-phone="true"] .ae-cl-detail :is(th, td):first-child {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:root:root:root[data-phone="true"] .ae-cl-detail :is(th, td):not(:first-child) {
+  width: 22%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---- Search (components/QuickJump.tsx, phone) ----------------------------------------------
+   The header's magnifier opens the search for the whole system (utils/phoneSearch.ts). It is a
+   sheet under the top of the screen, as wide as the screen allows and as tall as the space above
+   the keyboard and the bottom bar; results come in groups, each under a small heading, and a
+   product carries a second line with today's stock. Rows are a full thumb high. */
+:root:root:root[data-phone="true"] .ae-quickjump-overlay {
+  padding: 8px 8px 0;
+  align-items: flex-start;
+  background: rgba(0, 0, 0, 0.45);
+}
+:root:root:root[data-phone="true"] .ae-quickjump--phone {
+  width: 100%;
+  max-width: none;
+  max-height: min(78dvh, calc(var(--ae-vh) - var(--ae-bottomnav-h) - 16px));
+  border-radius: 10px;
+}
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-input {
+  padding: 14px 14px;
+  /* 16px: anything smaller makes iOS zoom the page when the box is focused. */
+  font-size: 16px;
+}
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-list {
+  padding: 4px 6px 8px;
+  overscroll-behavior: contain;
+}
+:root:root:root[data-phone="true"] .ae-quickjump-group {
+  padding: 10px 8px 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #f5c000;
+}
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-item {
+  align-items: center;
+  min-height: 44px;
+  padding: 6px 8px;
+  font-size: 14px;
+}
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-item-hint {
+  max-width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+}
+:root:root:root[data-phone="true"] .ae-quickjump-item-detail {
+  display: block;
+  margin-top: 1px;
+  /* The figures are the point of the row: they wrap rather than being cut short. */
+  white-space: normal;
+  font-size: 11.5px;
+  color: #b9b9b9;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dashboard on a phone: the date and the end-of-day pack (an icon) sit on the title line beside
+   "Dashboard" instead of on a toolbar line of their own. Kept small so the line still fits. */
+:root:root:root[data-phone="true"] .ae-dash-phone-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+:root:root:root[data-phone="true"] .ae-dash-phone-tools .ae-datestep {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+}
+:root:root:root[data-phone="true"] .ae-dash-phone-tools .ae-mb-btn--icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 30px;
+  padding: 0;
+}
+:root:root:root[data-phone="true"] .ae-dash-phone-tools .ae-datestep .ae-date-trigger {
+  height: 30px;
+  min-height: 0;
+  padding: 0 2px;
+  font-size: calc(13px * var(--ae-fs, 1));
+}
+:root:root:root[data-phone="true"] .ae-dash-phone-tools > .ae-mb-btn--icon {
+  margin-left: 4px;
+}
+
+/* The Dashboard's header is a single line: the date field's usual 136px minimum is dropped (it is
+   what spread the arrows apart), the title keeps its full width and the spacing tightens. */
+:root:root:root[data-phone="true"] .ae-page-header-top:has(.ae-dash-phone-tools) {
+  flex-wrap: nowrap;
+  gap: 4px 6px;
+}
+:root:root:root[data-phone="true"] .ae-page-header-top:has(.ae-dash-phone-tools) h2 {
+  flex: 0 0 auto;
+  display: block;
+  overflow: visible;
+}
+:root:root:root[data-phone="true"] .ae-page-header-top:has(.ae-dash-phone-tools) .ae-page-header-badges {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+}
+:root:root:root[data-phone="true"] .ae-page-header-top:has(.ae-dash-phone-tools) .ae-page-header-extras {
+  gap: 2px;
+}
+:root:root:root[data-phone="true"] .ae-dash-phone-tools .ae-datestep .ae-date-trigger {
+  min-width: 0;
+  width: auto;
+  flex: 0 0 auto;
+  gap: 0;
 }

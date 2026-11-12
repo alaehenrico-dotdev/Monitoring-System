@@ -1,19 +1,26 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { listProducts, PRODUCTS_CHANGED_EVENT } from "../api/products";
+import { getTotalStocks } from "../api/totalStocks";
 import {
   defaultGridPageFor,
   GRID_PAGES,
   navGroups,
   pagesForRole,
+  phoneNavPages,
   type NavLinkDef,
 } from "../config/navigation";
+import { settingsTabsFor } from "../config/settingsTabs";
+import { rankPhoneSearch, type PhoneSearchResult } from "../utils/phoneSearch";
 import { rankQuickJump, type QuickJumpResult } from "../utils/quickJump";
 import { requestQuickJump } from "../utils/quickJumpTarget";
-import type { Product } from "../types";
+import { handOff } from "../utils/searchHandoff";
+import { getCurrentShiftAndDate } from "../utils/shift";
+import type { Product, TotalStockRow } from "../types";
 
 /**
  * Products for the palette, fetched at most once per session rather than per
@@ -48,6 +55,28 @@ if (typeof window !== "undefined") {
   window.addEventListener(PRODUCTS_CHANGED_EVENT, clearQuickJumpProductCache);
 }
 
+/// Today's remaining stock by product, for the figures under a product on the phone's search.
+/// Asked for when the search opens and kept for a minute, so opening it again (or typing) costs
+/// nothing. A failed load is not kept: the results simply come without figures.
+const STOCKS_TTL_MS = 60_000;
+let stocksCache: { date: string; at: number; rows: Promise<ReadonlyMap<number, TotalStockRow> | null> } | null = null;
+
+function loadStocks(date: string): Promise<ReadonlyMap<number, TotalStockRow> | null> {
+  if (stocksCache && stocksCache.date === date && Date.now() - stocksCache.at < STOCKS_TTL_MS) return stocksCache.rows;
+  const rows = getTotalStocks(date).then(
+    (list) => new Map(list.map((r) => [r.product.id, r])),
+    () => {
+      stocksCache = null;
+      return null;
+    },
+  );
+  stocksCache = { date, at: Date.now(), rows };
+  return rows;
+}
+
+/// A result of either search: the desktop launcher's (pages and products) or the phone's.
+type Result = QuickJumpResult | PhoneSearchResult;
+
 /// Which ribbon group a page sits in, for the row's right-hand hint.
 function groupOf(page: NavLinkDef): string {
   return (
@@ -63,6 +92,11 @@ const isGridPage = (path: string): boolean =>
  * Ctrl+K / Cmd+K command palette - jump to any page the current role can
  * open, or to any product on a grid.
  *
+ * On a phone the same panel (opened from the header's magnifier) is the search
+ * for the whole read-only system - pages, settings sections, products with
+ * today's stock, categories, dates and the Change Log - ranked by
+ * utils/phoneSearch.ts and shown in groups. The desktop palette is unchanged.
+ *
  * Mounted once in Layout, so the shortcut works from every page. The
  * shortcut deliberately fires even while a grid cell input has focus: it
  * carries a modifier, so it can't collide with the digits an encoder is
@@ -75,9 +109,12 @@ export function QuickJump() {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [products, setProducts] = useState<Product[]>([]);
+  const [stocks, setStocks] = useState<ReadonlyMap<number, TotalStockRow> | null>(null);
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const isPhone = useReadOnlyPhone();
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -137,20 +174,33 @@ export function QuickJump() {
     loadProducts().then((list) => {
       if (!cancelled) setProducts(list);
     });
+    // Phone only: the stock figures shown under each product.
+    if (isPhone) {
+      loadStocks(getCurrentShiftAndDate().date).then((map) => {
+        if (!cancelled) setStocks(map);
+      });
+    }
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, isPhone]);
 
-  const phone = useReadOnlyPhone();
-  const pages = useMemo(() => pagesForRole(user?.role, phone), [user?.role, phone]);
+  const phone = isPhone;
+  const pages = useMemo(
+    () => (phone ? phoneNavPages(user?.role) : pagesForRole(user?.role, false)),
+    [user?.role, phone],
+  );
+  const settings = useMemo(() => settingsTabsFor(user?.role === "SUPERVISOR_ADMIN"), [user?.role]);
 
   // Filtering a few hundred rows is a sub-millisecond string scan, so there
   // is nothing here worth debouncing - a debounce would only add latency to
   // the keystroke it is meant to protect.
-  const results = useMemo(
-    () => rankQuickJump(query, pages, products, groupOf),
-    [query, pages, products],
+  const results = useMemo<Result[]>(
+    () =>
+      phone
+        ? rankPhoneSearch(query, { pages, groupOf, settings, products, stocks, today: getCurrentShiftAndDate().date, theme })
+        : rankQuickJump(query, pages, products, groupOf),
+    [phone, query, pages, settings, products, stocks, theme],
   );
 
   // A narrowing query can leave the cursor past the end of the list.
@@ -164,8 +214,18 @@ export function QuickJump() {
       ?.scrollIntoView({ block: "nearest" });
   }, [clampedActive, open, results.length]);
 
-  function choose(result: QuickJumpResult) {
+  function choose(result: Result) {
     close();
+    if (result.kind === "action") {
+      toggleTheme();
+      return;
+    }
+    if (result.kind === "link") {
+      // The value goes first, so the page finds it whether it is about to mount or already open.
+      if (result.handoff) handOff(result.handoff.key, result.handoff.value);
+      if (result.to !== pathname) navigate(result.to);
+      return;
+    }
     if (result.kind === "page") {
       navigate(result.to);
       return;
@@ -227,10 +287,10 @@ export function QuickJump() {
     >
       <div
         ref={panelRef}
-        className="ae-quickjump"
+        className={phone ? "ae-quickjump ae-quickjump--phone" : "ae-quickjump"}
         role="dialog"
         aria-modal="true"
-        aria-label="Quick jump"
+        aria-label={phone ? "Search" : "Quick jump"}
       >
         <input
           ref={inputRef}
@@ -245,8 +305,13 @@ export function QuickJump() {
               ? `ae-qj-${results[clampedActive].id}`
               : undefined
           }
-          aria-label="Search pages and products"
-          placeholder="Jump to a page or product…"
+          aria-label={phone ? "Search the whole system" : "Search pages and products"}
+          placeholder={phone ? "Product, SKU, page, date, setting…" : "Jump to a page or product…"}
+          // Phone keyboards: no capital first letter or "corrections" of a SKU, and a Search key.
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint={phone ? "search" : undefined}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -262,11 +327,19 @@ export function QuickJump() {
           className="ae-quickjump-list"
         >
           {results.length === 0 ? (
-            <div className="ae-quickjump-empty">No matching page or product</div>
+            <div className="ae-quickjump-empty">
+              {phone ? "Nothing matches. Try a product, SKU, category, a date (Nov 9) or a setting." : "No matching page or product"}
+            </div>
           ) : (
             results.map((r, i) => (
+              <Fragment key={r.id}>
+              {/* Phone: a heading where each group of results starts. */}
+              {"group" in r && (i === 0 || !("group" in results[i - 1]) || (results[i - 1] as PhoneSearchResult).group !== r.group) && query.trim() !== "" && (
+                <div className="ae-quickjump-group" role="presentation">
+                  {r.group}
+                </div>
+              )}
               <button
-                key={r.id}
                 id={`ae-qj-${r.id}`}
                 type="button"
                 role="option"
@@ -279,9 +352,13 @@ export function QuickJump() {
                 onMouseEnter={() => setActive(i)}
                 onClick={() => choose(r)}
               >
-                <span className="ae-quickjump-item-label">{r.label}</span>
+                <span className="ae-quickjump-item-label">
+                  {r.label}
+                  {"detail" in r && r.detail && <span className="ae-quickjump-item-detail">{r.detail}</span>}
+                </span>
                 <span className="ae-quickjump-item-hint">{r.hint}</span>
               </button>
+              </Fragment>
             ))
           )}
         </div>

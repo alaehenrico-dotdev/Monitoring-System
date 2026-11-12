@@ -48,6 +48,10 @@ export function LoginPage() {
       if (mfaToken && err instanceof ApiError && /expired/i.test(err.message)) {
         setMfaToken(null);
         setCode("");
+      } else if (mfaToken) {
+        // A wrong code: empty the box and put the cursor back so the next try is just typing.
+        setCode("");
+        document.getElementById("login-code")?.focus();
       }
     } finally {
       setSubmitting(false);

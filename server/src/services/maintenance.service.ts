@@ -1,5 +1,6 @@
 import { env } from "../config/env";
 import { purgeExpiredIdempotencyKeys } from "../middleware/idempotency";
+import { purgeExpiredRateLimitHits } from "../middleware/rateLimitStore";
 import { runArchive } from "./changeLogArchive.service";
 import { purgeClientErrors } from "./clientError.service";
 
@@ -11,6 +12,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 async function runMaintenance(): Promise<void> {
   try {
     await purgeExpiredIdempotencyKeys();
+    await purgeExpiredRateLimitHits();
     await purgeClientErrors({ olderThanDays: env.clientErrorRetentionDays, maxRows: env.clientErrorMaxRows });
     if (env.changeLogRetentionMonths > 0) await runArchive(env.changeLogRetentionMonths);
   } catch (err) {

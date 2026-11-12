@@ -607,6 +607,18 @@ model IdempotencyKey {
   @@map("idempotency_keys")
 }
 
+/// Counters for the login-related rate limiters (see middleware/rateLimitStore.ts), so a
+/// restart does not give a brute-force attempt a fresh start. One row per limiter and hashed
+/// client key; rows whose window has ended are purged nightly.
+model RateLimitHit {
+  key     String   @id @db.VarChar(80)
+  hits    Int
+  resetAt DateTime @db.DateTime(3)
+
+  @@index([resetAt])
+  @@map("rate_limit_hits")
+}
+
 /// Cold storage for change_log rows older than the retention period (see
 /// changeLogArchive.service.ts). Same columns as change_log; `id` is the
 /// original change_log id, not auto-generated.

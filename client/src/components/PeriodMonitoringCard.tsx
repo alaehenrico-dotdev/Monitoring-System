@@ -14,7 +14,6 @@ import {
   type PeriodKind,
 } from "../utils/periodMonitoring";
 import { getCurrentShiftAndDate } from "../utils/shift";
-import { Button } from "./ui";
 import { DatePicker } from "./DatePicker";
 import { DownloadIcon } from "./icons";
 import { BarsSkeleton } from "./Skeleton";
@@ -156,14 +155,14 @@ export function PeriodMonitoringCard() {
               ))}
             </span>
             <span className="ae-mm-year">
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
+                type="button"
+                className="ae-mm-step"
                 onClick={() => move(() => setAnchor(shiftPeriod(kind, anchor, -1)))}
                 aria-label={`Previous ${kind}`}
               >
                 ‹
-              </Button>
+              </button>
               <DatePicker
                 aria-label="Date in period"
                 value={anchor}
@@ -171,25 +170,25 @@ export function PeriodMonitoringCard() {
                 todayValue={today}
                 style={{ maxWidth: 150 }}
               />
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
+                type="button"
+                className="ae-mm-step"
                 onClick={() => move(() => setAnchor(shiftPeriod(kind, anchor, 1)))}
                 disabled={atCurrent}
                 aria-label={`Next ${kind}`}
               >
                 ›
-              </Button>
+              </button>
             </span>
-            <Button
-              variant="ghost"
-              size="sm"
+            <button
+              type="button"
+              className="ae-mm-csv"
               disabled={!data || data.products.length === 0}
               title="Export this period as CSV"
               onClick={() => data && downloadCsv(`${kind}ly-monitoring-${from}-to-${to}.csv`, periodCsv(data))}
             >
               <DownloadIcon /> CSV
-            </Button>
+            </button>
           </span>
         </h3>
 

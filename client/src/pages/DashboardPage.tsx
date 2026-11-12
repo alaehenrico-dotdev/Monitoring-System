@@ -239,6 +239,13 @@ export function DashboardPage() {
   );
 
   const showStatsError = stocks === null && stocksFailed;
+  const dateStepper = (
+    <DateStepper
+      value={viewDate}
+      onChange={(d) => setPickedDate(d === today ? null : d)}
+      todayValue={today}
+    />
+  );
 
   function retry() {
     productsFetchedAt.current = 0;
@@ -258,8 +265,24 @@ export function DashboardPage() {
             : `Here's how things stood on ${formatDate(viewDate)}.`
         }
         subtitleClassName="ae-dash-subtitle"
+        badges={
+          phone ? (
+            <span className="ae-dash-phone-tools">
+              {dateStepper}
+              <button
+                type="button"
+                className="ae-mb-btn ae-mb-btn--icon"
+                aria-label="End-of-day pack"
+                title="End-of-day pack"
+                onClick={() => setShowPack(true)}
+              >
+                <DownloadIcon />
+              </button>
+            </span>
+          ) : undefined
+        }
       >
-        <PageToolbar
+        {phone ? undefined : <PageToolbar
           label="Dashboard"
           menus={[
             {
@@ -279,14 +302,8 @@ export function DashboardPage() {
               ],
             },
           ]}
-          filters={
-            <DateStepper
-              value={viewDate}
-              onChange={(d) => setPickedDate(d === today ? null : d)}
-              todayValue={today}
-            />
-          }
-        />
+          filters={dateStepper}
+        />}
       </PageHeader>
 
       {showPack && (

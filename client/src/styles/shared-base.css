@@ -242,6 +242,116 @@
   background: var(--ae-text);
   color: var(--ae-surface);
 }
+/* ---- The period controls: one quiet, neutral look in every theme ------------------------------
+   Weekly | Monthly, the date with its arrows, and the CSV button are the same height, with the same
+   thin outline and 6px corners, in the text colour: no gold fill, no theme's button treatment. They
+   are written from the theme's own text, border and hover tokens, so they follow light / dark and
+   every theme without a rule per theme. The :root:root prefix puts them ahead of the themes' own
+   button, input and field rules. (Daily Out's Table | Chart and Stock flow's 7d | 14d | 30d share
+   the segmented control, so they match.) */
+.ae-mm-controls {
+  --ae-mm-ctl-h: 32px;
+}
+@media (pointer: coarse) {
+  .ae-mm-controls {
+    --ae-mm-ctl-h: 36px;
+  }
+}
+:root:root .ae-mm-view,
+:root:root .ae-mm-year,
+:root:root .ae-mm-csv {
+  box-sizing: border-box;
+  height: var(--ae-mm-ctl-h);
+  border: 1px solid var(--ae-border);
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ae-text);
+}
+:root:root .ae-mm-view,
+:root:root .ae-mm-year {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  overflow: hidden;
+}
+:root:root .ae-mm-view-btn {
+  min-height: 0;
+  height: 100%;
+  padding: 0 12px;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+}
+:root:root .ae-mm-view-btn + .ae-mm-view-btn {
+  border-left: 1px solid var(--ae-border);
+}
+:root:root .ae-mm-view-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--ae-text) 14%, transparent);
+  color: var(--ae-text);
+}
+:root:root .ae-mm-step,
+:root:root:root .ae-mm-year .ae-date-trigger.ae-input {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ae-text);
+  font: inherit;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+}
+:root:root .ae-mm-step {
+  width: 30px;
+  padding: 0;
+  font-size: calc(18px * var(--ae-fs, 1));
+  line-height: 1;
+  cursor: pointer;
+}
+:root:root:root .ae-mm-year .ae-date-trigger.ae-input {
+  border-inline: 1px solid var(--ae-border);
+  padding: 0 10px;
+  font-weight: 600;
+}
+/* The calendar mark is a quiet hint, not an accent. */
+:root:root .ae-mm-year .ae-date-trigger-icon {
+  color: var(--ae-text-muted);
+}
+:root:root .ae-mm-csv {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  cursor: pointer;
+}
+:root:root .ae-mm-view-btn:hover:not([aria-pressed="true"]),
+:root:root .ae-mm-step:hover:not(:disabled),
+:root:root:root .ae-mm-year .ae-date-trigger.ae-input:hover:not(:disabled),
+:root:root .ae-mm-csv:hover:not(:disabled) {
+  background: var(--ae-row-hover);
+  color: var(--ae-text);
+}
+:root:root .ae-mm-step:disabled,
+:root:root .ae-mm-csv:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+:root:root .ae-mm-view-btn:focus-visible,
+:root:root .ae-mm-step:focus-visible,
+:root:root:root .ae-mm-year .ae-date-trigger.ae-input:focus-visible,
+:root:root .ae-mm-csv:focus-visible {
+  outline: 2px solid var(--ae-focus-ring, #8a6800);
+  outline-offset: -2px;
+}
 .ae-mm-body {
   display: flex;
   flex: 1;
@@ -559,7 +669,6 @@
 @media (pointer: coarse) {
   .ae-mm-view-btn {
     min-height: 36px;
-    padding: 6px 12px;
   }
 }
 /* Phones: fit the whole range on screen instead of scrolling it sideways. The
@@ -735,7 +844,8 @@
   position: sticky;
   left: 0;
   z-index: 4;
-  background: var(--ae-surface);
+  /* The card's own colour (its near-solid phone fill over the page), so the strip does not show. */
+  background: color-mix(in srgb, var(--ae-surface) 88%, var(--ae-bg));
 }
 .ae-fl-yaxis {
   position: relative;
@@ -879,9 +989,10 @@
   font-weight: 400;
   color: var(--ae-text-muted);
 }
+/* The legend always sits beside the ring, never under it: in a narrow card the legend narrows
+   (each row's figures drop under its name) instead of the whole legend wrapping below. */
 .ae-donut {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 16px 28px;
 }
@@ -921,7 +1032,8 @@
   color: var(--ae-text-muted);
 }
 .ae-donut-legend {
-  flex: 1 1 200px;
+  flex: 1 1 0;
+  min-width: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -929,12 +1041,20 @@
 }
 .ae-donut-legend li {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 0 8px;
   padding: 4px 0;
 }
 .ae-donut-name {
-  flex: 1;
+  flex: 1 1 auto;
+}
+.ae-donut-figs {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-left: auto;
+  white-space: nowrap;
 }
 .ae-donut-legend strong {
   font-variant-numeric: tabular-nums;

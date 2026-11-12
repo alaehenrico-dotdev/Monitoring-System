@@ -9,18 +9,8 @@ import { EntryRulesSettings } from "./EntryRulesSettings";
 import { PageHeader } from "../components/PageHeader";
 import { SubTabPanel } from "../components/SubTabPanel";
 import { useAuth } from "../context/AuthContext";
-
-type Tab = "appearance" | "account" | "entry" | "backup" | "drive" | "reset" | "passwords";
-
-const TABS: { key: Tab; label: string; adminOnly: boolean }[] = [
-  { key: "appearance", label: "Appearance", adminOnly: false },
-  { key: "account", label: "My Account", adminOnly: false },
-  { key: "entry", label: "Entry Rules", adminOnly: true },
-  { key: "backup", label: "Backup & Restore", adminOnly: true },
-  { key: "drive", label: "Google Drive", adminOnly: true },
-  { key: "reset", label: "Data Reset", adminOnly: true },
-  { key: "passwords", label: "User Passwords", adminOnly: true },
-];
+import { useSearchHandoff } from "../hooks/useSearchHandoff";
+import { isSettingsTab, settingsTabsFor, type SettingsTab as Tab } from "../config/settingsTabs";
 
 /// Section Admin - groups the two "system-level" admin tools (Database
 /// Backup, Data Reset) behind one Settings page with tabs, rather than two
@@ -34,12 +24,16 @@ const TABS: { key: Tab; label: string; adminOnly: boolean }[] = [
 export function SettingsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "SUPERVISOR_ADMIN";
-  const tabs = TABS.filter((t) => isAdmin || !t.adminOnly);
+  const tabs = settingsTabsFor(isAdmin);
   // Google sends the browser back here with ?drive=... after the consent screen,
   // so that is the tab to land on.
   const [tab, setTab] = useState<Tab>(() =>
     isAdmin && new URLSearchParams(window.location.search).has("drive") ? "drive" : "appearance",
   );
+  // The phone's search opens a section directly ("backup" -> Backup & Restore); only one this role has.
+  useSearchHandoff("settings-tab", (key) => {
+    if (isSettingsTab(key) && tabs.some((t) => t.key === key)) setTab(key);
+  });
 
   return (
     <div>

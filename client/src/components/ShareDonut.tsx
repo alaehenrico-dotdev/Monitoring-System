@@ -56,8 +56,11 @@ export function ShareDonut({ slices, centerLabel }: { slices: ShareSlice[]; cent
           <li key={s.key}>
             <i aria-hidden className="ae-fl-key" style={{ background: s.color }} />
             <span className="ae-donut-name">{s.label}</span>
-            <strong>{compactNumber.format(s.value)}</strong>
-            <span className="ae-donut-pct">{total ? ((s.value / total) * 100).toFixed(1) : "0.0"}%</span>
+            {/* Kept together: in a narrow card the pair drops under the name as one, never split. */}
+            <span className="ae-donut-figs">
+              <strong>{compactNumber.format(s.value)}</strong>
+              <span className="ae-donut-pct">{total ? ((s.value / total) * 100).toFixed(1) : "0.0"}%</span>
+            </span>
           </li>
         ))}
       </ul>

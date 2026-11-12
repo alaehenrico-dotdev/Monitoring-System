@@ -1534,9 +1534,7 @@
   color: var(--ae-text);
   background:
     linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(245, 192, 0, 0.1) 100%),
-    rgba(10, 10, 10, 0.62);
-  -webkit-backdrop-filter: blur(22px) saturate(140%);
-  backdrop-filter: blur(22px) saturate(140%);
+    rgba(10, 10, 10, 0.84);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 4px;
   box-shadow:
@@ -1714,4 +1712,158 @@
     flex: 1 1 0;
     justify-content: center;
   }
+}
+
+/* ---- Login card: one floating card in every theme -------------------------------------------
+   No border, no frame, no hard offset shadow: the card is lifted off the page by a soft shadow
+   alone (plus a faint gold glow), with generous corners and room inside. It keeps each theme's own surface colour (smoked
+   glass on Classic, frosted on Glass, the paper / cream / charcoal of the others); only the edge
+   treatment is shared. In a dark theme the surface gets a faint light wash so it still reads
+   against the dark page without a line round it. */
+:root:root:root[data-ui] .ae-auth-card {
+  padding: 36px 32px 30px;
+  border: 0 !important;
+  outline: 0 !important;
+  /* No backdrop blur: over the moving light it is re-sampled every frame, for little to see. */
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border-radius: 20px !important;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.18),
+    0 14px 28px rgba(0, 0, 0, 0.28),
+    0 36px 80px rgba(0, 0, 0, 0.42),
+    0 0 44px -6px rgba(245, 192, 0, 0.22) !important;
+  animation: ae-auth-float 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+:root:root:root[data-ui] .ae-auth-card .ae-modal-border-sweep {
+  display: none !important;
+}
+:root:root:root[data-ui][data-theme="dark"] .ae-auth-card {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.045));
+}
+/* Classic's card is always smoked glass; keep its own gradient and drop only the edge light. */
+:root:root:root[data-ui="classic"] .ae-auth-card {
+  background-image:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(245, 192, 0, 0.1) 100%);
+}
+:root:root:root[data-ui] .ae-auth-heading {
+  margin: 0 0 22px;
+}
+:root:root:root[data-ui] .ae-auth-heading h2 {
+  font-size: calc(24px * var(--ae-fs, 1));
+  letter-spacing: -0.2px;
+}
+@keyframes ae-auth-float {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root:root[data-ui] .ae-auth-card {
+    animation: none;
+  }
+}
+@media (max-width: 420px) {
+  :root:root:root[data-ui] .ae-auth-card {
+    padding: 28px 22px 24px;
+    border-radius: 18px !important;
+  }
+}
+
+/* ---- Login backdrop: glass over a gradient in the logo's colours ------------------------------
+   The seal is gold, red and green on black, so the page behind the card is a deep dark base with
+   large soft pools of those three colours (two of them drift slowly), and the brand panel is a
+   frosted pane over them. The same in every theme: the sign-in screens are permanently dark
+   chrome, and the text on them is light. */
+:root:root:root[data-ui] .ae-auth {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(160deg, #1d1b17 0%, #121110 55%, #0d0d0c 100%);
+}
+/* The three colour pools are ONE layer, larger than the page, that drifts and breathes by
+   transform alone (about 40s a trip). Transform runs on the compositor, so the page is not
+   repainted every frame the way animating a background position (or a blurred element) would be. */
+:root:root:root[data-ui] .ae-auth::before {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 78% 22%, rgba(245, 192, 0, 0.13), transparent 38%),
+    radial-gradient(circle at 18% 80%, rgba(193, 39, 45, 0.10), transparent 36%),
+    radial-gradient(circle at 60% 92%, rgba(47, 107, 60, 0.15), transparent 40%);
+  will-change: transform;
+  animation: ae-auth-glow 40s ease-in-out infinite alternate;
+}
+@keyframes ae-auth-glow {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(5%, 4%, 0) scale(1.1);
+  }
+}
+/* The brand panel has no pane, tint or divider of its own: it sits straight on the gradient, so
+   there is no seam where it meets the card's side of the page. */
+:root:root:root[data-ui] .ae-auth-brand {
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border-right: 0 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root:root[data-ui] .ae-auth::before {
+    animation: none;
+    will-change: auto;
+  }
+}
+
+/* ---- Login screen, light mode ---------------------------------------------------------------
+   The whole screen follows the colour mode, not just the card: a warm cream page with the same
+   faint gold, red and green light, dark text on the brand block, and (on Classic) a frosted
+   white card in place of the smoked-glass one. Dark mode keeps the rules above. */
+:root:root:root[data-ui]:not([data-theme="dark"]) .ae-auth {
+  background: linear-gradient(160deg, #fcf8ee 0%, #f6f0e0 55%, #efe8d4 100%);
+}
+:root:root:root[data-ui]:not([data-theme="dark"]) .ae-auth::before {
+  background:
+    radial-gradient(circle at 78% 22%, rgba(245, 192, 0, 0.17), transparent 38%),
+    radial-gradient(circle at 18% 80%, rgba(193, 39, 45, 0.07), transparent 36%),
+    radial-gradient(circle at 60% 92%, rgba(47, 107, 60, 0.10), transparent 40%);
+}
+:root:root:root[data-ui]:not([data-theme="dark"]) .ae-auth-brand {
+  color: #2b2517;
+}
+:root:root:root[data-ui]:not([data-theme="dark"]) .ae-auth-wordmark {
+  color: #b58500 !important;
+}
+:root:root:root[data-ui]:not([data-theme="dark"]) .ae-auth-card {
+  box-shadow:
+    0 2px 4px rgba(70, 50, 0, 0.07),
+    0 14px 28px rgba(70, 50, 0, 0.11),
+    0 30px 70px rgba(70, 50, 0, 0.15),
+    0 0 44px -6px rgba(245, 192, 0, 0.32) !important;
+}
+:root:root:root[data-ui="classic"]:not([data-theme="dark"]) .ae-auth-card {
+  --ae-bg: #fffdf6;
+  --ae-bg-alt: #f6f1e3;
+  --ae-surface: rgba(0, 0, 0, 0.03);
+  --ae-text: #1f1b12;
+  --ae-text-muted: #6b6454;
+  --ae-border: rgba(0, 0, 0, 0.14);
+  --ae-hairline: rgba(0, 0, 0, 0.12);
+  --ae-warning-bg: rgba(245, 192, 0, 0.18);
+  --ae-warning-text: #7a5a00;
+  --ae-danger-text: #b3202a;
+  --ae-danger-bg: rgba(193, 39, 45, 0.1);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(245, 192, 0, 0.1) 100%),
+    rgba(255, 253, 246, 0.88);
 }

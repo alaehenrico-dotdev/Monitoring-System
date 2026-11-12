@@ -91,6 +91,23 @@ backups/
 snapshots/
 # User uploads / restored files, if one is ever staged inside the project.
 uploads/
+# The app's own Database Backup download is named ala-eh-backup-<date>-<time>.sql (plain
+# .sql when no BACKUP_ENCRYPTION_KEY is set, so nothing above would catch it) or .sql.enc;
+# a restore leaves ala-eh-restore-*.sql in the temp folder.
+ala-eh-backup-*
+ala-eh-restore-*
+# Exports named by date (online-stock-2026-09-30-morning.pdf, total-stocks-2026-09-30.xls,
+# end-of-day-pack-2026-09-30.zip ...) hold real stock figures; a copy dropped in the project
+# at any depth stays out. Tracked docs have no date in their name, so they are unaffected.
+end-of-day-pack-*
+*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.pdf
+*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.xls
+*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.xlsx
+*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.csv
+*[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*.zip
+# Authenticator recovery codes and reset codes saved to a file.
+*recovery-codes*
+*recovery_codes*
 
 # --- Docker -----------------------------------------------------------------
 # A personal compose override (ports, volumes) and anything Caddy writes if its data
