@@ -216,28 +216,45 @@ export function generatePassage(
   mode: TypingMode = "mix",
   previous?: string,
   rand: Rand = Math.random,
+  minLength = 0,
 ): string {
   for (let attempt = 0; attempt < 5; attempt++) {
-    const kind =
-      mode === "mix"
-        ? pick(["words", "sentences", "numbers"] as const, rand)
-        : mode;
-    const text = generateFor(kind, rand, previous);
-    if (text !== previous) return text;
+    let text = generateFor(kindFor(mode, rand), rand, previous);
+    if (text === previous) continue;
+    // Timed runs start with enough text that the typist never sees the end of it.
+    while (text.length < minLength) text += ` ${chunk(mode, rand)}`;
+    return text;
   }
   return generateFor("words", rand) + " ";
 }
 
-/// Paragraphs is a timed, continuous test (like Monkeytype or typing.com): the text keeps
-/// flowing for TIMED_SECONDS instead of ending when a fixed passage runs out. Every other
-/// mode is a short passage that ends when it is typed.
-export const TIMED_SECONDS = 60; // the default
-export const TIMER_OPTIONS: readonly number[] = [15, 30, 60, 120];
-export const isTimed = (mode: TypingMode): boolean => mode === "paragraphs";
+/// "mix" picks one of the short kinds at random; every other mode is itself.
+function kindFor(mode: TypingMode, rand: Rand): Exclude<TypingMode, "mix"> {
+  return mode === "mix"
+    ? pick(["words", "sentences", "numbers"] as const, rand)
+    : mode;
+}
 
-/// More text to append to a continuous passage, so the typist never reaches the end.
-export function continueText(rand: Rand = Math.random): string {
-  return paragraph(rand);
+/// One more stretch of text in the same style as `mode`.
+function chunk(mode: TypingMode, rand: Rand): string {
+  return generateFor(kindFor(mode, rand), rand);
+}
+
+/// The timer is optional in every mode: with a timer the text keeps flowing until the clock
+/// runs out (like Monkeytype or typing.com); with it off a passage ends when it is typed.
+/// A timer is on by default.
+export const TIMED_SECONDS = 60; // the default
+/// 0 means "Off".
+export const TIMER_OPTIONS: readonly number[] = [0, 15, 30, 60, 120];
+/// How much text a timed run starts with (it is topped up as you type).
+export const TIMED_MIN_LENGTH = 400;
+
+/// More text, in the style of `mode`, to append to a timed passage.
+export function continueText(
+  mode: TypingMode = "mix",
+  rand: Rand = Math.random,
+): string {
+  return chunk(mode, rand);
 }
 
 export interface TypingStats {

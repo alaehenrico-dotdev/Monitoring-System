@@ -3,7 +3,8 @@ import {
   computeStats,
   continueText,
   generatePassage,
-  isTimed,
+  TIMER_OPTIONS,
+  TIMED_MIN_LENGTH,
   keyForChar,
   TIMED_SECONDS,
   type TypingMode,
@@ -107,17 +108,31 @@ describe("paragraph mode (continuous, timed)", () => {
   it("can always be topped up so the typist never runs out", () => {
     let text = generatePassage("paragraphs");
     for (let i = 0; i < 20; i++) {
-      const more = continueText();
+      const more = continueText("paragraphs");
       expect(more.length).toBeGreaterThan(100);
       text += " " + more;
     }
     expect(text.length).toBeGreaterThan(3000);
   });
 
-  it("is the only timed mode", () => {
-    expect(isTimed("paragraphs")).toBe(true);
-    for (const m of ["mix", "words", "sentences", "numbers"] as const)
-      expect(isTimed(m)).toBe(false);
+  it("runs a timer by default (60s) and offers Off plus four lengths", () => {
     expect(TIMED_SECONDS).toBe(60);
+    expect(TIMER_OPTIONS).toEqual([0, 15, 30, 60, 120]);
+  });
+
+  it("can start a timed run of any mode with enough text, all typable", () => {
+    for (const m of [
+      "mix",
+      "words",
+      "sentences",
+      "paragraphs",
+      "numbers",
+    ] as const) {
+      const text = generatePassage(m, undefined, Math.random, TIMED_MIN_LENGTH);
+      expect(text.length).toBeGreaterThanOrEqual(TIMED_MIN_LENGTH);
+      for (const ch of text)
+        expect(keyForChar(ch), m + ' "' + ch + '"').not.toBeNull();
+      expect(continueText(m).length).toBeGreaterThan(10);
+    }
   });
 });

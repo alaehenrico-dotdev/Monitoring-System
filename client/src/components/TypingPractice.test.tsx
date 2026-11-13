@@ -20,13 +20,27 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("TypingPractice timer and results", () => {
-  it("offers the timer lengths only in Paragraphs mode", () => {
+  it("runs a 60s timer by default and offers Off plus the lengths in every mode", () => {
     render(<TypingPractice />);
     fireEvent.click(screen.getByLabelText("Typing practice"));
-    expect(screen.queryByText("15s")).toBeNull();
-    fireEvent.click(screen.getByText("Paragraphs"));
-    for (const s of ["15s", "30s", "60s", "120s"])
+    expect(screen.getByText(/60s left/)).toBeTruthy(); // Mix mode, default timer
+    for (const s of ["Off", "15s", "30s", "60s", "120s"])
       expect(screen.getByText(s)).toBeTruthy();
+  });
+
+  it("Off turns the timer off and the passage ends when it is typed", () => {
+    render(<TypingPractice />);
+    fireEvent.click(screen.getByLabelText("Typing practice"));
+    fireEvent.click(screen.getByText("Off"));
+    expect(screen.queryByText(/s left/)).toBeNull();
+    const input = screen.getByLabelText("Type the passage shown above");
+    const text = Array.from(
+      document.querySelectorAll(".ae-typing-ch"),
+      (c) => c.textContent ?? "",
+    ).join("");
+    fireEvent.change(input, { target: { value: text } });
+    expect(screen.getByText("Nicely done!")).toBeTruthy();
+    expect(localStorage.getItem("ae:typing-seconds")).toBe("0");
   });
 
   it("starts the clock on the first key and shows the results dialog when time is out", () => {

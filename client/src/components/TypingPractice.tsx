@@ -5,7 +5,7 @@ import {
   computeStats,
   continueText,
   generatePassage,
-  isTimed,
+  TIMED_MIN_LENGTH,
   keyForChar,
   keyIdFromEvent,
   KEY_ROWS,
@@ -30,7 +30,8 @@ function readBest(): number {
 function readSeconds(): number {
   try {
     const n = Number(localStorage.getItem(SECONDS_KEY));
-    return TIMER_OPTIONS.includes(n) ? n : TIMED_SECONDS;
+    const raw = localStorage.getItem(SECONDS_KEY);
+    return raw !== null && TIMER_OPTIONS.includes(n) ? n : TIMED_SECONDS;
   } catch {
     return TIMED_SECONDS;
   }
@@ -228,7 +229,14 @@ export function TypingPractice() {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<TypingMode>("mix");
   const [seconds, setSeconds] = useState(readSeconds);
-  const [passage, setPassage] = useState(() => generatePassage("mix"));
+  const [passage, setPassage] = useState(() =>
+    generatePassage(
+      "mix",
+      undefined,
+      Math.random,
+      readSeconds() > 0 ? TIMED_MIN_LENGTH : 0,
+    ),
+  );
   const [typed, setTyped] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [now, setNow] = useState(0);
@@ -238,19 +246,17 @@ export function TypingPractice() {
   const [held, setHeld] = useState<ReadonlySet<string>>(new Set());
   const [wrongKey, setWrongKey] = useState<string | null>(null);
   // Floating window: position, and a brief shake on a typo.
-  const [pos, setPos] = useState({ x: 0, y: 72 });
   const [shake, setShake] = useState(false);
   // The "Try Typing test!" speech bubble pops up now and then while the window is closed.
   const [nudge, setNudge] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const passageRef = useRef<HTMLDivElement>(null);
-  const floatRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
   const shakeTimer = useRef<number | undefined>(undefined);
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
-  const timed = isTimed(mode);
+  // A timer is on by default; 0 is Off (the passage then ends when it is typed).
+  const timed = seconds > 0;
   const limitMs = seconds * 1000;
   const done = result !== null;
   const elapsed =
@@ -271,6 +277,8 @@ export function TypingPractice() {
     held,
     timed,
     limitMs,
+    mode,
+    seconds,
     startedAt,
     done,
   });
@@ -282,6 +290,8 @@ export function TypingPractice() {
       held,
       timed,
       limitMs,
+      mode,
+      seconds,
       startedAt,
       done,
     };
@@ -313,9 +323,12 @@ export function TypingPractice() {
   }, []);
 
   /// A fresh run: new passage (for the given mode), cleared state, focus back in the typing box.
-  const newRun = useCallback((forMode: TypingMode) => {
+  const newRun = useCallback((forMode: TypingMode, forSeconds?: number) => {
+    const secs = forSeconds ?? latest.current.seconds;
     setMode(forMode);
-    setPassage((p) => generatePassage(forMode, p));
+    setPassage((p) =>
+      generatePassage(forMode, p, Math.random, secs > 0 ? TIMED_MIN_LENGTH : 0),
+    );
     setTyped("");
     setStartedAt(null);
     setNow(0);
@@ -337,13 +350,6 @@ export function TypingPractice() {
         ? document.activeElement
         : null;
     newRun(mode); // a fresh passage on every open, not what was left over from last time
-    setPos({
-      x: Math.max(
-        (window.innerWidth - Math.min(760, window.innerWidth - 16)) / 2,
-        8,
-      ),
-      y: 72,
-    });
     setOpen(true);
   }
 
@@ -439,7 +445,7 @@ export function TypingPractice() {
     if (run.timed) {
       // Continuous text: top it up well before the typist reaches the end.
       if (value.length > run.passage.length - 250)
-        setPassage((p) => `${p} ${continueText()}`);
+        setPassage((p) => `${p} ${continueText(run.mode)}`);
     } else if (value.length >= run.passage.length) {
       finish(value, t - (run.startedAt ?? t));
     }
@@ -527,9 +533,7 @@ export function TypingPractice() {
               }}
             />
             <div
-              ref={floatRef}
               className={`ae-typing-float no-print${shake ? " ae-typing-float--shake" : ""}`}
-              style={{ left: pos.x, top: pos.y }}
               role="dialog"
               aria-label="Typing practice"
             >
@@ -538,40 +542,7 @@ export function TypingPractice() {
                 style={{ transform: `scaleX(${Math.min(progress, 1)})` }}
               />
               <div className="ae-typing-inner">
-                <div
-                  className="ae-typing-head"
-                  onPointerDown={(e) => {
-                    if ((e.target as HTMLElement).closest("button")) return;
-                    dragRef.current = {
-                      dx: e.clientX - pos.x,
-                      dy: e.clientY - pos.y,
-                    };
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  }}
-                  onPointerMove={(e) => {
-                    const d = dragRef.current;
-                    if (!d) return;
-                    // Keep at least a grabbable strip of the window on screen.
-                    const w = floatRef.current?.offsetWidth ?? 760;
-                    setPos({
-                      x: Math.min(
-                        Math.max(e.clientX - d.dx, 80 - w),
-                        window.innerWidth - 80,
-                      ),
-                      y: Math.min(
-                        Math.max(e.clientY - d.dy, 0),
-                        window.innerHeight - 40,
-                      ),
-                    });
-                  }}
-                  onPointerUp={() => {
-                    dragRef.current = null;
-                    focusInput();
-                  }}
-                  onPointerCancel={() => {
-                    dragRef.current = null;
-                  }}
-                >
+                <div className="ae-typing-head">
                   <strong>Typing practice</strong>
                   <span className="ae-typing-best">Best: {best} WPM</span>
                   <button
@@ -601,12 +572,18 @@ export function TypingPractice() {
                       {m.label}
                     </button>
                   ))}
-                  {timed && (
+                  {
                     <span
                       className="ae-typing-timer"
                       role="group"
                       aria-label="Timer length"
                     >
+                      <span
+                        className="ae-typing-timer-label"
+                        aria-hidden="true"
+                      >
+                        Timer
+                      </span>
                       {TIMER_OPTIONS.map((s) => (
                         <button
                           key={s}
@@ -617,14 +594,14 @@ export function TypingPractice() {
                           onClick={() => {
                             setSeconds(s);
                             remember(SECONDS_KEY, s);
-                            newRun("paragraphs");
+                            newRun(mode, s);
                           }}
                         >
-                          {s}s
+                          {s === 0 ? "Off" : `${s}s`}
                         </button>
                       ))}
                     </span>
-                  )}
+                  }
                 </div>
                 <Passage
                   passage={passage}
