@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   computeStats,
+  continueText,
   generatePassage,
+  isTimed,
   keyForChar,
+  TIMED_SECONDS,
   type TypingMode,
 } from "./typingTest";
 
@@ -47,7 +50,13 @@ describe("keyboard model", () => {
 });
 
 describe("generatePassage", () => {
-  const modes: TypingMode[] = ["mix", "words", "sentences", "numbers"];
+  const modes: TypingMode[] = [
+    "mix",
+    "words",
+    "sentences",
+    "paragraphs",
+    "numbers",
+  ];
 
   it("only uses characters the on-screen keyboard has", () => {
     for (const m of modes)
@@ -82,5 +91,33 @@ describe("generatePassage", () => {
     expect(generatePassage("words", undefined, seq())).toBe(
       generatePassage("words", undefined, seq()),
     );
+  });
+});
+
+describe("paragraph mode (continuous, timed)", () => {
+  it("starts with a long flowing text that fits the keyboard", () => {
+    for (let i = 0; i < 40; i++) {
+      const p = generatePassage("paragraphs");
+      expect(p.length).toBeGreaterThanOrEqual(500);
+      expect(p).not.toContain(String.fromCharCode(10));
+      for (const ch of p) expect(keyForChar(ch), `"${ch}"`).not.toBeNull();
+    }
+  });
+
+  it("can always be topped up so the typist never runs out", () => {
+    let text = generatePassage("paragraphs");
+    for (let i = 0; i < 20; i++) {
+      const more = continueText();
+      expect(more.length).toBeGreaterThan(100);
+      text += " " + more;
+    }
+    expect(text.length).toBeGreaterThan(3000);
+  });
+
+  it("is the only timed mode", () => {
+    expect(isTimed("paragraphs")).toBe(true);
+    for (const m of ["mix", "words", "sentences", "numbers"] as const)
+      expect(isTimed(m)).toBe(false);
+    expect(TIMED_SECONDS).toBe(60);
   });
 });
