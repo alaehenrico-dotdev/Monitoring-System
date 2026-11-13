@@ -159,6 +159,27 @@
   background-color: color-mix(in srgb, #e0a800 16%, transparent) !important;
 }
 
+/* Opening stock that is not what the previous period carries forward: a small
+   warning mark and the expected figure beside the cell's own number. Never
+   blocks anything - the number itself is unchanged. */
+.ae-opening-break {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 6px;
+  color: var(--ae-warning-text, #8a5a00);
+  font-size: 0.85em;
+  cursor: help;
+}
+.ae-opening-break svg {
+  width: 13px;
+  height: 13px;
+}
+.ae-opening-break-exp {
+  opacity: 0.85;
+  text-decoration: line-through dotted;
+}
+
 /* Quick Fill: fill this column down, from the column header. */
 .ae-fill-down-btn {
   margin-left: 4px;
@@ -1867,3 +1888,181 @@
     linear-gradient(145deg, rgba(255, 255, 255, 0.7) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(245, 192, 0, 0.1) 100%),
     rgba(255, 253, 246, 0.88);
 }
+
+/* ==========================================================================
+   Typing practice (components/TypingPractice.tsx): a floating glass window.
+   Every colour comes from the active theme's tokens, so it follows light/dark
+   and each UI theme (glass, studio, skeuo, brutal, minimalism); the frosted
+   blur/edge/shadow is the shared recipe. Gold stays the brand accent.
+   ========================================================================== */
+.ae-typing-float {
+  --tp-gold: #f5c000;
+  --tp-glass: var(--ae-glass-bg, color-mix(in srgb, var(--ae-surface) 58%, transparent));
+  --tp-edge: var(--ae-gl-edge, color-mix(in srgb, var(--ae-text) 22%, transparent));
+  --tp-well: color-mix(in srgb, var(--ae-text) 7%, transparent);
+  --tp-key: color-mix(in srgb, var(--ae-text) 9%, transparent);
+  position: fixed;
+  z-index: 320;
+  width: min(760px, calc(100vw - 16px));
+  color: var(--ae-text);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, #fff 22%, transparent), transparent 55%),
+    var(--tp-glass);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  backdrop-filter: blur(22px) saturate(170%);
+  border: 1px solid var(--tp-edge);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 color-mix(in srgb, #fff 45%, transparent);
+  overflow: hidden;
+  animation: ae-typing-in 220ms cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+/* Browsers without backdrop-filter: fall back to a solid theme surface. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ae-typing-float { background: var(--ae-surface); }
+}
+.ae-typing-inner { display: flex; flex-direction: column; gap: 10px; padding: 12px 16px; }
+.ae-typing-head { display: flex; align-items: center; gap: 12px; cursor: grab; touch-action: none; user-select: none; }
+.ae-typing-head:active { cursor: grabbing; }
+.ae-typing-best { margin-left: auto; font-size: 12px; color: var(--ae-text-muted); }
+.ae-typing-close {
+  display: grid; place-items: center; width: 26px; height: 26px; padding: 0;
+  font-size: 18px; line-height: 1; color: inherit; background: transparent;
+  border: none; border-radius: 999px; cursor: pointer; opacity: 0.7;
+  transition: background-color 120ms, opacity 120ms;
+}
+.ae-typing-close:hover { opacity: 1; background: var(--tp-key); }
+.ae-typing-progress {
+  height: 3px; transform-origin: left; transition: transform 140ms ease-out;
+  background: linear-gradient(90deg, var(--tp-gold), color-mix(in srgb, var(--tp-gold) 60%, #fff));
+}
+.ae-typing-passage {
+  font-family: ui-monospace, Consolas, monospace; font-size: 17px; line-height: 1.7;
+  padding: 10px 14px; border-radius: 12px; cursor: text; user-select: none;
+  background: var(--tp-well);
+  box-shadow: inset 0 1px 3px color-mix(in srgb, #000 18%, transparent);
+}
+.ae-typing-ch { color: var(--ae-text-muted); transition: color 90ms ease-out, background-color 90ms ease-out; }
+.ae-typing-ch--ok { color: var(--ae-text); }
+.ae-typing-ch--bad { color: var(--ae-danger-text, #ff6b6b); background: var(--ae-danger-bg, rgba(255, 107, 107, 0.18)); border-radius: 3px; }
+.ae-typing-ch--cur { color: var(--ae-text); box-shadow: inset 0 -2px 0 var(--tp-gold); animation: ae-typing-blink 1s steps(2, start) infinite; }
+/* The real input is only a key sink; the passage above is what's read. */
+.ae-typing-input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
+.ae-typing-stats { display: flex; gap: 18px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ae-typing-stats span { transition: color 150ms; }
+.ae-typing-stats--done span { color: var(--tp-gold); animation: ae-typing-pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.5); }
+.ae-typing-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--ae-text-muted); }
+.ae-typing-restart {
+  padding: 5px 14px; font: inherit; color: var(--ae-text); cursor: pointer;
+  background: var(--tp-key); border: 1px solid var(--tp-edge); border-radius: 999px;
+  transition: background-color 120ms, transform 120ms;
+}
+.ae-typing-restart:hover { background: color-mix(in srgb, var(--ae-text) 16%, transparent); }
+.ae-typing-restart:active { transform: scale(0.95); }
+.ae-typing-float--shake { animation: ae-typing-shake 220ms ease-in-out; }
+
+/* Keyboard: frosted keycaps on a recessed glass tray. */
+.ae-kbd { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px; user-select: none; background: var(--tp-well); box-shadow: inset 0 1px 3px color-mix(in srgb, #000 18%, transparent); }
+.ae-kbd-row { display: flex; gap: 4px; }
+.ae-kbd-key {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  height: 36px; min-width: 0; padding: 0; font: inherit; font-size: 12px; cursor: pointer;
+  color: var(--ae-text);
+  background: linear-gradient(180deg, color-mix(in srgb, #fff 16%, transparent), transparent), var(--tp-key);
+  border: 1px solid var(--tp-edge); border-bottom-width: 2px; border-radius: 7px;
+  transition: background-color 80ms ease-out, transform 80ms ease-out, color 80ms ease-out;
+}
+.ae-kbd-key:hover { background-color: color-mix(in srgb, var(--ae-text) 15%, transparent); }
+.ae-kbd-key--next {
+  color: #1a1a1a; font-weight: 700; background: var(--tp-gold); border-color: var(--tp-gold);
+  animation: ae-kbd-pulse 1.1s ease-in-out infinite;
+}
+.ae-kbd-key--down { transform: translateY(1px) scale(0.96); border-bottom-width: 1px; background-color: color-mix(in srgb, var(--ae-text) 28%, transparent); }
+.ae-kbd-key--next.ae-kbd-key--down { background: color-mix(in srgb, var(--tp-gold) 75%, #fff); }
+.ae-kbd-key--down::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  border: 2px solid var(--tp-gold); animation: ae-kbd-ripple 380ms ease-out forwards;
+}
+.ae-kbd-key--bad { color: var(--ae-danger-text, #ff6b6b); background-color: var(--ae-danger-bg, rgba(255, 107, 107, 0.25)); border-color: var(--ae-danger-text, #ff6b6b); animation: ae-kbd-miss 260ms ease-in-out; }
+
+@keyframes ae-typing-in { from { opacity: 0; transform: translateY(12px) scale(0.96); } }
+@keyframes ae-typing-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@keyframes ae-typing-blink { 50% { box-shadow: none; } }
+@keyframes ae-typing-pop { 40% { transform: scale(1.25); } }
+@keyframes ae-kbd-pulse { 50% { box-shadow: 0 0 14px 2px color-mix(in srgb, var(--tp-gold) 65%, transparent); } }
+@keyframes ae-kbd-ripple { from { opacity: 0.9; transform: scale(1); } to { opacity: 0; transform: scale(1.45); } }
+@keyframes ae-kbd-miss { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+@media (max-width: 800px) { .ae-kbd-key { height: 30px; font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) {
+  .ae-typing-float, .ae-typing-float--shake, .ae-typing-ch--cur, .ae-kbd-key, .ae-kbd-key--next, .ae-kbd-key--bad,
+  .ae-typing-stats--done span, .ae-kbd-key--down::after { animation: none; transition: none; }
+  .ae-kbd-key--down { transform: none; }
+}
+
+/* Per-theme character on top of the shared glass. */
+:root[data-ui="brutal"] .ae-typing-float { border: 2px solid var(--ae-text); border-radius: 0; box-shadow: 6px 6px 0 var(--ae-text); -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--ae-surface); }
+:root[data-ui="brutal"] .ae-kbd-key, :root[data-ui="brutal"] .ae-typing-passage, :root[data-ui="brutal"] .ae-kbd, :root[data-ui="brutal"] .ae-typing-restart { border-radius: 0; }
+:root[data-ui="studio"] .ae-typing-float, :root[data-ui="minimal"] .ae-typing-float { border-radius: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); }
+
+/* Passage-type chips (Mix / Words / Sentences / Numbers). */
+.ae-typing-modes { display: flex; gap: 6px; }
+.ae-typing-mode {
+  padding: 3px 12px; font: inherit; font-size: 12px; color: var(--ae-text-muted); cursor: pointer;
+  background: transparent; border: 1px solid transparent; border-radius: 999px;
+  transition: background-color 120ms, color 120ms, transform 120ms;
+}
+.ae-typing-mode:hover { color: var(--ae-text); background: var(--tp-key, transparent); }
+.ae-typing-mode:active { transform: scale(0.95); }
+.ae-typing-mode--on { color: var(--ae-text); background: var(--tp-key, transparent); border-color: var(--tp-edge, currentColor); font-weight: 600; }
+
+/* Page blur while the typing window is open (sits just under the window). */
+.ae-typing-backdrop {
+  position: fixed; inset: 0; z-index: 319;
+  background: color-mix(in srgb, var(--ae-bg) 35%, transparent);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+  backdrop-filter: blur(8px) saturate(120%);
+  animation: ae-typing-backdrop-in 240ms ease-out;
+}
+@keyframes ae-typing-backdrop-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .ae-typing-backdrop { animation: none; } }
+
+/* Header keyboard icon: breathes gently, with an occasional "Try Typing test!" bubble. */
+.ae-typing-wrap { position: relative; display: inline-flex; }
+.ae-typing-btn { animation: ae-typing-breathe 3.2s ease-in-out infinite; }
+.ae-typing-btn:hover, .ae-typing-btn:focus-visible { animation-play-state: paused; }
+@keyframes ae-typing-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.7; box-shadow: 0 0 0 0 rgba(245, 192, 0, 0); }
+  50% { transform: scale(1.18); opacity: 1; box-shadow: 0 0 10px 2px rgba(245, 192, 0, 0.45); }
+}
+.ae-typing-nudge {
+  position: absolute; top: calc(100% + 10px); right: -6px; z-index: 60;
+  padding: 7px 12px; font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
+  color: #1a1a1a; background: #f5c000; border: none; border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+  transform-origin: calc(100% - 14px) 0;
+  animation: ae-typing-nudge-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.4), ae-typing-nudge-bob 2.4s ease-in-out 320ms infinite;
+}
+.ae-typing-nudge::before {
+  content: ""; position: absolute; top: -5px; right: 14px; width: 10px; height: 10px;
+  background: inherit; transform: rotate(45deg); border-radius: 2px;
+}
+@keyframes ae-typing-nudge-in { from { opacity: 0; transform: translateY(-6px) scale(0.8); } }
+@keyframes ae-typing-nudge-bob { 50% { transform: translateY(3px); } }
+@media (prefers-reduced-motion: reduce) {
+  .ae-typing-btn, .ae-typing-nudge { animation: none; }
+}
+
+/* Desktop-mode gate (components/DesktopModeGate.tsx): full-screen, theme-coloured. */
+.ae-dmg { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--ae-bg) 70%, transparent); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
+.ae-dmg-card { width: min(420px, 100%); padding: 22px; color: var(--ae-text); background: var(--ae-surface); border: 1px solid var(--ae-border); border-radius: 16px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35); }
+.ae-dmg-card h2 { margin: 0 0 10px; font-size: 18px; }
+.ae-dmg-card p { margin: 0 0 10px; font-size: 14px; line-height: 1.5; }
+.ae-dmg-hint { color: var(--ae-text-muted); font-size: 13px !important; }
+.ae-dmg-input { width: 100%; box-sizing: border-box; padding: 11px 12px; font: inherit; font-size: 16px; color: var(--ae-text); background: var(--ae-bg-alt); border: 1px solid var(--ae-border); border-radius: 10px; }
+.ae-dmg-error { margin-top: 8px !important; color: var(--ae-danger-text); }
+.ae-dmg-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+.ae-dmg-primary, .ae-dmg-secondary { min-height: 42px; padding: 0 16px; font: inherit; font-weight: 600; border-radius: 10px; cursor: pointer; }
+.ae-dmg-primary { color: #1a1a1a; background: #f5c000; border: none; }
+.ae-dmg-primary:disabled { opacity: 0.5; cursor: default; }
+.ae-dmg-secondary { color: var(--ae-text); background: transparent; border: 1px solid var(--ae-border); }

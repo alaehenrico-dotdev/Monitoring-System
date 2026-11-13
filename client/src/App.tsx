@@ -7,6 +7,7 @@ import { ProtectedRoute } from "./routes/ProtectedRoute";
 import { HomeRedirect, PhoneGate } from "./routes/PhoneGate";
 import { Layout } from "./components/Layout";
 import { ShiftModeGate } from "./components/ShiftModeGate";
+import { DesktopModeGate } from "./components/DesktopModeGate";
 import { TopProgressBar } from "./components/TopProgressBar";
 import { NoticeHost } from "./components/NoticeHost";
 import { PasswordPromptHost } from "./components/PasswordPromptHost";
@@ -131,6 +132,7 @@ export default function App() {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
                 <Route element={<ProtectedRoute />}>
+                  <Route element={<DesktopModeGate />}>
                   <Route element={<ShiftModeGate />}>
                   <Route element={<Layout />}>
                   <Route element={<PhoneGate />}>
@@ -179,6 +181,7 @@ export default function App() {
                       <Route path="/change-log" element={<ChangeLogPage />} />
                       <Route path="/products" element={<ProductsAdminPage />} />
                     </Route>
+                  </Route>
                   </Route>
                   </Route>
                   </Route>

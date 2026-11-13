@@ -34,6 +34,7 @@ export function saveNotices({
   negatives = [],
   otherShiftWarning = null,
   alsoUpdates = null,
+  transferOverwrite = null,
   now = getCurrentShiftAndDate(),
 }: {
   date: string;
@@ -43,6 +44,9 @@ export function saveNotices({
   otherShiftWarning?: string | null;
   /// Which other table this Save also writes to (a transfer is mirrored), if any.
   alsoUpdates?: string | null;
+  /// Set (see utils/transferCheck.ts describeTransferOverwrites) when the other
+  /// sheet already holds a different transfer figure that this save would replace.
+  transferOverwrite?: string | null;
   now?: { date: string; shift: Shift };
 }): SaveNotice[] {
   const notices: SaveNotice[] = [];
@@ -67,6 +71,7 @@ export function saveNotices({
     });
   }
 
+  if (transferOverwrite) notices.push({ tone: "warn", text: transferOverwrite });
   if (alsoUpdates) notices.push({ tone: "info", text: `Transfer figures in this save are also written to the ${alsoUpdates} table.` });
   if (otherShiftWarning) notices.push({ tone: "info", text: otherShiftWarning });
   return notices;

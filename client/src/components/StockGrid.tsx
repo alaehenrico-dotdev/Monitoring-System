@@ -14,7 +14,7 @@ import type { Product } from "../types";
 import { colors } from "../theme";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { NumberCellInput } from "./ui";
-import { ChevronIcon } from "./icons";
+import { AlertTriangleIcon, ChevronIcon } from "./icons";
 import { ColumnHeaderMenu, type ColumnMenuTarget } from "./ColumnHeaderMenu";
 import {
   CategoryColorMenu,
@@ -231,6 +231,13 @@ interface StockGridProps {
    * so without it a color picked on one sheet would paint the other.
    */
   colorScope?: string;
+  /**
+   * Products whose Opening stock is not what the previous period carries
+   * forward, productId -> expected vs actual (hooks/useOpeningBreaks.ts). Each
+   * gets a warning mark on its Opening cell. Display only: it never blocks or
+   * changes an entry.
+   */
+  openingBreaks?: Record<number, { expected: number; actual: number }>;
 }
 
 /// Rows the grid renders are the API's, which carry the database row id for
@@ -469,6 +476,7 @@ export function StockGrid({
   onExtraNameChange,
   onExtraNameCommit,
   colorScope = "grid",
+  openingBreaks,
 }: StockGridProps) {
   // Explicit expand/collapse choices, keyed by category name - absent means
   // "no choice made yet", which defaults to collapsed (below), not expanded.
@@ -1426,6 +1434,10 @@ export function StockGrid({
                             </td>
                           );
                         const formatted = formatGridNumber(raw);
+                        const openingBreak =
+                          col.key === "openingStock"
+                            ? openingBreaks?.[row.product.id]
+                            : undefined;
                         const cell =
                           !isEditable(col) || readOnly ? (
                             <td
@@ -1437,7 +1449,24 @@ export function StockGrid({
                                 ...(isEditable(col) ? undefined : lockedStyle),
                                 ...tint(col),
                               }}
+                              title={
+                                openingBreak
+                                  ? `Opening stock is ${openingBreak.actual.toLocaleString()}, but the previous period carries forward ${openingBreak.expected.toLocaleString()}. This is usually a CSV import that set the opening balance - check it is intended.`
+                                  : undefined
+                              }
                             >
+                              {openingBreak && (
+                                <span
+                                  className="ae-opening-break"
+                                  role="img"
+                                  aria-label={`Opening stock does not match the previous period: expected ${openingBreak.expected.toLocaleString()}`}
+                                >
+                                  <AlertTriangleIcon />
+                                  <span className="ae-opening-break-exp">
+                                    {openingBreak.expected.toLocaleString()}
+                                  </span>
+                                </span>
+                              )}
                               {formatted.text}
                             </td>
                           ) : (

@@ -22,6 +22,10 @@ import { useTopProgress } from "../hooks/useTopProgress";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useShiftWithSavedData } from "../hooks/useShiftWithSavedData";
 import { SaveSummary } from "../components/SaveSummary";
+import { EntryProgress } from "../components/EntryProgress";
+import { useOpeningBreaks } from "../hooks/useOpeningBreaks";
+import { describeTransferOverwrites, ONLINE_TRANSFER_PAIRS, transferOverwrites } from "../utils/transferCheck";
+import { getOfflineGrid } from "../api/offlineStock";
 import { rowsEndingNegative, saveNotices } from "../utils/saveReview";
 import { saveManualCount } from "../api/manualCounts";
 import {
@@ -247,6 +251,33 @@ export function OnlineEntryPage() {
   // Fill's "is this actually a change?" test - `displayRows` already has
   // staged edits overlaid, so it can't answer either question.
   const getSavedValue = useSavedValueLookup(rows);
+
+  // Opening stock that is not what the previous period carries forward: a mark on
+  // the cell (read from the same check the Audit page uses). Best effort. Not
+  // refetched on every realtime change - an opening only moves with a CSV import
+  // or a published audit - but on sheet change, reconnect, Refresh and own saves.
+  const openingBreaks = useOpeningBreaks(date, shift, "ONLINE", `${reconnects}:${refreshTick}:${savedAt ?? 0}`);
+
+  // The Offline sheet's saved rows, read while the Save review is open so it can
+  // say when this save would replace a transfer figure Offline already entered
+  // (saving mirrors both transfer figures onto it). Best effort: if it cannot be
+  // read the review simply has no such line.
+  const [counterpart, setCounterpart] = useState<{ key: string; rows: GridRow[] } | null>(null);
+  const hasTransferPending = Object.values(pending).some((p) => TRANSFER_KEYS.some((k) => k in p));
+  useEffect(() => {
+    if (!showPreview || !hasTransferPending) return;
+    let cancelled = false;
+    getOfflineGrid(date, shift)
+      .then((data) => {
+        if (!cancelled) setCounterpart({ key: `${date}:${shift}`, rows: data as unknown as GridRow[] });
+      })
+      .catch(() => {
+        if (!cancelled) setCounterpart(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showPreview, hasTransferPending, date, shift]);
 
   // Extra input columns added from a column header's right-click menu. Their
   // amounts stage through the same pending set as any other cell; the column
@@ -767,6 +798,14 @@ export function OnlineEntryPage() {
         />
       )}
       <ConflictResolution conflicts={conflicts} onResolve={resolveConflict} />
+      {rows && canEdit && (
+        <EntryProgress
+          rows={rows}
+          pending={pending}
+          enabled={!showPreview && !showClearConfirm && !saving}
+          isShown={(id) => visibleRows?.some((r) => r.product.id === id) ?? false}
+        />
+      )}
       {!rows ? (
         <TableSkeleton
           headers={["SKU", "Product", ...columns.map((c) => c.label)]}
@@ -811,6 +850,7 @@ export function OnlineEntryPage() {
             onExtraNameChange={canEdit ? extraLabels.change : undefined}
             onExtraNameCommit={canEdit ? extraLabels.commit : undefined}
             historyTable="daily_online_stock"
+            openingBreaks={openingBreaks}
             colorScope="online"
           />
         </div>
@@ -837,6 +877,10 @@ export function OnlineEntryPage() {
               shift,
               negatives: rowsEndingNegative(displayRows, pending),
               otherShiftWarning,
+              transferOverwrite: describeTransferOverwrites(
+                transferOverwrites(displayRows, pending, counterpart?.key === `${date}:${shift}` ? counterpart.rows : null, ONLINE_TRANSFER_PAIRS),
+                "Offline",
+              ),
               alsoUpdates: Object.values(pending).some((p) => TRANSFER_KEYS.some((k) => k in p)) ? "Offline" : null,
             })}
           />

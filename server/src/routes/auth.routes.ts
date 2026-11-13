@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate } from "../middleware/auth";
 import { authLimiter, loginIpLimiter, mfaLimiter, resetCodeLimiter } from "../middleware/rateLimit";
-import { getMe, postChangePassword, postLogin, postMfaDisable, postMfaEnable, postMfaLogin, postMfaSetup, postSignOutEverywhere, postForgotPasswordReset } from "../controllers/auth.controller";
+import { getMe, postChangePassword, postLogin, postMfaDisable, postMfaEnable, postMfaLogin, postMfaSetup, postSignOutEverywhere, postForgotPasswordReset, postVerifyPassword } from "../controllers/auth.controller";
 
 const router = Router();
 
@@ -19,6 +19,7 @@ router.post("/login/mfa", mfaLimiter, asyncHandler(postMfaLogin));
 router.post("/forgot-password/reset", loginIpLimiter, resetCodeLimiter, asyncHandler(postForgotPasswordReset));
 router.get("/me", authenticate, asyncHandler(getMe));
 router.post("/change-password", authenticate, asyncHandler(postChangePassword));
+router.post("/verify-password", mfaLimiter, authenticate, asyncHandler(postVerifyPassword));
 router.post("/sign-out-everywhere", authenticate, asyncHandler(postSignOutEverywhere));
 router.post("/mfa/setup", authenticate, asyncHandler(postMfaSetup));
 router.post("/mfa/enable", authenticate, asyncHandler(postMfaEnable));

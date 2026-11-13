@@ -16,6 +16,7 @@ import {
   Ellipsis,
   FileChartColumnIncreasing,
   History,
+  Keyboard,
   Layers,
   LayoutDashboard,
   Lock,
@@ -78,6 +79,10 @@ export function ClearIcon() {
 
 export function SearchIcon() {
   return <Search {...look(13, 1.6)} />;
+}
+
+export function KeyboardIcon() {
+  return <Keyboard {...look(15, 1.6)} />;
 }
 
 export function SunIcon() {

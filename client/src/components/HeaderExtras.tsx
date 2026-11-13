@@ -2,6 +2,8 @@ import { LiveClock } from "./LiveClock";
 import { openQuickJump } from "./QuickJump";
 import { SearchIcon } from "./icons";
 import { ThemeToggle } from "./ThemeToggle";
+import { TypingPractice } from "./TypingPractice";
+import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 /// Clock + dark-mode toggle, sitting at the right end of the header's title
 /// row (PageHeader.tsx) so they're vertically centered on the h2, rather than sitting among that page's own toolbar
@@ -13,6 +15,8 @@ import { ThemeToggle } from "./ThemeToggle";
 /// Renders inside the header's title row, never inside <Toolbar>/
 /// <ToolbarControls> - no <ToolbarDivider /> needed alongside it any more.
 export function HeaderExtras() {
+  // Typing practice is a keyboard exercise: desktop only, never on the phone view.
+  const phone = useReadOnlyPhone();
   return (
     <span
       className="no-print ae-page-header-extras"
@@ -34,6 +38,7 @@ export function HeaderExtras() {
       >
         <SearchIcon />
       </button>
+      {!phone && <TypingPractice />}
       <LiveClock />
       <ThemeToggle />
     </span>

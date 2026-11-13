@@ -52,6 +52,18 @@ describe("saveNotices", () => {
   });
 });
 
+describe("saveNotices - transfer overwrite", () => {
+  it("warns, and does not block, when the other sheet's transfer figure would be replaced", () => {
+    const notices = saveNotices({ date: "2026-10-27", shift: "MORNING", now: NOW, transferOverwrite: "2 transfer figures differ", alsoUpdates: "Offline" });
+    expect(notices[0]).toEqual({ tone: "warn", text: "2 transfer figures differ" });
+    expect(notices[1]).toMatchObject({ tone: "info" });
+  });
+
+  it("adds nothing when there is no overwrite", () => {
+    expect(saveNotices({ date: "2026-10-27", shift: "MORNING", now: NOW, transferOverwrite: null })).toEqual([]);
+  });
+});
+
 describe("rowsEndingNegative", () => {
   const row = (id: number, name: string, remaining: unknown) => ({ product: { id, name }, entry: { remainingStock: remaining } });
 

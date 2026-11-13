@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import { completeMfaLogin, login } from "../services/auth.service";
+import { assertAdminPassword } from "../services/adminPassword.service";
 import { changeOwnPassword, getSecurityFlags, resetPasswordWithCode, signOutEverywhere } from "../services/users.service";
 import { disableMfa, enableMfa, startMfaSetup } from "../services/mfa.service";
 import { PASSWORD_MAX } from "../utils/password";
@@ -81,5 +82,13 @@ export async function postForgotPasswordReset(req: Request, res: Response) {
   const parsed = forgotPasswordSchema.safeParse(req.body);
   if (!parsed.success) throw HttpError.badRequest("Username, reset code and new password are required");
   await resetPasswordWithCode(parsed.data.username.trim(), parsed.data.code, parsed.data.newPassword, req.ip);
+  res.json({ success: true });
+}
+
+/// "Is this really the account holder?" without issuing a new session - used by the client's
+/// desktop-mode gate on a touch device. 403 on a wrong password, 429 after repeated misses
+/// (the same per-user lockout every other password re-check uses).
+export async function postVerifyPassword(req: Request, res: Response) {
+  await assertAdminPassword(req.user!.id, typeof req.body?.password === "string" ? req.body.password : undefined);
   res.json({ success: true });
 }

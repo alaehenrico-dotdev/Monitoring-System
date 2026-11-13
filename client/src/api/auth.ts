@@ -46,3 +46,8 @@ export function disableMfa(password: string, code: string) {
 export function resetPasswordWithCode(username: string, code: string, newPassword: string) {
   return http.post<{ success: true }>("/auth/forgot-password/reset", { username, code, newPassword });
 }
+
+/// Re-checks the signed-in user's password (403 if wrong) without changing the session.
+export function verifyPassword(password: string) {
+  return http.post<{ success: true }>("/auth/verify-password", { password });
+}
