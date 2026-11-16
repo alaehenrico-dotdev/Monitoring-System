@@ -1,6 +1,5 @@
 import type { DailyOutEntry } from "../api/dailyOut";
 import type { FlowPoint, FlowSeries } from "../components/FlowLineChart";
-import type { ComboPoint, ComboTooltip } from "./comboChartData";
 import { fullNumber } from "./chartFormat";
 import { formatDateDisplay } from "./dateFormat";
 import { toCsv } from "./csv";
@@ -18,35 +17,6 @@ function describeDay(e: DailyOutEntry): string {
   if (e.totalOut === null) return `${when} — No entries recorded`;
   const side = (label: string, v: number | null) => `${label}: ${v === null ? "no entry" : fullNumber.format(v)}`;
   return `${when} — ${side("Online out", e.onlineOut)} · ${side("Offline out", e.offlineOut)} · Combined out: ${fullNumber.format(e.totalOut)}`;
-}
-
-function dayTooltip(e: DailyOutEntry): ComboTooltip {
-  const title = formatDateDisplay(e.date);
-  if (e.totalOut === null) return { title, empty: "No entries recorded" };
-  const missing = [e.onlineOut === null && "Online", e.offlineOut === null && "Offline"].filter(Boolean);
-  return {
-    title,
-    rows: [
-      { label: "Combined out", value: e.totalOut },
-      ...(e.onlineOut === null ? [] : [{ label: "Online out", value: e.onlineOut, series: "online" as const }]),
-      ...(e.offlineOut === null ? [] : [{ label: "Offline out", value: e.offlineOut, series: "offline" as const }]),
-    ],
-    footer: missing.length ? { text: `No ${missing.join(" or ")} entry that day` } : undefined,
-  };
-}
-
-/// The chart's points: the combined figure as the bar, the two pools as lines.
-export function dailyOutPoints(rows: DailyOutEntry[], today: string): ComboPoint[] {
-  return rows.map((e) => ({
-    key: e.date,
-    label: shortDate(e.date),
-    ariaLabel: describeDay(e),
-    bar: e.totalOut,
-    online: e.onlineOut,
-    offline: e.offlineOut,
-    current: e.date === today,
-    tooltip: dayTooltip(e),
-  }));
 }
 
 /// The same figures for the dashboard-style line chart (FlowLineChart): Combined,

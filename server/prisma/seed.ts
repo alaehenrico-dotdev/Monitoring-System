@@ -1,15 +1,7 @@
-import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword } from "../src/utils/password";
 
 const prisma = new PrismaClient();
-
-// 12 URL-safe characters (~71 bits of entropy) - plenty for a one-time
-// initial password an admin is expected to rotate on first login, and short
-// enough to type/read back without transcription errors.
-function randomPassword(): string {
-  return randomBytes(9).toString("base64url");
-}
 
 // Section 4.1 - Product and Category Master List, taken directly from the
 // business's actual monthly Online/Offline Stocks Monitoring reports
@@ -200,28 +192,35 @@ async function seedProducts() {
 }
 
 // No hardcoded default passwords on purpose (this file is committed, and -
-// since this repo is public - readable by anyone): each account's initial
-// password is either a real value from its env var, or a freshly generated
-// one-time random password printed to the console below. Either way, only
-// ever applies to an account that doesn't exist yet (see `if (existing)
-// continue` below) - re-running this against a DB that already has these
-// users is always a no-op for them, so it can never silently reset an
-// already-rotated production password.
+// since this repo is public - readable by anyone), and no generated ones
+// either: a password this script invented would have to be printed to the
+// console for anyone to use it, and a secret must never be written to a log.
+// So each account's initial password comes only from its env var, chosen by
+// whoever runs the seed; an account without one is skipped (and named, below)
+// instead of being created with a password nobody knows. Only ever applies to
+// an account that doesn't exist yet (see `if (existing) continue` below) -
+// re-running this against a DB that already has these users is always a no-op
+// for them, so it can never silently reset an already-rotated production
+// password. An admin can always set or reset a password later (README, "First
+// logins").
 async function seedUsers() {
   const defaultUsers = [
     { name: "System Administrator", username: "admin", role: "SUPERVISOR_ADMIN" as const, envVar: "SEED_ADMIN_PASSWORD" },
     { name: "Encoder", username: "encoder", role: "ENCODER" as const, envVar: "SEED_ENCODER_PASSWORD" },
   ];
 
-  const generated: { username: string; password: string }[] = [];
+  // Accounts left uncreated because their password setting was empty. Names only - never a secret.
+  const skipped: { username: string; envVar: string }[] = [];
 
   for (const u of defaultUsers) {
     const existing = await prisma.user.findUnique({ where: { username: u.username } });
     if (existing) continue;
 
-    const fromEnv = process.env[u.envVar]?.trim();
-    const password = fromEnv || randomPassword();
-    if (!fromEnv) generated.push({ username: u.username, password });
+    const password = process.env[u.envVar]?.trim();
+    if (!password) {
+      skipped.push({ username: u.username, envVar: u.envVar });
+      continue;
+    }
 
     const passwordHash = await hashPassword(password);
     // The password above is known to whoever ran the seed, so the first sign-in must replace it.
@@ -230,21 +229,17 @@ async function seedUsers() {
     });
   }
 
-  return generated;
+  return skipped;
 }
 
 async function main() {
   await seedProducts();
-  const generated = await seedUsers();
+  const skipped = await seedUsers();
   // eslint-disable-next-line no-console
-  console.log("Seed complete: product master list + default users loaded.");
-  if (generated.length > 0) {
+  console.log("Seed complete: product master list loaded" + (skipped.length > 0 ? "." : " + default users."));
+  for (const k of skipped) {
     // eslint-disable-next-line no-console
-    console.log("Generated one-time passwords for new accounts - shown only this once, write them down now:");
-    for (const g of generated) {
-      // eslint-disable-next-line no-console
-      console.log(`  ${g.username} / ${g.password}`);
-    }
+    console.log(`Account "${k.username}" was NOT created: set ${k.envVar} to the password you want it to start with, then run the seed again.`);
   }
 }
 

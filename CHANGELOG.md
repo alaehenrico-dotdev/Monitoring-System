@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **AI helpers (optional, Supervisor/Admin only; set `GEMINI_API_KEY` to turn on).** "Explain this variance" on the Audit page; an AI insights card on the Dashboard with "What changed?" (this period against the one before, numbers computed by the server and only narrated by the AI) and "Ask the data" (questions answered through a fixed set of read-only lookups, with the figures shown under each answer); and the header search takes questions too, with an AI-styled icon. Without a key none of it appears. When the AI cannot answer, a calm placeholder with Try again shows instead of an error, and the comparison figures still show. Settings: `GEMINI_API_KEY` (plus optional backups `GEMINI_API_KEY_2` / `GEMINI_API_KEY_3`, used only when the one before is rejected or out of quota), `GEMINI_MODEL`, `AI_RATE_LIMIT_MAX` (see `server/.env.example`).
+
+### Changed
+- **`npm run seed` no longer generates passwords.** It used to print a random one for any account without a `SEED_ADMIN_PASSWORD` / `SEED_ENCODER_PASSWORD`, which put a secret in the console log. Those two settings are now the only way to give the first accounts a password; an account without one is skipped and named. Nothing changes for deployments that already set them, and the seed still never touches an account that exists.
+- **Entry progress strip is a quiet single line** (count, a thin bar and a text "Next blank"), not a bordered box.
+
+### Security
+- **A server-wide daily cap on AI calls** (`AI_DAILY_CALL_LIMIT`, default 1000 per UTC day, 0 turns it off), on top of the per-person limit, so a misused account cannot run up the Google bill. At the cap the AI says so and the rest of the app is unaffected.
+- The API now sends a strict Content-Security-Policy (`default-src 'none'`; it only returns data, never pages), instead of having none.
+- Uploading an export to Google Drive checks that the file arrived as binary data before using its size.
+- The admin password re-check always verifies the password, whatever the request contained.
+
 ## 2.5.2 - 2026-11-13
 
 **Upgrading a running server:** run the normal deploy (it snapshots the database first). One new migration since 2.5.1, `20261112090000_rate_limit_hits`, adds the table the sign-in limiters keep their counts in. A new API route, `POST /auth/verify-password`, so the server and client need deploying together. No new settings.

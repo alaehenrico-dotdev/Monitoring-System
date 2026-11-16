@@ -148,3 +148,16 @@ describe("Ask the data", () => {
     expect(screen.queryByText("Try again")).toBeNull();
   });
 });
+
+describe("a Google usage limit", () => {
+  it("shows the calm placeholder with where to look as a detail line, and still offers Try again", async () => {
+    api.askData.mockRejectedValue(new Error("The AI has reached its Google usage limit for now. Try again in a minute; if it keeps happening, check the key's quota and billing in Google AI Studio."));
+    render(<DashboardAiCard />);
+    fireEvent.change(await screen.findByLabelText("Your question"), { target: { value: "What needs attention?" } });
+    fireEvent.click(screen.getByText("Ask"));
+    const note = await screen.findByRole("status");
+    expect(note.textContent).toContain("The AI isn't available right now");
+    expect(note.textContent).toContain("quota and billing in Google AI Studio");
+    expect(screen.getByText("Try again")).toBeTruthy();
+  });
+});

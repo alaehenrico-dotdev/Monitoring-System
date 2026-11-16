@@ -2097,7 +2097,6 @@
 .ae-typing-input { position: absolute; opacity: 0; width: 1px; height: 1px; pointer-events: none; }
 .ae-typing-stats { display: flex; gap: 18px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .ae-typing-stats span { transition: color 150ms; }
-.ae-typing-stats--done span { color: var(--tp-gold); animation: ae-typing-pop 380ms cubic-bezier(0.2, 0.9, 0.3, 1.5); }
 .ae-typing-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--ae-text-muted); }
 .ae-typing-restart {
   padding: 5px 14px; font: inherit; color: var(--ae-text); cursor: pointer;
@@ -2141,8 +2140,13 @@
 @keyframes ae-kbd-miss { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
 @media (max-width: 800px) { .ae-kbd-key { height: 30px; font-size: 10px; } }
 @media (prefers-reduced-motion: reduce) {
-  .ae-typing-float, .ae-typing-float--shake, .ae-typing-ch--cur, .ae-kbd-key, .ae-kbd-key--next, .ae-kbd-key--bad,
-  .ae-typing-stats--done span, .ae-kbd-key--down::after { animation: none; transition: none; }
+  .ae-typing-float,
+  .ae-typing-float--shake,
+  .ae-typing-ch--cur,
+  .ae-kbd-key,
+  .ae-kbd-key--next,
+  .ae-kbd-key--bad,
+  .ae-kbd-key--down::after { animation: none; transition: none; }
   .ae-kbd-key--down { transform: none; }
 }
 

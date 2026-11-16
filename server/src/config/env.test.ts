@@ -112,3 +112,36 @@ describe("env - CLIENT_ORIGIN", () => {
     await expect(import("./env.js")).rejects.toThrow(/must not end with a slash/);
   });
 });
+
+describe("env - Gemini keys", () => {
+  const GEMINI = ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"];
+  beforeEach(() => {
+    for (const n of GEMINI) delete process.env[n];
+  });
+
+  it("reads the main key and up to two backups, in order", async () => {
+    Object.assign(process.env, { GEMINI_API_KEY: "  main  ", GEMINI_API_KEY_2: "second", GEMINI_API_KEY_3: "third" });
+    const { env } = await import("./env.js");
+    expect(env.geminiApiKeys).toEqual(["main", "second", "third"]);
+    expect(env.geminiApiKey).toBe("main");
+  });
+
+  it("skips blank keys and counts a repeated key once", async () => {
+    Object.assign(process.env, { GEMINI_API_KEY: "same", GEMINI_API_KEY_2: "   ", GEMINI_API_KEY_3: "same" });
+    const { env } = await import("./env.js");
+    expect(env.geminiApiKeys).toEqual(["same"]);
+  });
+
+  it("uses a backup as the first key if the main one is not set", async () => {
+    Object.assign(process.env, { GEMINI_API_KEY_2: "backup-only" });
+    const { env } = await import("./env.js");
+    expect(env.geminiApiKeys).toEqual(["backup-only"]);
+    expect(env.geminiApiKey).toBe("backup-only");
+  });
+
+  it("is simply off with no keys", async () => {
+    const { env } = await import("./env.js");
+    expect(env.geminiApiKeys).toEqual([]);
+    expect(env.geminiApiKey).toBe("");
+  });
+});

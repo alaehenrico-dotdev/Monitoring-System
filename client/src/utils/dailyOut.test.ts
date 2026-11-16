@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DailyOutEntry } from "../api/dailyOut";
-import { DAILY_OUT_SERIES, dailyOutCsv, dailyOutFlowPoints, dailyOutPoints, dailyOutTotals } from "./dailyOut";
+import { DAILY_OUT_SERIES, dailyOutCsv, dailyOutFlowPoints, dailyOutTotals } from "./dailyOut";
 
 const day = (date: string, onlineOut: number | null, offlineOut: number | null, onlineRts: number | null = null, offlineBackloads: number | null = null): DailyOutEntry => ({
   date,
@@ -12,30 +12,6 @@ const day = (date: string, onlineOut: number | null, offlineOut: number | null, 
 });
 
 const ROWS = [day("2026-10-01", 120, 80, 5, 20), day("2026-10-02", null, null), day("2026-10-03", 50, null, 2, null)];
-
-describe("dailyOutPoints", () => {
-  const points = dailyOutPoints(ROWS, "2026-10-03");
-
-  it("draws the combined figure as the bar and each pool as a line", () => {
-    expect(points[0]).toMatchObject({ bar: 200, online: 120, offline: 80 });
-  });
-
-  it("leaves a day with nothing recorded empty, not zero", () => {
-    expect(points[1]).toMatchObject({ bar: null, online: null, offline: null });
-    expect(points[1].tooltip.empty).toBe("No entries recorded");
-    expect(points[1].ariaLabel).toMatch(/No entries recorded/);
-  });
-
-  it("says which side is missing when only one pool has an entry", () => {
-    expect(points[2].tooltip.rows?.map((r) => r.label)).toEqual(["Combined out", "Online out"]);
-    expect(points[2].tooltip.footer?.text).toBe("No Offline entry that day");
-    expect(points[2].ariaLabel).toMatch(/Offline out: no entry/);
-  });
-
-  it("marks only today as current", () => {
-    expect(points.map((p) => p.current)).toEqual([false, false, true]);
-  });
-});
 
 describe("dailyOutFlowPoints", () => {
   const points = dailyOutFlowPoints(ROWS, "2026-10-03");

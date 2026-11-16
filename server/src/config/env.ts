@@ -134,6 +134,15 @@ function limitCount(name: string, fallback: number): number {
   return value;
 }
 
+/// The Gemini keys, in the order they are tried: GEMINI_API_KEY first, then the optional backups
+/// GEMINI_API_KEY_2 and GEMINI_API_KEY_3 (lib/gemini.ts moves on to the next only when one is rejected or out
+/// of quota). Blank ones are skipped and a key listed twice counts once.
+function geminiKeys(): string[] {
+  const names = ["GEMINI_API_KEY", "GEMINI_API_KEY_2", "GEMINI_API_KEY_3"];
+  const keys = names.map((n) => process.env[n]?.trim() ?? "").filter(Boolean);
+  return [...new Set(keys)];
+}
+
 function nonNegativeInt(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) return fallback;
@@ -244,13 +253,19 @@ export const env = {
   // services/aiExplain.service.ts). With no key the button answers "not set up" and
   // nothing else changes. The key is only ever read here, on the server - it is never
   // sent to the browser. Create it in Google AI Studio.
-  geminiApiKey: process.env.GEMINI_API_KEY?.trim() || "",
+  geminiApiKeys: geminiKeys(),
+  // The first (primary) key, for anything that only needs to know whether one exists.
+  geminiApiKey: geminiKeys()[0] ?? "",
   // Model id is configurable so a model retirement is an .env change, not a deploy (Google retired
   // gemini-2.5-flash for new keys, which is why this default moved). Avoid the *-latest aliases: they
   // can point at a slower model than the one tested here.
   geminiModel: process.env.GEMINI_MODEL?.trim() || "gemini-3.5-flash",
   // Explanations per signed-in user per 10 minutes - a cost backstop, not a UX limit.
   aiRateLimitMax: limitCount("AI_RATE_LIMIT_MAX", 20),
+  // Every model call this server makes in one UTC day, across all users (lib/gemini.ts). The per-user
+  // limit above stops one person hammering it; this stops the TOTAL - a stolen supervisor login, a
+  // runaway script - from running up the Google bill. In memory, so a restart resets it. 0 turns it off.
+  aiDailyCallLimit: nonNegativeInt("AI_DAILY_CALL_LIMIT", 1000),
   databaseUrl: required("DATABASE_URL"),
   // No fallback for either of these two: a default here would mean
   // `required()` never actually throws, so every token this app has ever

@@ -38,8 +38,3 @@ export function subscribeHandoff(fn: () => void): () => void {
     listeners.delete(fn);
   };
 }
-
-/// For tests.
-export function clearHandoffs(): void {
-  pending.clear();
-}

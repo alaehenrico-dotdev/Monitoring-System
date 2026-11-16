@@ -20,11 +20,15 @@ export interface AiFallback {
 
 /// The server words an admin-fixable problem as "... check GEMINI_API_KEY" / "... Ask an admin ...".
 const SETUP_PROBLEM = /GEMINI_|Ask an admin/;
+/// A usage limit is not a setup mistake and often clears in a minute, so it keeps Try again - but the
+/// message says where to look if it does not, so it is shown as the detail line.
+const USAGE_LIMIT = /usage limit/;
 
 export function aiFallback(err: unknown, placeholder: string): AiFallback {
   const message = err instanceof Error ? err.message : "";
   if (err instanceof ApiError && err.status === 400 && message) return { text: message, retry: false };
   if (SETUP_PROBLEM.test(message)) return { text: placeholder, detail: message, retry: false };
+  if (USAGE_LIMIT.test(message)) return { text: placeholder, detail: message, retry: true };
   return { text: placeholder, retry: true };
 }
 

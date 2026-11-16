@@ -133,6 +133,20 @@ describe("explainVariance", () => {
     await expect(run()).rejects.toMatchObject({ message: "The AI service could not answer that." });
   });
 
+  it("says a Google usage limit is a usage limit (not 'busy'), keeps the metric in the log, and never the key", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const longMessage = "You exceeded your current quota. " + "x".repeat(400) + " Quota exceeded for metric: generate_content_free_tier_requests, limit: 5";
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: { status: "RESOURCE_EXHAUSTED", message: longMessage } }) }));
+    await expect(explainVariance(1, new Date(), "NIGHT" as never, "ONLINE")).rejects.toMatchObject({
+      status: 502,
+      message: expect.stringContaining("usage limit"),
+    });
+    const line = String(log.mock.calls.at(-1)?.[0]);
+    expect(line).toContain("RESOURCE_EXHAUSTED");
+    expect(line).toContain("limit: 5");
+    expect(line).not.toContain("test-key");
+  });
+
   it("maps a network failure/timeout to a 502", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("timeout")));

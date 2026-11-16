@@ -85,7 +85,10 @@ services:
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
       # Optional: AI "Explain this variance" on the Audit page. Empty key = feature off.
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_API_KEY_2: ${GEMINI_API_KEY_2:-}
+      GEMINI_API_KEY_3: ${GEMINI_API_KEY_3:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      AI_DAILY_CALL_LIMIT: ${AI_DAILY_CALL_LIMIT:-1000}
     # Snapshots taken before pending migrations are applied (server/docker/start.sh).
     volumes:
       - api_backups:/backups

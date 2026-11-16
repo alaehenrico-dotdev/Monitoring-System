@@ -150,9 +150,11 @@ npm run lint    # one shared ESLint flat config (eslint.config.mjs) for server +
 ### First logins (seeded)
 
 `npm run seed` creates two accounts: `admin` (Admin) and `encoder` (Encoder).
-There are no fixed default passwords: each is taken from `SEED_ADMIN_PASSWORD` / `SEED_ENCODER_PASSWORD`
-if set, otherwise a random one is generated and printed once at the end of the seed.
-Whichever it was, each account must choose its own password (10+ characters, nothing common) the first time it signs in.
+There are no default passwords, and the seed never invents or prints one: each account starts with the password you
+give in `SEED_ADMIN_PASSWORD` / `SEED_ENCODER_PASSWORD` (for example
+`SEED_ADMIN_PASSWORD='a-long-passphrase' SEED_ENCODER_PASSWORD='another-one' npm run seed`). An account whose setting
+is empty is not created; the seed names it and what to set, and you run it again.
+Each account must choose its own password (10+ characters, nothing common) the first time it signs in.
 Administrators should then turn on two-step verification under Settings > My Account.
 
 **Someone forgot their password?** There is no email in this system. An administrator opens Settings > User Passwords, clicks **Reset code** for that person and gives them the code (one use, 30 minutes). The person clicks **Forgot password?** on the login page and enters their username, the code and a new password. If nobody can sign in as an administrator (the only admin forgot their password), run this on the server: `docker compose exec api node dist/cli/resetPassword.js <username>` (it asks for the new password; their other sessions are signed out and they choose their own at next sign-in). If that admin also lost their phone, `docker compose exec api node dist/cli/resetMfa.js <username>` turns two-step off. Without Docker (the PM2 VPS setup), run `npm run reset-password -- <username>` / `npm run reset-mfa -- <username>` in `server/`. An administrator can also set a temporary password directly with **Set password** on the same page. Deployments upgraded from before 2.5.0 may have `online.encoder` and `offline.encoder` instead of `encoder`; both are Encoders and can be given the same temporary password (each person then chooses their own at sign-in). It is a good idea to keep two administrator accounts.
