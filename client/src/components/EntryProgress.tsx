@@ -75,37 +75,34 @@ export function EntryProgress({
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12,
+        gap: 10,
         flexWrap: "wrap",
-        margin: "0 0 10px",
-        padding: "6px 10px",
-        border: `1px solid ${colors.border}`,
-        borderRadius: 6,
-        background: colors.paperAlt,
-        fontSize: "calc(12.5px * var(--ae-fs, 1))",
-        color: colors.ink,
+        margin: "0 0 6px",
+        padding: "0 2px",
+        fontSize: "calc(12px * var(--ae-fs, 1))",
+        color: colors.subtleInk,
       }}
     >
       <span>
-        <strong>{progress.done}</strong> of {progress.total} products entered
-        {complete ? " - all done" : ` - ${progress.blank.length} left`}
+        <span style={{ color: colors.ink, fontWeight: 600 }}>{progress.done}</span> / {progress.total} entered
+        {complete ? " · all done" : ` · ${progress.blank.length} left`}
       </span>
       <span
         aria-hidden="true"
-        style={{ flex: "1 1 80px", maxWidth: 220, height: 6, borderRadius: 3, background: colors.border, overflow: "hidden" }}
+        style={{ flex: "1 1 80px", maxWidth: 160, height: 2, borderRadius: 1, background: colors.border, overflow: "hidden" }}
       >
         <span style={{ display: "block", width: `${percent}%`, height: "100%", background: colors.green, transition: "width 160ms ease-out" }} />
       </span>
       {!complete && (
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
           size="sm"
           onClick={jump}
           disabled={reachable.blank.length === 0}
           title={reachable.blank.length === 0 ? "The products left are hidden by the search or category filter" : "Jump to the next product not entered yet (Alt+N)"}
         >
-          Next blank (Alt+N)
+          Next blank <span style={{ opacity: 0.6, marginLeft: 4 }}>Alt+N</span>
         </Button>
       )}
     </div>

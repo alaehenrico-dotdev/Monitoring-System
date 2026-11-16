@@ -1862,6 +1862,7 @@ export function ManualCountPage() {
           shift={shift}
           locations={visibleLocations}
           canEdit
+          canExplain={canPublish}
           onClose={() => setDetailsProductId(null)}
           onRemarksSaved={(loc, remarks) =>
             setGridRows((prev) =>

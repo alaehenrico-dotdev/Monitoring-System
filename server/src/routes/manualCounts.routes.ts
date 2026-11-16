@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
-import { getAuditSnapshotHandler, getAuditSnapshotStatesHandler, postRevertSnapshot, getManualCounts, getTrace, getVarianceReportHandler, patchCountRemarks, postPublish, putManualCount } from "../controllers/manualCounts.controller";
+import { aiLimiter } from "../middleware/rateLimit";
+import { getAuditSnapshotHandler, getAuditSnapshotStatesHandler, postRevertSnapshot, getManualCounts, getTrace, postExplain, getVarianceReportHandler, patchCountRemarks, postPublish, putManualCount } from "../controllers/manualCounts.controller";
 
 const router = Router();
 
@@ -9,6 +10,8 @@ router.get("/", authenticate, asyncHandler(getManualCounts));
 router.get("/variance-report", authenticate, asyncHandler(getVarianceReportHandler));
 // Who/when/what behind one count's variance (read-only, same audience as the grid).
 router.get("/trace", authenticate, asyncHandler(getTrace));
+// "Explain this variance" (AI). Supervisor/Admin only, and rate-limited per user: every call is a paid API request.
+router.post("/explain", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), aiLimiter, asyncHandler(postExplain));
 // A published audit as it was released - what Audit History reopens (same audience as the grid).
 // (before /:id so "states" is not read as an id)
 router.get("/snapshots/states", authenticate, asyncHandler(getAuditSnapshotStatesHandler));

@@ -83,6 +83,9 @@ services:
       # Optional: encrypts every backup the API writes (download, Drive, pre-migration
       # snapshots). Empty = plain backups. Generate: openssl rand -base64 32
       BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+      # Optional: AI "Explain this variance" on the Audit page. Empty key = feature off.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
     # Snapshots taken before pending migrations are applied (server/docker/start.sh).
     volumes:
       - api_backups:/backups

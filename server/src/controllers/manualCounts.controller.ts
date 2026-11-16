@@ -4,6 +4,7 @@ import { StockLocation } from "@prisma/client";
 import { parseDateOnly } from "../utils/date";
 import { parseShift } from "../utils/shift";
 import { HttpError } from "../utils/HttpError";
+import { explainVariance } from "../services/aiExplain.service";
 import {
   MAX_REMARKS_LENGTH,
   deleteManualCount,
@@ -103,6 +104,13 @@ export async function getTrace(req: Request, res: Response) {
   const { productId, entryDate, shift, location } = countKey(req);
   if (location === "TOTAL") throw HttpError.badRequest("A trace is per location - choose ONLINE or OFFLINE");
   res.json(await getVarianceTrace(productId, entryDate, shift, location));
+}
+
+/// POST /manual-counts/explain - a plain-language explanation of one count's variance (AI, read-only).
+export async function postExplain(req: Request, res: Response) {
+  const { productId, entryDate, shift, location } = countKey(req);
+  if (location === "TOTAL") throw HttpError.badRequest("An explanation is per location - choose ONLINE or OFFLINE");
+  res.json(await explainVariance(productId, entryDate, shift, location));
 }
 
 /// GET /manual-counts/snapshots/:id - a published audit as it was released.

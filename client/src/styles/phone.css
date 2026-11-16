@@ -93,6 +93,16 @@
   display: none;
 }
 
+/* The AI search button (components/HeaderExtras.tsx) at touch size. */
+:root:root:root[data-phone="true"] .ae-header-search-btn--ai {
+  width: 40px;
+  height: 40px;
+}
+:root:root:root[data-phone="true"] .ae-header-search-btn--ai .ae-ai-search-icon {
+  width: 26px;
+  height: 26px;
+}
+
 /* The toolbar, on its own full-width line. */
 :root:root:root[data-phone="true"] .ae-page-header-collapsible--toolbar {
   order: 4;
@@ -1116,6 +1126,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 11px;
+}
+/* The AI's answer in the phone search (components/QuickJump.tsx): comfortable reading size, and it
+   scrolls inside the sheet like the result list does. The underline and "Ask AI" row need nothing
+   more - they are the same classes as on the desktop. */
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-ai {
+  padding: 14px;
+  font-size: 14px;
+  overscroll-behavior: contain;
+}
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-ai-q {
+  font-size: 12px;
+}
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-ai-src,
+:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-ai-note {
+  font-size: 11.5px;
 }
 :root:root:root[data-phone="true"] .ae-quickjump-item-detail {
   display: block;

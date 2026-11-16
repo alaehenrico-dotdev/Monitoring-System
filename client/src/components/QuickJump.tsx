@@ -4,6 +4,11 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { useAiAvailable } from "../hooks/useAiAvailable";
+import { askData } from "../api/ai";
+import { SparklesIcon } from "./icons";
+import { questionFirst, sourcesLine } from "../utils/aiSources";
+import { AI_PLACEHOLDER, aiFallback } from "../utils/aiFallback";
 import { listProducts, PRODUCTS_CHANGED_EVENT } from "../api/products";
 import { getTotalStocks } from "../api/totalStocks";
 import {
@@ -75,7 +80,21 @@ function loadStocks(date: string): Promise<ReadonlyMap<number, TotalStockRow> | 
 }
 
 /// A result of either search: the desktop launcher's (pages and products) or the phone's.
-type Result = QuickJumpResult | PhoneSearchResult;
+/// The "Ask AI" row (Supervisor/Admin, server has a key). Choosing it asks the question in place.
+interface AiResult {
+  kind: "ai";
+  id: string;
+  label: string;
+  hint: string;
+}
+type Result = QuickJumpResult | PhoneSearchResult | AiResult;
+
+/// The AI answer shown inside the palette instead of the result list.
+type AiState = { question: string } & (
+  | { status: "loading" }
+  | { status: "done"; answer: string; sources: { tool: string; args: Record<string, unknown> }[] }
+  | { status: "error"; text: string; detail?: string; retry: boolean }
+);
 
 /// Which ribbon group a page sits in, for the row's right-hand hint.
 function groupOf(page: NavLinkDef): string {
@@ -115,6 +134,11 @@ export function QuickJump() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isPhone = useReadOnlyPhone();
+  // AI: the "Ask AI" row, and the answer that replaces the list once it is asked. aiReq numbers each
+  // question so a late answer to one the person has since edited away is dropped.
+  const aiOn = useAiAvailable();
+  const [ai, setAi] = useState<AiState | null>(null);
+  const aiReq = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -127,6 +151,8 @@ export function QuickJump() {
     setOpen(false);
     setQuery("");
     setActive(0);
+    aiReq.current++;
+    setAi(null);
     returnFocusRef.current?.focus();
   }, []);
 
@@ -147,6 +173,8 @@ export function QuickJump() {
       });
       setQuery("");
       setActive(0);
+      aiReq.current++;
+      setAi(null);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -161,6 +189,8 @@ export function QuickJump() {
           : null;
       setQuery("");
       setActive(0);
+      aiReq.current++;
+      setAi(null);
       setOpen(true);
     }
     window.addEventListener(QUICK_JUMP_OPEN_EVENT, onOpen);
@@ -195,13 +225,17 @@ export function QuickJump() {
   // Filtering a few hundred rows is a sub-millisecond string scan, so there
   // is nothing here worth debouncing - a debounce would only add latency to
   // the keystroke it is meant to protect.
-  const results = useMemo<Result[]>(
-    () =>
-      phone
-        ? rankPhoneSearch(query, { pages, groupOf, settings, products, stocks, today: getCurrentShiftAndDate().date, theme })
-        : rankQuickJump(query, pages, products, groupOf),
-    [phone, query, pages, settings, products, stocks, theme],
-  );
+  const results = useMemo<Result[]>(() => {
+    const base: Result[] = phone
+      ? rankPhoneSearch(query, { pages, groupOf, settings, products, stocks, today: getCurrentShiftAndDate().date, theme })
+      : rankQuickJump(query, pages, products, groupOf);
+    const q = query.trim();
+    if (!aiOn || q.length < 3) return base;
+    const row: AiResult = { kind: "ai", id: "ai-ask", label: `Ask AI: ${q}`, hint: "AI" };
+    // A question goes first (Enter asks it); anything else goes last, so Enter still jumps to the
+    // best page or product exactly as it always did.
+    return questionFirst(q) ? [row, ...base] : [...base, row];
+  }, [phone, query, pages, settings, products, stocks, theme, aiOn]);
 
   // A narrowing query can leave the cursor past the end of the list.
   const clampedActive = Math.min(active, Math.max(results.length - 1, 0));
@@ -214,7 +248,27 @@ export function QuickJump() {
       ?.scrollIntoView({ block: "nearest" });
   }, [clampedActive, open, results.length]);
 
+  function askAi(question: string) {
+    const text = question.trim();
+    if (!aiOn || text.length < 3) return;
+    const id = ++aiReq.current;
+    setAi({ question: text, status: "loading" });
+    askData(text).then(
+      (r) => {
+        if (id === aiReq.current) setAi({ question: text, status: "done", answer: r.answer, sources: r.sources });
+      },
+      (e: unknown) => {
+        if (id === aiReq.current) setAi({ question: text, status: "error", ...aiFallback(e, AI_PLACEHOLDER.search) });
+      },
+    );
+  }
+
   function choose(result: Result) {
+    // Asking keeps the palette open: the answer appears in it.
+    if (result.kind === "ai") {
+      askAi(query);
+      return;
+    }
     close();
     if (result.kind === "action") {
       toggleTheme();
@@ -269,6 +323,12 @@ export function QuickJump() {
     }
     if (e.key === "Enter") {
       e.preventDefault();
+      // Ctrl/Cmd+Enter asks the AI whatever was typed; plain Enter leaves a shown answer alone.
+      if (e.ctrlKey || e.metaKey) {
+        askAi(query);
+        return;
+      }
+      if (ai) return;
       const hit = results[clampedActive];
       if (hit) choose(hit);
     }
@@ -287,7 +347,7 @@ export function QuickJump() {
     >
       <div
         ref={panelRef}
-        className={phone ? "ae-quickjump ae-quickjump--phone" : "ae-quickjump"}
+        className={`ae-quickjump${phone ? " ae-quickjump--phone" : ""}${aiOn ? " ae-quickjump--ai" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={phone ? "Search" : "Quick jump"}
@@ -306,7 +366,15 @@ export function QuickJump() {
               : undefined
           }
           aria-label={phone ? "Search the whole system" : "Search pages and products"}
-          placeholder={phone ? "Product, SKU, page, date, setting…" : "Jump to a page or product…"}
+          placeholder={
+            phone
+              ? aiOn
+                ? "Search, or ask a question…"
+                : "Product, SKU, page, date, setting…"
+              : aiOn
+                ? "Jump to a page or product, or ask a question…"
+                : "Jump to a page or product…"
+          }
           // Phone keyboards: no capital first letter or "corrections" of a SKU, and a Search key.
           autoCapitalize="none"
           autoCorrect="off"
@@ -316,9 +384,43 @@ export function QuickJump() {
           onChange={(e) => {
             setQuery(e.target.value);
             setActive(0);
+            // Editing the text goes back to searching.
+            aiReq.current++;
+            setAi(null);
           }}
           onKeyDown={onKeyDown}
         />
+        {ai ? (
+          <div className="ae-quickjump-ai" role="status" aria-live="polite">
+            <div className="ae-quickjump-ai-q">{ai.question}</div>
+            {ai.status === "loading" && <div className="ae-quickjump-ai-a ae-quickjump-ai-thinking">Thinking…</div>}
+            {/* Not an error as far as the person is concerned: a calm note, and the search still works. */}
+            {ai.status === "error" && (
+              <div className="ae-quickjump-ai-a ae-quickjump-ai-soft">
+                {ai.text}
+                {ai.detail && <div className="ae-quickjump-ai-note">{ai.detail}</div>}
+                {ai.retry && (
+                  <button
+                    type="button"
+                    className="ae-quickjump-ai-retry"
+                    // Keeps focus in the input, so Escape still closes the palette.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => askAi(ai.question)}
+                  >
+                    Try again
+                  </button>
+                )}
+              </div>
+            )}
+            {ai.status === "done" && (
+              <>
+                <div className="ae-quickjump-ai-a">{ai.answer}</div>
+                {ai.sources.length > 0 && <div className="ae-quickjump-ai-src">Based on {sourcesLine(ai.sources)}</div>}
+                <div className="ae-quickjump-ai-note">AI-written from your figures - check the numbers. Edit the text to search again.</div>
+              </>
+            )}
+          </div>
+        ) : (
         <div
           ref={listRef}
           id={listId}
@@ -345,7 +447,7 @@ export function QuickJump() {
                 role="option"
                 aria-selected={i === clampedActive}
                 data-qj-active={i === clampedActive}
-                className={`ae-quickjump-item${i === clampedActive ? " ae-quickjump-item--active" : ""}`}
+                className={`ae-quickjump-item${i === clampedActive ? " ae-quickjump-item--active" : ""}${r.kind === "ai" ? " ae-quickjump-item--ai" : ""}`}
                 // Mouse down would close the palette via the overlay handler
                 // before the click ever lands.
                 onMouseDown={(e) => e.preventDefault()}
@@ -353,6 +455,11 @@ export function QuickJump() {
                 onClick={() => choose(r)}
               >
                 <span className="ae-quickjump-item-label">
+                  {r.kind === "ai" && (
+                    <span className="ae-quickjump-ai-icon">
+                      <SparklesIcon />
+                    </span>
+                  )}
                   {r.label}
                   {"detail" in r && r.detail && <span className="ae-quickjump-item-detail">{r.detail}</span>}
                 </span>
@@ -362,6 +469,7 @@ export function QuickJump() {
             ))
           )}
         </div>
+        )}
       </div>
     </div>,
     document.body,

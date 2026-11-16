@@ -9,6 +9,7 @@ import { formatRelativeTime } from "../utils/dateFormat";
 import { StatCardsSkeleton, TableSkeleton } from "../components/Skeleton";
 import { StockFlowChart } from "../components/StockFlowChart";
 import { PeriodMonitoringCard } from "../components/PeriodMonitoringCard";
+import { DashboardAiCard } from "../components/DashboardAiCard";
 import {
   EntryStatusCard,
   LowStockCard,
@@ -393,6 +394,9 @@ export function DashboardPage() {
         <LowestDaysLeftCard rows={daysOfStock} failed={daysOfStockFailed} />
         <NeedsRestockCard rows={daysOfStock} failed={daysOfStockFailed} />
       </div>
+
+      {/* Hidden unless the server has AI set up (GEMINI_API_KEY). Supervisor-only like the page. */}
+      <DashboardAiCard />
 
       <div className="ae-dash-quicklinks" aria-label="Quick links">
         {QUICK_LINKS.map((l) => (

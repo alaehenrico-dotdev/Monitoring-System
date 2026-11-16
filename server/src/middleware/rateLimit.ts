@@ -138,3 +138,20 @@ export const passcodeLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: "Too many attempts - please wait a few minutes and try again." },
 });
+
+/// Cost backstop for the AI helper (services/aiExplain.service.ts): each call is a paid Google
+/// request, so it is capped per signed-in user (not per IP - the office shares one). In memory is
+/// fine: a restart only resets a counter that exists to limit spend.
+const aiLimit = () =>
+  rateLimit({
+    windowMs: 10 * 60 * 1000,
+    limit: env.aiRateLimitMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many AI requests - please wait a few minutes and try again." },
+    keyGenerator: (req: Request) => (req.user ? `user:${req.user.id}` : ipKeyGenerator(req.ip ?? "")),
+  });
+/// One bucket per feature, so a burst of questions does not use up the explain button's allowance.
+export const aiLimiter = aiLimit();
+export const aiAskLimiter = aiLimit();
+export const aiChangesLimiter = aiLimit();

@@ -1,9 +1,10 @@
 import { LiveClock } from "./LiveClock";
 import { openQuickJump } from "./QuickJump";
-import { SearchIcon } from "./icons";
+import { AiSearchIcon, SearchIcon } from "./icons";
 import { ThemeToggle } from "./ThemeToggle";
 import { TypingPractice } from "./TypingPractice";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { useAiAvailable } from "../hooks/useAiAvailable";
 
 /// Clock + dark-mode toggle, sitting at the right end of the header's title
 /// row (PageHeader.tsx) so they're vertically centered on the h2, rather than sitting among that page's own toolbar
@@ -17,6 +18,9 @@ import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 export function HeaderExtras() {
   // Typing practice is a keyboard exercise: desktop only, never on the phone view.
   const phone = useReadOnlyPhone();
+  // Supervisor/Admin on a server with an AI key: the same button, AI-styled, and the palette it opens
+  // also takes questions. Everyone else gets the plain search icon.
+  const ai = useAiAvailable();
   return (
     <span
       className="no-print ae-page-header-extras"
@@ -31,12 +35,12 @@ export function HeaderExtras() {
           the fast path; this is what makes the feature discoverable at all. */}
       <button
         type="button"
-        className="ae-header-search-btn"
+        className={ai ? "ae-header-search-btn ae-header-search-btn--ai" : "ae-header-search-btn"}
         onClick={openQuickJump}
-        aria-label="Quick jump to a page or product (Ctrl+K)"
-        title="Jump to a page or product (Ctrl+K)"
+        aria-label={ai ? "Search pages and products, or ask AI (Ctrl+K)" : "Quick jump to a page or product (Ctrl+K)"}
+        title={ai ? "Search, or ask AI a question (Ctrl+K)" : "Jump to a page or product (Ctrl+K)"}
       >
-        <SearchIcon />
+        {ai ? <AiSearchIcon /> : <SearchIcon />}
       </button>
       {!phone && <TypingPractice />}
       <LiveClock />

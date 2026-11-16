@@ -5,6 +5,8 @@ import type { VarianceTrace } from "../api/manualCounts";
 
 const api = vi.hoisted(() => ({ getVarianceTrace: vi.fn(), setCountRemarks: vi.fn() }));
 vi.mock("../api/manualCounts", () => api);
+const ai = vi.hoisted(() => ({ explainVariance: vi.fn() }));
+vi.mock("../api/ai", () => ai);
 
 const trace = (over: Partial<VarianceTrace> = {}): VarianceTrace => ({
   product: { id: 5, sku: "AFP007", name: "Soy Sauce 1L" },
@@ -117,5 +119,45 @@ describe("VarianceDetails", () => {
     open();
     expect(await screen.findByText(/Published .* final for reporting/)).toBeTruthy();
     expect(screen.queryByText(/Not published yet/)).toBeNull();
+  });
+});
+
+describe("VarianceDetails - Explain this variance (AI)", () => {
+  const openExplain = (canExplain: boolean) =>
+    render(
+      <VarianceDetails productId={5} productName="Soy Sauce 1L" sku="AFP007" date="2026-10-09" shift="NIGHT" locations={["ONLINE"]} canEdit canExplain={canExplain} onClose={vi.fn()} />,
+    );
+
+  it("is hidden unless the viewer may use it", async () => {
+    openExplain(false);
+    await screen.findByText(/variance 5/);
+    expect(screen.queryByText("Explain this variance")).toBeNull();
+  });
+
+  it("is hidden when there is no variance to explain", async () => {
+    api.getVarianceTrace.mockResolvedValue(trace({ count: { ...trace().count!, variance: 0 } }));
+    openExplain(true);
+    await screen.findByText(/variance 0/);
+    expect(screen.queryByText("Explain this variance")).toBeNull();
+  });
+
+  it("asks only on click and shows the answer as text with a check-it note", async () => {
+    ai.explainVariance.mockResolvedValue({ explanation: "Over by 5 because of a late edit.", model: "m" });
+    openExplain(true);
+    const button = await screen.findByText("Explain this variance");
+    expect(ai.explainVariance).not.toHaveBeenCalled();
+    fireEvent.click(button);
+    expect(await screen.findByText("Over by 5 because of a late edit.")).toBeTruthy();
+    expect(ai.explainVariance).toHaveBeenCalledWith(5, "2026-10-09", "NIGHT", "ONLINE");
+    expect(screen.getByText(/check it before acting/)).toBeTruthy();
+  });
+
+  it("shows a calm placeholder when the AI cannot answer, and the button becomes Try again", async () => {
+    ai.explainVariance.mockRejectedValue(new Error("The AI service did not respond. Try again in a moment."));
+    openExplain(true);
+    fireEvent.click(await screen.findByText("Explain this variance"));
+    expect((await screen.findByRole("status")).textContent).toContain("An explanation isn't available right now");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByText("Try again")).toBeTruthy();
   });
 });

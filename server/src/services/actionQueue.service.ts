@@ -17,7 +17,7 @@ const LOCAL_UTC_OFFSET_HOURS = 8;
 type ShiftName = "MORNING" | "NIGHT";
 const SHIFTS: ShiftName[] = ["MORNING", "NIGHT"];
 
-function localToday(now: Date): Date {
+export function localToday(now: Date): Date {
   const local = new Date(now.getTime() + LOCAL_UTC_OFFSET_HOURS * 3_600_000);
   return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()));
 }

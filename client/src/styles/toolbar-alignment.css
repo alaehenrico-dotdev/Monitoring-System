@@ -679,6 +679,145 @@
   transform: scale(0.92);
 }
 
+/* AI-styled search, after Google's AI search. Two small touches and nothing else: the header
+   icon itself is drawn in the AI colours (components/icons.tsx AiSearchIcon), and the palette's
+   input gets a thin underline in the same four colours (blue, red, yellow, green) that flows
+   slowly from left to right. No border, ring or glow around anything. Both stop with reduced
+   motion. */
+@keyframes ae-ai-flow {
+  to {
+    background-position-x: 320px;
+  }
+}
+@keyframes ae-ai-twinkle {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(0.88);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+/* Sized in CSS so it follows the app's text-size setting (--ae-fs) like the rest of the header, and
+   drawn big enough to carry the same visual weight as the clock and theme toggle beside it - the
+   plain magnifier is 24px, this is 30px with a 21px drawing. Touch screens get a full-size target
+   (below), which is also where the phone view lands. */
+.ae-ai-search-icon {
+  display: block;
+  overflow: visible;
+  width: calc(21px * var(--ae-fs, 1));
+  height: calc(21px * var(--ae-fs, 1));
+}
+.ae-ai-spark {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ae-ai-twinkle 3.8s ease-in-out infinite;
+}
+/* The icon carries its own colour, so it should not be dimmed like the plain one. */
+.ae-header-search-btn--ai {
+  opacity: 1;
+  width: calc(30px * var(--ae-fs, 1));
+  height: calc(30px * var(--ae-fs, 1));
+  flex-shrink: 0;
+}
+@media (pointer: coarse) {
+  .ae-header-search-btn--ai {
+    width: 40px;
+    height: 40px;
+  }
+  .ae-ai-search-icon {
+    width: 26px;
+    height: 26px;
+  }
+}
+.ae-header-search-btn--ai:hover .ae-ai-search-icon,
+.ae-header-search-btn--ai:focus-visible .ae-ai-search-icon {
+  filter: drop-shadow(0 0 2px rgba(251, 188, 4, 0.55));
+}
+/* The underline is the input's own background, painted over its (transparent) bottom border and
+   tiled every 320px - the gradient starts and ends on blue, so the slide loops without a seam.
+   Soft while idle, full strength while typing. */
+.ae-quickjump--ai .ae-quickjump-input {
+  border-bottom: 2px solid transparent;
+  background-image: linear-gradient(
+    90deg,
+    rgba(66, 133, 244, 0.55),
+    rgba(234, 67, 53, 0.55),
+    rgba(251, 188, 4, 0.55),
+    rgba(52, 168, 83, 0.55),
+    rgba(66, 133, 244, 0.55)
+  );
+  background-size: 320px 2px;
+  background-repeat: repeat-x;
+  background-position: 0 100%;
+  background-origin: border-box;
+  background-clip: border-box;
+  animation: ae-ai-flow 8s linear infinite;
+}
+.ae-quickjump--ai .ae-quickjump-input:focus-visible {
+  box-shadow: none;
+  background-image: linear-gradient(90deg, #4285f4, #ea4335, #fbbc04, #34a853, #4285f4);
+}
+
+/* "Ask AI" row and the answer, inside the quick-jump panel (components/QuickJump.tsx). The panel
+   is dark in both colour modes, so these use its own fixed greys and the gold accent. */
+.ae-quickjump-ai-icon {
+  display: inline-flex;
+  margin-right: 6px;
+  vertical-align: -2px;
+}
+.ae-quickjump-ai {
+  overflow-y: auto;
+  padding: 12px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  line-height: 1.5;
+}
+.ae-quickjump-ai-q {
+  color: #8f8f8f;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+}
+.ae-quickjump-ai-a {
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+.ae-quickjump-ai-thinking {
+  color: #8f8f8f;
+  animation: ae-ai-breathe 1.6s ease-in-out infinite;
+}
+@keyframes ae-ai-breathe {
+  50% {
+    opacity: 0.45;
+  }
+}
+/* The AI could not answer: a quiet note in the panel's normal text colour (never red) and a plain
+   text button to try again. */
+.ae-quickjump-ai-soft {
+  color: #cfcfcf;
+}
+.ae-quickjump-ai-retry {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  font: inherit;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: #f5c000;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ae-quickjump-ai-retry:hover,
+.ae-quickjump-ai-retry:focus-visible {
+  text-decoration: underline;
+}
+.ae-quickjump-ai-src,
+.ae-quickjump-ai-note {
+  margin-top: 8px;
+  color: #8f8f8f;
+  font-size: calc(11px * var(--ae-fs, 1));
+}
+
 /* "Copy previous" popover (components/CopyPreviousButton.tsx). Inherits the
    whole panel treatment from .ae-col-menu - this only adds the row/action
    layout the column menu has no need for. */
@@ -851,8 +990,15 @@
    `animation: ... both` otherwise holds them at the keyframe's opacity: 0. */
 @media (prefers-reduced-motion: reduce) {
   .ae-quickjump,
-  .ae-cell-history-row {
+  .ae-cell-history-row,
+  .ae-ai-spark,
+  .ae-quickjump--ai .ae-quickjump-input,
+  .ae-quickjump-ai-thinking {
     animation: none;
+  }
+  .ae-ai-spark {
+    opacity: 0.9;
+    transform: none;
   }
   .ae-cell-history-row {
     opacity: 1;

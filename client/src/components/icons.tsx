@@ -1,3 +1,4 @@
+import { useId } from "react";
 import {
   ArrowDownUp,
   ArrowUp,
@@ -79,6 +80,83 @@ export function ClearIcon() {
 
 export function SearchIcon() {
   return <Search {...look(13, 1.6)} />;
+}
+
+/// The AI's colours: the four of Google's AI search, used as a gradient on the spark and as the ring
+/// around the search (styles/toolbar-alignment.css uses the same four).
+const AI_STOPS = [
+  ["0%", "#4285f4"],
+  ["38%", "#ea4335"],
+  ["68%", "#fbbc04"],
+  ["100%", "#34a853"],
+] as const;
+
+/// A four-point spark filled with the AI gradient. Each instance gets its own gradient id so two on
+/// one page never share (or lose) a definition.
+function AiSpark({ x, y, scale, className }: { x: number; y: number; scale: number; className?: string }) {
+  const id = `ae-ai-grad-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  return (
+    <>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          {AI_STOPS.map(([offset, color]) => (
+            <stop key={offset} offset={offset} stopColor={color} />
+          ))}
+        </linearGradient>
+      </defs>
+      <g transform={`translate(${x} ${y}) scale(${scale})`}>
+        <path
+          className={className}
+          fill={`url(#${id})`}
+          d="M0 -5 Q0.9 -0.9 5 0 Q0.9 0.9 0 5 Q-0.9 0.9 -5 0 Q-0.9 -0.9 0 -5 Z"
+        />
+      </g>
+    </>
+  );
+}
+
+/// Whether the person asked their system for less motion. Read once when the icon mounts: the
+/// gradient below is animated by SVG itself, which CSS's prefers-reduced-motion rule cannot reach.
+const prefersReducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/// The header search icon when the AI is available: an open-ring magnifier with a four-point spark
+/// beside it, both drawn in the AI gradient, and the gradient drifts slowly along the
+/// icon (one colour cycle every 8 seconds; still with reduced motion). The spark also twinkles
+/// (.ae-ai-spark in styles/toolbar-alignment.css). Decorative - the button carries the label.
+export function AiSearchIcon() {
+  const id = `ae-ai-search-${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const still = prefersReducedMotion();
+  return (
+    <svg className="ae-ai-search-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <defs>
+        {/* userSpaceOnUse + repeat: one cycle spans 24 units, so sliding it by exactly 24 loops seamlessly. */}
+        <linearGradient id={id} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="24" y2="0" spreadMethod="repeat">
+          <stop offset="0%" stopColor="#4285f4" />
+          <stop offset="25%" stopColor="#ea4335" />
+          <stop offset="50%" stopColor="#fbbc04" />
+          <stop offset="75%" stopColor="#34a853" />
+          <stop offset="100%" stopColor="#4285f4" />
+          {!still && <animateTransform attributeName="gradientTransform" type="translate" from="0 0" to="24 0" dur="8s" repeatCount="indefinite" />}
+        </linearGradient>
+      </defs>
+      {/* An open ring - 270 degrees, the top-right quarter left clear - with the handle leaving it at the
+          bottom right and the spark sitting in the gap, outside the lens. */}
+      <path d="M10.4 8.2 A4.2 4.2 0 1 1 6.2 4" stroke={`url(#${id})`} strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M9.2 11.2 L12.6 14.6" stroke={`url(#${id})`} strokeWidth="1.7" strokeLinecap="round" />
+      <g transform="translate(11.9 4) scale(0.62)">
+        <path className="ae-ai-spark" fill={`url(#${id})`} d="M0 -5 Q0.9 -0.9 5 0 Q0.9 0.9 0 5 Q-0.9 0.9 -5 0 Q-0.9 -0.9 0 -5 Z" />
+      </g>
+    </svg>
+  );
+}
+
+/// The spark alone, for the "Ask AI" row in the search palette.
+export function SparklesIcon() {
+  return (
+    <svg width="14" height="14" viewBox="-6 -6 12 12" fill="none" aria-hidden="true">
+      <AiSpark x={0} y={0} scale={1} />
+    </svg>
+  );
 }
 
 export function KeyboardIcon() {

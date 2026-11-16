@@ -238,6 +238,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/// Like useAuth, but null outside an AuthProvider instead of throwing - for chrome (the header) that
+/// also renders on screens and in tests where nobody is signed in.
+export function useOptionalAuth() {
+  return useContext(AuthContext);
+}
+
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within an AuthProvider");

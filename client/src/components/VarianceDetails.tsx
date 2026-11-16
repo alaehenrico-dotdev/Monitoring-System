@@ -7,6 +7,9 @@ import {
   setCountRemarks,
   type VarianceTrace,
 } from "../api/manualCounts";
+import { explainVariance } from "../api/ai";
+import { AI_PLACEHOLDER, aiFallback } from "../utils/aiFallback";
+import { AiNotice } from "./AiNotice";
 import type { Shift } from "../types";
 import { colors } from "../theme";
 import { formatDateDisplay } from "../utils/dateFormat";
@@ -37,6 +40,7 @@ export function VarianceDetails({
   shift,
   locations,
   canEdit,
+  canExplain = false,
   onClose,
   onRemarksSaved,
 }: {
@@ -47,6 +51,8 @@ export function VarianceDetails({
   shift: Shift;
   locations: Loc[];
   canEdit: boolean;
+  /// Show "Explain this variance" (AI). Supervisor/Admin only - the server enforces it too.
+  canExplain?: boolean;
   onClose: () => void;
   /// Lets the page pick up the new remarks without waiting for a refresh.
   onRemarksSaved?: (location: Loc, remarks: string | null) => void;
@@ -68,6 +74,7 @@ export function VarianceDetails({
           shift={shift}
           location={loc}
           canEdit={canEdit}
+          canExplain={canExplain}
           onRemarksSaved={onRemarksSaved}
         />
       ))}
@@ -81,6 +88,7 @@ function LocationTrace({
   shift,
   location,
   canEdit,
+  canExplain,
   onRemarksSaved,
 }: {
   productId: number;
@@ -88,10 +96,15 @@ function LocationTrace({
   shift: Shift;
   location: Loc;
   canEdit: boolean;
+  canExplain: boolean;
   onRemarksSaved?: (location: Loc, remarks: string | null) => void;
 }) {
   const [trace, setTrace] = useState<VarianceTrace | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // AI explanation: fetched only when asked (each call is a paid request), shown as plain text.
+  const [explaining, setExplaining] = useState(false);
+  const [explanation, setExplanation] = useState<string | null>(null);
+  const [explainError, setExplainError] = useState<unknown>(null);
   const [remarks, setRemarks] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -111,6 +124,18 @@ function LocationTrace({
       cancelled = true;
     };
   }, [productId, date, shift, location]);
+
+  async function explain() {
+    setExplaining(true);
+    setExplainError(null);
+    try {
+      setExplanation((await explainVariance(productId, date, shift, location)).explanation);
+    } catch (e) {
+      setExplainError(e);
+    } finally {
+      setExplaining(false);
+    }
+  }
 
   async function saveRemarks() {
     setSaving(true);
@@ -203,6 +228,23 @@ function LocationTrace({
             <p style={lineStyle}>No stock entry was saved for this period, so the system figure is the carried-forward opening.</p>
           )}
 
+          {canExplain && trace.count && trace.count.variance !== 0 && (
+            <div style={{ margin: "10px 0" }}>
+              <Button type="button" size="sm" variant="secondary" onClick={() => void explain()} disabled={explaining}>
+                {explaining ? "Thinking…" : explainError !== null ? "Try again" : explanation ? "Explain again" : "Explain this variance"}
+              </Button>
+              {explainError !== null && <AiNotice note={aiFallback(explainError, AI_PLACEHOLDER.explain)} />}
+              {explanation && (
+                <div style={explainBoxStyle}>
+                  <p style={{ ...lineStyle, margin: 0 }}>{explanation}</p>
+                  <p style={{ margin: "6px 0 0", fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}>
+                    AI-written from the details above - check it before acting on it.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           {trace.count && (
             <div style={{ margin: "10px 0" }}>
               <label style={{ display: "block", fontSize: "calc(12px * var(--ae-fs, 1))", fontWeight: 600, color: colors.subtleInk, marginBottom: 4 }}>
@@ -287,6 +329,13 @@ const itemStyle = {
   padding: "5px 0",
   fontSize: "calc(12.5px * var(--ae-fs, 1))",
   borderBottom: `1px solid ${colors.border}`,
+} as const;
+const explainBoxStyle = {
+  marginTop: 8,
+  padding: "8px 10px",
+  borderRadius: 4,
+  border: `1px solid ${colors.border}`,
+  background: colors.paperAlt,
 } as const;
 const tagStyle = {
   marginLeft: 8,

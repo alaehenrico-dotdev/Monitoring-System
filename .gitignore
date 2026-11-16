@@ -194,6 +194,11 @@ yarn-error.log*
 *.local
 !*.example
 
+# Browser-automation tool output and caches (Playwright / Playwright MCP: page snapshots, console logs).
+.playwright/
+.playwright-mcp/
+playwright/.cache/
+
 # Browser test output (screenshots, traces, HTML report)
 e2e-browser/screenshots/
 e2e-browser/results/

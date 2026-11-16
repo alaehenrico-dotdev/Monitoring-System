@@ -5,6 +5,10 @@ import { getMonthlyOverview } from "../services/dashboardAnalytics.service";
 import { getDaysOfStock } from "../services/daysOfStock.service";
 import { getOrSet } from "../lib/cache";
 import { parseDateOnly, toDateOnlyString } from "../utils/date";
+import { env } from "../config/env";
+import { geminiConfigured } from "../lib/gemini";
+import { WHAT_CHANGED_DAYS, whatChanged } from "../services/aiWhatChanged.service";
+import { askData, MAX_QUESTION_LENGTH } from "../services/aiAsk.service";
 
 // Built fresh on every request (not a module-level constant) - this server
 // process can stay up for a long time (pm2 only restarts it on a crash, not
@@ -47,4 +51,28 @@ export async function getDaysOfStockHandler(req: Request, res: Response) {
   const asOf = parsed.data.date ? parseDateOnly(parsed.data.date) : new Date();
   const key = `days-of-stock:${toDateOnlyString(asOf)}`;
   res.json(await getOrSet(key, DAYS_OF_STOCK_TTL_MS, () => getDaysOfStock(asOf)));
+}
+
+/// GET /dashboard/ai/status - whether the AI helpers are set up, so the dashboard can leave their
+/// cards out entirely (rather than show buttons that only say "not set up").
+export function getAiStatusHandler(_req: Request, res: Response) {
+  res.json({ enabled: geminiConfigured(), model: geminiConfigured() ? env.geminiModel : null, windows: WHAT_CHANGED_DAYS });
+}
+
+const whatChangedSchema = z.object({ days: z.coerce.number().int().default(7) });
+
+/// POST /dashboard/ai/what-changed?days=7 - this window against the one before it (numbers + AI summary).
+export async function postWhatChangedHandler(req: Request, res: Response) {
+  const parsed = whatChangedSchema.safeParse(req.query);
+  if (!parsed.success) throw HttpError.badRequest("Invalid days", parsed.error.flatten());
+  res.json(await whatChanged(parsed.data.days));
+}
+
+const askSchema = z.object({ question: z.string().min(1).max(MAX_QUESTION_LENGTH) });
+
+/// POST /dashboard/ai/ask - a question answered from the app's own reports through fixed read-only tools.
+export async function postAskHandler(req: Request, res: Response) {
+  const parsed = askSchema.safeParse(req.body);
+  if (!parsed.success) throw HttpError.badRequest(`Keep the question under ${MAX_QUESTION_LENGTH} characters.`, parsed.error.flatten());
+  res.json(await askData(parsed.data.question));
 }
