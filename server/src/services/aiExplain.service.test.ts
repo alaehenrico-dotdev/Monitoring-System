@@ -117,6 +117,22 @@ describe("explainVariance", () => {
     expect(log.mock.calls.every((c) => !String(c[0]).includes("test-key"))).toBe(true);
   });
 
+  it("recognises Google's other ways of saying the key or the region is the problem (a bad key is a 400)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const google = (status: number, message: string) =>
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status, json: async () => ({ error: { status: "X", message } }) }));
+    const run = () => explainVariance(1, new Date(), "NIGHT" as never, "ONLINE");
+
+    google(400, "API key not valid. Please pass a valid API key.");
+    await expect(run()).rejects.toMatchObject({ message: expect.stringContaining("GEMINI_API_KEY") });
+    google(400, "User location is not supported for the API use.");
+    await expect(run()).rejects.toMatchObject({ message: expect.stringContaining("country this server is hosted in") });
+    google(403, "Requests from referer <empty> are blocked.");
+    await expect(run()).rejects.toMatchObject({ message: expect.stringContaining("GEMINI_API_KEY") });
+    google(400, "Something else is wrong with the request.");
+    await expect(run()).rejects.toMatchObject({ message: "The AI service could not answer that." });
+  });
+
   it("maps a network failure/timeout to a 502", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("timeout")));

@@ -38,11 +38,19 @@ export function requireGemini() {
 
 const messageOf = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-/// What the person at the dashboard sees. Setup problems (key rejected, model gone) say so,
-/// because "could not answer" sends people hunting in the wrong place; the detail is in the log.
-function userMessageFor(status: number): string {
+/// What the person at the dashboard sees. Setup problems say so, because "could not answer" sends people
+/// hunting in the wrong place; the full detail is in the server log. Google reports several different
+/// problems under the same HTTP status (a rejected key is a 400, not a 401), so this reads Google's own
+/// message as well as the status. Wording that tells an admin what to do ends "Ask an admin ..." - the
+/// client shows those as a detail line (client/src/utils/aiFallback.ts).
+function userMessageFor(status: number, googleMessage = ""): string {
   if (status === 429) return "The AI service is busy. Try again in a minute.";
-  if (status === 401 || status === 403) return "The AI service rejected the API key. Ask an admin to check GEMINI_API_KEY.";
+  if (/location is not supported/i.test(googleMessage)) {
+    return "Google's AI is not available from the country this server is hosted in. Ask an admin to host it elsewhere or route it through a supported region.";
+  }
+  if (/api key|permission.?denied|has not been used|is disabled|referer|ip address/i.test(googleMessage) || status === 401 || status === 403) {
+    return "The AI service rejected the API key. Ask an admin to check GEMINI_API_KEY (and its restrictions in Google AI Studio).";
+  }
   if (status === 404) return "The AI model is not available. Ask an admin to check GEMINI_MODEL.";
   return "The AI service could not answer that.";
 }
@@ -103,7 +111,7 @@ export async function generate(opts: GenerateOptions): Promise<GeminiContent> {
         model: env.geminiModel,
       }),
     );
-    throw new HttpError(502, userMessageFor(response.status));
+    throw new HttpError(502, userMessageFor(response.status, err?.message));
   }
 
   const data = (await response.json()) as { candidates?: { content?: { parts?: GeminiPart[] } }[] };

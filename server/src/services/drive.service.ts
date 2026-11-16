@@ -327,6 +327,11 @@ export function exportFileInfo(rawName: string): { name: string; mimeType: strin
 }
 
 export async function saveExport(rawName: string, data: Buffer, userId: number): Promise<{ saved: boolean }> {
+  // The route hands over a Buffer (express.raw), but this is the boundary that relies on it: a string or
+  // an array would make `.length` a character or element count, so the size recorded and sent to Google
+  // would silently be wrong. Refuse anything else here rather than trusting every caller.
+  if (!Buffer.isBuffer(data)) throw HttpError.badRequest("The file was not received as a binary upload.");
+  const size = data.byteLength;
   const info = exportFileInfo(rawName);
   if (!info) throw HttpError.badRequest("Only CSV, Excel, PDF and ZIP exports can be saved to Google Drive.");
   const conn = await prisma.driveConnection.findUnique({ where: { id: CONNECTION_ID } });
@@ -337,13 +342,13 @@ export async function saveExport(rawName: string, data: Buffer, userId: number):
       name: info.name,
       parentId: conn.exportFolderId,
       mimeType: info.mimeType,
-      size: data.length,
+      size,
       body: data,
     });
-    await logUpload({ kind: "export", fileName: info.name, driveFileId: id, sizeBytes: data.length, status: "OK", createdById: userId });
+    await logUpload({ kind: "export", fileName: info.name, driveFileId: id, sizeBytes: size, status: "OK", createdById: userId });
     return { saved: true };
   } catch (err) {
-    await logUpload({ kind: "export", fileName: info.name, sizeBytes: data.length, status: "FAILED", error: messageOf(err), createdById: userId });
+    await logUpload({ kind: "export", fileName: info.name, sizeBytes: size, status: "FAILED", error: messageOf(err), createdById: userId });
     throw err;
   }
 }

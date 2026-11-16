@@ -19,7 +19,11 @@ export async function assertAdminPassword(userId: number, password: string | und
     throw new HttpError(429, "Too many incorrect passwords - try again in a few minutes");
   }
   const user = await userRepository.findById(userId);
-  const ok = !!password && !!user && (await verifyPassword(password, user.passwordHash));
+  // Verification runs whenever the account exists - never skipped because of what the caller sent. Only a
+  // string can be a password; anything else (missing, a number, an object) is checked as "" and so fails.
+  const supplied = typeof password === "string" ? password : "";
+  const matches = user ? await verifyPassword(supplied, user.passwordHash) : false;
+  const ok = matches && supplied.length > 0;
   if (!ok) {
     failures.set(userId, { count: (current?.count ?? 0) + 1, firstAt: current?.firstAt ?? now });
     throw HttpError.forbidden("Incorrect password");

@@ -21,6 +21,14 @@ describe("assertAdminPassword", () => {
     await expect(assertAdminPassword(2, undefined)).rejects.toMatchObject({ status: 403 });
   });
 
+  it("rejects a password that is not a string, an empty one, and an unknown account - all with 403", async () => {
+    for (const odd of [123, { toString: () => "right-password" }, ["right-password"], ""]) {
+      await expect(assertAdminPassword(5, odd as never)).rejects.toMatchObject({ status: 403 });
+    }
+    findById.mockResolvedValue(null);
+    await expect(assertAdminPassword(6, "right-password")).rejects.toMatchObject({ status: 403 });
+  });
+
   it("locks out after repeated misses, even for the right password", async () => {
     for (let i = 0; i < 5; i++) await assertAdminPassword(3, "bad").catch(() => {});
     await expect(assertAdminPassword(3, "right-password")).rejects.toMatchObject({ status: 429 });

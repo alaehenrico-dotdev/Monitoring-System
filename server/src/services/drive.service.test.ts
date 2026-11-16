@@ -185,7 +185,7 @@ describe("connecting", () => {
 
   it("explains how to recover when Google withholds the refresh token", async () => {
     vi.mocked(google.exchangeCode).mockResolvedValue({ accessToken: "a", expiresIn: 3600 });
-    await expect(completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }))).rejects.toThrow(/myaccount\.google\.com\/permissions/);
+    await expect(completeConnect("code", stateFor({ purpose: "drive-connect", uid: 7 }))).rejects.toThrow("myaccount.google.com/permissions");
   });
 
   it("refuses a connection where the Drive permission was left unticked, before creating any folder", async () => {
@@ -261,6 +261,13 @@ describe("saveExport", () => {
     expect(await saveExport("a.csv", Buffer.from("x"), 3)).toEqual({ saved: false });
     db.conn = null;
     expect(await saveExport("a.csv", Buffer.from("x"), 3)).toEqual({ saved: false });
+    expect(google.uploadFile).not.toHaveBeenCalled();
+  });
+
+  it("refuses anything that is not a binary Buffer, so a size can never be a text or array length", async () => {
+    for (const notABuffer of ["%PDF", ["%", "P"], { length: 999999 }, 42, null]) {
+      await expect(saveExport("daily.pdf", notABuffer as never, 3)).rejects.toMatchObject({ status: 400 });
+    }
     expect(google.uploadFile).not.toHaveBeenCalled();
   });
 

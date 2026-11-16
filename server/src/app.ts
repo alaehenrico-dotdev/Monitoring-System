@@ -33,13 +33,20 @@ export function createApp() {
   // See config/env.ts's trustProxySetting() for the accepted values.
   app.set("trust proxy", env.trustProxy);
 
-  // This server only ever returns JSON (see routes below) and never renders
-  // HTML itself (the React client is a separate origin/deploy - see
-  // client/vite.config.ts's own CSP for that) - `contentSecurityPolicy` is
-  // disabled here since a CSP is meaningless for a document this server
-  // never serves, but the rest of helmet's defaults (nosniff, no
-  // `X-Powered-By`, HSTS, etc.) still harden every JSON response.
-  app.use(helmet({ contentSecurityPolicy: false }));
+  // This server only ever returns data (JSON, a CSV, a redirect - see routes below) and never renders
+  // HTML itself (the React client is a separate origin/deploy - see client/vite.config.ts's own CSP for
+  // that). So its CSP is the strictest one there is: nothing may load or run from any response, and no
+  // response may be framed. That is what `default-src 'none'` says; it costs nothing because there is no
+  // page here for it to break, and it keeps a response that is ever opened in a browser (a download, an
+  // error body) inert. The rest of helmet's defaults (nosniff, no `X-Powered-By`, HSTS, etc.) apply too.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        useDefaults: false,
+        directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"] },
+      },
+    }),
+  );
   // `exposedHeaders` for Content-Disposition - without this, a cross-origin
   // fetch() (client and server are separate origins by default, see
   // env.clientOrigin) can read the response body but the Headers object

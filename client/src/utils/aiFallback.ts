@@ -18,10 +18,13 @@ export interface AiFallback {
   retry: boolean;
 }
 
+/// The server words an admin-fixable problem as "... check GEMINI_API_KEY" / "... Ask an admin ...".
+const SETUP_PROBLEM = /GEMINI_|Ask an admin/;
+
 export function aiFallback(err: unknown, placeholder: string): AiFallback {
   const message = err instanceof Error ? err.message : "";
   if (err instanceof ApiError && err.status === 400 && message) return { text: message, retry: false };
-  if (/GEMINI_/.test(message)) return { text: placeholder, detail: message, retry: false };
+  if (SETUP_PROBLEM.test(message)) return { text: placeholder, detail: message, retry: false };
   return { text: placeholder, retry: true };
 }
 
