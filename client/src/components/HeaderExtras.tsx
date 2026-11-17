@@ -3,6 +3,7 @@ import { openQuickJump } from "./QuickJump";
 import { AiSearchIcon, SearchIcon } from "./icons";
 import { ThemeToggle } from "./ThemeToggle";
 import { TypingPractice } from "./TypingPractice";
+import { HeaderCalculator } from "./Calculator";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { useAiAvailable } from "../hooks/useAiAvailable";
 
@@ -35,13 +36,20 @@ export function HeaderExtras() {
           the fast path; this is what makes the feature discoverable at all. */}
       <button
         type="button"
-        className={ai ? "ae-header-search-btn ae-header-search-btn--ai" : "ae-header-search-btn"}
+        className={ai ? `ae-header-search-btn ae-header-search-btn--ai${phone ? "" : " ae-header-search-btn--labeled"}` : "ae-header-search-btn"}
         onClick={openQuickJump}
         aria-label={ai ? "Search pages and products, or ask AI (Ctrl+K)" : "Quick jump to a page or product (Ctrl+K)"}
         title={ai ? "Search, or ask AI a question (Ctrl+K)" : "Jump to a page or product (Ctrl+K)"}
       >
+        {ai && !phone && (
+          <span className="ae-hsb-glow" aria-hidden="true">
+            <span />
+          </span>
+        )}
         {ai ? <AiSearchIcon /> : <SearchIcon />}
+        {ai && !phone && <span className="ae-hsb-label">Search</span>}
       </button>
+      <HeaderCalculator />
       {!phone && <TypingPractice />}
       <LiveClock />
       <ThemeToggle />

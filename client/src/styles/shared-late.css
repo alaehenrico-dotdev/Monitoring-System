@@ -83,6 +83,14 @@ input[type="reset"],
   border-radius: 50% !important;
 }
 
+/* The desktop "Search" button in the header (components/HeaderExtras.tsx) is a full pill with a ring
+   that follows its curve. Same specificity trick as .ae-round above, so the 4px rule can't flatten it:
+   the 4px rule's three :not() classes plus `button` score 0,3,1, so this needs the element and four
+   classes (0,4,1) to win. */
+button.ae-header-search-btn--labeled.ae-header-search-btn--labeled.ae-header-search-btn--labeled.ae-header-search-btn--labeled {
+  border-radius: 999px !important;
+}
+
 /* ---- Tables: one minimal treatment in every theme ------------------------------
    No outer frame, a thin line under every row, a hairline between columns, a charcoal category
    bar whose name carries a gold gradient, and a subtle gold grand total. This is the Minimalism

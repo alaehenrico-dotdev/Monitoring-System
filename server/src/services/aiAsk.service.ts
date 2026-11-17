@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { env } from "../config/env";
-import { generate, requireGemini, textOf, type GeminiContent, type GeminiFunctionDeclaration, type GeminiPart } from "../lib/gemini";
+import { generate, requireAi, textOf, type GeminiContent, type GeminiFunctionDeclaration, type GeminiPart } from "../lib/gemini";
 import { getOrSet } from "../lib/cache";
 import { HttpError } from "../utils/HttpError";
 import { parseDateOnly, toDateOnlyString } from "../utils/date";
@@ -251,7 +251,7 @@ export async function askData(question: string, now: Date = new Date()) {
   const q = question.trim();
   if (q.length < 3) throw HttpError.badRequest("Ask a question of a few words.");
   if (q.length > MAX_QUESTION_LENGTH) throw HttpError.badRequest(`Keep the question under ${MAX_QUESTION_LENGTH} characters.`);
-  requireGemini();
+  requireAi();
 
   const today = localToday(now);
   const deadline = Date.now() + DEADLINE_MS;

@@ -4,6 +4,7 @@ import {
   ArrowUp,
   ArrowUpFromLine,
   Ban,
+  Calculator,
   Calendar,
   Check,
   ChevronDown,
@@ -141,10 +142,10 @@ export function AiSearchIcon() {
       </defs>
       {/* An open ring - 270 degrees, the top-right quarter left clear - with the handle leaving it at the
           bottom right and the spark sitting in the gap, outside the lens. */}
-      <path d="M10.4 8.2 A4.2 4.2 0 1 1 6.2 4" stroke={`url(#${id})`} strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M9.2 11.2 L12.6 14.6" stroke={`url(#${id})`} strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M10.4 8.2 A4.2 4.2 0 1 1 6.2 4" stroke={`url(#${id})`} strokeWidth="1.1" strokeLinecap="round" />
+      <path d="M9.2 11.2 L12.6 14.6" stroke={`url(#${id})`} strokeWidth="1.1" strokeLinecap="round" />
       <g transform="translate(11.9 4) scale(0.62)">
-        <path className="ae-ai-spark" fill={`url(#${id})`} d="M0 -5 Q0.9 -0.9 5 0 Q0.9 0.9 0 5 Q-0.9 0.9 -5 0 Q-0.9 -0.9 0 -5 Z" />
+        <path className="ae-ai-spark" fill={`url(#${id})`} d="M0 -5 Q0.6 -0.6 5 0 Q0.6 0.6 0 5 Q-0.6 0.6 -5 0 Q-0.6 -0.6 0 -5 Z" />
       </g>
     </svg>
   );
@@ -161,6 +162,10 @@ export function SparklesIcon() {
 
 export function KeyboardIcon() {
   return <Keyboard {...look(15, 1.6)} />;
+}
+
+export function CalculatorIcon() {
+  return <Calculator {...look(15, 1.6)} />;
 }
 
 export function SunIcon() {

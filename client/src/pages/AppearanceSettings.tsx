@@ -24,13 +24,13 @@ const MODES: Choice<Theme>[] = [
   {
     value: "light",
     label: "Light",
-    description: "Warm paper background with dark text. Best in a bright room.",
+    description: "Warm paper, dark text. Best in a bright room.",
     preview: <ModePreview dark={false} />,
   },
   {
     value: "dark",
     label: "Dark",
-    description: "Charcoal background with light text. Easier on the eyes at night.",
+    description: "Charcoal background, light text. Easier at night.",
     preview: <ModePreview dark />,
   },
 ];
@@ -39,37 +39,37 @@ const THEMES: Choice<UiStyle>[] = [
   {
     value: "classic",
     label: "Classic",
-    description: "The glass header with gold accents, warm cream surfaces and the Ala Eh! seal behind the page. The look you have been using.",
+    description: "Gold accents on warm cream. The default look.",
     preview: <ClassicPreview />,
   },
   {
     value: "brutal",
     label: "Neobrutalism",
-    description: "Loud and graphic, in the Ala Eh! colors: thick black outlines, hard offset shadows, flat gold headers and red actions on the original cream page. Same pages and shortcuts as Classic.",
+    description: "Bold and graphic: thick black outlines and hard shadows.",
     preview: <BrutalPreview />,
   },
   {
     value: "glass",
     label: "Glassmorphism",
-    description: "Frosted, translucent panes with a backdrop blur floating over a soft gold, red and green glow. Same pages and shortcuts as Classic.",
+    description: "Frosted, see-through panes over a soft colour glow.",
     preview: <GlassPreview />,
   },
   {
     value: "minimal",
     label: "Minimalism",
-    description: "Only what is information: no fills, shadows or glow. Plain text on a quiet page, hairline rules, ink buttons and a muted-to-dark text scale. Same pages and shortcuts as Classic.",
+    description: "Plain and quiet: no fills, shadows or glow.",
     preview: <MinimalPreview />,
   },
   {
     value: "skeuo",
     label: "Skeuomorphism",
-    description: "Things that look real: a parchment desk, a stitched leather header, embossed metal table headers, glossy push buttons and recessed fields.",
+    description: "Real-world textures: parchment, leather, metal and glossy buttons.",
     preview: <SkeuoPreview />,
   },
   {
     value: "studio",
     label: "Studio",
-    description: "An editor-style layout: the navigation tabs sit in their own strip directly under the header, and the current tab is outlined in gold and open at the bottom, joined to the page. Flat and quiet otherwise. Same pages and shortcuts as Classic.",
+    description: "Flat, editor-style look with tabs in their own strip.",
     preview: <StudioPreview />,
   },
 ];
@@ -80,25 +80,25 @@ const HEADERS: Choice<HeaderStyle>[] = [
   {
     value: "standard",
     label: "Standard",
-    description: "The layout you have been using: the page tabs along the top, then a card with the seal and title, and the toolbar under the title.",
+    description: "Tabs on top, then the title card, with the toolbar below.",
     preview: <HeaderPreview kind="standard" />,
   },
   {
     value: "inline",
     label: "Inline",
-    description: "Title and toolbar share one line: the seal, the title, then the toolbar and the clock beside it, with no card around them. The toolbar wraps under the title only when the window is too narrow. Shows the most rows - best for data entry.",
+    description: "Title and toolbar on one line. Shows the most rows.",
     preview: <HeaderPreview kind="inline" />,
   },
   {
     value: "ribbon",
     label: "Ribbon",
-    description: "A slim title line, with the toolbar below it as a full-width band ruled above and below, like an office-app ribbon. The controls read as one strip, apart from the title.",
+    description: "A slim title with the toolbar as a full-width band.",
     preview: <HeaderPreview kind="ribbon" />,
   },
   {
     value: "dock",
     label: "Dock",
-    description: "The page tabs move from the top to a strip docked under the title and toolbar, next to the data, like the sheet tabs at the bottom of a spreadsheet.",
+    description: "Page tabs sit below the toolbar, next to the data.",
     preview: <HeaderPreview kind="dock" />,
   },
 ];
@@ -175,7 +175,7 @@ function FontSettings() {
 export function AppearanceSettings() {
   const { theme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle } = useTheme();
   return (
-    <div className="ae-appearance" style={{ width: "100%", maxWidth: 880, margin: "0 auto", display: "grid", gap: 22 }}>
+    <div className="ae-appearance" style={{ width: "100%", maxWidth: 1400, margin: "0 auto", display: "grid", gap: 16 }}>
       <ChoiceGroup legend="Color mode" choices={MODES} value={theme} onChange={setTheme} />
       <ChoiceGroup legend="Theme" choices={THEMES} value={uiStyle} onChange={setUiStyle} />
       <ChoiceGroup legend="Header and toolbar" choices={HEADERS} value={headerStyle} onChange={setHeaderStyle} />
@@ -204,8 +204,10 @@ function ChoiceGroup<T extends string>({
   const groupId = useId();
   return (
     <fieldset style={{ border: "none", margin: 0, padding: 0, minWidth: 0 }}>
-      <legend style={{ fontSize: 14, fontWeight: 700, marginBottom: 10, padding: 0, color: colors.ink }}>{legend}</legend>
-      <div className="ae-choice-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 14 }}>
+      <legend style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, padding: 0, color: colors.ink }}>{legend}</legend>
+      {/* auto-fill, not auto-fit: a group of two keeps card-sized cards instead of stretching across the
+          page, and wide screens fit five or six to a row so the tab needs little scrolling. */}
+      <div className="ae-choice-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(200px, 100%), 1fr))", gap: 12 }}>
         {choices.map((c) => {
           const selected = c.value === value;
           return (
@@ -222,10 +224,10 @@ function ChoiceGroup<T extends string>({
               <span className="ae-choice-card-preview" aria-hidden>
                 {c.preview}
               </span>
-              <span id={`${groupId}-${c.value}-title`} className="ae-choice-title" style={{ display: "block", fontWeight: 600, marginTop: 8 }}>
+              <span id={`${groupId}-${c.value}-title`} className="ae-choice-title" style={{ display: "block", fontWeight: 600, marginTop: 6 }}>
                 {c.label}
               </span>
-              <span id={`${groupId}-${c.value}-desc`} className="ae-choice-desc" style={{ display: "block", fontSize: 12.5, color: colors.subtleInk, marginTop: 2 }}>
+              <span id={`${groupId}-${c.value}-desc`} className="ae-choice-desc" style={{ display: "block", fontSize: 12, lineHeight: 1.4, color: colors.subtleInk, marginTop: 2 }}>
                 {c.description}
               </span>
             </label>

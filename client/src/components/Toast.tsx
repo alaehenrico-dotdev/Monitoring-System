@@ -263,6 +263,61 @@ export function Toast({
   );
 }
 
+/**
+ * A toast that stays up for as long as `show` is true: no countdown and no dismiss X, because it
+ * carries the actions for something still pending (the unsaved-changes toast on the entry sheets
+ * has Discard and Review and save). Same look, same shared stack as Toast, so it sits with the
+ * other toasts instead of being a bar docked into the page. `children` is the message; `actions`
+ * go on their own row underneath.
+ */
+export function StickyToast({
+  show,
+  variant = "info",
+  children,
+  actions,
+  failed = false,
+}: {
+  show: boolean;
+  variant?: ToastVariant;
+  children: ReactNode;
+  actions?: ReactNode;
+  failed?: boolean;
+}) {
+  return createPortal(
+    <AnimatePresence>
+      {show && (
+        <motion.div
+          key="sticky"
+          layout
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, transition: { duration: 0.25, ease: "easeOut" } }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          role="status"
+          className={`ae-toast ae-toast--sticky${failed ? " ae-toast--failed" : ""}`}
+          style={{ pointerEvents: "auto" }}
+        >
+          <span
+            className="ae-toast-icon"
+            role="img"
+            aria-label={VARIANT_LABEL[variant]}
+            style={{
+              color: HUE[variant],
+              background: `color-mix(in srgb, ${HUE[variant]} 20%, var(--ae-surface))`,
+              borderColor: `color-mix(in srgb, ${HUE[variant]} 40%, transparent)`,
+            }}
+          >
+            <ToastIcon variant={variant} />
+          </span>
+          <div className="ae-toast-message ae-toast-message--strong">{children}</div>
+          {actions && <div className="ae-toast-actions">{actions}</div>}
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    getStack(),
+  );
+}
+
 // ---- Imperative toasts, for code that isn't a React component. <ToastHost/>
 // is mounted once in Layout and renders whatever showToast() last published.
 interface PendingToast {

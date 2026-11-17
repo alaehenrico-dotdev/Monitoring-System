@@ -1,3 +1,4 @@
+import type { SaveDateGate } from "../hooks/useSaveDateGate";
 import type { Shift } from "../types";
 import { colors } from "../theme";
 import { formatDateLong } from "../utils/dateFormat";
@@ -15,6 +16,8 @@ export function SaveSummary({
   changes,
   products,
   notices,
+  gate,
+  onChangeDate,
 }: {
   page: string;
   date: string;
@@ -22,6 +25,10 @@ export function SaveSummary({
   changes: number;
   products: number;
   notices: SaveNotice[];
+  /// When the date isn't today (useSaveDateGate), the tick that unlocks Save.
+  gate?: SaveDateGate;
+  /// Closes the dialog and opens the date picker. Unsaved changes stay with THIS date.
+  onChangeDate?: () => void;
 }) {
   return (
     <div style={{ marginBottom: 12 }}>
@@ -35,12 +42,26 @@ export function SaveSummary({
           background: colors.paperAlt,
         }}
       >
-        <div style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk, textTransform: "uppercase", letterSpacing: "0.04em" }}>{page}</div>
-        <div style={{ fontSize: "calc(16px * var(--ae-fs, 1))", fontWeight: 700, color: colors.ink, margin: "2px 0" }}>
-          {formatDateLong(date)} · {shiftWithWord(shift)}
-        </div>
-        <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
-          {changes} change{changes === 1 ? "" : "s"} to {products} product{products === 1 ? "" : "s"}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk, textTransform: "uppercase", letterSpacing: "0.04em" }}>{page}</div>
+            <div style={{ fontSize: "calc(16px * var(--ae-fs, 1))", fontWeight: 700, color: colors.ink, margin: "2px 0" }}>
+              {formatDateLong(date)} · {shiftWithWord(shift)}
+            </div>
+            <div style={{ fontSize: "calc(12.5px * var(--ae-fs, 1))", color: colors.subtleInk }}>
+              {changes} change{changes === 1 ? "" : "s"} to {products} product{products === 1 ? "" : "s"}
+            </div>
+          </div>
+          {onChangeDate && (
+            <button
+              type="button"
+              className="ae-change-date-btn"
+              onClick={onChangeDate}
+              title="Close this and pick another date. Unsaved changes stay with this date."
+            >
+              Change date
+            </button>
+          )}
         </div>
       </div>
       {notices.map((n, i) => (
@@ -60,6 +81,26 @@ export function SaveSummary({
           {n.text}
         </p>
       ))}
+      {gate?.needed && (
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            margin: "8px 0 0",
+            padding: "8px 10px",
+            borderRadius: 4,
+            border: `1px solid ${colors.border}`,
+            fontSize: "calc(13px * var(--ae-fs, 1))",
+            fontWeight: 600,
+            color: colors.ink,
+            cursor: "pointer",
+          }}
+        >
+          <input type="checkbox" checked={gate.confirmed} onChange={(e) => gate.setConfirmed(e.target.checked)} />
+          Yes, {formatDateLong(date)} is the right date
+        </label>
+      )}
     </div>
   );
 }

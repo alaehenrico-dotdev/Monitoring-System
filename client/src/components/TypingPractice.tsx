@@ -247,8 +247,6 @@ export function TypingPractice() {
   const [wrongKey, setWrongKey] = useState<string | null>(null);
   // Floating window: position, and a brief shake on a typo.
   const [shake, setShake] = useState(false);
-  // The "Try Typing test!" speech bubble pops up now and then while the window is closed.
-  const [nudge, setNudge] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const passageRef = useRef<HTMLDivElement>(null);
@@ -344,7 +342,6 @@ export function TypingPractice() {
   }, []);
 
   function openDialog() {
-    setNudge(false);
     returnFocusRef.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
@@ -352,32 +349,6 @@ export function TypingPractice() {
     newRun(mode); // a fresh passage on every open, not what was left over from last time
     setOpen(true);
   }
-
-  // Random schedule: first hint after 10-30s, then every 45-120s, each shown for 6s.
-  // Skipped while the window is open (and the timers are cleaned up on open/unmount).
-  useEffect(() => {
-    if (open) return;
-    let showTimer: number | undefined;
-    let hideTimer: number | undefined;
-    const schedule = (minMs: number, maxMs: number) => {
-      showTimer = window.setTimeout(
-        () => {
-          setNudge(true);
-          hideTimer = window.setTimeout(() => {
-            setNudge(false);
-            schedule(45_000, 120_000);
-          }, 6000);
-        },
-        minMs + Math.random() * (maxMs - minMs),
-      );
-    };
-    schedule(10_000, 30_000);
-    return () => {
-      window.clearTimeout(showTimer);
-      window.clearTimeout(hideTimer);
-      setNudge(false);
-    };
-  }, [open]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
@@ -504,20 +475,15 @@ export function TypingPractice() {
           className="ae-header-search-btn ae-typing-btn"
           onClick={openDialog}
           aria-label="Typing practice"
-          title="Typing practice"
         >
           <KeyboardIcon />
         </button>
-        {nudge && !open && (
-          <button
-            type="button"
-            className="ae-typing-nudge no-print"
-            aria-hidden="true"
-            tabIndex={-1}
-            onClick={openDialog}
-          >
-            Try Typing test!
-          </button>
+        {/* Shown by CSS on hover / keyboard focus of the button; the button's aria-label is its name. */}
+        {!open && (
+          <span className="ae-typing-tip no-print" aria-hidden="true">
+            Typing test
+            <span className="ae-typing-tip-sub">Practise your speed</span>
+          </span>
         )}
       </span>
       {open &&

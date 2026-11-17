@@ -13,6 +13,7 @@ import { formatDateDisplay } from "../utils/dateFormat";
 import { describeArgs, TOOL_LABEL } from "../utils/aiSources";
 import { AI_PLACEHOLDER, aiFallback } from "../utils/aiFallback";
 import { AiNotice } from "./AiNotice";
+import { SparklesIcon } from "./icons";
 import { loadAiEnabled } from "../hooks/useAiAvailable";
 
 /**
@@ -62,27 +63,39 @@ export function DashboardAiCard() {
     };
   }, []);
 
+  // Either helper working: the card's border turns faster, the same "thinking" cue as the header search.
+  const [changedBusy, setChangedBusy] = useState(false);
+  const [askBusy, setAskBusy] = useState(false);
+
   if (!enabled) return null;
   return (
-    <section className="ae-dash-section" aria-label="AI insights" style={{ marginTop: 16 }}>
-      <h3 className="ae-dash-heading">AI insights</h3>
-      <div className="ae-dash-card" style={{ padding: 14 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "18px 28px" }}>
-          <WhatChangedPanel />
-          <AskPanel />
+    <section className="ae-dash-section" aria-label="AI insights" style={{ marginTop: 12 }}>
+      <div className={`ae-dash-card ae-dash-ai${changedBusy || askBusy ? " ae-dash-ai--busy" : ""}`} style={{ padding: "10px 14px 12px" }}>
+        {/* The glow round the card's edge (see .ae-dash-ai-glow in dashboard.css). */}
+        <span className="ae-dash-ai-glow no-print" aria-hidden="true">
+          <span />
+        </span>
+        <div className="ae-dash-ai-head">
+          <h3 className="ae-dash-ai-title">
+            <SparklesIcon />
+            AI insights
+          </h3>
+          <span style={mutedStyle}>AI-written. Check the numbers before acting.</span>
         </div>
-        <p style={{ ...mutedStyle, margin: "12px 0 0" }}>
-          AI-written from your own figures - check the numbers before acting on them.
-        </p>
+        <div className="ae-dash-ai-grid">
+          <WhatChangedPanel onBusy={setChangedBusy} />
+          <AskPanel onBusy={setAskBusy} />
+        </div>
       </div>
     </section>
   );
 }
 
-function WhatChangedPanel() {
+function WhatChangedPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
   const [days, setDays] = useState(7);
   const [result, setResult] = useState<WhatChanged | null>(null);
   const [busy, setBusy] = useState(false);
+  useEffect(() => onBusy(busy), [busy, onBusy]);
   const [error, setError] = useState<unknown>(null);
   // A late answer for a window the person has since left should not replace the current one.
   const latest = useRef(0);
@@ -104,8 +117,8 @@ function WhatChangedPanel() {
   const facts = result?.facts;
   return (
     <div aria-label="What changed">
-      <h4 style={panelHeadingStyle}>What changed?</h4>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      <div className="ae-dash-ai-row">
+        <h4 style={panelHeadingStyle}>What changed?</h4>
         <select
           className="ae-input"
           aria-label="Comparison window"
@@ -118,7 +131,7 @@ function WhatChangedPanel() {
             setError(null);
             setBusy(false);
           }}
-          style={{ flex: 1, minWidth: 180 }}
+          style={{ flex: 1, minWidth: 140 }}
         >
           {WINDOWS.map((w) => (
             <option key={w.days} value={w.days}>
@@ -210,12 +223,22 @@ function Movers({ title, rows, bad }: { title: string; rows: ChangeMover[]; bad?
   );
 }
 
-function AskPanel() {
+function AskPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<AskAnswer | null>(null);
   const [asked, setAsked] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => onBusy(busy), [busy, onBusy]);
+
+  /// Back to the starting point (the example chips) for the next question.
+  function clear() {
+    setAnswer(null);
+    setError(null);
+    setQuestion("");
+    inputRef.current?.focus();
+  }
 
   async function ask(q: string) {
     const text = q.trim();
@@ -235,15 +258,16 @@ function AskPanel() {
 
   return (
     <div aria-label="Ask the data">
-      <h4 style={panelHeadingStyle}>Ask the data</h4>
       <form
+        className="ae-dash-ai-row"
         onSubmit={(e) => {
           e.preventDefault();
           void ask(question);
         }}
-        style={{ display: "flex", gap: 8 }}
       >
+        <h4 style={panelHeadingStyle}>Ask the data</h4>
         <input
+          ref={inputRef}
           className="ae-input"
           aria-label="Your question"
           value={question}
@@ -259,12 +283,12 @@ function AskPanel() {
       </form>
 
       {!answer && !busy && !error && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+        <div className="ae-dash-ai-chips">
           {EXAMPLES.map((ex) => (
             <button
               key={ex}
               type="button"
-              style={chipStyle}
+              className="ae-dash-ai-chip"
               onClick={() => {
                 setQuestion(ex);
                 void ask(ex);
@@ -279,8 +303,13 @@ function AskPanel() {
       {error !== null && <AiNotice note={aiFallback(error, AI_PLACEHOLDER.ask)} onRetry={() => void ask(asked)} busy={busy} />}
 
       {answer && (
-        <div style={{ marginTop: 10 }}>
-          <div style={{ ...mutedStyle, fontWeight: 600 }}>{asked}</div>
+        <div style={{ marginTop: 10 }} role="status" aria-live="polite">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+            <div style={{ ...mutedStyle, fontWeight: 600 }}>{asked}</div>
+            <button type="button" className="ae-dash-ai-clear" onClick={clear}>
+              Ask another
+            </button>
+          </div>
           <p style={{ ...bodyStyle, margin: "4px 0 8px", whiteSpace: "pre-wrap" }}>{answer.answer}</p>
           {answer.sources.length === 0 ? (
             <p style={mutedStyle}>No figures were looked up for this answer.</p>
@@ -301,21 +330,12 @@ function AskPanel() {
   );
 }
 
-const panelHeadingStyle: CSSProperties = { margin: "0 0 8px", fontSize: "calc(13px * var(--ae-fs, 1))", fontWeight: 700, color: colors.ink };
+const panelHeadingStyle: CSSProperties = { margin: 0, fontSize: "calc(13px * var(--ae-fs, 1))", fontWeight: 700, color: colors.ink, whiteSpace: "nowrap" };
 const bodyStyle: CSSProperties = { margin: "8px 0 0", fontSize: "calc(13px * var(--ae-fs, 1))", lineHeight: 1.5, color: colors.ink };
 const mutedStyle: CSSProperties = { fontSize: "calc(11.5px * var(--ae-fs, 1))", color: colors.subtleInk };
 const tableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: "calc(12.5px * var(--ae-fs, 1))" };
 const thStyle: CSSProperties = { textAlign: "left", padding: "3px 6px", fontWeight: 600, color: colors.subtleInk, borderBottom: `1px solid ${colors.border}` };
 const tdStyle: CSSProperties = { padding: "3px 6px", borderBottom: `1px solid ${colors.border}`, color: colors.ink };
-const chipStyle: CSSProperties = {
-  padding: "3px 10px",
-  borderRadius: 999,
-  border: `1px solid ${colors.border}`,
-  background: colors.paperAlt,
-  color: colors.ink,
-  fontSize: "calc(11.5px * var(--ae-fs, 1))",
-  cursor: "pointer",
-};
 const preStyle: CSSProperties = {
   margin: "4px 0 0",
   padding: 8,

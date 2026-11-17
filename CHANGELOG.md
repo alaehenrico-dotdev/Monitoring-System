@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 2.5.3 - 2026-11-17
+
+**Upgrading a running server:** run the normal deploy. No new database migrations since 2.5.2. The AI features are optional and off until a key is set (`GEMINI_API_KEY`, optionally `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` and `AI_DAILY_CALL_LIMIT`; see `server/.env.example` and `.env.docker.example`). Without them nothing about the AI appears and nothing else changes.
 
 ### Added
 - **AI helpers (optional, Supervisor/Admin only; set `GEMINI_API_KEY` to turn on).** "Explain this variance" on the Audit page; an AI insights card on the Dashboard with "What changed?" (this period against the one before, numbers computed by the server and only narrated by the AI) and "Ask the data" (questions answered through a fixed set of read-only lookups, with the figures shown under each answer); and the header search takes questions too, with an AI-styled icon. Without a key none of it appears. When the AI cannot answer, a calm placeholder with Try again shows instead of an error, and the comparison figures still show. Settings: `GEMINI_API_KEY` (plus optional backups `GEMINI_API_KEY_2` / `GEMINI_API_KEY_3`, used only when the one before is rejected or out of quota), `GEMINI_MODEL`, `AI_RATE_LIMIT_MAX` (see `server/.env.example`).
@@ -8,6 +10,18 @@
 ### Changed
 - **`npm run seed` no longer generates passwords.** It used to print a random one for any account without a `SEED_ADMIN_PASSWORD` / `SEED_ENCODER_PASSWORD`, which put a secret in the console log. Those two settings are now the only way to give the first accounts a password; an account without one is skipped and named. Nothing changes for deployments that already set them, and the seed still never touches an account that exists.
 - **Entry progress strip is a quiet single line** (count, a thin bar and a text "Next blank"), not a bordered box.
+- **Saving to a day that is not today asks you to confirm the date.** In the Review and save dialog on Online, Offline and Manual Count / Audit, a past or future date now needs a tick ("Yes, <date> is the right date") before Save works, so a sheet left on yesterday after midnight cannot be saved by habit. Today's sheet saves as before. The dialog also has a gold **Change date** button that closes it and opens the date picker (unsaved changes stay with the date they were typed on).
+- **The unsaved-changes notice on the entry sheets is a toast**, in the same bottom-right stack as the others, not a bar docked under the table. It stays while there are unsaved edits, with Discard and Review and save (or Retry save after a failed save).
+- **Settings > Appearance fits more on screen.** A wider area with 5 or 6 choices per row on a wide screen, tighter spacing, and one-line descriptions, so the tab needs much less scrolling. The phone layout is unchanged.
+- **The header search is a labelled "Search" button on desktop** (when AI is on), a pill with a thin iridescent ring and soft glow that turns slowly. The search panel's underline is a single thin line that glows and flows faster while the AI is thinking.
+- **AI insights card, redesigned.** More compact (labels beside their controls, example questions in one scrolling row), a thin iridescent border with a soft halo that turns slowly and speeds up while the AI works, "Ask another" to clear an answer, and a layout that stacks properly on a phone.
+- **The typing practice hint is a tooltip.** The "Try Typing test!" bubble that popped up at random is replaced by a quiet tooltip on hover or keyboard focus.
+- **Lighter on the browser.** The header keyboard icon's pulse now animates only size and opacity (no per-frame repaint of the header).
+
+### Added (continued)
+- **A free fallback AI provider (OpenRouter).** If Gemini is out of quota, its key is rejected or Google is unreachable, the same question is sent to an OpenRouter free model (`OPENROUTER_API_KEY` + `OPENROUTER_MODEL`, which can list several free models, comma-separated, tried in order, because a free model is often busy). Free only by construction: the server will not start unless the model id ends in `:free`. Requests ask OpenRouter to avoid hosts that train on prompts (`OPENROUTER_DATA_COLLECTION`). Callers do not change: Ask the data, What changed? and Explain this variance work whichever provider answers.
+
+- **A calculator in the header (desktop and phone).** A calculator icon beside the search opens a small panel under it, for the sums that come up while entering stock without leaving the page. Type on the keyboard (digits, `. + - * / x ( ) %`, Enter or `=` to calculate, Backspace, `C` to clear, Esc to close) or use the keypad. It shows the answer as you type, understands percentages the way a handheld does (`200 + 10%` is 220), keeps your last few calculations (click one to reuse its answer), and copies the answer. The sum you are in the middle of, and whether the panel is open, carry over when you change page (for this browser tab only; a new visit starts clean). It never touches the sheet you are on. The arithmetic is a small hand-written parser, never `eval`.
 
 ### Security
 - **A server-wide daily cap on AI calls** (`AI_DAILY_CALL_LIMIT`, default 1000 per UTC day, 0 turns it off), on top of the per-person limit, so a misused account cannot run up the Google bill. At the cap the AI says so and the rest of the app is unaffected.

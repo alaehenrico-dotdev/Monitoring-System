@@ -88,6 +88,9 @@ services:
       GEMINI_API_KEY_2: ${GEMINI_API_KEY_2:-}
       GEMINI_API_KEY_3: ${GEMINI_API_KEY_3:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      OPENROUTER_DATA_COLLECTION: ${OPENROUTER_DATA_COLLECTION:-deny}
       AI_DAILY_CALL_LIMIT: ${AI_DAILY_CALL_LIMIT:-1000}
     # Snapshots taken before pending migrations are applied (server/docker/start.sh).
     volumes:

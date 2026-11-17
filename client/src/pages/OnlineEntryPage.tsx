@@ -22,6 +22,8 @@ import { useTopProgress } from "../hooks/useTopProgress";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useShiftWithSavedData } from "../hooks/useShiftWithSavedData";
 import { SaveSummary } from "../components/SaveSummary";
+import { useSaveDateGate } from "../hooks/useSaveDateGate";
+import { openDatePicker } from "../utils/openDatePicker";
 import { EntryProgress } from "../components/EntryProgress";
 import { useOpeningBreaks } from "../hooks/useOpeningBreaks";
 import { describeTransferOverwrites, ONLINE_TRANSFER_PAIRS, transferOverwrites } from "../utils/transferCheck";
@@ -150,6 +152,7 @@ export function OnlineEntryPage() {
   // Bumped by Edit > Refresh to re-read the sheet from the server.
   const [refreshTick, setRefreshTick] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
+  const dateGate = useSaveDateGate(date, showPreview);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   // Real per-item percent (see handleSaveAll) for LoadingOverlay's ring -
   // kept local to this page rather than routed through the shared top
@@ -872,6 +875,11 @@ export function OnlineEntryPage() {
             shift={shift}
             changes={saveReviewItems.length}
             products={new Set(saveReviewItems.map((i) => i.productId)).size}
+            gate={dateGate}
+            onChangeDate={() => {
+              setShowPreview(false);
+              openDatePicker();
+            }}
             notices={saveNotices({
               date,
               shift,
@@ -905,7 +913,7 @@ export function OnlineEntryPage() {
               type="button"
               size="sm"
               onClick={handleSaveAll}
-              disabled={pendingCount === 0 || saving}
+              disabled={pendingCount === 0 || saving || dateGate.blocked}
             >
               {saving ? "Saving…" : `Save (${pendingCount})`}
             </Button>

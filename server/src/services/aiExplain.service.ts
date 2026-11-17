@@ -1,6 +1,6 @@
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
-import { generate, requireGemini, textOf } from "../lib/gemini";
+import { generate, requireAi, textOf } from "../lib/gemini";
 import { getVarianceTrace } from "./manualCounts.service";
 
 /// "Explain this variance" - turns the numbers getVarianceTrace already computes
@@ -67,7 +67,7 @@ export async function explainVariance(
   shift: Parameters<typeof getVarianceTrace>[2],
   location: "ONLINE" | "OFFLINE",
 ) {
-  requireGemini();
+  requireAi();
   const trace = await getVarianceTrace(productId, entryDate, shift, location);
   if (!trace.count) throw HttpError.badRequest("There is no saved count to explain yet.");
   const reply = await generate({

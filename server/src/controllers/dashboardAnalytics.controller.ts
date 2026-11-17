@@ -6,7 +6,7 @@ import { getDaysOfStock } from "../services/daysOfStock.service";
 import { getOrSet } from "../lib/cache";
 import { parseDateOnly, toDateOnlyString } from "../utils/date";
 import { env } from "../config/env";
-import { geminiConfigured } from "../lib/gemini";
+import { aiConfigured, geminiConfigured } from "../lib/gemini";
 import { WHAT_CHANGED_DAYS, whatChanged } from "../services/aiWhatChanged.service";
 import { askData, MAX_QUESTION_LENGTH } from "../services/aiAsk.service";
 
@@ -56,7 +56,7 @@ export async function getDaysOfStockHandler(req: Request, res: Response) {
 /// GET /dashboard/ai/status - whether the AI helpers are set up, so the dashboard can leave their
 /// cards out entirely (rather than show buttons that only say "not set up").
 export function getAiStatusHandler(_req: Request, res: Response) {
-  res.json({ enabled: geminiConfigured(), model: geminiConfigured() ? env.geminiModel : null, windows: WHAT_CHANGED_DAYS });
+  res.json({ enabled: aiConfigured(), model: !aiConfigured() ? null : geminiConfigured() ? env.geminiModel : env.openrouterModel, windows: WHAT_CHANGED_DAYS });
 }
 
 const whatChangedSchema = z.object({ days: z.coerce.number().int().default(7) });

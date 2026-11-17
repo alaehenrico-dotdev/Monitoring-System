@@ -65,6 +65,7 @@ describe("the header search button", () => {
     vi.doMock("../components/LiveClock", () => ({ LiveClock: () => null }));
     vi.doMock("../components/ThemeToggle", () => ({ ThemeToggle: () => null }));
     vi.doMock("../components/TypingPractice", () => ({ TypingPractice: () => null }));
+    vi.doMock("../components/Calculator", () => ({ HeaderCalculator: () => null }));
     vi.doMock("../components/QuickJump", () => ({ openQuickJump: vi.fn() }));
     vi.doMock("./useReadOnlyPhone", () => ({ useReadOnlyPhone: () => false }));
     const { HeaderExtras } = await import("../components/HeaderExtras");

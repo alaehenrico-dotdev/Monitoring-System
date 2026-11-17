@@ -143,6 +143,23 @@ function geminiKeys(): string[] {
   return [...new Set(keys)];
 }
 
+/// The fallback provider's models: one or several, comma-separated, tried in order. A free model is often
+/// "temporarily rate-limited upstream" (its host's pool is shared by everyone), so more than one makes the
+/// fallback far more dependable. FREE ONLY, enforced here: the server refuses to start if any id does not end
+/// in ":free", so a typo or a pasted paid model name can never spend money. At most 5, to bound the wait.
+function openrouterModels(): string[] {
+  const models = (process.env.OPENROUTER_MODEL ?? "")
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean);
+  const notFree = models.find((m) => !m.endsWith(":free"));
+  if (notFree) {
+    throw new Error(`OPENROUTER_MODEL must be free models - every id ends in ":free" (got "${notFree}"). Free only is deliberate; see .env.example.`);
+  }
+  if (models.length > 5) throw new Error("OPENROUTER_MODEL lists too many models (at most 5).");
+  return [...new Set(models)];
+}
+
 function nonNegativeInt(name: string, fallback: number): number {
   const raw = process.env[name]?.trim();
   if (!raw) return fallback;
@@ -266,6 +283,14 @@ export const env = {
   // limit above stops one person hammering it; this stops the TOTAL - a stolen supervisor login, a
   // runaway script - from running up the Google bill. In memory, so a restart resets it. 0 turns it off.
   aiDailyCallLimit: nonNegativeInt("AI_DAILY_CALL_LIMIT", 1000),
+  // Fallback AI provider (lib/openrouter.ts), used only when Gemini fails for a reason that is about Google
+  // (quota, a rejected key, unreachable). Needs BOTH the key and a free model. "deny" asks OpenRouter to route
+  // only to hosts that do not train on prompts (fewer free models qualify); "allow" removes that restriction.
+  openrouterApiKey: process.env.OPENROUTER_API_KEY?.trim() || "",
+  openrouterModels: openrouterModels(),
+  // The first (preferred) one, for anything that only needs a name to show.
+  openrouterModel: openrouterModels()[0] ?? "",
+  openrouterDataCollection: process.env.OPENROUTER_DATA_COLLECTION?.trim().toLowerCase() === "allow" ? ("allow" as const) : ("deny" as const),
   databaseUrl: required("DATABASE_URL"),
   // No fallback for either of these two: a default here would mean
   // `required()` never actually throws, so every token this app has ever

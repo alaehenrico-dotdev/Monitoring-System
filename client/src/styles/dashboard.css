@@ -407,6 +407,229 @@
   margin-bottom: 24px;
   flex-shrink: 0;
 }
+
+/* Dashboard > AI insights card: compact, with the same flowing blue/red/yellow/green line as the
+   header search, drawn as the card's 1px border. The border is a masked pseudo-element rather than a
+   border-image or an opaque padding-box fill, so the card stays translucent and keeps its radius.
+   The same ring in every theme: the card's own border, radius and shadow are overridden (with
+   !important, since each theme styles .ae-dash-card its own way) so a hard outline or offset shadow
+   can't show next to the gradient. The ring is a 1px edge on all four sides: the mask punches out an
+   explicitly sized and placed inner rectangle, which stays exact where "content-box" did not. */
+.ae-dash-ai {
+  position: relative;
+  border: 1px solid transparent !important;
+  border-radius: 24px !important;
+  box-shadow: none !important;
+  /* .ae-dash-card clips to its padding box, which cuts off the ring (it sits on the border). */
+  overflow: visible !important;
+}
+.ae-dash-ai::before {
+  content: "";
+  position: absolute;
+  /* A hairline, to match the search box's underline: under a full pixel, so it renders finer. */
+  inset: -0.75px;
+  border-radius: inherit;
+  padding: 0.75px;
+  pointer-events: none;
+  /* A conic gradient, not a left-to-right one (that is one flat colour down the sides): the four
+     colours are spread round the card, blue top, green right, yellow bottom, red left, like the
+     Google AI Studio prompt box, and turn slowly. */
+  background: var(--ae-ai-conic);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.8;
+}
+/* One animated angle on the card, inherited by the ring and the glow, so they turn together. */
+.ae-dash-ai {
+  /* Spectrum from the design brief: blue, green, amber, coral red. The stretch between amber and red
+     (about the bottom edge) fades to a faint tint, so the light is directional and organic rather
+     than uniformly neon, and that dim patch travels round with the rotation. */
+  --ae-ai-conic: conic-gradient(
+    from var(--ae-ai-angle),
+    #4285f4 0%,
+    #34a853 24%,
+    #fbbc05 44%,
+    rgba(251, 188, 5, 0.12) 54%,
+    rgba(234, 67, 53, 0.12) 61%,
+    #ea4335 76%,
+    #4285f4 100%
+  );
+  animation: ae-dash-ai-spin 8s linear infinite;
+}
+/* The soft glow outside the ring. Two nested spans because a filter runs before a mask on the same
+   element: the inner one is the blurred colour (a filled version of the same gradient, the size of
+   the card), the outer one masks out the card's own area so the glow only spills round the edges and
+   never tints what is written inside. */
+.ae-dash-ai-glow {
+  position: absolute;
+  /* The band is wider than the blur's reach (28px), so the halo fades out on its own instead of
+     being cut off at the band's edge. */
+  inset: -56px;
+  padding: 56px;
+  border-radius: 80px;
+  pointer-events: none;
+  z-index: 0;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.ae-dash-ai-glow > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 24px;
+  background: var(--ae-ai-conic);
+  filter: blur(28px);
+  opacity: 0.32;
+  transition: opacity 300ms ease;
+}
+/* Hover, or focus anywhere inside the card (the select, the question box), lifts the halo. */
+.ae-dash-ai:hover .ae-dash-ai-glow > span,
+.ae-dash-ai:focus-within .ae-dash-ai-glow > span {
+  opacity: 0.5;
+}
+.ae-dash-ai > :not(.ae-dash-ai-glow) {
+  position: relative;
+  z-index: 1;
+}
+@property --ae-ai-angle {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 340deg;
+}
+@keyframes ae-dash-ai-spin {
+  to {
+    --ae-ai-angle: 700deg;
+  }
+}
+.ae-dash-ai-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-bottom: 8px;
+}
+.ae-dash-ai-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: calc(14px * var(--ae-fs, 1));
+  font-weight: 700;
+  color: var(--ae-text);
+}
+.ae-dash-ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 10px 24px;
+}
+.ae-dash-ai-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.ae-dash-ai-row > .ae-input {
+  flex: 1;
+  min-width: 0;
+}
+.ae-dash-ai-chips {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* A soft fade at the right edge says the row scrolls. */
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.ae-dash-ai-chip {
+  flex: none;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  white-space: nowrap;
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out;
+}
+.ae-dash-ai-chip:hover {
+  border-color: #d4a000;
+  background: color-mix(in srgb, #f5c000 12%, var(--ae-bg-alt));
+}
+.ae-dash-ai-chip:focus-visible,
+.ae-dash-ai-clear:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
+.ae-dash-ai-clear {
+  flex: none;
+  padding: 0;
+  font: inherit;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-warning-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ae-dash-ai-clear:hover {
+  text-decoration: underline;
+}
+/* While the AI is working, the border runs about three times faster. */
+.ae-dash-ai--busy {
+  animation-duration: 3.5s;
+}
+.ae-dash-ai.ae-dash-ai--busy .ae-dash-ai-glow > span {
+  opacity: 0.85;
+}
+.ae-dash-ai-chips::-webkit-scrollbar {
+  display: none;
+}
+/* Narrow screens (a 6.1" phone is about 390px wide): the label moves above its controls so the
+   select and the question box get the full width instead of being squeezed beside it, the buttons
+   and fields are touch-sized, and the example chips scroll edge to edge. */
+@media (max-width: 560px) {
+  .ae-dash-ai {
+    padding: 10px 12px 12px !important;
+  }
+  .ae-dash-ai-head {
+    margin-bottom: 10px;
+  }
+  .ae-dash-ai-grid {
+    gap: 14px;
+  }
+  .ae-dash-ai-row {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+  }
+  .ae-dash-ai-row > h4 {
+    flex: 0 0 100%;
+  }
+  .ae-dash-ai-row > .ae-input {
+    min-height: 40px;
+    font-size: 16px;
+  }
+  .ae-dash-ai-row > button {
+    min-height: 40px;
+    padding-inline: 16px;
+  }
+  .ae-dash-ai-chips {
+    margin-inline: -12px;
+    padding-inline: 12px;
+    padding-bottom: 2px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-dash-ai {
+    animation: none;
+  }
+}
 .ae-dash-heading {
   display: flex;
   align-items: baseline;

@@ -22,6 +22,8 @@ import { useTopProgress } from "../hooks/useTopProgress";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useShiftWithSavedData } from "../hooks/useShiftWithSavedData";
 import { SaveSummary } from "../components/SaveSummary";
+import { useSaveDateGate } from "../hooks/useSaveDateGate";
+import { openDatePicker } from "../utils/openDatePicker";
 import { EntryProgress } from "../components/EntryProgress";
 import { useOpeningBreaks } from "../hooks/useOpeningBreaks";
 import { describeTransferOverwrites, OFFLINE_TRANSFER_PAIRS, transferOverwrites } from "../utils/transferCheck";
@@ -161,6 +163,7 @@ export function OfflineEntryPage() {
   // Preview dialog's animated border.
   const [savePercent, setSavePercent] = useState(0);
   const [showPreview, setShowPreview] = useState(false);
+  const dateGate = useSaveDateGate(date, showPreview);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   // Expand/collapse-all for the grid's category rows. The grid owns the
   // per-category state; this is the toolbar icon's side of it - a command
@@ -872,6 +875,11 @@ export function OfflineEntryPage() {
             shift={shift}
             changes={saveReviewItems.length}
             products={new Set(saveReviewItems.map((i) => i.productId)).size}
+            gate={dateGate}
+            onChangeDate={() => {
+              setShowPreview(false);
+              openDatePicker();
+            }}
             notices={saveNotices({
               date,
               shift,
@@ -905,7 +913,7 @@ export function OfflineEntryPage() {
               type="button"
               size="sm"
               onClick={handleSaveAll}
-              disabled={pendingCount === 0 || saving}
+              disabled={pendingCount === 0 || saving || dateGate.blocked}
             >
               {saving ? "Saving…" : `Save (${pendingCount})`}
             </Button>

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { env } from "../config/env";
 import { getOrSet } from "../lib/cache";
-import { generate, requireGemini, textOf } from "../lib/gemini";
+import { generate, requireAi, textOf } from "../lib/gemini";
 import { HttpError } from "../utils/HttpError";
 import { localToday } from "./actionQueue.service";
 import { getPeriodMonitoring, type PeriodMonitoring } from "./periodMonitoring.service";
@@ -126,7 +126,7 @@ export async function whatChanged(days: number, anchor: Date = localToday(new Da
   if (!WHAT_CHANGED_DAYS.includes(days as (typeof WHAT_CHANGED_DAYS)[number])) {
     throw HttpError.badRequest(`Choose ${WHAT_CHANGED_DAYS.join(", ")} days`);
   }
-  requireGemini();
+  requireAi();
 
   const currentFrom = addDays(anchor, -(days - 1));
   const previousTo = addDays(currentFrom, -1);

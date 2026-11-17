@@ -63,6 +63,8 @@ import { VarianceDetails } from "../components/VarianceDetails";
 import { Dropdown } from "../components/Dropdown";
 import { Modal } from "../components/Modal";
 import { SaveSummary } from "../components/SaveSummary";
+import { useSaveDateGate } from "../hooks/useSaveDateGate";
+import { openDatePicker } from "../utils/openDatePicker";
 import { saveNotices } from "../utils/saveReview";
 import { LoadingOverlay } from "../components/Spinner";
 import { matchesSearch } from "../utils/search";
@@ -396,6 +398,7 @@ export function ManualCountPage() {
   // overlay Online/Offline Entry and CSV import use, so all saves look alike.
   const [savePercent, setSavePercent] = useState(0);
   const [showConfirm, setShowConfirm] = useState(false);
+  const dateGate = useSaveDateGate(date, showConfirm);
   const realtimeVersion = useRealtimeVersion();
   // Bumped after the product list changed from an import, so the grid reloads.
   const [productsVersion, setProductsVersion] = useState(0);
@@ -1974,6 +1977,11 @@ export function ManualCountPage() {
             shift={shift}
             changes={pendingChanges.length}
             products={new Set(pendingChanges.map((c) => c.name)).size}
+            gate={dateGate}
+            onChangeDate={() => {
+              setShowConfirm(false);
+              openDatePicker();
+            }}
             notices={[
               ...saveNotices({ date, shift }),
               {
@@ -2098,7 +2106,7 @@ export function ManualCountPage() {
               type="button"
               size="sm"
               onClick={handleSaveAll}
-              disabled={pendingCount === 0 || saving}
+              disabled={pendingCount === 0 || saving || dateGate.blocked}
             >
               {saving ? "Saving…" : `Save (${pendingCount})`}
             </Button>

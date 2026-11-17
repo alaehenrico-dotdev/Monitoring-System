@@ -347,7 +347,7 @@ export function QuickJump() {
     >
       <div
         ref={panelRef}
-        className={`ae-quickjump${phone ? " ae-quickjump--phone" : ""}${aiOn ? " ae-quickjump--ai" : ""}`}
+        className={`ae-quickjump${phone ? " ae-quickjump--phone" : ""}${aiOn ? " ae-quickjump--ai" : ""}${aiOn && ai?.status === "loading" ? " ae-quickjump--thinking" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-label={phone ? "Search" : "Quick jump"}

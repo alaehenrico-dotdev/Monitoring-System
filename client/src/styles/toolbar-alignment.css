@@ -732,6 +732,105 @@
     height: 26px;
   }
 }
+/* Desktop: the AI search button is a fully rounded pill - the icon and the word "Search" - with the
+   same iridescent border as the dashboard's AI insights card (styles/dashboard.css): a 1px conic
+   spectrum ring (blue, green, amber, coral red, with a faint stretch along part of the bottom so the
+   light is directional) and a soft blurred halo behind it, both orbiting together once every 8s. The
+   halo brightens on hover or focus. The ring is a masked pseudo-element; the halo is two nested spans
+   (a filter runs before a mask on one element, so the inner span blurs and the outer one masks the
+   button's own area out). The angle property is registered in dashboard.css. */
+.ae-header-search-btn--labeled {
+  --ae-ai-conic: conic-gradient(
+    from var(--ae-ai-angle),
+    #4285f4 0%,
+    #34a853 24%,
+    #fbbc05 44%,
+    rgba(251, 188, 5, 0.12) 54%,
+    rgba(234, 67, 53, 0.12) 61%,
+    #ea4335 76%,
+    #4285f4 100%
+  );
+  animation: ae-dash-ai-spin 8s linear infinite;
+  position: relative;
+  /* Its own stacking context, so the ring layers below can sit behind the label but in front of
+     the header. */
+  isolation: isolate;
+  width: auto;
+  gap: 7px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 600;
+  background: transparent;
+}
+/* The ring, drawn the sharp way: a pill filled with the gradient (::before) and a solid dark pill
+   one pixel smaller on top of it (::after), so what shows is a 1px edge. Both are plain rounded
+   rectangles, which the browser anti-aliases smoothly, unlike a masked ring, whose curved inner edge
+   came out jagged. The inner pill takes the theme's surface colour (see ::after). */
+.ae-header-search-btn--labeled::before,
+.ae-header-search-btn--labeled::after {
+  content: "";
+  position: absolute;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.ae-header-search-btn--labeled::before {
+  inset: 0;
+  z-index: -2;
+  background: var(--ae-ai-conic);
+  opacity: 0.8;
+}
+.ae-header-search-btn--labeled::after {
+  inset: 1px;
+  z-index: -1;
+  /* The theme's own opaque surface (white in light mode, charcoal in dark), with the label in the
+     theme's text colour, so the word is readable in both. */
+  background: var(--ae-surface);
+  transition: background-color 150ms ease;
+}
+.ae-header-search-btn--labeled {
+  color: var(--ae-text);
+}
+.ae-header-search-btn--labeled:hover::after,
+.ae-header-search-btn--labeled:focus-visible::after {
+  background: color-mix(in srgb, var(--ae-surface) 92%, var(--ae-text));
+}
+.ae-hsb-glow {
+  z-index: -3;
+  position: absolute;
+  /* Wider than the blur's reach, so the halo fades out on its own instead of being cut at the band. */
+  inset: -30px;
+  padding: 30px;
+  border-radius: 999px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.ae-hsb-glow > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ae-ai-conic);
+  filter: blur(14px);
+  opacity: 0.32;
+  transition: opacity 300ms ease;
+}
+.ae-header-search-btn--labeled:hover .ae-hsb-glow > span,
+.ae-header-search-btn--labeled:focus-visible .ae-hsb-glow > span {
+  opacity: 0.5;
+}
+.ae-hsb-label {
+  line-height: 1;
+}
+/* Reduced motion: the ring and halo stay put, still visible. */
+@media (prefers-reduced-motion: reduce) {
+  .ae-header-search-btn--labeled {
+    animation: none;
+  }
+}
 .ae-header-search-btn--ai:hover .ae-ai-search-icon,
 .ae-header-search-btn--ai:focus-visible .ae-ai-search-icon {
   filter: drop-shadow(0 0 2px rgba(251, 188, 4, 0.55));
@@ -740,7 +839,7 @@
    tiled every 320px - the gradient starts and ends on blue, so the slide loops without a seam.
    Soft while idle, full strength while typing. */
 .ae-quickjump--ai .ae-quickjump-input {
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
   background-image: linear-gradient(
     90deg,
     rgba(66, 133, 244, 0.55),
@@ -749,7 +848,7 @@
     rgba(52, 168, 83, 0.55),
     rgba(66, 133, 244, 0.55)
   );
-  background-size: 320px 2px;
+  background-size: 320px 1px;
   background-repeat: repeat-x;
   background-position: 0 100%;
   background-origin: border-box;
@@ -759,6 +858,30 @@
 .ae-quickjump--ai .ae-quickjump-input:focus-visible {
   box-shadow: none;
   background-image: linear-gradient(90deg, #4285f4, #ea4335, #fbbc04, #34a853, #4285f4);
+}
+
+/* While the AI is thinking: the underline runs at full strength and flows faster. Under it sits a
+   continuous glow in the line's own colours: one tinted colour layer with a single eased fade
+   to the panel colour laid over it, so the whole line glows evenly and fades smoothly (a real
+   gradient, not stacked strips, so no horizontal banding). The
+   colours flow left to right through it; all layers share the 320px tile, so it loops seamlessly. */
+.ae-quickjump--ai.ae-quickjump--thinking .ae-quickjump-input,
+.ae-quickjump--ai.ae-quickjump--thinking .ae-quickjump-input:focus-visible {
+  background-image:
+    linear-gradient(90deg, #4285f4, #ea4335, #fbbc04, #34a853, #4285f4),
+    /* Fade: the panel's own colour, opaque at the top and clear at the line, eased. */
+    linear-gradient(
+      to bottom,
+      #232323 0%,
+      rgba(35, 35, 35, 0.9) 20%,
+      rgba(35, 35, 35, 0.66) 40%,
+      rgba(35, 35, 35, 0.4) 60%,
+      rgba(35, 35, 35, 0.18) 80%,
+      rgba(35, 35, 35, 0) 100%
+    ),
+    linear-gradient(90deg, rgba(66, 133, 244, 0.42), rgba(234, 67, 53, 0.42), rgba(251, 188, 4, 0.42), rgba(52, 168, 83, 0.42), rgba(66, 133, 244, 0.42));
+  background-size: 320px 1px, 320px 18px, 320px 18px;
+  animation: ae-ai-flow 3.5s linear infinite;
 }
 
 /* "Ask AI" row and the answer, inside the quick-jump panel (components/QuickJump.tsx). The panel
@@ -993,6 +1116,8 @@
   .ae-cell-history-row,
   .ae-ai-spark,
   .ae-quickjump--ai .ae-quickjump-input,
+  .ae-quickjump--ai.ae-quickjump--thinking .ae-quickjump-input,
+  .ae-quickjump--ai.ae-quickjump--thinking .ae-quickjump-input:focus-visible,
   .ae-quickjump-ai-thinking {
     animation: none;
   }
@@ -1843,39 +1968,28 @@
   }
 }
 
-.ae-entry-savebar {
-  position: sticky;
-  bottom: 10px;
-  z-index: 30;
-  display: flex;
+/* The unsaved-changes toast (components/EntrySaveBar.tsx, StickyToast in Toast.tsx): a normal toast
+   with no dismiss X, so it keeps the right padding of the others, message on top and the actions on
+   their own row, right-aligned. */
+.ae-toast--sticky {
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px 12px;
-  margin: 10px 0 0;
-  padding: 8px 12px;
-  border: 0.3px solid var(--ae-hairline);
-  border-left: 3px solid #d4a000;
-  border-radius: 4px;
-  background: var(--ae-surface);
-  color: var(--ae-text);
-  box-shadow: 0 6px 20px rgba(12, 12, 12, 0.22);
-  font-size: calc(13px * var(--ae-fs, 1));
-  font-weight: 600;
+  padding-right: 12px;
 }
-.ae-entry-savebar--failed {
-  border-left-color: var(--ae-danger-text);
+.ae-toast--failed .ae-toast-message {
   color: var(--ae-danger-text);
 }
-.ae-entry-savebar-actions {
-  display: inline-flex;
+.ae-toast-message--strong {
+  font-weight: 600;
+  color: var(--ae-text);
+}
+.ae-toast-actions {
+  display: flex;
+  flex: 1 1 100%;
+  justify-content: flex-end;
   gap: 6px;
 }
 @media (max-width: 520px) {
-  .ae-entry-savebar-actions {
-    flex: 1 1 100%;
-  }
-  .ae-entry-savebar-actions > * {
+  .ae-toast-actions > * {
     flex: 1 1 0;
     justify-content: center;
   }
@@ -2177,30 +2291,253 @@
 @keyframes ae-typing-backdrop-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .ae-typing-backdrop { animation: none; } }
 
-/* Header keyboard icon: breathes gently, with an occasional "Try Typing test!" bubble. */
+/* Header keyboard icon: breathes gently; a tooltip names it on hover or keyboard focus. */
 .ae-typing-wrap { position: relative; display: inline-flex; }
-.ae-typing-btn { animation: ae-typing-breathe 3.2s ease-in-out infinite; }
+/* This runs on every page for as long as the app is open, so it only animates transform and opacity,
+   which the browser does on the GPU without repainting. (It used to animate box-shadow, which
+   repaints the header every frame.) The glow is the same shadow on a pseudo-element whose opacity
+   pulses instead. */
+.ae-typing-btn { position: relative; will-change: transform, opacity; animation: ae-typing-breathe 3.2s ease-in-out infinite; }
+.ae-typing-btn::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  box-shadow: 0 0 10px 2px rgba(245, 192, 0, 0.45); opacity: 0;
+  animation: ae-typing-glow 3.2s ease-in-out infinite;
+}
 .ae-typing-btn:hover, .ae-typing-btn:focus-visible { animation-play-state: paused; }
+.ae-typing-btn:hover::after, .ae-typing-btn:focus-visible::after { animation-play-state: paused; }
 @keyframes ae-typing-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.7; box-shadow: 0 0 0 0 rgba(245, 192, 0, 0); }
-  50% { transform: scale(1.18); opacity: 1; box-shadow: 0 0 10px 2px rgba(245, 192, 0, 0.45); }
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.18); opacity: 1; }
 }
-.ae-typing-nudge {
-  position: absolute; top: calc(100% + 10px); right: -6px; z-index: 60;
-  padding: 7px 12px; font: inherit; font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: pointer;
-  color: #1a1a1a; background: #f5c000; border: none; border-radius: 10px;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-  transform-origin: calc(100% - 14px) 0;
-  animation: ae-typing-nudge-in 320ms cubic-bezier(0.2, 0.9, 0.3, 1.4), ae-typing-nudge-bob 2.4s ease-in-out 320ms infinite;
+@keyframes ae-typing-glow { 50% { opacity: 1; } }
+/* Hover / focus tooltip: dark in both colour modes, like the quick-jump panel. Fades in after a
+   short delay so it doesn't flash while the cursor passes over the toolbar. */
+.ae-typing-tip {
+  position: absolute; top: calc(100% + 8px); right: -4px; z-index: 60;
+  display: flex; flex-direction: column; gap: 1px; padding: 7px 11px;
+  font-size: 12px; font-weight: 600; line-height: 1.3; white-space: nowrap; letter-spacing: 0.01em;
+  color: #ececec; background: #232323; border: 0.5px solid #3f3f3f; border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(12, 12, 12, 0.4);
+  opacity: 0; transform: translateY(-3px); pointer-events: none;
+  transition: opacity 140ms ease-out, transform 140ms ease-out;
 }
-.ae-typing-nudge::before {
-  content: ""; position: absolute; top: -5px; right: 14px; width: 10px; height: 10px;
-  background: inherit; transform: rotate(45deg); border-radius: 2px;
+.ae-typing-tip-sub { font-size: 11px; font-weight: 400; color: #9a9a9a; }
+.ae-typing-tip::before {
+  content: ""; position: absolute; top: -4px; right: 14px; width: 7px; height: 7px;
+  background: #232323; border-top: 0.5px solid #3f3f3f; border-left: 0.5px solid #3f3f3f;
+  transform: rotate(45deg);
 }
-@keyframes ae-typing-nudge-in { from { opacity: 0; transform: translateY(-6px) scale(0.8); } }
-@keyframes ae-typing-nudge-bob { 50% { transform: translateY(3px); } }
+.ae-typing-wrap:hover .ae-typing-tip,
+.ae-typing-wrap:has(.ae-typing-btn:focus-visible) .ae-typing-tip,
+.ae-calc-wrap:has(.ae-header-search-btn:focus-visible) .ae-typing-tip {
+  opacity: 1; transform: none; transition-delay: 250ms;
+}
 @media (prefers-reduced-motion: reduce) {
-  .ae-typing-btn, .ae-typing-nudge { animation: none; }
+  .ae-typing-btn, .ae-typing-btn::after { animation: none; }
+  .ae-typing-tip { transition: none; transform: none; }
+}
+
+/* Header calculator (components/Calculator.tsx): an icon that opens a small panel under it. Theme
+   tokens throughout, so it follows the colour mode and each theme. The icon button and its
+   hover tooltip reuse the typing practice's classes. */
+.ae-calc-pop {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -4px;
+  z-index: 80;
+  width: 292px;
+  max-width: calc(100vw - 24px);
+  padding: 12px;
+  color: var(--ae-text);
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(12, 12, 12, 0.35);
+  outline: none;
+  transform-origin: top right;
+  animation: ae-calc-in 140ms ease-out;
+}
+@keyframes ae-calc-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+.ae-calc-display {
+  margin-bottom: 10px;
+  padding: 8px 12px 10px;
+  background: var(--ae-bg-alt);
+  border-radius: 10px;
+}
+.ae-calc-expr {
+  height: 17px;
+  overflow: hidden;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-variant-numeric: tabular-nums;
+  line-height: 17px;
+  color: var(--ae-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ae-calc-main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ae-calc-result {
+  min-width: 0;
+  overflow: hidden;
+  font-size: calc(26px * var(--ae-fs, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ae-calc-result--error {
+  font-size: calc(14px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-danger-text);
+}
+.ae-calc-copy,
+.ae-calc-link {
+  flex: none;
+  padding: 2px 4px;
+  font: inherit;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-warning-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ae-calc-copy:hover:not(:disabled),
+.ae-calc-link:hover {
+  text-decoration: underline;
+}
+.ae-calc-copy:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ae-calc-keys {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.ae-calc-key {
+  height: 40px;
+  padding: 0;
+  font: inherit;
+  font-size: calc(16px * var(--ae-fs, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  cursor: pointer;
+  transition: border-color 120ms ease-out, background-color 120ms ease-out, transform 80ms ease-out;
+}
+.ae-calc-key:hover {
+  border-color: #d4a000;
+}
+.ae-calc-key:active {
+  transform: scale(0.96);
+}
+.ae-calc-key--fn {
+  color: var(--ae-text-muted);
+}
+.ae-calc-key--op {
+  background: color-mix(in srgb, #f5c000 16%, var(--ae-bg-alt));
+}
+.ae-calc-key--eq {
+  grid-column: 1 / -1;
+  height: 42px;
+  color: #1a1a1a;
+  background: #f5c000;
+  border-color: #d4a000;
+}
+.ae-calc-key--eq:hover {
+  background: #ffd02a;
+}
+.ae-calc-key:focus-visible,
+.ae-calc-copy:focus-visible,
+.ae-calc-link:focus-visible,
+.ae-calc-hist-item:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
+.ae-calc-history {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ae-border);
+}
+.ae-calc-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-calc-history ul {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ae-calc-hist-item {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 6px;
+  font: inherit;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  font-variant-numeric: tabular-nums;
+  color: var(--ae-text);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ae-calc-hist-item:hover {
+  background: var(--ae-bg-alt);
+}
+.ae-calc-hist-expr {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ae-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ae-calc-hist-res {
+  flex: none;
+  font-weight: 600;
+}
+.ae-calc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+/* A finger needs a bigger key. */
+@media (pointer: coarse) {
+  .ae-calc-key {
+    height: 46px;
+  }
+  .ae-calc-key--eq {
+    height: 48px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-calc-pop {
+    animation: none;
+  }
+  .ae-calc-key {
+    transition: none;
+  }
 }
 
 /* Desktop-mode gate (components/DesktopModeGate.tsx): full-screen, theme-coloured. */

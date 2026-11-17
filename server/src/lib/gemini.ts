@@ -1,5 +1,6 @@
 import { env } from "../config/env";
 import { HttpError } from "../utils/HttpError";
+import { callOpenRouter, openrouterConfigured, OpenRouterError } from "./openrouter";
 
 /// The one place the server talks to Google's Gemini API. Used by the variance explainer
 /// (services/aiExplain.service.ts), the dashboard's "What changed?" and "Ask the data"
@@ -33,9 +34,12 @@ const apiKeys = (): string[] => (env.geminiApiKeys?.length ? env.geminiApiKeys :
 
 export const geminiConfigured = () => apiKeys().length > 0;
 
-export function requireGemini() {
-  if (!geminiConfigured()) {
-    throw new HttpError(503, "AI features are not set up. Add GEMINI_API_KEY to the server settings.");
+/// Whether ANY AI provider is set up (Gemini, or the OpenRouter fallback on its own).
+export const aiConfigured = () => geminiConfigured() || openrouterConfigured();
+
+export function requireAi() {
+  if (!aiConfigured()) {
+    throw new HttpError(503, "AI features are not set up. Add GEMINI_API_KEY (or OPENROUTER_API_KEY and a free OPENROUTER_MODEL) to the server settings.");
   }
 }
 
@@ -75,6 +79,8 @@ let usage = { day: "", calls: 0 };
 const RATE_LIMIT_COOLDOWN_MS = 60_000;
 const REJECTED_KEY_COOLDOWN_MS = 10 * 60_000;
 let cooldowns = new Map<number, { until: number; failure: HttpError }>();
+/// The same idea for the OpenRouter fallback (its free tier is small: 20 a minute, 50 a day).
+let openrouterCooldown: { until: number; failure: HttpError } | null = null;
 
 /// A failure that is about THIS key (its quota or its validity), so the next key may well work. Anything else
 /// (Google down, a bad request, an unknown model) would fail the same on every key and is not retried.
@@ -91,6 +97,7 @@ class KeyFailure extends Error {
 export function resetAiUsage(): void {
   usage = { day: "", calls: 0 };
   cooldowns = new Map();
+  openrouterCooldown = null;
 }
 
 function takeDailyAllowance(): void {
@@ -119,11 +126,53 @@ export interface GenerateOptions {
   event: string;
 }
 
-/// One model call, on the first key that is not cooling down; on a key-specific failure (quota or a rejected
-/// key) the next key is tried. Returns the model's turn (its parts, untouched).
+/// One model call. Gemini first (its keys in order, see below). Only if Gemini fails for a reason that is about
+/// Google - a 502: out of quota, a rejected key, unreachable, no answer - and the OpenRouter fallback is set up,
+/// the same request is sent there. Our own daily cap (429) and "not set up" (503) never trigger a fallback: they
+/// are decisions, not Google failing. If the fallback fails too, Gemini's reason is the one reported (the
+/// fallback's goes to the log), because that is what the admin should look at first.
+/// With no Gemini key at all, OpenRouter simply is the provider.
+/// Returns the model's turn (its parts, untouched).
 export async function generate(opts: GenerateOptions): Promise<GeminiContent> {
-  requireGemini();
+  requireAi();
   const keys = apiKeys();
+  if (keys.length === 0) return generateWithOpenRouter(opts, false);
+
+  try {
+    return await generateWithGemini(opts, keys);
+  } catch (err) {
+    if (!openrouterConfigured() || !(err instanceof HttpError) || err.status !== 502) throw err;
+    console.error(JSON.stringify({ level: "warn", event: "ai-provider-fallback", from: "gemini", to: "openrouter", reason: err.message.slice(0, 80) }));
+    try {
+      return await generateWithOpenRouter(opts, true);
+    } catch (second) {
+      // The daily cap is shared by both providers; if THAT is what stopped the fallback, say so.
+      if (second instanceof HttpError && second.status === 429) throw second;
+      throw err;
+    }
+  }
+}
+
+async function generateWithOpenRouter(opts: GenerateOptions, hasGemini: boolean): Promise<GeminiContent> {
+  if (openrouterCooldown && openrouterCooldown.until > Date.now()) throw openrouterCooldown.failure;
+  takeDailyAllowance();
+  try {
+    return await callOpenRouter(opts);
+  } catch (err) {
+    if (!(err instanceof OpenRouterError)) throw err;
+    // Cool it down only when Gemini is there to carry on meanwhile; as the only provider every request must
+    // still be tried, or "Try again" would fail for a minute without even asking.
+    if (hasGemini) {
+      const ms = err.status === 429 ? RATE_LIMIT_COOLDOWN_MS : [401, 402, 403, 404].includes(err.status) ? REJECTED_KEY_COOLDOWN_MS : 0;
+      if (ms) openrouterCooldown = { until: Date.now() + ms, failure: err.failure };
+    }
+    throw err.failure;
+  }
+}
+
+/// The Gemini keys, in order: the first that is not cooling down; on a key-specific failure (quota or a rejected
+/// key) the next key is tried.
+async function generateWithGemini(opts: GenerateOptions, keys: string[]): Promise<GeminiContent> {
   const now = Date.now();
   const ready = keys.map((key, index) => ({ key, index })).filter(({ index }) => (cooldowns.get(index)?.until ?? 0) <= now);
   if (ready.length === 0) {

@@ -1,7 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  env: { geminiApiKey: "k", geminiApiKeys: undefined as string[] | undefined, geminiModel: "m", aiDailyCallLimit: 3 },
+  env: {
+    geminiApiKey: "k",
+    geminiApiKeys: undefined as string[] | undefined,
+    geminiModel: "m",
+    aiDailyCallLimit: 3,
+    openrouterApiKey: "",
+    openrouterModel: "",
+    openrouterDataCollection: "deny" as "deny" | "allow",
+  },
 }));
 vi.mock("../config/env", () => ({ env: mocks.env }));
 
@@ -15,6 +23,8 @@ beforeEach(() => {
   mocks.env.geminiApiKey = "k";
   mocks.env.geminiApiKeys = undefined;
   mocks.env.aiDailyCallLimit = 3;
+  mocks.env.openrouterApiKey = "";
+  mocks.env.openrouterModel = "";
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue(okResponse()));
   vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
@@ -169,5 +179,114 @@ describe("backup keys (failover)", () => {
     byKey({ "only-key": okResponse() });
     await call();
     expect(keysUsed()).toEqual(["only-key"]);
+  });
+});
+
+describe("OpenRouter fallback", () => {
+  const quota = { ok: false, status: 429, json: async () => ({ error: { status: "RESOURCE_EXHAUSTED", message: "You exceeded your current quota" } }) };
+  const orOk = () => ({ ok: true, json: async () => ({ choices: [{ message: { content: "from openrouter" } }] }) });
+  const orFail = (status: number) => ({ ok: false, status, json: async () => ({ error: { message: "nope" } }) });
+  const isOr = (u: string) => u.includes("openrouter.ai");
+  /// Routes by provider: gemini(...) answers Google calls, openrouter(...) answers OpenRouter calls.
+  const route = (gemini: unknown, openrouter: unknown) =>
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async (u: string) => (isOr(u) ? openrouter : gemini)));
+  const orCalls = () => vi.mocked(fetch).mock.calls.filter((c) => isOr(String(c[0]))).length;
+  const textOf = (r: { parts: { text?: string }[] }) => r.parts.map((p) => p.text).join("");
+
+  beforeEach(() => {
+    mocks.env.aiDailyCallLimit = 0;
+    mocks.env.openrouterApiKey = "or-key";
+    mocks.env.openrouterModel = "vendor/model:free";
+  });
+
+  it("is not used while Gemini works", async () => {
+    route(okResponse(), orOk());
+    expect(textOf((await call()) as never)).toBe("hi");
+    expect(orCalls()).toBe(0);
+  });
+
+  it("answers from OpenRouter when Gemini is out of quota, and the caller notices nothing", async () => {
+    route(quota, orOk());
+    expect(textOf((await call()) as never)).toBe("from openrouter");
+    expect(orCalls()).toBe(1);
+  });
+
+  it("also covers Google failing outright", async () => {
+    route({ ok: false, status: 500, json: async () => ({}) }, orOk());
+    expect(textOf((await call()) as never)).toBe("from openrouter");
+  });
+
+  it("does NOT fall back for our own daily cap - that is a decision, not Google failing", async () => {
+    mocks.env.aiDailyCallLimit = 1;
+    route(okResponse(), orOk());
+    await call();
+    await expect(call()).rejects.toMatchObject({ status: 429, message: expect.stringContaining("AI_DAILY_CALL_LIMIT") });
+    expect(orCalls()).toBe(0);
+  });
+
+  it("counts the fallback's attempt against the same daily cap", async () => {
+    mocks.env.aiDailyCallLimit = 2;
+    route(quota, orOk());
+    await call(); // Gemini attempt (1) + OpenRouter attempt (2)
+    await expect(call()).rejects.toMatchObject({ status: 429 });
+  });
+
+  it("without the fallback configured, Gemini's own failure is what comes back", async () => {
+    mocks.env.openrouterApiKey = "";
+    route(quota, orOk());
+    await expect(call()).rejects.toMatchObject({ status: 502, message: expect.stringContaining("usage limit") });
+    expect(orCalls()).toBe(0);
+  });
+
+  it("needs both a key and a model - one alone is not 'configured'", async () => {
+    mocks.env.openrouterModel = "";
+    route(quota, orOk());
+    await expect(call()).rejects.toMatchObject({ status: 502 });
+    expect(orCalls()).toBe(0);
+  });
+
+  it("when both fail, reports Gemini's reason (the fallback's goes to the log)", async () => {
+    route(quota, orFail(401));
+    await expect(call()).rejects.toMatchObject({ message: expect.stringContaining("Google usage limit") });
+    expect(orCalls()).toBe(1);
+  });
+
+  it("works as the ONLY provider, with no Gemini key at all", async () => {
+    mocks.env.geminiApiKey = "";
+    mocks.env.geminiApiKeys = undefined;
+    route(okResponse(), orOk());
+    expect(textOf((await call()) as never)).toBe("from openrouter");
+    expect(vi.mocked(fetch).mock.calls.every((c) => isOr(String(c[0])))).toBe(true);
+  });
+
+  it("as the only provider, a refusal is never remembered - Try again really asks again", async () => {
+    mocks.env.geminiApiKey = "";
+    route(okResponse(), orFail(429));
+    await expect(call()).rejects.toMatchObject({ status: 502 });
+    route(okResponse(), orOk());
+    await expect(call()).resolves.toBeTruthy();
+  });
+
+  it("with Gemini as well, a refused fallback is left alone for a minute so its small daily allowance is not wasted", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-16T10:00:00Z"));
+    route(quota, orFail(429));
+    await call().catch(() => undefined);
+    await call().catch(() => undefined);
+    expect(orCalls()).toBe(1); // the second request skipped the cooling fallback
+
+    vi.setSystemTime(new Date("2026-11-16T10:02:00Z"));
+    route(quota, orOk());
+    expect(textOf((await call()) as never)).toBe("from openrouter");
+  });
+
+  it("never logs a key from either provider", async () => {
+    const log = vi.mocked(console.error);
+    route(quota, orFail(404));
+    await call().catch(() => undefined);
+    const logged = log.mock.calls.map((c) => String(c[0])).join("\n");
+    expect(logged).toContain("ai-provider-fallback");
+    expect(logged).not.toContain("or-key");
+    expect(logged).not.toContain('"k"');
   });
 });

@@ -145,3 +145,59 @@ describe("env - Gemini keys", () => {
     expect(env.geminiApiKey).toBe("");
   });
 });
+
+describe("env - OpenRouter fallback (free only)", () => {
+  const NAMES = ["OPENROUTER_API_KEY", "OPENROUTER_MODEL", "OPENROUTER_DATA_COLLECTION"];
+  beforeEach(() => {
+    for (const n of NAMES) delete process.env[n];
+  });
+
+  it("is off with nothing set, and asks for no-training hosts by default", async () => {
+    const { env } = await import("./env.js");
+    expect(env.openrouterApiKey).toBe("");
+    expect(env.openrouterModel).toBe("");
+    expect(env.openrouterModels).toEqual([]);
+    expect(env.openrouterDataCollection).toBe("deny");
+  });
+
+  it("accepts a free model and trims the key", async () => {
+    Object.assign(process.env, { OPENROUTER_API_KEY: "  sk-or-abc  ", OPENROUTER_MODEL: " vendor/model:free " });
+    const { env } = await import("./env.js");
+    expect(env.openrouterApiKey).toBe("sk-or-abc");
+    expect(env.openrouterModel).toBe("vendor/model:free");
+    expect(env.openrouterModels).toEqual(["vendor/model:free"]);
+  });
+
+  it("reads several free models in order, ignoring blanks and repeats", async () => {
+    Object.assign(process.env, { OPENROUTER_API_KEY: "k", OPENROUTER_MODEL: " a/one:free , b/two:free,, a/one:free " });
+    const { env } = await import("./env.js");
+    expect(env.openrouterModels).toEqual(["a/one:free", "b/two:free"]);
+    expect(env.openrouterModel).toBe("a/one:free");
+  });
+
+  it("refuses to start if ANY listed model is not free, even when the first one is", async () => {
+    Object.assign(process.env, { OPENROUTER_API_KEY: "k", OPENROUTER_MODEL: "a/one:free,openai/gpt-oss-120b" });
+    await expect(import("./env.js")).rejects.toThrow(/must be free models/);
+  });
+
+  it("refuses an over-long list", async () => {
+    Object.assign(process.env, { OPENROUTER_API_KEY: "k", OPENROUTER_MODEL: ["a", "b", "c", "d", "e", "f"].map((n) => `v/${n}:free`).join(",") });
+    await expect(import("./env.js")).rejects.toThrow(/too many models/);
+  });
+
+  it.each(["openai/gpt-oss-120b", "nvidia/nemotron-3-super-120b-a12b", "vendor/model:free-ish", "openrouter/auto"])(
+    "refuses to start with a model that is not free: %s",
+    async (model) => {
+      Object.assign(process.env, { OPENROUTER_API_KEY: "k", OPENROUTER_MODEL: model });
+      await expect(import("./env.js")).rejects.toThrow(/must be free models/);
+    },
+  );
+
+  it("only lifts the no-training restriction on an explicit allow", async () => {
+    Object.assign(process.env, { OPENROUTER_DATA_COLLECTION: "Allow" });
+    expect((await import("./env.js")).env.openrouterDataCollection).toBe("allow");
+    vi.resetModules();
+    Object.assign(process.env, { OPENROUTER_DATA_COLLECTION: "yes please" });
+    expect((await import("./env.js")).env.openrouterDataCollection).toBe("deny");
+  });
+});
