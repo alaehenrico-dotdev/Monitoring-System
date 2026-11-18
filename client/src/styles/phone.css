@@ -1512,3 +1512,15 @@
   flex: 0 0 auto;
   gap: 0;
 }
+
+/* A tapped product name in the Monitoring table opens in full: it wraps (the closed one is cut to one
+   line, above). */
+:root:root:root[data-phone="true"] .ae-pm-table td.ae-pm-name--full {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Room above Recent Activity: it sat right under the AI card (or the last insight card) with no gap. */
+:root:root:root[data-phone="true"] .ae-dash-activity-row {
+  margin-top: 20px;
+}

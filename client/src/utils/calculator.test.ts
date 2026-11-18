@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluate, formatResult, plainResult, prettyExpression } from "./calculator";
+import { copyText, evaluate, formatResult, formatWith, packSplit, parseNumberList, plainResult, prettyExpression, sumLines } from "./calculator";
 
 const val = (s: string) => {
   const r = evaluate(s);
@@ -103,5 +103,47 @@ describe("formatting", () => {
   it("shows the symbols a person expects, and keeps a leading minus as one", () => {
     expect(prettyExpression("6*7/2-1")).toBe("6×7÷2−1");
     expect(prettyExpression("-5+2")).toBe("−5+2");
+  });
+});
+
+
+describe("parseNumberList", () => {
+  it("reads one number per line, tab or space, and ignores labels and currency", () => {
+    expect(parseNumberList("Soy\t120\nVinegar 35\n₱ 7.5")).toEqual([120, 35, 7.5]);
+  });
+  it("treats 1,250 as one number but 1,2,3 as three", () => {
+    expect(parseNumberList("1,250\n3,000,000")).toEqual([1250, 3000000]);
+    expect(parseNumberList("1,2,3")).toEqual([1, 2, 3]);
+  });
+  it("reads negatives (a minus sign or a proper minus) and a leading point", () => {
+    expect(parseNumberList("-4 −5 .5")).toEqual([-4, -5, 0.5]);
+  });
+  it("returns nothing for text without numbers, and caps a huge paste", () => {
+    expect(parseNumberList("no numbers here")).toEqual([]);
+    expect(parseNumberList(Array.from({ length: 800 }, (_, i) => i).join("\n"))).toHaveLength(500);
+  });
+});
+
+describe("sumLines, packSplit, formatWith, copyText", () => {
+  it("adds without floating-point noise", () => {
+    expect(sumLines([0.1, 0.2])).toBe(0.3);
+    expect(sumLines([])).toBe(0);
+  });
+  it("splits pieces into whole packs and a remainder, or says it cannot", () => {
+    expect(packSplit(100, 24)).toEqual({ packs: 4, rest: 4 });
+    expect(packSplit(48, 24)).toEqual({ packs: 2, rest: 0 });
+    expect(packSplit(10.5, 24)).toBeNull();
+    expect(packSplit(-3, 24)).toBeNull();
+    expect(packSplit(10, 0)).toBeNull();
+  });
+  it("formats with fixed decimals and optional grouping", () => {
+    expect(formatWith(1234.5)).toBe("1,234.5");
+    expect(formatWith(1234.5, { decimals: 2 })).toBe("1,234.50");
+    expect(formatWith(1234.567, { decimals: 0, grouping: false })).toBe("1235");
+    expect(formatWith(-0)).toBe("0");
+  });
+  it("copies the number rounded to the chosen decimals, as plain text", () => {
+    expect(copyText(1234.567, 2)).toBe("1234.57");
+    expect(copyText(1234.5, null)).toBe("1234.5");
   });
 });

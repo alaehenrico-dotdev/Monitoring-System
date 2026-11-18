@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 
@@ -263,6 +263,9 @@ export function Toast({
   );
 }
 
+/// How long the pointer must rest on a hidden StickyToast's tab before the toast comes back.
+const REVEAL_DWELL_MS = 700;
+
 /**
  * A toast that stays up for as long as `show` is true: no countdown and no dismiss X, because it
  * carries the actions for something still pending (the unsaved-changes toast on the entry sheets
@@ -276,26 +279,117 @@ export function StickyToast({
   children,
   actions,
   failed = false,
+  dismissible = false,
+  autoHideMs,
+  revealTab = false,
+  tabLabel,
+  revealDelayMs = REVEAL_DWELL_MS,
+  resetKey,
 }: {
   show: boolean;
   variant?: ToastVariant;
   children: ReactNode;
   actions?: ReactNode;
   failed?: boolean;
+  /// Adds a close X. Closing only hides the toast; `show` is still what says there is something pending.
+  dismissible?: boolean;
+  /// Hides the toast by itself after this long, so it never sits over the entries; it waits while the
+  /// pointer or keyboard focus is on it, and a failure (`failed`) stays up until closed.
+  autoHideMs?: number;
+  /// While hidden (and `show` is true), a small tab stays in the corner. Resting the pointer on it for a
+  /// moment (or clicking it) brings the toast back, smoothly; moving the pointer around the corner does
+  /// nothing.
+  revealTab?: boolean;
+  /// What the tab says (e.g. "3 unsaved").
+  tabLabel?: ReactNode;
+  /// How long the pointer rests on the tab before the toast comes back.
+  revealDelayMs?: number;
+  /// A change of this value (e.g. the count in the message) restarts the auto-hide timer.
+  resetKey?: unknown;
 }) {
+  const [hidden, setHidden] = useState(false);
+  const [held, setHeld] = useState(false);
+  // Each new pending session starts visible, and a failure always shows. (State adjusted while rendering,
+  // React's pattern for a value derived from the previous props.)
+  const [seen, setSeen] = useState({ show, failed });
+  if (seen.show !== show || seen.failed !== failed) {
+    setSeen({ show, failed });
+    if (!show || (failed && !seen.failed)) setHidden(false);
+  }
+  const visible = show && !hidden;
+  // The pointer (or a focused button) can be on the toast when it goes away - Discard, the X, a save -
+  // and then no mouseleave / blur ever arrives. Forget it then, or the next time the toast shows it
+  // would wait for a pointer that is long gone and never auto-hide.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
+    if (!visible) setHeld(false);
+  }
+
+  useEffect(() => {
+    if (!visible || !autoHideMs || failed || held) return;
+    const timer = setTimeout(() => setHidden(true), autoHideMs);
+    return () => clearTimeout(timer);
+  }, [visible, autoHideMs, failed, held, resetKey]);
+
+  // The tab: the pointer must rest on it for `revealDelayMs` (a bar fills along its bottom edge while it
+  // does), so passing over it or working near the corner never opens the toast by accident.
+  const [dwelling, setDwelling] = useState(false);
+  const dwellTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const stopDwell = () => {
+    clearTimeout(dwellTimer.current);
+    setDwelling(false);
+  };
+  const startDwell = () => {
+    clearTimeout(dwellTimer.current);
+    setDwelling(true);
+    dwellTimer.current = setTimeout(() => {
+      setDwelling(false);
+      setHidden(false);
+    }, revealDelayMs);
+  };
+  useEffect(() => () => clearTimeout(dwellTimer.current), []);
+  const tabShown = show && hidden && revealTab;
+
   return createPortal(
     <AnimatePresence>
-      {show && (
+      {tabShown && (
+        <motion.button
+          key="tab"
+          type="button"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8, transition: { duration: 0.18, ease: "easeOut" } }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className={`ae-toast-tab${dwelling ? " is-dwelling" : ""}`}
+          style={{ pointerEvents: "auto", ["--ae-dwell" as string]: `${revealDelayMs}ms` }}
+          aria-label={`Show the notice: ${typeof tabLabel === "string" ? tabLabel : "unsaved changes"}`}
+          onMouseEnter={startDwell}
+          onMouseLeave={stopDwell}
+          onClick={() => {
+            stopDwell();
+            setHidden(false);
+          }}
+        >
+          <span className="ae-toast-tab-dot" aria-hidden />
+          {tabLabel ?? "Unsaved"}
+        </motion.button>
+      )}
+      {visible && (
         <motion.div
           key="sticky"
           layout
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, transition: { duration: 0.25, ease: "easeOut" } }}
+          exit={{ opacity: 0, y: 10, transition: { duration: 0.25, ease: "easeOut" } }}
           transition={{ duration: 0.2, ease: "easeOut" }}
           role="status"
-          className={`ae-toast ae-toast--sticky${failed ? " ae-toast--failed" : ""}`}
+          className={`ae-toast ae-toast--sticky${failed ? " ae-toast--failed" : ""}${dismissible ? " ae-toast--dismissible" : ""}`}
           style={{ pointerEvents: "auto" }}
+          onMouseEnter={() => setHeld(true)}
+          onMouseLeave={() => setHeld(false)}
+          onFocusCapture={() => setHeld(true)}
+          onBlurCapture={() => setHeld(false)}
         >
           <span
             className="ae-toast-icon"
@@ -311,6 +405,19 @@ export function StickyToast({
           </span>
           <div className="ae-toast-message ae-toast-message--strong">{children}</div>
           {actions && <div className="ae-toast-actions">{actions}</div>}
+          {dismissible && (
+            <button
+              type="button"
+              onClick={() => setHidden(true)}
+              aria-label="Hide"
+              title={revealTab ? "Hide (a small tab stays in the corner to bring it back)" : "Hide"}
+              className="ae-toast-close"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden focusable="false">
+                <path d="M4 4 12 12M12 4 4 12" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
         </motion.div>
       )}
     </AnimatePresence>,

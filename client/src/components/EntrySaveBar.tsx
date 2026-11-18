@@ -3,8 +3,9 @@ import { StickyToast } from "./Toast";
 
 /// The unsaved-changes notice on an entry sheet, shown as a toast in the shared bottom-right stack
 /// (not a bar docked into the page) while the sheet has unsaved edits or a save failed. The
-/// Review / Discard actions stay in reach while the grid is scrolled. Hidden when there is nothing
-/// unsaved.
+/// Review / Discard actions stay in reach while the grid is scrolled. It hides itself after a few
+/// seconds and with its X, so it never blocks the entries, leaving a small tab that brings it back.
+/// Gone when there is nothing unsaved.
 export function EntrySaveBar({
   pendingCount,
   pendingCellCount,
@@ -28,6 +29,13 @@ export function EntrySaveBar({
       show={pendingCount > 0}
       variant={failedNow ? "error" : "warning"}
       failed={failedNow}
+      // It must not sit over the entries: it hides after a few seconds (or with the X), leaving a small
+      // tab in the corner that brings it back when the pointer rests on it. A failed save stays up.
+      dismissible
+      autoHideMs={8000}
+      revealTab
+      tabLabel={`${pendingCellCount} unsaved`}
+      resetKey={pendingCellCount}
       actions={
         <>
           <Button type="button" variant="secondary" size="sm" onClick={onDiscard} disabled={saving}>

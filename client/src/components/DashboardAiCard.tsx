@@ -12,7 +12,7 @@ import { Button } from "./ui";
 import { Dropdown } from "./Dropdown";
 import { colors } from "../theme";
 import { formatDateDisplay } from "../utils/dateFormat";
-import { describeArgs, TOOL_LABEL } from "../utils/aiSources";
+import { sourcesLine } from "../utils/aiSources";
 import { AI_PLACEHOLDER, aiFallback } from "../utils/aiFallback";
 import { AiNotice } from "./AiNotice";
 import { SparklesIcon } from "./icons";
@@ -367,15 +367,9 @@ function AskPanel({ onBusy, outEl, onFilled, onFresh }: { onBusy: (busy: boolean
           {answer.sources.length === 0 ? (
             <p style={mutedStyle}>No figures were looked up for this answer.</p>
           ) : (
-            answer.sources.map((s, i) => (
-              <details key={i} style={{ marginTop: 4 }}>
-                <summary style={{ ...mutedStyle, cursor: "pointer" }}>
-                  Based on: {TOOL_LABEL[s.tool] ?? s.tool}
-                  {Object.keys(s.args).length > 0 && ` (${describeArgs(s.args)})`}
-                </summary>
-                <pre style={preStyle}>{JSON.stringify(s.result, null, 1)}</pre>
-              </details>
-            ))
+            // A plain line saying which lookups the answer used (and their dates), like the header search's
+            // chat. The raw data behind it is not shown.
+            <p style={{ ...mutedStyle, margin: 0 }}>Based on: {sourcesLine(answer.sources)}</p>
           )}
         </div>
       )}
@@ -421,14 +415,3 @@ const mutedStyle: CSSProperties = { fontSize: "calc(11.5px * var(--ae-fs, 1))", 
 const tableStyle: CSSProperties = { width: "100%", borderCollapse: "collapse", fontSize: "calc(12.5px * var(--ae-fs, 1))" };
 const thStyle: CSSProperties = { textAlign: "left", padding: "3px 6px", fontWeight: 600, color: colors.subtleInk, borderBottom: `1px solid ${colors.border}` };
 const tdStyle: CSSProperties = { padding: "3px 6px", borderBottom: `1px solid ${colors.border}`, color: colors.ink };
-const preStyle: CSSProperties = {
-  margin: "4px 0 0",
-  padding: 8,
-  maxHeight: 220,
-  overflow: "auto",
-  borderRadius: 4,
-  border: `1px solid ${colors.border}`,
-  background: colors.paperAlt,
-  color: colors.ink,
-  fontSize: "calc(11px * var(--ae-fs, 1))",
-};

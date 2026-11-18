@@ -113,6 +113,8 @@ describe("Ask the data", () => {
     expect(await screen.findByText(/short in 3 audits/)).toBeTruthy();
     expect(api.askData).toHaveBeenCalledWith("Which products are short most often?");
     expect(screen.getByText(/Based on: Variance by product/).textContent).toContain("2026-11-01 → 2026-11-14");
+    // The raw lookup result is never shown.
+    expect(document.querySelector("details, pre")).toBeNull();
   });
 
   it("will not send a question that is too short", async () => {

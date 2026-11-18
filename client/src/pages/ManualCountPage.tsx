@@ -1582,7 +1582,7 @@ export function ManualCountPage() {
               <thead>
                 <tr>
                   {headers.map((h) => (
-                    <th key={h} style={manualCountHeadStyle[h]}>
+                    <th key={h} style={manualCountHeadStyle[h]} className={h === "SKU" || h === "Product" ? "ae-col-id" : undefined}>
                       {h}
                     </th>
                   ))}

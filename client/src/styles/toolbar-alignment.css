@@ -2074,6 +2074,69 @@
   flex-wrap: wrap;
   padding-right: 12px;
 }
+/* The tab a hidden unsaved-changes toast leaves in the corner (StickyToast, revealTab): a small pill,
+   bottom-right. A bar fills along its bottom edge while the pointer rests on it, then the toast opens. */
+.ae-toast-tab {
+  position: relative;
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  padding: 6px 14px 6px 12px;
+  color: var(--ae-text);
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  border-radius: 999px;
+  box-shadow: 0 6px 18px rgba(12, 12, 12, 0.28);
+  font: inherit;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  cursor: pointer;
+}
+.ae-toast-tab:hover,
+.ae-toast-tab:focus-visible {
+  border-color: rgba(212, 160, 0, 0.6);
+}
+.ae-toast-tab:focus-visible {
+  outline: 2px solid var(--ae-focus-ring);
+  outline-offset: 2px;
+}
+.ae-toast-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #d4a000;
+}
+.ae-toast-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: #d4a000;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.ae-toast-tab.is-dwelling::after {
+  animation: ae-toast-dwell var(--ae-dwell, 700ms) linear forwards;
+}
+@keyframes ae-toast-dwell {
+  to {
+    transform: scaleX(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-toast-tab.is-dwelling::after {
+    animation: none;
+    transform: scaleX(1);
+  }
+}
+/* With the close X (top-right, absolute): the message keeps clear of it. */
+.ae-toast--dismissible .ae-toast-message {
+  padding-right: 22px;
+}
 .ae-toast--failed .ae-toast-message {
   color: var(--ae-danger-text);
 }
@@ -2444,8 +2507,13 @@
   top: calc(100% + 10px);
   right: -4px;
   z-index: 80;
-  width: 292px;
+  width: 300px;
   max-width: calc(100vw - 24px);
+  /* The panel grew (tabs, memory, tape, pack converter): it never runs off the bottom of the screen,
+     it scrolls inside itself instead. */
+  max-height: calc(var(--ae-vh, 100vh) - 84px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 12px;
   color: var(--ae-text);
   background: var(--ae-surface);
@@ -2621,8 +2689,269 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
 }
+/* Tabs (Calc / Tape), the format row and the small segmented buttons. */
+.ae-calc-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ae-calc-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--ae-bg-alt);
+  border-radius: 8px;
+}
+.ae-calc-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ae-calc-tab[aria-pressed="true"] {
+  color: #1a1a1a;
+  background: #f5c000;
+}
+.ae-calc-tab--solo {
+  background: var(--ae-bg-alt);
+}
+.ae-calc-tab-count {
+  min-width: 16px;
+  padding: 0 4px;
+  font-size: 10.5px;
+  line-height: 16px;
+  text-align: center;
+  color: var(--ae-text);
+  background: color-mix(in srgb, var(--ae-text) 14%, transparent);
+  border-radius: 999px;
+}
+.ae-calc-gear {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 15px;
+  color: var(--ae-text-muted);
+  background: none;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ae-calc-gear:hover,
+.ae-calc-gear[aria-expanded="true"] {
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+}
+.ae-calc-fmt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ae-calc-mem {
+  font-size: calc(11px * var(--ae-fs, 1));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ae-warning-text);
+}
+.ae-calc-note {
+  margin-top: 2px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-warning-text);
+}
+/* Memory row and the pack converter: small keys under / over the keypad. */
+.ae-calc-memrow {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+  margin-bottom: 6px;
+}
+.ae-calc-mkey {
+  min-height: 28px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ae-text-muted);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  cursor: pointer;
+}
+.ae-calc-mkey:hover:not(:disabled) {
+  color: var(--ae-text);
+  border-color: #d4a000;
+}
+.ae-calc-mkey:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ae-calc-pack {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-calc-pack label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+}
+.ae-calc-pack-input {
+  width: 54px;
+  min-height: 28px;
+  padding: 0 6px;
+  font: inherit;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  border-radius: 4px;
+}
+/* The tape (adding-machine list). */
+.ae-calc-tape {
+  margin-bottom: 8px;
+}
+.ae-calc-tape-empty {
+  margin: 0 0 6px;
+  padding: 10px 6px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  line-height: 1.4;
+  text-align: center;
+  color: var(--ae-text-muted);
+}
+.ae-calc-tape-lines {
+  max-height: 8.5rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  scrollbar-width: thin;
+}
+.ae-calc-tape-lines li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 4px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-variant-numeric: tabular-nums;
+}
+.ae-calc-tape-n {
+  width: 2ch;
+  min-width: 2ch;
+  font-size: 11px;
+  color: var(--ae-text-muted);
+}
+.ae-calc-tape-v {
+  flex: 1;
+  text-align: right;
+}
+.ae-calc-tape-x {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--ae-text-muted);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ae-calc-tape-x:hover {
+  color: var(--ae-text);
+  background: var(--ae-bg-alt);
+}
+.ae-calc-tape-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--ae-border);
+  font-size: calc(13px * var(--ae-fs, 1));
+}
+.ae-calc-tape-total strong {
+  font-size: calc(17px * var(--ae-fs, 1));
+  font-variant-numeric: tabular-nums;
+}
+.ae-calc-tape-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.ae-calc-link:disabled {
+  opacity: 0.4;
+  cursor: default;
+  text-decoration: none;
+}
+/* History: up to 20, scrolling, with a pin on each. */
+.ae-calc-history ul {
+  max-height: 8rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.ae-calc-history li {
+  display: flex;
+  align-items: center;
+}
+.ae-calc-history li .ae-calc-hist-item {
+  flex: 1;
+  min-width: 0;
+}
+.ae-calc-pin {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 14px;
+  color: var(--ae-text-muted);
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ae-calc-pin.is-pinned {
+  color: #f5c000;
+}
+.ae-calc-pin:hover {
+  background: var(--ae-bg-alt);
+}
+.ae-calc-tab:focus-visible,
+.ae-calc-gear:focus-visible,
+.ae-calc-mkey:focus-visible,
+.ae-calc-pin:focus-visible,
+.ae-calc-tape-x:focus-visible,
+.ae-calc-pack-input:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
 /* A finger needs a bigger key. */
 @media (pointer: coarse) {
+  .ae-calc-mkey,
+  .ae-calc-tab {
+    min-height: 34px;
+  }
+  .ae-calc-pack-input {
+    min-height: 36px;
+    font-size: 16px;
+  }
   .ae-calc-key {
     height: 46px;
   }

@@ -216,7 +216,9 @@ export function PeriodMonitoringCard() {
                   <thead>
                     <tr>
                       {["SKU", "Product", "Online out", "Offline out", "Total out", "Backloads", "RTS", "Production in", "Net var.", "Abs. var."].map((h) => (
-                        <th key={h}>{h}</th>
+                        <th key={h} className={h === "SKU" || h === "Product" ? "ae-col-id" : undefined}>
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
@@ -247,9 +249,9 @@ export function PeriodMonitoringCard() {
                         )}
                         {(!phone || openCategories.has(category)) && rows.map((p) => (
                           <tr key={p.productId}>
-                            <td>{p.sku ?? ""}</td>
+                            <td className="ae-cell-sku">{p.sku ?? ""}</td>
                             <td
-                              className={phone && fullName === p.productId ? "ae-pm-name ae-pm-name--full" : "ae-pm-name"}
+                              className={phone && fullName === p.productId ? "ae-cell-name ae-pm-name ae-pm-name--full" : "ae-cell-name ae-pm-name"}
                               style={{ textAlign: "left" }}
                               title={phone ? p.name : undefined}
                               onClick={phone ? () => setFullName((cur) => (cur === p.productId ? null : p.productId)) : undefined}

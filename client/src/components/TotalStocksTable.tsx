@@ -146,7 +146,9 @@ export function TotalStocksTable({
               ...(showOffline ? ["Offline Remaining"] : []),
               ...(showTotal ? ["Consolidated Remaining"] : []),
             ].map((h) => (
-              <th key={h}>{h}</th>
+              <th key={h} className={h === "SKU" || h === "Product" ? "ae-col-id" : undefined}>
+                {h}
+              </th>
             ))}
           </tr>
         </thead>

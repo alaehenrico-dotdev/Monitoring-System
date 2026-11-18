@@ -445,3 +445,85 @@ button.ae-header-search-btn--labeled.ae-header-search-btn--labeled.ae-header-sea
   max-width: 100%;
   overflow-x: auto;
 }
+
+/* ---- SKU and Product columns: one colour in every table and every theme (ash black in dark mode, soft
+   light blue in light mode) -------------------------------------------------------------------------
+   The two identity columns used to take the theme's header glass (light paper in one theme, frosted in
+   another, tinted by column and by row), so the same column looked different from page to page. Now one
+   solid colour everywhere, set by the variables below: the cells, their header cells, hovered and
+   selected rows. The text colours are chosen for the fill, not taken from the theme. The Total, Subtotal
+   and Grand total label cells span both columns (colspan), so the :not([colspan]) is all it takes to
+   leave them, and those rows, with their own colours; print keeps its own transparent rule.
+   Cheap by design: short selectors (no long :not() chains for the browser to test on every cell of a
+   several-hundred-row grid), and no backdrop-filter on any of these cells (a blur per sticky cell was
+   the costliest thing the old style did while scrolling). */
+
+/* Light mode: a soft light blue, with dark text chosen for it (dark amber SKU, near-black Product). */
+:root {
+  --ae-ash: #e4f0fb;
+  --ae-ash-hover: #d5e8f8;
+  --ae-ash-head: #cfe2f4;
+  --ae-ash-text: #14202b;
+  --ae-ash-sku: #8a5a00;
+  --ae-ash-muted: #3a5670;
+}
+/* Dark mode: ash black, brand-yellow SKU, light Product. */
+:root[data-theme="dark"] {
+  --ae-ash: #1c1c1c;
+  --ae-ash-hover: #252525;
+  --ae-ash-head: #262626;
+  --ae-ash-text: #e8e8e8;
+  --ae-ash-sku: #f5c000;
+  --ae-ash-muted: #b9b9b9;
+}
+:root:root:root .ae-table td.ae-cell-sku:not([colspan]),
+:root:root:root .ae-table td.ae-cell-name:not([colspan]) {
+  background: var(--ae-ash);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+:root:root:root .ae-table td.ae-cell-sku:not([colspan]) {
+  color: var(--ae-ash-sku);
+}
+:root:root:root .ae-table td.ae-cell-name:not([colspan]) {
+  color: var(--ae-ash-text);
+}
+/* Hover lifts it a shade; a selected row (later, so it wins over hover) mixes in a little gold - its
+   yellow edge on the SKU stays. */
+:root:root:root .ae-table tr:hover td.ae-cell-sku:not([colspan]),
+:root:root:root .ae-table tr:hover td.ae-cell-name:not([colspan]) {
+  background: var(--ae-ash-hover);
+}
+:root:root:root .ae-table tr.ae-row-selected td.ae-cell-sku:not([colspan]),
+:root:root:root .ae-table tr.ae-row-selected td.ae-cell-name:not([colspan]) {
+  background: color-mix(in srgb, var(--ae-ash) 80%, #f5c000);
+}
+/* Their header cells. */
+:root:root:root .ae-table th.ae-sticky-sku,
+:root:root:root .ae-table th.ae-sticky-name,
+:root:root:root .ae-table th.ae-col-id {
+  background: var(--ae-ash-head);
+  color: var(--ae-ash-muted);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+/* The Monitoring table (dashboard) shares these two classes for the colour, not for "never wrap": its
+   product names wrap as they always did (on a phone they are cut to one line until tapped, phone.css). */
+.ae-pm-table td.ae-cell-name {
+  white-space: normal;
+}
+
+/* Paper: no coloured fill, and dark text. The dark theme's yellow SKU is unreadable on white, and the
+   frosted/sticky treatment already goes in print (toolbar.css), but not on the tables that are not
+   sticky (Total Stocks, Manual Count, Monitoring). */
+@media print {
+  :root:root:root .ae-table td.ae-cell-sku:not([colspan]),
+  :root:root:root .ae-table td.ae-cell-name:not([colspan]),
+  :root:root:root .ae-table th.ae-sticky-sku,
+  :root:root:root .ae-table th.ae-sticky-name,
+  :root:root:root .ae-table th.ae-col-id {
+    background: transparent !important;
+    color: #0c0c0c !important;
+  }
+}
