@@ -1110,6 +1110,11 @@
   text-overflow: ellipsis;
   font-size: 10.5px;
 }
+/* The pills' ring: one device pixel thick (PhoneBottomNav sets --ae-hair to 1 / devicePixelRatio), so it
+   is crisp on any screen density; 1px until that is set. */
+:root:root:root[data-phone="true"] .ae-bottomnav-bar > .ae-ring {
+  padding: var(--ae-hair, 1px);
+}
 /* The three-dots button, last in the right-hand pill, and the layout menu it opens above it. */
 :root:root:root[data-phone="true"] .ae-bottomnav-more {
   position: relative;

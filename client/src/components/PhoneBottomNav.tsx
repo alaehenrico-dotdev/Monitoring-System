@@ -37,7 +37,7 @@ const isNarrow = () => typeof window !== "undefined" && typeof window.matchMedia
 const LAYOUT_KEY = "ae:phone-nav-layout";
 
 /// Split (two pills, one at each side) is the default; the choice is remembered on this device.
-export function readNavLayout(): NavLayout {
+function readNavLayout(): NavLayout {
   try {
     return localStorage.getItem(LAYOUT_KEY) === "centered" ? "centered" : "split";
   } catch {
@@ -81,6 +81,25 @@ export function PhoneBottomNav() {
       document.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
+
+  // The ring is exactly one DEVICE pixel thick, whatever the screen's density (1 / devicePixelRatio CSS
+  // px): a fixed 0.5px is one device pixel only at 2x and blurs at 2.6x or 3x. Re-measured when the
+  // density changes (moving the window to another screen, zooming).
+  useEffect(() => {
+    const el = navRef.current;
+    if (!el) return;
+    let mq: MediaQueryList | undefined;
+    const apply = () => {
+      const dpr = window.devicePixelRatio || 1;
+      el.style.setProperty("--ae-hair", `${1 / dpr}px`);
+      if (typeof window.matchMedia !== "function") return;
+      mq?.removeEventListener("change", apply);
+      mq = window.matchMedia(`(resolution: ${dpr}dppx)`);
+      mq.addEventListener("change", apply, { once: true });
+    };
+    apply();
+    return () => mq?.removeEventListener("change", apply);
+  }, [compact, layout]);
 
   // Switching layouts: each page link glides from where it was to where it now is (a FLIP move),
   // and the pills ease in. The links are re-created under a different parent, so their old

@@ -38,16 +38,15 @@ export function Layout() {
   } = useAuth();
   // Which way a page change goes along the tab order (the bottom nav's), so the new page slides in from
   // that side: "fwd" for a tab further along, "back" for one before, none (a plain fade) otherwise.
+  // (State adjusted while rendering, React's pattern for a value derived from the previous one.)
   const { pathname } = useLocation();
-  const prevPath = useRef(pathname);
-  const navDir = useRef<"fwd" | "back" | undefined>(undefined);
-  if (prevPath.current !== pathname) {
+  const [route, setRoute] = useState<{ path: string; dir: "fwd" | "back" | undefined }>({ path: pathname, dir: undefined });
+  if (route.path !== pathname) {
     const order = phoneNavPages(user?.role).map((p) => p.to);
     const at = (path: string) => order.findIndex((to) => path === to || path.startsWith(to + "/"));
-    const from = at(prevPath.current);
+    const from = at(route.path);
     const to = at(pathname);
-    navDir.current = from < 0 || to < 0 || from === to ? undefined : to > from ? "fwd" : "back";
-    prevPath.current = pathname;
+    setRoute({ path: pathname, dir: from < 0 || to < 0 || from === to ? undefined : to > from ? "fwd" : "back" });
   }
   // Set (to the function that actually closes the window) when the desktop
   // app's close button is pressed with unsaved work - see useUnsavedWorkGuard.
@@ -87,7 +86,7 @@ export function Layout() {
         <main
           ref={mainRef}
           className="ae-main"
-          data-nav-dir={navDir.current}
+          data-nav-dir={route.dir}
           // No background of its own: .app-shell paints the page color plus the
           // Ala Eh! seal watermark (see index.css), and this sits on top of both.
           style={{
