@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getStockFlow, type StockFlowEntry } from "../api/stockFlow";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { addDaysIso } from "../utils/dateMath";
@@ -51,7 +51,7 @@ function flowPoints(rows: StockFlowEntry[], today: string): FlowPoint[] {
  * every line runs across the whole window; only recorded days get a marker and
  * figures in the tooltip.
  */
-export function StockFlowChart() {
+export function StockFlowChart({ aside }: { aside?: ReactNode } = {}) {
   const today = getCurrentShiftAndDate().date;
   const [days, setDays] = useState(DEFAULT_DAYS);
   const [rows, setRows] = useState<StockFlowEntry[] | null>(null);
@@ -132,6 +132,7 @@ export function StockFlowChart() {
                 )}
               </ul>
             {anyData && (
+              <div className="ae-fl-lower">
               <div className="ae-fl-split">
                 <h4 className="ae-fl-split-title">
                   Out by channel <span>Share of the last {days} days</span>
@@ -143,6 +144,9 @@ export function StockFlowChart() {
                     { key: "offline", label: "Offline delivered", value: outOffline, color: "var(--ae-viz-offline)" },
                   ]}
                 />
+              </div>
+              {/* Foldable screens only (styles/phone.css): the Top variances card beside the split. */}
+              {aside && <div className="ae-fl-aside">{aside}</div>}
               </div>
             )}
           </div>

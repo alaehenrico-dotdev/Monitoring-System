@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { env } from "../config/env";
 import { getOrSet } from "../lib/cache";
 import { generate, requireAi, textOf } from "../lib/gemini";
+import { toPlainText } from "../lib/aiText";
 import { HttpError } from "../utils/HttpError";
 import { localToday } from "./actionQueue.service";
 import { getPeriodMonitoring, type PeriodMonitoring } from "./periodMonitoring.service";
@@ -119,7 +120,7 @@ const SYSTEM_PROMPT = [
   "Write 3 to 5 plain sentences. Lead with the biggest change. Name at most 3 products. Say what is worth checking, not what to do.",
   "Rules: use ONLY numbers present in the JSON; never calculate new figures; changePct null means the earlier figure was 0, so say 'new' instead of a percentage;",
   "if currentWindowMayBePartial is true, mention that the latest day may be incomplete; variance means counted minus system stock, and 'absVariance' is the total size of discrepancies;",
-  "if nothing changed much, say so plainly. No markdown, no bullet points, no greeting.",
+  "if nothing changed much, say so plainly. Plain sentences only: no JSON, braces or field names (say 'total out' and 'size of discrepancies', not totalOut or absVariance), no markdown, no bullet points, no greeting.",
 ].join(" ");
 
 export async function whatChanged(days: number, anchor: Date = localToday(new Date()), now: Date = new Date()) {
@@ -153,7 +154,7 @@ export async function whatChanged(days: number, anchor: Date = localToday(new Da
       contents: [{ role: "user", parts: [{ text: JSON.stringify(facts) }] }],
       event: "ai-what-changed",
     });
-    const text = textOf(reply);
+    const text = toPlainText(textOf(reply));
     if (!text) throw new HttpError(502, "The AI service returned no summary. Try again.");
     return text;
   });

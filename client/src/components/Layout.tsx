@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
+import { phoneNavPages } from "../config/navigation";
 import { Sidebar } from "./Sidebar";
 import { BackToTop } from "./BackToTop";
 import { PhoneBottomNav } from "./PhoneBottomNav";
@@ -35,6 +36,19 @@ export function Layout() {
     recoveredDrafts,
     dismissRecovered,
   } = useAuth();
+  // Which way a page change goes along the tab order (the bottom nav's), so the new page slides in from
+  // that side: "fwd" for a tab further along, "back" for one before, none (a plain fade) otherwise.
+  const { pathname } = useLocation();
+  const prevPath = useRef(pathname);
+  const navDir = useRef<"fwd" | "back" | undefined>(undefined);
+  if (prevPath.current !== pathname) {
+    const order = phoneNavPages(user?.role).map((p) => p.to);
+    const at = (path: string) => order.findIndex((to) => path === to || path.startsWith(to + "/"));
+    const from = at(prevPath.current);
+    const to = at(pathname);
+    navDir.current = from < 0 || to < 0 || from === to ? undefined : to > from ? "fwd" : "back";
+    prevPath.current = pathname;
+  }
   // Set (to the function that actually closes the window) when the desktop
   // app's close button is pressed with unsaved work - see useUnsavedWorkGuard.
   const [closePrompt, setClosePrompt] = useState<(() => void) | null>(null);
@@ -73,6 +87,7 @@ export function Layout() {
         <main
           ref={mainRef}
           className="ae-main"
+          data-nav-dir={navDir.current}
           // No background of its own: .app-shell paints the page color plus the
           // Ala Eh! seal watermark (see index.css), and this sits on top of both.
           style={{

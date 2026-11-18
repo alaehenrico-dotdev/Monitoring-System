@@ -25,6 +25,18 @@ describe("aiFallback - what a failed AI request looks like", () => {
     }
   });
 
+  it("shows the server's own limit messages as they are, since they say how long to wait", () => {
+    const wait = "You've asked the AI a lot in a short time. Try again in about 7 minutes.";
+    expect(aiFallback(new ApiError(429, wait), P)).toEqual({ text: wait, retry: true });
+    const busy = "The AI is still working on your last question. Wait for the answer, then ask again.";
+    expect(aiFallback(new ApiError(429, busy), P)).toEqual({ text: busy, retry: true });
+  });
+
+  it("shows the daily allowance message without Try again, because trying again cannot help until tomorrow", () => {
+    const daily = "You've used your 100 AI requests for today. The allowance resets tomorrow.";
+    expect(aiFallback(new ApiError(429, daily), P)).toEqual({ text: daily, retry: false });
+  });
+
   it("explains a Google usage limit as a detail line, and still allows a retry (it often clears in a minute)", () => {
     const m = "The AI has reached its Google usage limit for now. Try again in a minute; if it keeps happening, check the key's quota and billing in Google AI Studio.";
     expect(aiFallback(new Error(m), P)).toEqual({ text: P, detail: m, retry: true });

@@ -6,8 +6,8 @@ import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 /// A touch screen showing the desktop layout: a phone using its browser's "Desktop site"
 /// option (the page then gets a desktop-sized width, so the read-only phone view switches
-/// off and editing opens up). Tablets match too, which is acceptable: it is one prompt a
-/// session. `pointer: coarse` is the primary input, so a laptop with a touchscreen is not caught.
+/// off and editing opens up). Tablets are read-only like phones (see PHONE_QUERY), so they
+/// never reach here. `pointer: coarse` is the primary input, so a laptop with a touchscreen is not caught.
 function isTouchInDesktopMode(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function")
     return false;

@@ -2,6 +2,7 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Request } from "express";
 import { env } from "../config/env";
 import { PrismaRateLimitStore } from "./rateLimitStore";
+import { aiGuard } from "./aiLimits";
 
 /// The global apiLimiter uses express-rate-limit's default in-memory store: it runs on every
 /// request, is only a backstop, and losing its counts on a restart does no harm. Every
@@ -139,19 +140,9 @@ export const passcodeLimiter = rateLimit({
   message: { error: "Too many attempts - please wait a few minutes and try again." },
 });
 
-/// Cost backstop for the AI helper (services/aiExplain.service.ts): each call is a paid Google
-/// request, so it is capped per signed-in user (not per IP - the office shares one). In memory is
-/// fine: a restart only resets a counter that exists to limit spend.
-const aiLimit = () =>
-  rateLimit({
-    windowMs: 10 * 60 * 1000,
-    limit: env.aiRateLimitMax,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: "Too many AI requests - please wait a few minutes and try again." },
-    keyGenerator: (req: Request) => (req.user ? `user:${req.user.id}` : ipKeyGenerator(req.ip ?? "")),
-  });
-/// One bucket per feature, so a burst of questions does not use up the explain button's allowance.
-export const aiLimiter = aiLimit();
-export const aiAskLimiter = aiLimit();
-export const aiChangesLimiter = aiLimit();
+/// The AI endpoints' limits - one at a time, a short window and a daily allowance, per signed-in user
+/// (see middleware/aiLimits.ts). One set per feature, so a burst of questions does not use up the
+/// explain button's allowance.
+export const aiLimiter = aiGuard("explain");
+export const aiAskLimiter = aiGuard("ask");
+export const aiChangesLimiter = aiGuard("changes");

@@ -92,6 +92,7 @@ services:
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
       OPENROUTER_DATA_COLLECTION: ${OPENROUTER_DATA_COLLECTION:-deny}
       AI_DAILY_CALL_LIMIT: ${AI_DAILY_CALL_LIMIT:-1000}
+      AI_USER_DAILY_LIMIT: ${AI_USER_DAILY_LIMIT:-100}
     # Snapshots taken before pending migrations are applied (server/docker/start.sh).
     volumes:
       - api_backups:/backups

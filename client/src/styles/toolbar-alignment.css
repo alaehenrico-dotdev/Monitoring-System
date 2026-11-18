@@ -860,6 +860,105 @@
   background-image: linear-gradient(90deg, #4285f4, #ea4335, #fbbc04, #34a853, #4285f4);
 }
 
+/* The AI chat inside the search panel (components/QuickJump.tsx): a thread of saved replies, your
+   questions as small bubbles on the right and the AI's answers on the left, with the newest at the
+   bottom. The panel is dark in both colour modes, so these use its own fixed greys. */
+.ae-qj-chat {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+.ae-qj-chat-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 12px;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #8f8f8f;
+  border-bottom: 1px solid #2f2f2f;
+}
+.ae-qj-chat-actions {
+  display: inline-flex;
+  gap: 4px;
+}
+.ae-qj-chat-btn {
+  padding: 3px 8px;
+  font: inherit;
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: #f5c000;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.ae-qj-chat-btn:hover:not(:disabled) {
+  text-decoration: underline;
+}
+.ae-qj-chat-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ae-qj-chat-btn:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 1px;
+}
+.ae-qj-chat-thread {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 110px;
+  padding: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ae-qj-chat-empty {
+  margin: auto 0;
+  padding: 8px 4px;
+  font-size: calc(12.5px * var(--ae-fs, 1));
+  line-height: 1.5;
+  color: #8f8f8f;
+  text-align: center;
+}
+.ae-qj-msg {
+  max-width: 92%;
+  font-size: calc(13px * var(--ae-fs, 1));
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.ae-qj-msg--q {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 6px 11px;
+  color: #e5e5e5;
+  background: #303030;
+  border-radius: 14px 14px 4px 14px;
+}
+.ae-qj-msg--a {
+  align-self: flex-start;
+  color: #e5e5e5;
+}
+.ae-qj-msg--a .ae-quickjump-ai-a {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.ae-qj-chat-foot {
+  flex: none;
+  padding: 6px 12px 8px;
+  font-size: calc(11px * var(--ae-fs, 1));
+  line-height: 1.4;
+  color: #8f8f8f;
+  border-top: 1px solid #2f2f2f;
+}
+
 /* While the AI is thinking: the underline runs at full strength and flows faster. Under it sits a
    continuous glow in the line's own colours: one tinted colour layer with a single eased fade
    to the panel colour laid over it, so the whole line glows evenly and fades smoothly (a real

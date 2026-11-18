@@ -4,7 +4,24 @@ import { useLayoutEffect, useSyncExternalStore } from "react";
 /// the page's layout width, not the screen's size, on purpose: a phone browser's
 /// "Desktop site" option gives the page a desktop-sized layout width, so that
 /// option is also the way out of the read-only view.
-export const PHONE_QUERY = "(max-width: 700px) and (pointer: coarse)";
+///
+/// Foldables: a Galaxy Z Fold's inner screen is wider than 700px, so a half-folded
+/// (tabletop/book) posture would read as a desktop site. A browser reports that posture
+/// as two viewport segments (or `device-posture: folded`), which is a phone being held
+/// folded, never a "Desktop site" request, so those count as phone too. A browser that
+/// doesn't know a feature just skips that clause of the list.
+///
+/// Tablets (iPad, Android tablets, a foldable's flat inner screen) get the same read-only view: a
+/// touch screen that is PHYSICALLY at least 600px wide (min-device-width: the screen, which a
+/// "Desktop site" setting does not change) and whose layout is up to 1400px. The screen test is what
+/// keeps a phone's "Desktop site" (a 980px layout on a 360px screen) a way out of the read-only view.
+export const PHONE_QUERY = [
+  "(max-width: 700px) and (pointer: coarse)",
+  "(max-width: 1400px) and (min-device-width: 600px) and (pointer: coarse)",
+  "(horizontal-viewport-segments: 2) and (pointer: coarse)",
+  "(vertical-viewport-segments: 2) and (pointer: coarse)",
+  "(device-posture: folded) and (pointer: coarse)",
+].join(", ");
 
 /// For testing on a computer (a narrow window is not a touch screen): open any
 /// page with `?phone=1` to force the phone view on this browser, `?phone=0` to

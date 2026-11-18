@@ -283,6 +283,10 @@ export const env = {
   // limit above stops one person hammering it; this stops the TOTAL - a stolen supervisor login, a
   // runaway script - from running up the Google bill. In memory, so a restart resets it. 0 turns it off.
   aiDailyCallLimit: nonNegativeInt("AI_DAILY_CALL_LIMIT", 1000),
+  // AI requests one person may make in a UTC day, across Ask the data, What changed? and Explain
+  // (middleware/aiLimits.ts). Keeps one heavy user from using up the shared daily cap above and
+  // leaving everyone else without the AI. In memory, so a restart resets it. 0 turns it off.
+  aiUserDailyLimit: nonNegativeInt("AI_USER_DAILY_LIMIT", 100),
   // Fallback AI provider (lib/openrouter.ts), used only when Gemini fails for a reason that is about Google
   // (quota, a rejected key, unreachable). Needs BOTH the key and a free model. "deny" asks OpenRouter to route
   // only to hosts that do not train on prompts (fewer free models qualify); "allow" removes that restriction.

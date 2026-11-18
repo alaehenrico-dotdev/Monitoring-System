@@ -16,6 +16,7 @@ import {
   Clock,
   Download,
   Ellipsis,
+  EllipsisVertical,
   FileChartColumnIncreasing,
   History,
   Keyboard,
@@ -301,6 +302,11 @@ export function BanIcon() {
 /// "More actions" - the overflow menu's trigger.
 export function EllipsisIcon() {
   return <Ellipsis {...look(18, 1.8)} />;
+}
+
+/// Three dots stacked vertically: the phone bottom nav's layout switch.
+export function EllipsisVerticalIcon() {
+  return <EllipsisVertical {...look(18, 1.8)} />;
 }
 
 export function LockIcon({ size = 16 }: { size?: number }) {

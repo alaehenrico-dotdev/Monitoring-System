@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
   askData,
   getWhatChanged,
@@ -8,6 +9,7 @@ import {
   type WhatChanged,
 } from "../api/ai";
 import { Button } from "./ui";
+import { Dropdown } from "./Dropdown";
 import { colors } from "../theme";
 import { formatDateDisplay } from "../utils/dateFormat";
 import { describeArgs, TOOL_LABEL } from "../utils/aiSources";
@@ -66,14 +68,60 @@ export function DashboardAiCard() {
   // Either helper working: the card's border turns faster, the same "thinking" cue as the header search.
   const [changedBusy, setChangedBusy] = useState(false);
   const [askBusy, setAskBusy] = useState(false);
+  // One answer area for both helpers, at the bottom of the card (see AiOut).
+  const [outEl, setOutEl] = useState<HTMLDivElement | null>(null);
+  const [changedFilled, setChangedFilled] = useState(false);
+  const [askFilled, setAskFilled] = useState(false);
+  // The answer floats under the card (a popover): it can be closed, and a new answer reopens it.
+  const [dismissed, setDismissed] = useState(false);
+  const [fresh, setFresh] = useState(0);
+  const onFresh = useCallback(() => {
+    setDismissed(false);
+    setFresh((n) => n + 1);
+  }, []);
+  const showOut = (changedFilled || askFilled) && !dismissed;
+  useEffect(() => {
+    // Brings the answer into view if the card sits near the bottom of the screen (the page scrolls, nothing moves).
+    if (showOut && outEl && typeof outEl.scrollIntoView === "function") outEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [showOut, outEl, fresh]);
+  useEffect(() => {
+    if (!showOut) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDismissed(true);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showOut]);
+
+  // The ring only turns while the card is on screen.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [onScreen, setOnScreen] = useState(true);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [enabled]);
 
   if (!enabled) return null;
   return (
-    <section className="ae-dash-section" aria-label="AI insights" style={{ marginTop: 12 }}>
-      <div className={`ae-dash-card ae-dash-ai${changedBusy || askBusy ? " ae-dash-ai--busy" : ""}`} style={{ padding: "10px 14px 12px" }}>
-        {/* The glow round the card's edge (see .ae-dash-ai-glow in dashboard.css). */}
+    <section className="ae-dash-section ae-dash-ai-slot" aria-label="AI insights">
+      <div
+        ref={cardRef}
+        className={`ae-dash-card ae-dash-ai${changedBusy || askBusy ? " ae-dash-ai--busy" : ""}`}
+        data-ring-paused={onScreen ? undefined : "true"}
+        style={{ padding: "10px 14px 12px" }}
+      >
+        {/* The turning seal-coloured ring and the glow round the card's edge (see .ae-ring and
+            .ae-dash-ai-glow in dashboard.css). */}
+        <span className="ae-ring no-print" aria-hidden="true">
+          <i />
+        </span>
         <span className="ae-dash-ai-glow no-print" aria-hidden="true">
-          <span />
+          <span>
+            <i />
+          </span>
         </span>
         <div className="ae-dash-ai-head">
           <h3 className="ae-dash-ai-title">
@@ -83,15 +131,24 @@ export function DashboardAiCard() {
           <span style={mutedStyle}>AI-written. Check the numbers before acting.</span>
         </div>
         <div className="ae-dash-ai-grid">
-          <WhatChangedPanel onBusy={setChangedBusy} />
-          <AskPanel onBusy={setAskBusy} />
+          <WhatChangedPanel onBusy={setChangedBusy} outEl={outEl} onFilled={setChangedFilled} onFresh={onFresh} />
+          <AskPanel onBusy={setAskBusy} outEl={outEl} onFilled={setAskFilled} onFresh={onFresh} />
+        </div>
+        {/* The answers of both helpers float here, under the card: nothing is reserved inside it, so it
+            never grows or moves what is under it. Hidden until there is an answer. */}
+        <div ref={setOutEl} className="ae-dash-ai-out" role="region" aria-label="Answer" tabIndex={-1} hidden={!showOut}>
+          <button type="button" className="ae-dash-ai-out-close" aria-label="Close answer" onClick={() => setDismissed(true)}>
+            ×
+          </button>
         </div>
       </div>
     </section>
   );
 }
 
-function WhatChangedPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
+type OutProps = { outEl: HTMLDivElement | null; onFilled: (filled: boolean) => void; onFresh: () => void };
+
+function WhatChangedPanel({ onBusy, outEl, onFilled, onFresh }: { onBusy: (busy: boolean) => void } & OutProps) {
   const [days, setDays] = useState(7);
   const [result, setResult] = useState<WhatChanged | null>(null);
   const [busy, setBusy] = useState(false);
@@ -119,72 +176,69 @@ function WhatChangedPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
     <div aria-label="What changed">
       <div className="ae-dash-ai-row">
         <h4 style={panelHeadingStyle}>What changed?</h4>
-        <select
-          className="ae-input"
+        {/* The app's themed dropdown, not a native <select>: the browser's own list is white, in the
+            system font and far too large on a phone. */}
+        <Dropdown
           aria-label="Comparison window"
-          value={days}
+          value={String(days)}
           disabled={busy}
-          onChange={(e) => {
+          options={WINDOWS.map((w) => ({ value: String(w.days), label: w.label }))}
+          onChange={(v) => {
             latest.current++;
-            setDays(Number(e.target.value));
+            setDays(Number(v));
             setResult(null);
             setError(null);
             setBusy(false);
           }}
-          style={{ flex: 1, minWidth: 140 }}
-        >
-          {WINDOWS.map((w) => (
-            <option key={w.days} value={w.days}>
-              {w.label}
-            </option>
-          ))}
-        </select>
+        />
         <Button type="button" size="sm" onClick={() => void run()} disabled={busy}>
           {busy ? "Comparing…" : result ? "Refresh" : "Compare"}
         </Button>
       </div>
 
-      {error !== null && <AiNotice note={aiFallback(error, AI_PLACEHOLDER.changes)} onRetry={() => void run()} busy={busy} />}
+      <AiOut panel="changed" outEl={outEl} onFilled={onFilled} onFresh={onFresh} signal={result ?? error} filled={error !== null || !!facts}>
+        {error !== null && <AiNotice note={aiFallback(error, AI_PLACEHOLDER.changes)} onRetry={() => void run()} busy={busy} />}
 
-      {facts && (
-        <>
-          <p style={{ ...mutedStyle, margin: "10px 0 0" }}>
-            {formatDateDisplay(facts.current.from)} – {formatDateDisplay(facts.current.to)} vs {formatDateDisplay(facts.previous.from)} –{" "}
-            {formatDateDisplay(facts.previous.to)}
-            {facts.currentWindowMayBePartial && " · latest day may be incomplete"}
-          </p>
-          {result.explanation ? (
-            <p style={{ ...bodyStyle, margin: "8px 0" }}>{result.explanation}</p>
-          ) : result.unavailable ? (
-            <AiNotice note={aiFallback(new Error(result.unavailable), AI_PLACEHOLDER.changesSummary)} onRetry={() => void run()} busy={busy} />
-          ) : (
-            <p style={{ ...bodyStyle, margin: "8px 0", color: colors.subtleInk }}>
-              Nothing was recorded in the earlier period, so there is nothing to compare with yet.
+        {facts && (
+          <>
+            <p style={{ ...mutedStyle, margin: "10px 0 0" }}>
+              {formatDateDisplay(facts.current.from)} – {formatDateDisplay(facts.current.to)} vs {formatDateDisplay(facts.previous.from)} –{" "}
+              {formatDateDisplay(facts.previous.to)}
+              {facts.currentWindowMayBePartial && " · latest day may be incomplete"}
             </p>
-          )}
-          <table style={tableStyle}>
-            <thead>
-              <tr>
-                <th style={thStyle}>Total</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>Before</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>Now</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>Change</th>
-              </tr>
-            </thead>
-            <tbody>
-              <DeltaRow label="Stock out" d={facts.totals.totalOut} />
-              <DeltaRow label="Production in" d={facts.totals.productionIn} />
-              <DeltaRow label="Backloads" d={facts.totals.backloads} />
-              <DeltaRow label="Returns to supplier" d={facts.totals.rts} />
-              <DeltaRow label="Audit variance (size)" d={facts.totals.absVariance} bad />
-              <DeltaRow label="Products with variance" d={facts.totals.flaggedProducts} bad />
-            </tbody>
-          </table>
-          <Movers title="Stock out rose most" rows={facts.outflowUp} />
-          <Movers title="Stock out fell most" rows={facts.outflowDown} />
-          <Movers title="Variance grew most" rows={facts.varianceUp} bad />
-        </>
-      )}
+            {result.explanation ? (
+              <p style={{ ...bodyStyle, margin: "8px 0" }}>{result.explanation}</p>
+            ) : result.unavailable ? (
+              <AiNotice note={aiFallback(new Error(result.unavailable), AI_PLACEHOLDER.changesSummary)} onRetry={() => void run()} busy={busy} />
+            ) : (
+              <p style={{ ...bodyStyle, margin: "8px 0", color: colors.subtleInk }}>
+                Nothing was recorded in the earlier period, so there is nothing to compare with yet.
+              </p>
+            )}
+            <table style={tableStyle}>
+              <thead>
+                <tr>
+                  <th style={thStyle}>Total</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Before</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Now</th>
+                  <th style={{ ...thStyle, textAlign: "right" }}>Change</th>
+                </tr>
+              </thead>
+              <tbody>
+                <DeltaRow label="Stock out" d={facts.totals.totalOut} />
+                <DeltaRow label="Production in" d={facts.totals.productionIn} />
+                <DeltaRow label="Backloads" d={facts.totals.backloads} />
+                <DeltaRow label="Returns to supplier" d={facts.totals.rts} />
+                <DeltaRow label="Audit variance (size)" d={facts.totals.absVariance} bad />
+                <DeltaRow label="Products with variance" d={facts.totals.flaggedProducts} bad />
+              </tbody>
+            </table>
+            <Movers title="Stock out rose most" rows={facts.outflowUp} />
+            <Movers title="Stock out fell most" rows={facts.outflowDown} />
+            <Movers title="Variance grew most" rows={facts.varianceUp} bad />
+          </>
+        )}
+      </AiOut>
     </div>
   );
 }
@@ -223,7 +277,7 @@ function Movers({ title, rows, bad }: { title: string; rows: ChangeMover[]; bad?
   );
 }
 
-function AskPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
+function AskPanel({ onBusy, outEl, onFilled, onFresh }: { onBusy: (busy: boolean) => void } & OutProps) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<AskAnswer | null>(null);
   const [asked, setAsked] = useState("");
@@ -282,8 +336,7 @@ function AskPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
         </Button>
       </form>
 
-      {!answer && !busy && !error && (
-        <div className="ae-dash-ai-chips">
+      <div className="ae-dash-ai-chips">
           {EXAMPLES.map((ex) => (
             <button
               key={ex}
@@ -297,9 +350,9 @@ function AskPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
               {ex}
             </button>
           ))}
-        </div>
-      )}
+      </div>
 
+      <AiOut panel="ask" outEl={outEl} onFilled={onFilled} onFresh={onFresh} signal={answer ?? error} filled={error !== null || !!answer}>
       {error !== null && <AiNotice note={aiFallback(error, AI_PLACEHOLDER.ask)} onRetry={() => void ask(asked)} busy={busy} />}
 
       {answer && (
@@ -326,7 +379,39 @@ function AskPanel({ onBusy }: { onBusy: (busy: boolean) => void }) {
           )}
         </div>
       )}
+      </AiOut>
     </div>
+  );
+}
+
+/// A helper's answer, shown in the card's shared answer area (a portal into it), not under its own
+/// field. The area has a fixed height and scrolls inside itself, so a long answer never makes the card
+/// (and everything under it) grow or jump; each new answer or error scrolls to its own top.
+function AiOut({
+  panel,
+  outEl,
+  onFilled,
+  onFresh,
+  signal,
+  filled,
+  children,
+}: OutProps & { panel: "changed" | "ask"; signal: unknown; filled: boolean; children: ReactNode }) {
+  const block = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    onFilled(filled);
+    return () => onFilled(false);
+  }, [filled, onFilled]);
+  useEffect(() => {
+    if (signal) onFresh();
+    const el = block.current;
+    if (outEl && el && signal && typeof outEl.scrollTo === "function") outEl.scrollTo({ top: el.offsetTop, behavior: "smooth" });
+  }, [signal, outEl, onFresh]);
+  if (!outEl || !filled) return null;
+  return createPortal(
+    <div ref={block} className="ae-dash-ai-block" data-panel={panel}>
+      {children}
+    </div>,
+    outEl,
   );
 }
 

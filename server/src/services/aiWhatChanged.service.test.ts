@@ -87,6 +87,37 @@ describe("whatChanged", () => {
     expect(JSON.parse(sent).totals.totalOut.changePct).toBe(30);
   });
 
+  it("writes the note in plain sentences even if the model answers with JSON or markdown, and asks for that", async () => {
+    mocks.getPeriodMonitoring.mockImplementation(async (from: Date, to: Date) =>
+      period(from.toISOString().slice(0, 10), to.toISOString().slice(0, 10), from.getUTCDate() < 8 ? [row(1, "Soy", 100)] : [row(1, "Soy", 130)]),
+    );
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '**Summary**\n{"totalOut": 130, "changePct": 30}' }] } }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await whatChanged(7, new Date("2026-11-14T00:00:00Z"), new Date("2026-11-14T10:00:00Z"));
+    // Mixed text and JSON is not valid JSON as a whole, so only the markdown is cleaned; the prompt is the main defence.
+    expect(out.explanation).toBe('Summary\n{"totalOut": 130, "changePct": 30}');
+    const prompt: string = JSON.parse(fetchMock.mock.calls[0][1].body).systemInstruction.parts[0].text;
+    expect(prompt).toMatch(/no JSON, braces or field names/);
+  });
+
+  it("turns a whole-JSON note into plain lines", async () => {
+    mocks.getPeriodMonitoring.mockImplementation(async (from: Date, to: Date) =>
+      period(from.toISOString().slice(0, 10), to.toISOString().slice(0, 10), from.getUTCDate() < 8 ? [row(1, "Soy", 100)] : [row(1, "Soy", 130)]),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: '{"totalOut": 130, "changePct": 30}' }] } }] }),
+      }),
+    );
+    const out = await whatChanged(7, new Date("2026-11-14T00:00:00Z"), new Date("2026-11-14T10:00:00Z"));
+    expect(out.explanation).toBe("total out: 130\nchange pct: 30");
+  });
+
   it("still returns the comparison when the AI cannot answer, saying so instead of failing", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     mocks.getPeriodMonitoring.mockImplementation(async (from: Date, to: Date) =>

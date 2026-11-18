@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -22,6 +23,7 @@ import type { AuthUser } from "../types";
 import { parkDraftsForLogout, restoreDraftBackup } from "../utils/draftBackup";
 import { countAllUnsavedWork } from "../utils/unsavedWork";
 import { isDeviceRemembered, saveDeviceChoice } from "../utils/rememberDevice";
+import { clearAllAiChats } from "../utils/aiChat";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -73,6 +75,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [sessionExpired, setSessionExpired] = useState(false);
   const [recoveredDrafts, setRecoveredDrafts] = useState(0);
+
+  // The header search's saved AI replies quote the company's figures, so they go whenever a signed-in
+  // person stops being signed in - however it happens (Log out, an expired session, a revoked or
+  // deactivated account). One place, because those all end in setUser(null).
+  const hadUser = useRef(false);
+  useEffect(() => {
+    if (user) {
+      hadUser.current = true;
+    } else if (hadUser.current) {
+      hadUser.current = false;
+      clearAllAiChats();
+    }
+  }, [user]);
 
   // Puts back edits that survived a closed window/crash BEFORE the user is
   // set: the pages read their staged edits once, when they mount, and they

@@ -61,6 +61,39 @@ describe("askData - the tool loop", () => {
     expect(bodyOf(fetchMock, 0).systemInstruction.parts[0].text).toContain("2026-11-14");
   });
 
+  it("asks for plain text and says why: no JSON, no field names, no markdown", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(text("Fine."));
+    vi.stubGlobal("fetch", fetchMock);
+    await askData("What needs attention?", TODAY);
+    const prompt: string = bodyOf(fetchMock, 0).systemInstruction.parts[0].text;
+    expect(prompt).toMatch(/plain text only/i);
+    expect(prompt).toMatch(/Never output JSON/);
+    expect(prompt).toMatch(/never a field name such as totalOut/);
+  });
+
+  it("turns an answer that came back as JSON into plain lines", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(text('{"from": "2026-11-01", "to": "2026-11-14", "topProduct": {"name": "Soy", "totalOut": 90}}')),
+    );
+    const out = await askData("Which product moved most?", TODAY);
+    expect(out.answer).toBe("from: 2026-11-01\nto: 2026-11-14\ntop product: name Soy, total out 90");
+    expect(out.answer).not.toMatch(/[{}"]/);
+  });
+
+  it("turns a fenced list of rows into bullets, led by the product name", async () => {
+    const rows = [{ sku: "S1", name: "Soy", totalOut: 90 }, { sku: "S2", name: "Vinegar", totalOut: 40 }];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(text("```json\n" + JSON.stringify(rows) + "\n```")));
+    const out = await askData("Which products moved most?", TODAY);
+    expect(out.answer).toBe("- Soy (S1): total out 90\n- Vinegar (S2): total out 40");
+  });
+
+  it("strips markdown from an answer, and leaves a plain one exactly as written", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(text("## Result\n**Soy** moved `90` units.")).mockResolvedValueOnce(text("Soy moved 90 units.")));
+    expect((await askData("How much Soy went out?", TODAY)).answer).toBe("Result\nSoy moved 90 units.");
+    expect((await askData("How much Soy went out?", TODAY)).answer).toBe("Soy moved 90 units.");
+  });
+
   it("answers directly when no tool is needed", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(text("I can only help with your stock data.")));
     const out = await askData("What is the capital of France?", TODAY);

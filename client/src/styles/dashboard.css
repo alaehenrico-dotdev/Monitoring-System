@@ -45,6 +45,43 @@
 .ae-dash-activity-row {
   margin: 0 0 24px;
 }
+/* Two columns: Recent Activity at the left, the quick links stacked in a narrow column at the
+   right (its top lines up with the activity card, under the heading). One column on a narrow
+   screen, the links then side by side under the activity. */
+.ae-dash-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 220px);
+  gap: 12px 14px;
+  align-items: stretch;
+}
+.ae-dash-lower > .ae-dash-quicklinks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(84px, 1fr);
+  gap: 12px;
+  margin: 26px 0 0;
+}
+.ae-dash-lower .ae-dash-quicklink {
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.ae-dash-lower .ae-dash-quicklink-icon {
+  width: 30px;
+  height: 30px;
+}
+@media (max-width: 560px) {
+  .ae-dash-lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ae-dash-lower > .ae-dash-quicklinks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    margin-top: 0;
+  }
+}
 /* The graph fills whatever height the stacked cards give it. */
 .ae-dash-hero-chart .ae-mm-body > .ae-fl-chart {
   flex: 1;
@@ -423,39 +460,64 @@
   /* .ae-dash-card clips to its padding box, which cuts off the ring (it sits on the border). */
   overflow: visible !important;
 }
-.ae-dash-ai::before {
-  content: "";
+/* The seal-coloured ring (card and phone bottom nav share it). Built for the compositor: the ring
+   is a STATIC 1px mask (a crisp whole pixel, not a sub-pixel hairline that blurs) over a square
+   conic gradient that turns with transform: rotate(). Animating a gradient's angle (@property)
+   repaints it on the main thread every frame; a transform costs the page nothing. The square is
+   wider than the ring's diagonal (the box is at most a few hundred px tall), so it covers the
+   ring at every angle. The colours are the official seal's (theme.ts): gold, green, banner red,
+   with the stretch between the gold and the red faded so the light is directional. */
+:root {
+  --ae-seal-conic: conic-gradient(
+    from 340deg,
+    #f5c000 0%,
+    #3e8e50 24%,
+    #d4a000 44%,
+    rgba(212, 160, 0, 0.12) 54%,
+    rgba(193, 39, 45, 0.12) 61%,
+    #c1272d 76%,
+    #f5c000 100%
+  );
+}
+.ae-ring {
   position: absolute;
-  /* A hairline, to match the search box's underline: under a full pixel, so it renders finer. */
-  inset: -0.75px;
+  inset: -1px;
   border-radius: inherit;
-  padding: 0.75px;
+  padding: 1px;
+  overflow: hidden;
   pointer-events: none;
-  /* A conic gradient, not a left-to-right one (that is one flat colour down the sides): the four
-     colours are spread round the card, blue top, green right, yellow bottom, red left, like the
-     Google AI Studio prompt box, and turn slowly. */
-  background: var(--ae-ai-conic);
+  contain: paint;
+  opacity: 0.85;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
-  opacity: 0.8;
 }
-/* One animated angle on the card, inherited by the ring and the glow, so they turn together. */
-.ae-dash-ai {
-  /* Spectrum from the design brief: blue, green, amber, coral red. The stretch between amber and red
-     (about the bottom edge) fades to a faint tint, so the light is directional and organic rather
-     than uniformly neon, and that dim patch travels round with the rotation. */
-  --ae-ai-conic: conic-gradient(
-    from var(--ae-ai-angle),
-    #4285f4 0%,
-    #34a853 24%,
-    #fbbc05 44%,
-    rgba(251, 188, 5, 0.12) 54%,
-    rgba(234, 67, 53, 0.12) 61%,
-    #ea4335 76%,
-    #4285f4 100%
-  );
-  animation: ae-dash-ai-spin 8s linear infinite;
+.ae-ring > i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(100% + 480px);
+  aspect-ratio: 1;
+  background: var(--ae-seal-conic);
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: ae-ring-spin 8s linear infinite;
+  will-change: transform;
+}
+@keyframes ae-ring-spin {
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+/* Off screen: the ring holds still. */
+[data-ring-paused="true"] .ae-ring > i,
+[data-ring-paused="true"] .ae-dash-ai-glow i {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-ring > i,
+  .ae-dash-ai-glow i {
+    animation: none;
+  }
 }
 /* The soft glow outside the ring. Two nested spans because a filter runs before a mask on the same
    element: the inner one is the blurred colour (a filled version of the same gradient, the size of
@@ -475,21 +537,33 @@
   mask-composite: exclude;
 }
 .ae-dash-ai-glow > span {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
   border-radius: 24px;
-  background: var(--ae-ai-conic);
+  overflow: hidden;
   filter: blur(28px);
   opacity: 0.32;
   transition: opacity 300ms ease;
+}
+.ae-dash-ai-glow i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(100% + 480px);
+  aspect-ratio: 1;
+  background: var(--ae-seal-conic);
+  transform: translate(-50%, -50%) rotate(0deg);
+  animation: ae-ring-spin 8s linear infinite;
+  will-change: transform;
 }
 /* Hover, or focus anywhere inside the card (the select, the question box), lifts the halo. */
 .ae-dash-ai:hover .ae-dash-ai-glow > span,
 .ae-dash-ai:focus-within .ae-dash-ai-glow > span {
   opacity: 0.5;
 }
-.ae-dash-ai > :not(.ae-dash-ai-glow) {
+.ae-dash-ai > :not(.ae-dash-ai-glow):not(.ae-ring):not(.ae-dash-ai-out) {
   position: relative;
   z-index: 1;
 }
@@ -525,21 +599,46 @@
   grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
   gap: 10px 24px;
 }
+/* Each row is a grid: label | field | button. The label column is a fixed width, so the select and the
+   question box start at the same x and end at the same x, and the select, the box and both buttons
+   share one height. */
 .ae-dash-ai-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 6.75rem minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 8px 10px;
   margin: 0;
 }
-.ae-dash-ai-row > .ae-input {
-  flex: 1;
+.ae-dash-ai-row > h4 {
+  margin: 0;
+  white-space: nowrap;
+}
+.ae-dash-ai-row > .ae-input,
+.ae-dash-ai-row > button {
+  box-sizing: border-box;
+  height: 38px;
+  min-height: 38px;
   min-width: 0;
+  margin: 0;
+  font-size: 14px;
+}
+.ae-dash-ai-row > .ae-input {
+  width: 100%;
+  padding-block: 0;
+}
+.ae-dash-ai-row > button {
+  padding-inline: 16px;
+  white-space: nowrap;
 }
 .ae-dash-ai-chips {
   display: flex;
   gap: 6px;
-  margin-top: 6px;
+  /* Lined up under the field, not under the label. */
+  margin: 8px 0 0 calc(6.75rem + 10px);
+  padding-bottom: 2px;
   overflow-x: auto;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   /* A soft fade at the right edge says the row scrolls. */
   -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
@@ -547,7 +646,9 @@
 }
 .ae-dash-ai-chip {
   flex: none;
-  padding: 3px 10px;
+  scroll-snap-align: start;
+  min-height: 28px;
+  padding: 3px 11px;
   font: inherit;
   font-size: calc(11.5px * var(--ae-fs, 1));
   white-space: nowrap;
@@ -582,11 +683,91 @@
   text-decoration: underline;
 }
 /* While the AI is working, the border runs about three times faster. */
-.ae-dash-ai--busy {
+.ae-dash-ai--busy .ae-ring > i,
+.ae-dash-ai--busy .ae-dash-ai-glow i {
   animation-duration: 3.5s;
 }
 .ae-dash-ai.ae-dash-ai--busy .ae-dash-ai-glow > span {
   opacity: 0.85;
+}
+/* The answer: a popover under the card, over what is below it (no space is reserved in the card, so
+   an answer arriving never grows it or moves anything). Both helpers answer here; it scrolls inside
+   itself and closes with the x, Escape or "Ask another". */
+.ae-dash-ai-out {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 30;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  max-height: min(18rem, 55dvh);
+  padding: 10px 14px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  background: var(--ae-surface-solid, var(--ae-surface, #1a1a1a));
+  border: 1px solid var(--ae-border);
+  border-radius: 14px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  animation: ae-ai-pop 160ms ease-out;
+}
+.ae-dash-ai-out[hidden] {
+  display: none;
+}
+.ae-dash-ai-out:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: 2px;
+}
+@keyframes ae-ai-pop {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ae-dash-ai-out {
+    animation: none;
+  }
+}
+.ae-dash-ai-out-close {
+  position: sticky;
+  top: 0;
+  align-self: flex-end;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  margin: -4px -8px -20px 0;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ae-text) 10%, transparent);
+  color: var(--ae-text);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+.ae-dash-ai-out-close:hover {
+  background: color-mix(in srgb, var(--ae-text) 18%, transparent);
+}
+.ae-dash-ai-block[data-panel="changed"] {
+  order: 1;
+}
+.ae-dash-ai-block[data-panel="ask"] {
+  order: 2;
+}
+.ae-dash-ai-block {
+  flex: none;
+}
+/* Both answers showing: the Ask one (always displayed second) gets the divider. */
+.ae-dash-ai-out:has(.ae-dash-ai-block[data-panel="changed"]) .ae-dash-ai-block[data-panel="ask"] {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px dashed color-mix(in srgb, var(--ae-text) 14%, transparent);
 }
 .ae-dash-ai-chips::-webkit-scrollbar {
   display: none;
@@ -594,7 +775,19 @@
 /* Narrow screens (a 6.1" phone is about 390px wide): the label moves above its controls so the
    select and the question box get the full width instead of being squeezed beside it, the buttons
    and fields are touch-sized, and the example chips scroll edge to edge. */
-@media (max-width: 560px) {
+/* In the "Needs attention" grid the card is the full row by default; on a foldable it sits in one
+   cell. Its narrow layout therefore follows the card's own width (a container query), not the
+   screen's. */
+.ae-dash-ai-slot {
+  grid-column: 1 / -1;
+  margin: 12px 0 0;
+  min-width: 0;
+  /* Above the cards after it: the answer popover hangs under this card, over them. */
+  position: relative;
+  z-index: 20;
+  container: aicard / inline-size;
+}
+@container aicard (max-width: 560px) {
   .ae-dash-ai {
     padding: 10px 12px 12px !important;
   }
@@ -602,34 +795,29 @@
     margin-bottom: 10px;
   }
   .ae-dash-ai-grid {
-    gap: 14px;
+    gap: 16px;
   }
   .ae-dash-ai-row {
-    flex-wrap: wrap;
-    gap: 6px 8px;
+    grid-template-columns: minmax(0, 1fr) auto;
   }
   .ae-dash-ai-row > h4 {
-    flex: 0 0 100%;
+    grid-column: 1 / -1;
+  }
+  .ae-dash-ai-row > .ae-input,
+  .ae-dash-ai-row > button {
+    height: 44px;
+    min-height: 44px;
   }
   .ae-dash-ai-row > .ae-input {
-    min-height: 40px;
+    /* 16px: anything smaller makes iOS zoom the page when the box is focused. */
     font-size: 16px;
   }
-  .ae-dash-ai-row > button {
-    min-height: 40px;
-    padding-inline: 16px;
-  }
   .ae-dash-ai-chips {
-    margin-inline: -12px;
+    margin: 8px -12px 0;
     padding-inline: 12px;
-    padding-bottom: 2px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .ae-dash-ai {
-    animation: none;
-  }
-}
+
 .ae-dash-heading {
   display: flex;
   align-items: baseline;

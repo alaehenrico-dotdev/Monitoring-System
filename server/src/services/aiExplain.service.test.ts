@@ -89,6 +89,23 @@ describe("explainVariance", () => {
     expect(init.headers["x-goog-api-key"]).toBe("test-key");
   });
 
+  it("shows an explanation in plain sentences even if the model answers with markdown or JSON, and asks for that", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "**Short by 12.** Check the `late edit`." }] } }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const out = await explainVariance(1, new Date(), "NIGHT" as never, "ONLINE");
+    expect(out.explanation).toBe("Short by 12. Check the late edit.");
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body).systemInstruction.parts[0].text).toMatch(/no JSON, braces or field names/);
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{"variance": -12, "likelyCause": "late edit"}' }] } }] }) }),
+    );
+    expect((await explainVariance(1, new Date(), "NIGHT" as never, "ONLINE")).explanation).toBe("variance: -12\nlikely cause: late edit");
+  });
+
   it("maps a Google error to a 502 that does not leak the response", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({ error: "secret detail" }) }));

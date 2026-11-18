@@ -9,6 +9,7 @@ import { Toast } from "../components/Toast";
 import { UploadIcon } from "../components/icons";
 import { colors } from "../theme";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
+import { clearAllAiChats } from "../utils/aiChat";
 
 type Status =
   | "idle"
@@ -143,6 +144,8 @@ export function DatabaseRestoreCard() {
       // everything else, so there's nothing to clear client-side here.
       // Browser-local cache of pre-restore staged edits (see DataResetPage).
       clearAllPendingEntryState();
+      // Saved AI replies describe the data that was just replaced.
+      clearAllAiChats();
       setStatus("done");
       returnToInitial();
     } catch (err) {

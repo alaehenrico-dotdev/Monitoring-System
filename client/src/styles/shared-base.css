@@ -113,8 +113,38 @@
 .ae-main > div > :not(.ae-sticky-head) {
   animation: ae-page-in 160ms ease-out;
 }
+/* Switching tab: the page also slides in a short way from the side the tab is on (the tab order is
+   the bottom nav's; Layout.tsx sets data-nav-dir). Short and quick, so it reads as a change of
+   place, not a delay. */
+@keyframes ae-page-in-fwd {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ae-page-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.ae-main[data-nav-dir="fwd"] > div > :not(.ae-sticky-head) {
+  animation: ae-page-in-fwd 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ae-main[data-nav-dir="back"] > div > :not(.ae-sticky-head) {
+  animation: ae-page-in-back 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 @media (prefers-reduced-motion: reduce) {
-  .ae-main > div > :not(.ae-sticky-head) {
+  .ae-main > div > :not(.ae-sticky-head),
+  .ae-main[data-nav-dir] > div > :not(.ae-sticky-head) {
     animation: none;
   }
 }
@@ -809,14 +839,16 @@
   gap: 0 8px;
   padding: 4px 0;
 }
+/* Compact: the figures sit right after the name (not pushed to the far edge of a wide legend); a
+   minimum name width keeps the figures of every row in one column. */
 .ae-donut-name {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  min-width: 7.5rem;
 }
 .ae-donut-figs {
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
-  margin-left: auto;
   white-space: nowrap;
 }
 .ae-donut-legend strong {

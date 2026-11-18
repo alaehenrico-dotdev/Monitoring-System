@@ -413,8 +413,10 @@
 
 /* ---- Dashboard: square tiles -------------------------------------------------------
    The three stock cards were full-width bars (each ~110px tall) and the quick links a loose
-   wrap of pills. On a phone they are square tiles in an even grid: icon at the top, the figure
-   big in the middle, its label under it, the change badge in the corner. */
+   wrap of pills. On a phone they are compact tiles in an even grid, as short as their content (not
+   square: a square tile on a wider foldable screen is mostly empty): icon at the top, the figure
+   big under it, its label below, the change badge in the corner. The figure scales with the
+   tile's own width (a container query), so it is as large as the tile allows on any screen. */
 :root:root:root[data-phone="true"] .ae-dash-hero-left .ae-dash-stats--hero,
 :root:root:root[data-phone="true"] .ae-dash-stats--hero {
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -431,11 +433,11 @@
 }
 :root:root:root[data-phone="true"] .ae-dash-stat,
 :root:root:root[data-phone="true"] .ae-dash-stat--hero {
-  aspect-ratio: 1 / 1;
+  container-type: inline-size;
   min-width: 0;
-  padding: 10px 8px 8px;
+  padding: 8px 10px 9px;
   gap: 4px;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: flex-start;
 }
 :root:root:root[data-phone="true"] .ae-dash-stat-head {
@@ -444,20 +446,21 @@
 :root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-icon,
 :root:root:root[data-phone="true"] .ae-dash-stat--hero .ae-dash-stat-icon {
   order: 0;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
 }
 :root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-value,
 :root:root:root[data-phone="true"] .ae-dash-stat--hero .ae-dash-stat-value {
   order: 1;
-  font-size: clamp(20px, 6.4vw, 26px);
+  font-size: clamp(20px, 22cqw, 46px);
+  line-height: 1.05;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 :root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-label {
   order: 2;
-  font-size: 11px;
+  font-size: 11.5px;
   line-height: 1.2;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -496,6 +499,26 @@
   font-size: 11.5px;
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+/* Under Recent Activity's right-hand side the links are a stacked column, not square tiles. */
+:root:root:root[data-phone="true"] .ae-dash-lower > .ae-dash-quicklinks {
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(84px, 1fr);
+  gap: 8px;
+  margin: 26px 0 0;
+}
+:root:root:root[data-phone="true"] .ae-dash-lower .ae-dash-quicklink {
+  aspect-ratio: auto;
+}
+@media (max-width: 560px) {
+  :root:root:root[data-phone="true"] .ae-dash-lower > .ae-dash-quicklinks {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: auto;
+    margin-top: 0;
+  }
+  :root:root:root[data-phone="true"] .ae-dash-lower .ae-dash-quicklink {
+    min-height: 76px;
+  }
 }
 
 /* ---- Dashboard: Weekly / Monthly Monitoring card ---------------------------------------
@@ -974,9 +997,21 @@
    text colours, so it reads the same in every theme and header layout.
    --ae-bottomnav-h is the bar's full height (home-indicator area included), for the floating
    things that must sit above it: the Back to top button and the toasts. */
+/* Floating pill, centred along the bottom: a fixed width (never the screen's full width, so it
+   doesn't stretch on a foldable's wider inner screen), lifted off the edge by --ae-bottomnav-gap
+   and the home-indicator area. --ae-bottomnav-h is the whole zone it occupies, so the page
+   scrolls clear of it (padding on .ae-main) and Back to top and the toasts sit above it. */
 :root:root:root[data-phone="true"] {
-  --ae-bottomnav-h: calc(56px + env(safe-area-inset-bottom, 0px));
+  --ae-bottomnav-bar: 56px;
+  --ae-bottomnav-gap: 10px;
+  --ae-bottomnav-rows: 1;
+  --ae-bottomnav-h: calc(
+    var(--ae-bottomnav-bar) * var(--ae-bottomnav-rows) + var(--ae-bottomnav-gap) * (var(--ae-bottomnav-rows) + 1) +
+      env(safe-area-inset-bottom, 0px)
+  );
 }
+/* Full page names need room: on a narrow screen the nav takes two rows (split: a pill per row;
+   centered: the one pill wraps) instead of squeezing or cutting the names. */
 :root:root:root[data-phone="true"] .app-shell {
   flex-direction: column;
 }
@@ -984,30 +1019,181 @@
   flex: 1 1 0;
   min-height: 0;
   width: 100%;
+  padding-bottom: var(--ae-bottomnav-h);
+  box-sizing: border-box;
 }
+/* The container only positions the pills (it lets taps through between them) and carries the one
+   turning angle the pills' rings share. Split, the default: a pill at each side. Centered: one pill. */
 :root:root:root[data-phone="true"] .ae-bottomnav {
-  flex: none;
+  position: fixed;
+  /* The whole width on a phone; on a tablet a centred strip at most 52rem wide, so the pills do not
+     drift to the far edges of a 1000px+ screen. */
+  left: 0;
+  right: 0;
+  width: min(calc(100% - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 52rem);
+  margin-inline: auto;
+  bottom: calc(var(--ae-bottomnav-gap) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  pointer-events: none;
+  /* Above the page and its pinned table headers; under the account panel (50) and dialogs (200). */
+  z-index: 40;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav[data-layout="centered"] {
+  justify-content: center;
+}
+/* A fade behind the pills, the full width of the screen (even where the pills are a narrower strip):
+   from the page colour at the bottom edge to nothing above, so the page does not run under the floating
+   pills as hard-edged content. Behind the pills (z-index -1 in the bar container's own stacking context),
+   never catches a tap. Every tab, every phone / tablet layout. */
+:root:root:root[data-phone="true"] .ae-bottomnav::before {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--ae-bottomnav-h) + 28px);
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--ae-bg) 96%, transparent) 0%,
+    color-mix(in srgb, var(--ae-bg) 82%, transparent) 38%,
+    color-mix(in srgb, var(--ae-bg) 40%, transparent) 72%,
+    transparent 100%
+  );
+}
+/* Split: the screen is two equal halves and each pill is centred in its own half (not pushed to the
+   screen's edge); stacked, one per row, when the screen is narrow. */
+:root:root:root[data-phone="true"] .ae-bottomnav[data-layout="split"] {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-items: center;
+  align-items: end;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav[data-layout="split"] .ae-bottomnav-bar {
+  max-width: 100%;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-bar {
+  position: relative;
+  pointer-events: auto;
   display: flex;
   align-items: stretch;
-  height: var(--ae-bottomnav-h);
-  padding: 0 4px env(safe-area-inset-bottom, 0px);
+  flex: 0 1 auto;
+  min-width: 0;
+  min-height: var(--ae-bottomnav-bar);
+  padding: 0 6px;
   box-sizing: border-box;
   background: var(--ae-surface);
-  border-top: 1px solid var(--ae-border);
-  /* Above the page and its pinned table headers; under the account panel (50) and dialogs (200). */
+  border: 1px solid transparent;
+  border-radius: 28px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+/* A normal phone (under 600px; PhoneBottomNav sets data-compact): one floating pill, one row, the six
+   tabs sharing its width with their short labels, as the bar always was. No layout choice to make. */
+:root:root:root[data-phone="true"] .ae-bottomnav[data-compact="true"] .ae-bottomnav-bar {
+  flex: 1 1 100%;
+  flex-wrap: nowrap;
+  padding: 0 4px;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav[data-compact="true"] .ae-bottomnav-item {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 2px;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav[data-compact="true"] .ae-bottomnav-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10.5px;
+}
+/* The three-dots button, last in the right-hand pill, and the layout menu it opens above it. */
+:root:root:root[data-phone="true"] .ae-bottomnav-more {
   position: relative;
-  z-index: 40;
+  flex: none;
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-dots {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ae-text-muted);
+  -webkit-tap-highlight-color: transparent;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-dots:active,
+:root:root:root[data-phone="true"] .ae-bottomnav-dots[aria-expanded="true"] {
+  background: var(--ae-row-hover);
+  color: var(--ae-text);
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-dots:focus-visible {
+  outline: 2px solid var(--ae-focus-ring, #8a6800);
+  outline-offset: -2px;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 18px);
+  min-width: 11.5rem;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  background: var(--ae-surface);
+  border: 1px solid var(--ae-border);
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-menu-item {
+  min-height: 44px;
+  padding: 0 12px 0 30px;
+  position: relative;
+  text-align: left;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ae-text);
+  font: inherit;
+  font-size: 14px;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-menu-item[aria-checked="true"] {
+  color: var(--ae-warning-text);
+  font-weight: 600;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-menu-item[aria-checked="true"]::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -3.5px;
+  border-radius: 50%;
+  background: currentColor;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-menu-item:active {
+  background: var(--ae-row-hover);
 }
 :root:root:root[data-phone="true"] .ae-bottomnav-item {
   position: relative;
-  flex: 1 1 0;
+  flex: 0 0 auto;
   min-width: 0;
+  min-height: var(--ae-bottomnav-bar);
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 0 2px;
+  padding: 0 9px;
   color: var(--ae-text-muted);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
@@ -1016,11 +1202,9 @@
   flex: none;
 }
 :root:root:root[data-phone="true"] .ae-bottomnav-label {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* The full page name, never cut off. */
   white-space: nowrap;
-  font-size: 10.5px;
+  font-size: 11.5px;
   font-weight: 600;
   line-height: 1.1;
   letter-spacing: 0.01em;
@@ -1031,12 +1215,29 @@
 :root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"]::before {
   content: "";
   position: absolute;
-  top: -1px;
-  left: 22%;
-  right: 22%;
+  top: 3px;
+  left: 28%;
+  right: 28%;
   height: 2px;
-  border-radius: 0 0 2px 2px;
+  border-radius: 2px;
   background: currentColor;
+}
+/* The open tab: its colour eases in and its line grows out from the middle when it becomes current. */
+:root:root:root[data-phone="true"] .ae-bottomnav-item {
+  transition: color 180ms ease;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"]::before {
+  animation: ae-nav-line 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes ae-nav-line {
+  from {
+    transform: scaleX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"]::before {
+    animation: none;
+  }
 }
 :root:root:root[data-phone="true"] .ae-bottomnav-item:active {
   background: var(--ae-row-hover);
@@ -1044,7 +1245,7 @@
 :root:root:root[data-phone="true"] .ae-bottomnav-item:focus-visible {
   outline: 2px solid var(--ae-focus-ring, #8a6800);
   outline-offset: -3px;
-  border-radius: 6px;
+  border-radius: 22px;
 }
 /* The toasts (Toast.tsx sets their place inline) rise above the bar. */
 :root:root:root[data-phone="true"] #ae-toast-stack {
@@ -1058,6 +1259,55 @@
 :root:root:root[data-phone="true"] .ae-donut-ring {
   width: 108px;
   height: 108px;
+}
+
+/* Foldable (a phone-view screen 600px or wider): Top variances moves up beside Out by channel, the
+   donut and its legend at the left, the variances at the right. The lower part of the Stock flow card
+   becomes two columns; elsewhere the wrapper adds nothing and the aside is not shown. */
+.ae-fl-lower {
+  display: contents;
+}
+.ae-fl-aside {
+  display: none;
+}
+@media (min-width: 600px) {
+  :root:root:root[data-phone="true"] .ae-fl-lower {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 12px 20px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid color-mix(in srgb, var(--ae-text) 9%, transparent);
+  }
+  :root:root:root[data-phone="true"] .ae-fl-lower > .ae-fl-split {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  :root:root:root[data-phone="true"] .ae-fl-aside {
+    display: block;
+    min-width: 0;
+  }
+  :root:root:root[data-phone="true"] .ae-fl-aside .ae-dash-section {
+    margin: 0;
+  }
+  :root:root:root[data-phone="true"] .ae-fl-aside .ae-dash-card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  /* The AI card takes the free cell beside the insight cards instead of its own row. */
+  :root:root:root[data-phone="true"] .ae-dash-ai-slot {
+    grid-column: auto;
+    margin-top: 0;
+    align-self: start;
+  }
+  /* Its original place in "Needs attention" empties: the card shows beside the donut instead. */
+  :root:root:root[data-phone="true"] .ae-dash-variance-main {
+    display: none;
+  }
 }
 
 /* Change Log, an opened entry: the Field / Before / After table fills the card, the field name
@@ -1092,10 +1342,61 @@
   background: rgba(0, 0, 0, 0.45);
 }
 :root:root:root[data-phone="true"] .ae-quickjump--phone {
-  width: 100%;
+  position: relative;
+  /* Centred, as wide as a comfortable sheet; the whole width on a narrow phone. */
+  width: min(100%, 30rem);
   max-width: none;
   max-height: min(78dvh, calc(var(--ae-vh) - var(--ae-bottomnav-h) - 16px));
   border-radius: 10px;
+}
+/* The position switch: three small buttons at the right of the search box. Only where there is room
+   to dock (a foldable's wider screen); a narrow phone shows the sheet full width, nothing to choose. */
+:root:root:root[data-phone="true"] .ae-quickjump-dock {
+  display: none;
+}
+@media (min-width: 600px) {
+  :root:root:root[data-phone="true"] .ae-quickjump-dock {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  :root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-input {
+    padding-right: 7.5rem;
+  }
+  /* Docked: the left or right half of the screen (a half of a folded foldable's inner screen). */
+  :root:root:root[data-phone="true"] .ae-quickjump--dock-left {
+    width: min(calc(50% - 4px), 30rem);
+    margin-right: auto;
+  }
+  :root:root:root[data-phone="true"] .ae-quickjump--dock-right {
+    width: min(calc(50% - 4px), 30rem);
+    margin-left: auto;
+  }
+}
+:root:root:root[data-phone="true"] .ae-quickjump-dock-btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ae-text-muted, #a0a0a0);
+  -webkit-tap-highlight-color: transparent;
+}
+:root:root:root[data-phone="true"] .ae-quickjump-dock-btn[aria-pressed="true"] {
+  background: rgba(245, 192, 0, 0.18);
+  color: #f5c000;
+}
+:root:root:root[data-phone="true"] .ae-quickjump-dock-btn:focus-visible {
+  outline: 2px solid #d4a000;
+  outline-offset: -2px;
 }
 :root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-input {
   padding: 14px 14px;

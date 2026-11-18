@@ -370,7 +370,9 @@ export function DashboardPage() {
         </div>
 
         <div className="ae-dash-hero-chart">
-          <StockFlowChart />
+          <StockFlowChart
+            aside={<VarianceTopCard rows={stocks} date={viewDate} failed={showStatsError} />}
+          />
         </div>
       </div>
 
@@ -381,11 +383,14 @@ export function DashboardPage() {
           already fetched for the stat cards. */}
       <div className="ae-dash-insights">
         <EntryStatusCard date={viewDate} defaultShift={currentShift} />
-        <VarianceTopCard
-          rows={stocks}
-          date={viewDate}
-          failed={showStatsError}
-        />
+        {/* On a foldable's wide screen this card moves beside Out by channel (styles/phone.css). */}
+        <div className="ae-dash-variance-main">
+          <VarianceTopCard
+            rows={stocks}
+            date={viewDate}
+            failed={showStatsError}
+          />
+        </div>
         <LowStockCard rows={stocks} failed={showStatsError} />
         {/* Sits in the first row beside the other three. It and "Needs
             restock" read one shared fetch (see useDaysOfStock) - "Needs
@@ -393,31 +398,18 @@ export function DashboardPage() {
             level. */}
         <LowestDaysLeftCard rows={daysOfStock} failed={daysOfStockFailed} />
         <NeedsRestockCard rows={daysOfStock} failed={daysOfStockFailed} />
+        {/* Hidden unless the server has AI set up (GEMINI_API_KEY). Supervisor-only like the page.
+            The full row under the cards, except on a foldable's wide screen (styles/phone.css),
+            where it fills the free cell beside them. */}
+        <DashboardAiCard />
       </div>
 
-      {/* Hidden unless the server has AI set up (GEMINI_API_KEY). Supervisor-only like the page. */}
-      <DashboardAiCard />
-
-      <div className="ae-dash-quicklinks" aria-label="Quick links">
-        {QUICK_LINKS.map((l) => (
-          <PhoneSafeLink key={l.to} to={l.to} className="ae-dash-quicklink">
-            <span aria-hidden className="ae-dash-quicklink-icon">
-              {l.icon}
-            </span>
-            <span className="ae-dash-quicklink-label">{l.label}</span>
-            <span aria-hidden className="ae-dash-quicklink-arrow">
-              <ChevronRightIcon />
-            </span>
-          </PhoneSafeLink>
-        ))}
-      </div>
-
-      <div className="ae-dash-activity-row">
+      <div className="ae-dash-activity-row ae-dash-lower">
         {/* Recent Activity: the change_log (Section 5.8) is otherwise only
             visible on its own dedicated page - surfacing the last few edits
             here means a supervisor can spot something odd (a bulk edit, a
             deletion, an unfamiliar name) without navigating away first.
-            Compact, full width under the quick links. */}
+            Compact, at the left, with the quick links stacked at its right. */}
         <section className="ae-dash-section ae-dash-hero-activity">
           <h3 className="ae-dash-heading">
             Recent Activity
@@ -474,6 +466,21 @@ export function DashboardPage() {
             )}
           </div>
         </section>
+
+        {/* The two quick links, stacked at the right of Recent Activity. */}
+        <div className="ae-dash-quicklinks" aria-label="Quick links">
+          {QUICK_LINKS.map((l) => (
+            <PhoneSafeLink key={l.to} to={l.to} className="ae-dash-quicklink">
+              <span aria-hidden className="ae-dash-quicklink-icon">
+                {l.icon}
+              </span>
+              <span className="ae-dash-quicklink-label">{l.label}</span>
+              <span aria-hidden className="ae-dash-quicklink-arrow">
+                <ChevronRightIcon />
+              </span>
+            </PhoneSafeLink>
+          ))}
+        </div>
       </div>
 
       <PeriodMonitoringCard />

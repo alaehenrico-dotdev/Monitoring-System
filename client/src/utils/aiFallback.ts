@@ -28,13 +28,17 @@ export function aiFallback(err: unknown, placeholder: string): AiFallback {
   const message = err instanceof Error ? err.message : "";
   if (err instanceof ApiError && err.status === 400 && message) return { text: message, retry: false };
   if (SETUP_PROBLEM.test(message)) return { text: placeholder, detail: message, retry: false };
+  // The server's own limits (too many in a short time, one question at a time, the daily allowance)
+  // answer 429 with a message that tells the person what to do - how long to wait, or that it resets
+  // tomorrow - so it is shown as it is, instead of a placeholder that hides it.
+  if (err instanceof ApiError && err.status === 429 && message) return { text: message, retry: !/tomorrow/i.test(message) };
   if (USAGE_LIMIT.test(message)) return { text: placeholder, detail: message, retry: true };
   return { text: placeholder, retry: true };
 }
 
 /// The placeholder wording per place, so the same failure reads the same everywhere.
 export const AI_PLACEHOLDER = {
-  search: "The AI isn't available right now. Pages and products still work - edit the text to search, or try again in a moment.",
+  search: "The AI isn't available right now. Pages and products still work - go back to search, or try again in a moment.",
   ask: "The AI isn't available right now. Try again in a moment.",
   changes: "Couldn't compare these periods right now. Try again in a moment.",
   changesSummary: "The AI summary isn't available right now - the figures here are still current.",

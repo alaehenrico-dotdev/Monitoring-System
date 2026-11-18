@@ -7,6 +7,7 @@ import { Button } from "../components/ui";
 import { Modal } from "../components/Modal";
 import { colors } from "../theme";
 import { clearAllPendingEntryState } from "../hooks/usePendingEntryChanges";
+import { clearAllAiChats } from "../utils/aiChat";
 import { InlineLoading, Spinner } from "../components/Spinner";
 import { LockIcon } from "../components/icons";
 
@@ -159,6 +160,8 @@ export function DataResetPage() {
       // already gone on any remount/navigation - there's nothing left for a
       // reset to clean up.
       clearAllPendingEntryState();
+      // Saved AI replies describe data that no longer exists.
+      clearAllAiChats();
       // The quick-jump palette keeps its own copy of the product list.
       notifyProductsChanged();
       setStatus("done");

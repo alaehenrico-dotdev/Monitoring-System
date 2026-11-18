@@ -24,6 +24,8 @@ const facts = (over = {}) => ({
 });
 
 beforeEach(() => {
+  // jsdom has no layout, so no scrollIntoView (the dropdown calls it on open).
+  Element.prototype.scrollIntoView = vi.fn();
   vi.clearAllMocks();
   resetAiAvailableCache();
   api.getAiStatus.mockResolvedValue({ enabled: true, model: "m", windows: [1, 7, 14, 30] });
@@ -56,7 +58,8 @@ describe("What changed?", () => {
   it("shows the AI summary beside the server's numbers", async () => {
     api.getWhatChanged.mockResolvedValue({ facts: facts(), explanation: "Soy Sauce drove the rise.", model: "m" });
     render(<DashboardAiCard />);
-    fireEvent.change(await screen.findByLabelText("Comparison window"), { target: { value: "14" } });
+    fireEvent.click(await screen.findByLabelText("Comparison window"));
+    fireEvent.click(await screen.findByRole("option", { name: /Last 14 days/ }));
     fireEvent.click(screen.getByText("Compare"));
     expect(await screen.findByText("Soy Sauce drove the rise.")).toBeTruthy();
     expect(api.getWhatChanged).toHaveBeenCalledWith(14);
