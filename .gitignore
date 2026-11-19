@@ -74,6 +74,12 @@ gemini*.json
 *api_key*.json
 *apikey*.json
 
+# Web Push (VAPID) key pair for admin notifications: the private key belongs in server/.env (or the
+# server's .env next to docker-compose.yml), never in a committed file. Catches a pasted copy.
+vapid*.txt
+vapid*.json
+*vapid*.key
+
 # --- Data that must never be committed ----------------------------------------
 # Database dumps and backups. The backup scripts write outside the repo by default
 # (C:\ala-eh-backups, /var/backups/alaeh-stocks); this catches one pointed inside it.

@@ -24,7 +24,7 @@ export function EntryTotalsStrip({
     <div className="ae-entry-totals" role="group" aria-label="Sheet totals">
       <div className="ae-entry-total">
         <span className="ae-entry-total-value">{remaining.toLocaleString()}</span>
-        <span className="ae-entry-total-label">Total remaining stock</span>
+        <span className="ae-entry-total-label">Stock</span>
       </div>
       <button
         type="button"
@@ -35,11 +35,11 @@ export function EntryTotalsStrip({
         onClick={() => onRowFilterChange(showingNegative ? "all" : "negative")}
       >
         <span className="ae-entry-total-value">{negative}</span>
-        <span className="ae-entry-total-label">Below zero</span>
+        <span className="ae-entry-total-label">Negative</span>
       </button>
-      <div className="ae-entry-total">
+      <div className={`ae-entry-total${changed === 0 ? " ae-entry-total--zero" : ""}`}>
         <span className="ae-entry-total-value">{changed}</span>
-        <span className="ae-entry-total-label">Edited, unsaved</span>
+        <span className="ae-entry-total-label">Unsaved</span>
       </div>
     </div>
   );

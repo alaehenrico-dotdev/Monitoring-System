@@ -63,6 +63,29 @@
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
+/* Minimalist: the figure is a quiet medium-weight number, the label lighter still, and a
+   count of zero (nothing to act on) recedes further. Red appears only when something is below zero. */
+.ae-page-header-badges .ae-entry-totals {
+  gap: 22px;
+}
+.ae-page-header-badges .ae-entry-total {
+  padding: 3px 0;
+  gap: 5px;
+}
+.ae-page-header-badges .ae-entry-total-value {
+  font-weight: 500;
+  font-size: calc(13px * var(--ae-fs, 1));
+}
+.ae-page-header-badges .ae-entry-total-label {
+  font-weight: 400;
+  font-size: calc(10.5px * var(--ae-fs, 1));
+  letter-spacing: 0.02em;
+  opacity: 0.6;
+}
+.ae-page-header-badges .ae-entry-total--zero,
+.ae-page-header-badges .ae-entry-total--action:disabled {
+  opacity: 0.45;
+}
 .ae-page-header-badges .ae-entry-total--action {
   transition: color 120ms ease;
 }

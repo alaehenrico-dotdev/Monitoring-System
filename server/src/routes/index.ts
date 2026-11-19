@@ -19,6 +19,7 @@ import extraColumnLabelsRoutes from "./extraColumnLabels.routes";
 import clientErrorRoutes from "./clientError.routes";
 import correctionRoutes from "./correction.routes";
 import actionQueueRoutes from "./actionQueue.routes";
+import alertsRoutes from "./alerts.routes";
 import orderTemplatesRoutes from "./orderTemplates.routes";
 import pendingReleaseRoutes from "./pendingRelease.routes";
 import monthCloseRoutes from "./monthClose.routes";
@@ -59,6 +60,7 @@ router.use("/pending-releases", retrySafe, pendingReleaseRoutes);
 router.use("/extra-labels", retrySafe, extraColumnLabelsRoutes);
 router.use("/corrections", retrySafe, correctionRoutes);
 router.use("/action-queue", actionQueueRoutes);
+router.use("/alerts", alertsRoutes);
 router.use("/order-templates", retrySafe, orderTemplatesRoutes);
 router.use("/client-errors", clientErrorRoutes);
 

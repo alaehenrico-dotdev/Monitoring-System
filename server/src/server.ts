@@ -6,6 +6,7 @@ import { prisma } from "./lib/prisma";
 import { attachRealtime, closeRealtime } from "./lib/realtime";
 import { startMaintenance } from "./services/maintenance.service";
 import { startDriveScheduler } from "./services/drive.service";
+import { startAlerts } from "./services/alerts.service";
 
 const app = createApp();
 const server = createServer(app);
@@ -14,6 +15,7 @@ attachRealtime(server);
 logKeyWarnings(env);
 startMaintenance();
 startDriveScheduler();
+startAlerts();
 
 server.listen(env.port, env.host, () => {
   // eslint-disable-next-line no-console

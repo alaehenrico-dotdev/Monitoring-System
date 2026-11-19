@@ -430,9 +430,24 @@
 
 /* ---- Warnings that do not rely on colour alone ---------------------------- */
 /* The "negative stock" total on the entry pages: bold and underlined as well as red. */
+/* In the header the red figure gets a small dot before it instead of an underline. */
 :root[data-ui="minimal"] .ae-entry-total--bad .ae-entry-total-value {
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+:root[data-ui="minimal"] .ae-page-header-badges .ae-entry-total--bad .ae-entry-total-value {
+  font-weight: 500;
+  text-decoration: none;
+}
+:root[data-ui="minimal"] .ae-page-header-badges .ae-entry-total--bad .ae-entry-total-value::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  clip-path: circle(50%);
+  background: currentColor;
+  vertical-align: middle;
 }
 

@@ -73,6 +73,7 @@ model User {
   manualCounts         ManualCount[]         @relation("CountedBy")
   publishedCounts      ManualCount[]         @relation("PublishedBy")
   changeLogEntries     ChangeLog[]           @relation("ChangedBy")
+  pushSubscriptions    PushSubscription[]
   importBatches        ImportBatch[]         @relation("ImportedBy")
   reportHistory        ReportHistoryEntry[]  @relation("GeneratedBy")
   systemLogEntries     SystemLogEntry[]      @relation("UpdatedOn")
@@ -864,4 +865,28 @@ model AppSetting {
   updatedAt   DateTime @updatedAt
 
   @@map("app_settings")
+}
+
+/// A browser/phone an admin turned notifications on for (Web Push). One row per device
+/// endpoint; a row the push service reports as gone is deleted by the alerts job.
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique @db.VarChar(500)
+  p256dh    String   @db.VarChar(200)
+  auth      String   @db.VarChar(100)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
+/// Alerts already pushed, so the same problem is notified once and not on every check. A row
+/// goes when its problem clears, which lets a problem that comes back notify again.
+model AlertSeen {
+  id     String   @id @db.VarChar(120)
+  seenAt DateTime @default(now())
+
+  @@map("alert_seen")
 }

@@ -93,6 +93,11 @@ services:
       OPENROUTER_DATA_COLLECTION: ${OPENROUTER_DATA_COLLECTION:-deny}
       AI_DAILY_CALL_LIMIT: ${AI_DAILY_CALL_LIMIT:-1000}
       AI_USER_DAILY_LIMIT: ${AI_USER_DAILY_LIMIT:-100}
+      # Optional: push notifications to admins' phones/desktops (bell in the app header).
+      # Generate the pair once: npx web-push generate-vapid-keys. Empty = push off.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@example.com}
     # Snapshots taken before pending migrations are applied (server/docker/start.sh).
     volumes:
       - api_backups:/backups

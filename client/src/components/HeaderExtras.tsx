@@ -1,6 +1,7 @@
 import { LiveClock } from "./LiveClock";
 import { openQuickJump } from "./QuickJump";
 import { AiSearchIcon, SearchIcon } from "./icons";
+import { AlertBell } from "./AlertBell";
 import { ThemeToggle } from "./ThemeToggle";
 import { TypingPractice } from "./TypingPractice";
 import { HeaderCalculator } from "./Calculator";
@@ -49,6 +50,7 @@ export function HeaderExtras() {
         {ai ? <AiSearchIcon /> : <SearchIcon />}
         {ai && !phone && <span className="ae-hsb-label">Search</span>}
       </button>
+      <AlertBell />
       <HeaderCalculator />
       {!phone && <TypingPractice />}
       <LiveClock />

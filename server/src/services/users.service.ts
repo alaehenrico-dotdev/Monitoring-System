@@ -117,8 +117,22 @@ export async function resetPasswordWithCode(username: string, code: string, newP
   throw invalid();
 }
 
+/// The account list for the admin, with each person's last successful sign-in (read from the
+/// change log's "login" events, so no extra column to keep in step) and whether two-step
+/// sign-in is on.
 export async function listUsers() {
-  return userRepository.findAllPublic();
+  const [users, logins, mfa] = await Promise.all([
+    userRepository.findAllPublic(),
+    prisma.changeLog.groupBy({
+      by: ["changedById"],
+      where: { tableName: "system", newValue: { path: "$.event", equals: "login" }, changedById: { not: null } },
+      _max: { changedAt: true },
+    }),
+    prisma.user.findMany({ where: { totpEnabledAt: { not: null } }, select: { id: true } }),
+  ]);
+  const lastLogin = new Map(logins.map((l) => [l.changedById, l._max?.changedAt]));
+  const mfaOn = new Set(mfa.map((m) => m.id));
+  return users.map((u) => ({ ...u, lastLoginAt: lastLogin.get(u.id) ?? null, mfaEnabled: mfaOn.has(u.id) }));
 }
 
 export async function createUser(data: { name: string; username: string; password: string; role: Role }, actorId?: number) {

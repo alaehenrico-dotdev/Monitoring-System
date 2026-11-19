@@ -10,6 +10,7 @@ import { Modal } from "../components/Modal";
 import { showToast } from "../components/Toast";
 import { colors } from "../theme";
 import { initials } from "../utils/initials";
+import { formatRelativeTime } from "../utils/dateFormat";
 
 const MIN_LENGTH = 10;
 
@@ -75,6 +76,10 @@ export function UserPasswordsPage() {
                       inactive
                     </span>
                   )}
+                  <span title={a.lastLoginAt ? new Date(a.lastLoginAt).toLocaleString() : undefined}>
+                    {a.lastLoginAt ? `Last sign-in ${formatRelativeTime(a.lastLoginAt)}` : "Never signed in"}
+                  </span>
+                  {a.mfaEnabled && <span>2-step on</span>}
                 </div>
               </div>
               <div className="ae-account-actions">

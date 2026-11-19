@@ -7,6 +7,9 @@ export interface AccountSummary {
   username: string;
   role: Role;
   isActive: boolean;
+  /// Last successful sign-in (ISO), or null if they never have.
+  lastLoginAt?: string | null;
+  mfaEnabled?: boolean;
 }
 
 /// Supervisor/Admin only (the server enforces it).

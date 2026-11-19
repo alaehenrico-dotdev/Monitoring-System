@@ -3082,3 +3082,92 @@
 .ae-typing-head strong { font-size: clamp(14px, 1.9cqw, 18px); }
 .ae-typing-timer { align-items: center; }
 .ae-typing-timer-label { margin-right: 2px; font-size: clamp(11px, 1.5cqw, 14px); color: var(--ae-text-muted); }
+
+/* Alert bell (components/AlertBell.tsx): the Supervisor/Admin's "needs attention" count and list. */
+.ae-alert-bell {
+  position: relative;
+  display: inline-flex;
+}
+.ae-alert-bell-btn {
+  position: relative;
+}
+.ae-alert-badge {
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  min-width: 14px;
+  padding: 0 4px;
+  border-radius: 7px;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+  color: var(--ae-text);
+  background: var(--ae-hairline);
+}
+.ae-alert-badge--urgent {
+  color: #fff;
+  background: var(--ae-danger-text, #c0392b);
+}
+.ae-alert-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(320px, calc(100vw - 24px));
+  padding: 10px 12px;
+  border: 0.5px solid var(--ae-hairline);
+  border-radius: 8px;
+  background: var(--ae-surface, Canvas);
+  color: var(--ae-text);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  font-size: calc(12px * var(--ae-fs, 1));
+}
+.ae-alert-list {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.ae-alert-item {
+  display: block;
+  padding: 5px 0;
+  color: var(--ae-text-muted);
+  text-decoration: none;
+}
+.ae-alert-item--urgent {
+  color: var(--ae-text);
+}
+.ae-alert-item:hover {
+  text-decoration: underline;
+}
+.ae-alert-empty {
+  margin: 0 0 8px;
+  color: var(--ae-text-muted);
+}
+.ae-alert-all {
+  display: block;
+  padding: 6px 0;
+  border-top: 0.5px solid var(--ae-hairline);
+  font-weight: 600;
+  color: var(--ae-text);
+  text-decoration: none;
+}
+.ae-alert-notify {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 0.5px solid var(--ae-hairline);
+  color: var(--ae-text-muted);
+}
+.ae-alert-toggle {
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border: 0.5px solid var(--ae-hairline);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ae-text);
+  font: inherit;
+  cursor: pointer;
+}

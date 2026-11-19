@@ -4,6 +4,7 @@ import {
   ArrowUp,
   ArrowUpFromLine,
   Ban,
+  Bell,
   Calculator,
   Calendar,
   Check,
@@ -78,6 +79,10 @@ export function UndoIcon() {
 /// since clearing never touches the server.
 export function ClearIcon() {
   return <X {...look(14, 1.5)} />;
+}
+
+export function BellIcon() {
+  return <Bell {...look(14, 1.6)} />;
 }
 
 export function SearchIcon() {

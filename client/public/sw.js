@@ -83,3 +83,37 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+/* Push notifications for admins (see server/src/services/alerts.service.ts). The payload is
+ * {title, body, url}; a tap focuses an open window on that page, or opens one. Notifications
+ * shown by the open app itself (utils/pushNotifications.ts) use the same click handler. */
+self.addEventListener("push", (event) => {
+  let data;
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = {};
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "Needs attention", {
+      body: data.body || "",
+      icon: "/icon-512.png",
+      tag: "ae-alert",
+      data: { url: data.url || "/admin-queue" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/admin-queue";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
+      const open = wins[0];
+      if (open) {
+        return open.focus().then(() => ("navigate" in open ? open.navigate(url) : undefined));
+      }
+      return self.clients.openWindow(url);
+    }),
+  );
+});

@@ -244,6 +244,13 @@ export const env = {
   // 0 turns either limit off.
   clientErrorRetentionDays: nonNegativeInt("CLIENT_ERROR_RETENTION_DAYS", 90),
   clientErrorMaxRows: nonNegativeInt("CLIENT_ERROR_MAX_ROWS", 20_000),
+  // Phone/desktop push notifications for admins (services/alerts.service.ts). Generate the pair
+  // once with `npm run vapid --workspace server`. Without both keys, push stays off; the in-app
+  // bell and open-app notifications work regardless. The subject is a mailto: or https: contact
+  // the push services can reach if your server misbehaves.
+  vapidPublicKey: process.env.VAPID_PUBLIC_KEY?.trim() || "",
+  vapidPrivateKey: process.env.VAPID_PRIVATE_KEY?.trim() || "",
+  vapidSubject: process.env.VAPID_SUBJECT?.trim() || "mailto:admin@example.com",
   // A backup older than this many hours (or none at all) shows as overdue in
   // the admin action queue.
   backupOverdueHours: limitCount("BACKUP_OVERDUE_HOURS", 36),
