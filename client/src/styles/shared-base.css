@@ -622,6 +622,16 @@
   grid-template-rows: minmax(200px, 1fr) 22px;
   min-height: 240px;
 }
+/* A second axis line (the weekday) needs a taller axis row. */
+.ae-fl-chart--sub {
+  grid-template-rows: minmax(200px, 1fr) 36px;
+}
+.ae-fl-xsub {
+  display: block;
+  font-size: 0.86em;
+  font-weight: 400;
+  opacity: 0.8;
+}
 /* Phone, long period: the plot keeps a readable width per day and scrolls sideways, with the
    y axis pinned over it. --ae-fl-min is set by FlowLineChart from the number of days. */
 .ae-fl-chart--scroll {
@@ -716,6 +726,151 @@
   height: 8px;
   border-width: 1.5px;
 }
+/* Chart type (Settings > Appearance > Charts): grouped bars and the filled area under a curve. */
+.ae-fl-area {
+  stroke: none;
+  opacity: 0.16;
+}
+.ae-fl-bars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.ae-fl-bargroup {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  /* Fixed, not a percentage: a percentage padding is taken from the whole plot's width, not this day's column. */
+  padding: 0 5px;
+  box-sizing: border-box;
+}
+/* Stacked: one column per day, the series piled up from the baseline (the first series at the bottom). */
+.ae-fl-bargroup--stack {
+  flex-direction: column-reverse;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+}
+/* Stacked bars: a day is a pile of identical square blocks (one row each, in the series' colour), the first
+   series at the bottom, with a small gap between blocks. FlowLineChart sets each block's height. */
+.ae-fl-bargroup--stack {
+  padding: 0 6px;
+}
+.ae-fl-bargroup--stack .ae-fl-bar {
+  flex: 0 0 auto;
+  align-self: center;
+  width: 100%;
+  max-width: 44px;
+  border-radius: 0;
+  margin-top: 2px;
+}
+.ae-fl-tip-total {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--ae-border);
+}
+.ae-fl-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 22px;
+  border-radius: 0;
+}
+.ae-fl-cross--band {
+  width: auto;
+  background: color-mix(in srgb, var(--ae-text) 8%, transparent);
+}
+/* Chart look: Classic is the default drawing above; Minimal thins the marks and drops the grid and
+   the per-day dots; Bold thickens them. */
+.ae-fl-chart[data-look="minimal"] .ae-fl-line {
+  stroke-width: 1.5;
+}
+.ae-fl-chart[data-look="minimal"] .ae-fl-grid:not(.ae-fl-grid--base) {
+  display: none;
+}
+.ae-fl-chart[data-look="minimal"] .ae-fl-dot--sm {
+  display: none;
+}
+.ae-fl-chart[data-look="minimal"] .ae-fl-area {
+  opacity: 0.08;
+}
+.ae-fl-chart[data-look="minimal"] .ae-fl-bar {
+  border-radius: 0;
+  max-width: 10px;
+}
+.ae-fl-chart[data-look="bold"] .ae-fl-line {
+  stroke-width: 4;
+}
+.ae-fl-chart[data-look="bold"] .ae-fl-dot--sm {
+  width: 11px;
+  height: 11px;
+  border-width: 2px;
+}
+.ae-fl-chart[data-look="bold"] .ae-fl-grid:not(.ae-fl-grid--base) {
+  border-top-color: color-mix(in srgb, var(--ae-text) 16%, transparent);
+}
+.ae-fl-chart[data-look="bold"] .ae-fl-area {
+  opacity: 0.26;
+}
+.ae-fl-chart[data-look="bold"] .ae-fl-bar {
+  max-width: 30px;
+}
+/* Load animation, every time a chart is shown. Lines and areas are drawn in from the left (the dots follow),
+   grouped bars grow up from the baseline day by day, and stacked blocks appear one after another from the
+   bottom of each pile to its top. Skipped entirely for people who ask for less motion. */
+@keyframes ae-fl-reveal {
+  from {
+    clip-path: inset(-6px 100% -6px -6px);
+  }
+  to {
+    clip-path: inset(-6px -6px -6px -6px);
+  }
+}
+@keyframes ae-fl-grow {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+@keyframes ae-fl-block-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+@keyframes ae-fl-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ae-fl-lines {
+    animation: ae-fl-reveal 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+  .ae-fl-dot--sm {
+    animation: ae-fl-fade 0.35s ease-out 0.7s both;
+  }
+  .ae-fl-bargroup:not(.ae-fl-bargroup--stack) .ae-fl-bar {
+    transform-origin: bottom;
+    animation: ae-fl-grow 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) var(--ae-d, 0ms) both;
+  }
+  .ae-fl-bargroup--stack .ae-fl-bar {
+    transform-origin: bottom;
+    animation: ae-fl-block-in 0.28s ease-out calc(var(--ae-d, 0ms) + var(--ae-n, 0) * 22ms) both;
+  }
+}
 .ae-fl-tip {
   position: absolute;
   top: 8px;
@@ -765,6 +920,104 @@
 .ae-fl-xlabel--current {
   font-weight: 700;
   color: var(--ae-text);
+}
+/* Today is still being entered: a small live dot before its label, a band behind its column, and an
+   "in progress" note in the tooltip. A day's changes (a saved entry) flash its column once. */
+.ae-fl-xlabel--live::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  vertical-align: middle;
+  clip-path: circle(50%);
+  background: var(--ae-success-text, #2f8f4e);
+}
+.ae-fl-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--ae-text) 5%, transparent);
+  border-left: 1px dashed color-mix(in srgb, var(--ae-text) 22%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--ae-text) 22%, transparent);
+  pointer-events: none;
+}
+.ae-fl-missing {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--ae-warning-text, #8a6800) 14%, transparent);
+  border-bottom: 3px solid var(--ae-warning-text, #8a6800);
+  pointer-events: none;
+}
+.ae-fl-flash {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--ae-success-text, #2f8f4e) 22%, transparent);
+  pointer-events: none;
+}
+.ae-fl-tip-live {
+  font-weight: 400;
+  color: var(--ae-text-muted);
+}
+@keyframes ae-fl-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes ae-fl-missing-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
+@keyframes ae-fl-flash-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ae-fl-xlabel--live::before {
+    animation: ae-fl-live-pulse 1.8s ease-in-out infinite;
+  }
+  .ae-fl-today {
+    animation: ae-fl-live-pulse 3.2s ease-in-out infinite;
+  }
+  .ae-fl-flash {
+    animation: ae-fl-flash-out 1.4s ease-out both;
+  }
+  .ae-fl-missing {
+    animation: ae-fl-missing-blink 1.6s ease-in-out infinite;
+  }
+  /* A saved entry moves what is already drawn instead of redrawing it: bars and dots glide, curves morph.
+     Browsers that cannot animate a path's shape simply jump to it. */
+  .ae-fl-chart[data-settled] .ae-fl-bargroup:not(.ae-fl-bargroup--stack) .ae-fl-bar {
+    transition: height 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .ae-fl-chart[data-settled] .ae-fl-dot--sm {
+    transition:
+      left 0.5s cubic-bezier(0.22, 0.61, 0.36, 1),
+      bottom 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  .ae-fl-chart[data-settled] .ae-fl-line,
+  .ae-fl-chart[data-settled] .ae-fl-area {
+    transition: d 0.5s cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+  /* A block added to a pile after the first draw just pops in, without the load-time stagger. */
+  .ae-fl-chart[data-settled] .ae-fl-bargroup--stack .ae-fl-bar {
+    animation: ae-fl-block-in 0.22s ease-out 0ms both;
+  }
 }
 .ae-fl-split {
   margin-top: 12px;

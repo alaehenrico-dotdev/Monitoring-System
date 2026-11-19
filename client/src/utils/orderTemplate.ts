@@ -32,6 +32,16 @@ function modeSize(cells: XlsxStyledCell[]): number {
   return best;
 }
 
+/// Puts `row` into a template after the last row of its category (matched the way the sync matches categories), or at
+/// the end under a new heading when the template has none of that category. Returns a new list.
+export function insertTemplateRow(rows: readonly TemplateRow[], row: TemplateRow): TemplateRow[] {
+  const wanted = categoryKey(row.category);
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (categoryKey(rows[i].category) === wanted) return [...rows.slice(0, i + 1), row, ...rows.slice(i + 1)];
+  }
+  return [...rows, row];
+}
+
 export function templateRowsFromColumn(cells: XlsxStyledCell[]): TemplateRow[] {
   // A bare number is a date or a figure, never a name.
   const bold = cells.filter((c) => c.bold && !/^[\d.,\s-]+$/.test(c.text));

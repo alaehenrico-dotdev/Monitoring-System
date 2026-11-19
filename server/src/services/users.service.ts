@@ -9,6 +9,7 @@ import { issueSession } from "./auth.service";
 import { assertAdminPassword } from "./adminPassword.service";
 import { verifyMfaCode } from "./mfa.service";
 import { logSystemEvent, recordChange } from "./changeLog.service";
+import { removeAllPushSubscriptions } from "./pushSubscriptions.service";
 
 function assertAcceptablePassword(password: string, username: string) {
   const problem = passwordProblem(password, username);
@@ -34,6 +35,8 @@ export async function changeOwnPassword(userId: number, currentPassword: string 
     return tx.user.findUniqueOrThrow({ where: { id: userId } });
   });
   invalidate(`user-status:${userId}`);
+  // Devices registered for alerts before this are dropped; the one in use registers itself again on its next load.
+  await removeAllPushSubscriptions(userId);
   await logSystemEvent("password_changed", { username: user.username }, userId, "UPDATE");
   return issueSession(updated, remember);
 }
@@ -44,6 +47,7 @@ export async function changeOwnPassword(userId: number, currentPassword: string 
 export async function signOutEverywhere(userId: number, remember = false) {
   const updated = await userRepository.bumpTokenVersion(userId);
   invalidate(`user-status:${userId}`);
+  await removeAllPushSubscriptions(userId);
   await logSystemEvent("sign_out_everywhere", {}, userId, "UPDATE");
   const user = await userRepository.findById(userId);
   if (!user) throw HttpError.notFound("User not found");
@@ -96,6 +100,7 @@ export async function resetPasswordWithCode(username: string, code: string, newP
     const consumed = await userRepository.consumeResetCode(user!.id, user!.resetCodeHash!, now, await hashPassword(newPassword));
     if (!consumed) throw invalid();
     invalidate(`user-status:${user!.id}`);
+    await removeAllPushSubscriptions(user!.id);
     await logSystemEvent("password_reset_by_code", { username: user!.username, ip: ip ?? null }, user!.id, "UPDATE");
     return;
   }
@@ -106,6 +111,7 @@ export async function resetPasswordWithCode(username: string, code: string, newP
     if (verified) {
       await userRepository.setPasswordHash(user.id, await hashPassword(newPassword), false);
       invalidate(`user-status:${user.id}`);
+      await removeAllPushSubscriptions(user.id);
       await logSystemEvent("password_reset_by_mfa", { username: user.username, ip: ip ?? null }, user.id, "UPDATE");
       return;
     }
@@ -171,6 +177,7 @@ export async function resetUserPassword(userId: number, newPassword: string, act
   // The reset bumped the account's tokenVersion; drop the cached status so the
   // old sessions are refused immediately instead of after the cache TTL.
   invalidate(`user-status:${userId}`);
+  await removeAllPushSubscriptions(userId);
 }
 
 export async function setUserActive(userId: number, isActive: boolean, actorId?: number) {
@@ -189,5 +196,7 @@ export async function setUserActive(userId: number, isActive: boolean, actorId?:
   // Deactivation should take effect immediately, not wait out
   // middleware/auth.ts's revocation-check TTL.
   invalidate(`user-status:${userId}`);
+  // A deactivated account keeps no alert devices; reactivating it does not bring old ones back.
+  if (!isActive) await removeAllPushSubscriptions(userId);
   return updated;
 }

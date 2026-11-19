@@ -5,6 +5,8 @@ import {
   ensureWebFont,
   FONT_FAMILIES,
   useTheme,
+  type ChartLook,
+  type ChartType,
   type FontFamily,
   type FontSize,
   type HeaderStyle,
@@ -104,6 +106,65 @@ const HEADERS: Choice<HeaderStyle>[] = [
 ];
 
 
+/// Settings > Appearance > Charts: the drawing of the Dashboard stock-flow chart and the Daily Out chart.
+const CHART_TYPE_CHOICES: Choice<ChartType>[] = [
+  { value: "line", label: "Lines", description: "One smooth curve per series. The default.", preview: <ChartPreview type="line" look="classic" /> },
+  { value: "bar", label: "Grouped bars", description: "Side-by-side bars for each day. Easy to compare exact days.", preview: <ChartPreview type="bar" look="classic" /> },
+  { value: "stack", label: "Stacked bars", description: "Each day is a stack of equal square blocks in the series colours. The taller the stack, the more stock.", preview: <ChartPreview type="stack" look="classic" /> },
+  { value: "area", label: "Area", description: "Curves with the space under them filled in.", preview: <ChartPreview type="area" look="classic" /> },
+];
+const CHART_LOOK_CHOICES: Choice<ChartLook>[] = [
+  { value: "classic", label: "Detailed", description: "Grid lines and a dot on every reading. The default.", preview: <ChartPreview type="line" look="classic" /> },
+  { value: "minimal", label: "Clean", description: "Thin marks, no grid or dots. Just the shape.", preview: <ChartPreview type="line" look="minimal" /> },
+  { value: "bold", label: "Bold", description: "Thick marks and big dots. Easy to read from a distance.", preview: <ChartPreview type="line" look="bold" /> },
+];
+
+const PREVIEW_A = [14, 30, 22, 40, 34, 46];
+const PREVIEW_B = [8, 16, 26, 20, 30, 24];
+
+/// A tiny chart with the choice's own drawing (fixed colours, like the other previews).
+function ChartPreview({ type, look }: { type: ChartType; look: ChartLook }) {
+  const w = 120;
+  const h = 56;
+  const step = w / PREVIEW_A.length;
+  const px = (i: number) => step * i + step / 2;
+  const py = (v: number) => h - v;
+  const line = (vals: number[]) => vals.map((v, i) => `${i ? "L" : "M"}${px(i)} ${py(v)}`).join(" ");
+  const stroke = look === "bold" ? 3.5 : look === "minimal" ? 1.2 : 2;
+  const colors2 = ["#d4a000", "#2f6b3c"];
+  return (
+    <span style={{ display: "block", background: "#fffcf5", height: 86, borderRadius: 4, padding: 8 }}>
+      <svg viewBox={`0 0 ${w} ${h}`} width="100%" height="100%" preserveAspectRatio="none" aria-hidden>
+        {look !== "minimal" && [0.33, 0.66].map((f) => <line key={f} x1="0" x2={w} y1={h * f} y2={h * f} stroke="#e7dfc9" strokeWidth="1" />)}
+        <line x1="0" x2={w} y1={h - 0.5} y2={h - 0.5} stroke="#c9c0a8" strokeWidth="1" />
+        {type === "stack"
+          ? PREVIEW_A.map((a0, i) => {
+              // Equal square blocks, one per fixed amount, the first series at the bottom.
+              const blocks = [...Array(Math.round(a0 / 5)).fill(0), ...Array(Math.round(PREVIEW_B[i] / 5)).fill(1)];
+              return (
+                <g key={i}>
+                  {blocks.map((c, n) => (
+                    <rect key={n} x={px(i) - 9} y={h - (n + 1) * 3.4} width="18" height="2.4" fill={colors2[c]} />
+                  ))}
+                </g>
+              );
+            })
+          : type === "bar"
+          ? [PREVIEW_A, PREVIEW_B].map((vals, s) =>
+              vals.map((v, i) => <rect key={`${s}-${i}`} x={px(i) - 8 + s * 8} y={py(v)} width="7" height={v} fill={colors2[s]} />),
+            )
+          : [PREVIEW_A, PREVIEW_B].map((vals, s) => (
+              <g key={s}>
+                {type === "area" && <path d={`${line(vals)} L${px(vals.length - 1)} ${h} L${px(0)} ${h} Z`} fill={colors2[s]} opacity={look === "bold" ? 0.28 : 0.16} />}
+                <path d={line(vals)} fill="none" stroke={colors2[s]} strokeWidth={stroke} strokeLinejoin="round" strokeLinecap="round" />
+                {look !== "minimal" && vals.map((v, i) => <circle key={i} cx={px(i)} cy={py(v)} r={look === "bold" ? 3.2 : 2} fill={colors2[s]} />)}
+              </g>
+            ))}
+      </svg>
+    </span>
+  );
+}
+
 const FONT_CHOICES: Choice<FontFamily>[] = [
   { value: "inter", label: "Inter", description: "The default: clean and easy to read at small sizes.", preview: <FontPreview family="'Inter', system-ui, sans-serif" /> },
   { value: "hyperlegible", label: "Atkinson Hyperlegible", description: "Designed for low vision: every letter is easy to tell apart.", preview: <FontPreview family="'Atkinson Hyperlegible', system-ui, sans-serif" /> },
@@ -173,12 +234,14 @@ function FontSettings() {
  * reach them, unlike the other Settings tabs.
  */
 export function AppearanceSettings() {
-  const { theme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle } = useTheme();
+  const { theme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle, chartType, setChartType, chartLook, setChartLook } = useTheme();
   return (
     <div className="ae-appearance" style={{ width: "100%", maxWidth: 1400, margin: "0 auto", display: "grid", gap: 16 }}>
       <ChoiceGroup legend="Color mode" choices={MODES} value={theme} onChange={setTheme} />
       <ChoiceGroup legend="Theme" choices={THEMES} value={uiStyle} onChange={setUiStyle} />
       <ChoiceGroup legend="Header and toolbar" choices={HEADERS} value={headerStyle} onChange={setHeaderStyle} />
+      <ChoiceGroup legend="Chart type" choices={CHART_TYPE_CHOICES} value={chartType} onChange={setChartType} />
+      <ChoiceGroup legend="Chart look" choices={CHART_LOOK_CHOICES} value={chartLook} onChange={setChartLook} />
       <FontSettings />
       <p style={{ margin: 0, fontSize: 12.5, color: colors.subtleInk }}>
         These are saved in this browser only. Another computer, or another person signing in here after you, keeps their own choice.

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from "./icons";
-import { formatDateDisplay } from "../utils/dateFormat";
+import { formatDateDisplay, formatDateLong } from "../utils/dateFormat";
 import { addDays, addMonths, parseISO, sameDay, toISO } from "../utils/calendar";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { formatShortDay } from "../utils/dateFormat";
@@ -338,7 +338,7 @@ export function DatePicker({ value, onChange, className = "", style, disabled, t
               </div>
 
               <div className="ae-datepicker-foot">
-                <span className="ae-datepicker-foot-text">{selected ? formatDateDisplay(value) : "No date selected"}</span>
+                <span className="ae-datepicker-foot-text">{selected ? formatDateLong(value) : "No date selected"}</span>
                 <button type="button" className="ae-datepicker-today" onClick={() => pick(today)}>
                   Today
                 </button>

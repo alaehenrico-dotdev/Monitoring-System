@@ -16,7 +16,7 @@ import { useRealtimeVersion } from "../context/RealtimeContext";
 import { fullNumber } from "../utils/chartFormat";
 import { downloadCsv } from "../utils/csv";
 import { DAILY_OUT_SERIES, dailyOutCsv, dailyOutFlowPoints, dailyOutTotals } from "../utils/dailyOut";
-import { formatDateDisplay } from "../utils/dateFormat";
+import { formatDateLong } from "../utils/dateFormat";
 import { getCurrentShiftAndDate } from "../utils/shift";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { formatShortDay } from "../utils/dateFormat";
@@ -126,7 +126,7 @@ export function DailyOutPage() {
   return (
     <div>
       <PageHeader
-        title={`Daily Out - ${formatDateDisplay(to)}`}
+        title={`Daily Out - ${formatDateLong(to)}`}
         subtitle={`The last ${days} days to this date: stock leaving the company each day - Online fulfilled, Offline delivered, and both combined.`}
       >
         <PageToolbar

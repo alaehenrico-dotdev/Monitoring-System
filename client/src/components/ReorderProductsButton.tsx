@@ -47,9 +47,8 @@ export function ReorderProductsButton({ isAdmin }: { isAdmin: boolean }) {
 export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
   const [items, setItems] = useState<Product[] | null>(null);
   const [original, setOriginal] = useState<number[]>([]);
-  // Add product (for one the template does not list): the form is open, and each
-  // product's category by id, so a product added now can be placed in `original`
-  // (the order as saved) the same way the server placed it.
+  // Add product (an existing SKU the template does not list): the form is open, and each product's category by id,
+  // so a SKU brought back now can be placed after its category.
   const [adding, setAdding] = useState(false);
   const categoryOf = useRef(new Map<number, string>());
   const [error, setError] = useState<string | null>(null);
@@ -113,21 +112,26 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
     setOverIndex(null);
   }
 
-  /// The server has already saved the new product, right after the last one of its
-  /// category. Put it in the same place in the list on screen and in the saved
-  /// order, so adding a product is not an unsaved change and any reordering in
-  /// progress is kept.
-  function handleAdded(created: Product) {
-    categoryOf.current.set(created.id, created.category);
-    setItems((cur) => (cur ? insertAfterCategory(cur, created) : [created]));
-    setOriginal((ids) =>
-      insertAfterCategory(
-        ids.map((id) => ({ id, category: categoryOf.current.get(id) ?? "" })),
-        { id: created.id, category: created.category },
-      ).map((x) => x.id),
+  /// Existing SKUs were brought back (each is saved as active already). Show them after the rest of their category,
+  /// the same place a new product goes, and read the saved order again: the server kept the place each had before it
+  /// was switched off, so the on-screen position is an unsaved change until the order is saved. Any reordering already
+  /// in progress is kept. The form closes itself when everything chosen was added.
+  async function handleReactivated(added: Product[]) {
+    for (const p of added) categoryOf.current.set(p.id, p.category);
+    setItems((cur) => added.reduce((list, p) => insertAfterCategory(list, p), cur ?? []));
+    try {
+      const saved = await listProducts();
+      setOriginal(saved.map((p) => p.id));
+      for (const p of saved) categoryOf.current.set(p.id, p.category);
+    } catch {
+      /* the list on screen is right; Save still sends it */
+    }
+    showToast(
+      added.length === 1
+        ? `${added[0].name} is back in the list under ${added[0].category}. Save the order to keep its place.`
+        : `${added.length} products are back in the list, each after its category. Save the order to keep their places.`,
+      "success",
     );
-    setAdding(false);
-    showToast(`${created.name} added to ${created.category}.`, "success");
   }
 
   /// Reads one sheet of the template into rows for the review.
@@ -249,7 +253,7 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
             size="sm"
             disabled={saving || !items || adding}
             onClick={() => setAdding(true)}
-            title="Add a product the template does not list"
+            title="Add a product the template does not list, from the SKUs that already exist (inactive ones too)"
           >
             Add product
           </Button>
@@ -296,15 +300,18 @@ export function ReorderProductsDialog({ onClose }: { onClose: () => void }) {
       )}
       {templateRows && items ? (
         <OrderTemplateReview
+          // A different template starts afresh: nothing added to the last one carries over.
+          key={`${activeSaved ?? "file"}:${template?.fileName ?? ""}:${template?.sheet ?? ""}`}
           rows={templateRows}
           existing={items}
           saveAs={saveAs}
+          savedName={activeSaved === null ? undefined : saved.find((t) => t.id === activeSaved)?.name}
           onBack={() => setTemplateRows(null)}
           onDone={onClose}
         />
       ) : (
         <>
-      {adding && items && <AddProductForm products={items} onAdded={handleAdded} onCancel={() => setAdding(false)} />}
+      {adding && items && <AddProductForm products={items} onReactivated={(added) => void handleReactivated(added)} onCancel={() => setAdding(false)} />}
       <p style={{ margin: "0 0 12px", fontSize: "calc(13px * var(--ae-fs, 1))", color: colors.subtleInk }}>
         Drag a row by its handle, or use the arrows. Each product keeps its SKU. The new order applies to every page
         and report, for everyone.

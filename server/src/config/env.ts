@@ -251,6 +251,9 @@ export const env = {
   vapidPublicKey: process.env.VAPID_PUBLIC_KEY?.trim() || "",
   vapidPrivateKey: process.env.VAPID_PRIVATE_KEY?.trim() || "",
   vapidSubject: process.env.VAPID_SUBJECT?.trim() || "mailto:admin@example.com",
+  // Push subscriptions must point at a known browser push service (utils/pushEndpoint.ts). Add another service
+  // here as a comma-separated list of exact hosts or `*.suffix` patterns, e.g. "push.example.com,*.push.example.net".
+  pushExtraHosts: (process.env.PUSH_ENDPOINT_EXTRA_HOSTS ?? "").split(",").map((h) => h.trim()).filter(Boolean),
   // A backup older than this many hours (or none at all) shows as overdue in
   // the admin action queue.
   backupOverdueHours: limitCount("BACKUP_OVERDUE_HOURS", 36),

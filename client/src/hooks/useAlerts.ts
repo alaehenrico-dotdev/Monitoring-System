@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getAlerts, type Alerts } from "../api/alerts";
 import { useOptionalAuth } from "../context/AuthContext";
-import { currentMode, showLocalNotification } from "../utils/pushNotifications";
+import { currentMode, resyncNotifications, showLocalNotification } from "../utils/pushNotifications";
 
 const POLL_MS = 2 * 60 * 1000;
 
@@ -38,7 +38,10 @@ export function useAlerts(): { alerts: Alerts | null; refresh: () => void } | nu
   useEffect(() => {
     if (!eligible) return;
     const first = setTimeout(() => void load(), 0);
-    const timer = setInterval(() => void load(), POLL_MS);
+    // Re-registers this device if the server dropped it (see resyncNotifications).
+    void resyncNotifications();
+    // A tab in the background does not poll: it refreshes the moment it is shown again (below).
+    const timer = setInterval(() => document.visibilityState === "visible" && void load(), POLL_MS);
     const onVisible = () => document.visibilityState === "visible" && void load();
     document.addEventListener("visibilitychange", onVisible);
     return () => {

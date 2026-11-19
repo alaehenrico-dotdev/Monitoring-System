@@ -22,6 +22,7 @@ import { RowGlowScroll } from "../components/RowGlowScroll";
 import { TableSkeleton } from "../components/Skeleton";
 import { CategoryField } from "../components/CategoryField";
 import { categoriesOf, unitForCategory } from "../utils/productPlacement";
+import { strictNameKey } from "../utils/importMatch";
 
 /// Section 4.1 - Admins can add, rename, deactivate, or re-categorize
 /// products without a developer; new SKUs appear in every grid automatically.
@@ -69,6 +70,9 @@ export function ProductsAdminPage() {
   // adds products), so this list never shows a stale one.
   const realtimeVersion = useRealtimeVersion();
   useEffect(reload, [realtimeVersion]);
+
+  // The products already in the chosen category, in list order, so what is being added can be checked against them.
+  const inCategory = category.trim() ? (products ?? []).filter((p) => strictNameKey(p.category) === strictNameKey(category)) : [];
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -309,6 +313,28 @@ export function ProductsAdminPage() {
           Add SKU
         </Button>
       </form>
+      {inCategory.length > 0 && (
+        <section
+          aria-label={`Products in ${category.trim()}`}
+          style={{ border: `1px solid ${colors.border}`, borderRadius: 4, padding: 10, margin: "-8px 0 20px", background: colors.paperAlt, maxWidth: 560 }}
+        >
+          <div style={{ fontSize: "calc(13px * var(--ae-fs, 1))", fontWeight: 600, marginBottom: 6 }}>
+            Already in {inCategory[0].category} ({inCategory.length})
+          </div>
+          <ul style={{ listStyle: "none", margin: 0, padding: 0, maxHeight: 160, overflowY: "auto", fontSize: "calc(13px * var(--ae-fs, 1))" }}>
+            {inCategory.map((p) => (
+              <li key={p.id} style={{ padding: "2px 0", opacity: p.isActive ? 1 : 0.55 }}>
+                {p.sku ?? "no SKU"} · {p.name}
+                {!p.isActive && <span style={{ color: colors.subtleInk }}> (inactive)</span>}
+              </li>
+            ))}
+          </ul>
+          <div style={{ marginTop: 6, fontSize: "calc(12px * var(--ae-fs, 1))", color: colors.subtleInk }}>
+            A new product here goes after {inCategory[inCategory.length - 1].name}. Check the list first: if it is already there,
+            reactivate it instead of adding it again.
+          </div>
+        </section>
+      )}
       <Toast
         message={error}
         onDismiss={() => setError(null)}

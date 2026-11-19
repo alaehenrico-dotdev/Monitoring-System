@@ -73,7 +73,7 @@ import {
   draftAction,
   isRealChange as isRealDraftChange,
 } from "../utils/manualCountDrafts";
-import { formatDateDisplay } from "../utils/dateFormat";
+import { formatDateDisplay, formatDateLong } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { auditSnapshotPdf } from "../utils/auditSnapshot";
 import { pdfFileName, stockGridSection } from "../utils/pdfTables";
@@ -1263,6 +1263,17 @@ export function ManualCountPage() {
             },
           ],
         },
+        {
+          items: [
+            {
+              id: "reorder",
+              label: "Reorder products…",
+              icon: <ReorderIcon />,
+              disabledReason: canPublish ? undefined : "Only an admin can change the product order",
+              onSelect: () => setReorderOpen(true),
+            },
+          ],
+        },
       ],
     },
     {
@@ -1279,13 +1290,6 @@ export function ManualCountPage() {
               onSelect: () => setAllExpanded(!anyExpanded),
             },
             fitWidthItem(fit, setFit),
-            {
-              id: "reorder",
-              label: "Reorder products…",
-              icon: <ReorderIcon />,
-              disabledReason: canPublish ? undefined : "Only an admin can change the product order",
-              onSelect: () => setReorderOpen(true),
-            },
             {
               id: "history",
               label: "Audit history…",
@@ -1343,7 +1347,7 @@ export function ManualCountPage() {
           <>
             Manual Counting &amp; Variance
             <span className="ae-title-sub">
-              {formatDateDisplay(date)} - {shiftWithWord(shift)} - {FILTER_LABEL[sourceFilter]}
+              {formatDateLong(date)} - {shiftWithWord(shift)} - {FILTER_LABEL[sourceFilter]}
             </span>
           </>
         }

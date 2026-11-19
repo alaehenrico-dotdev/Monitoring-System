@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { templateRowsFromColumn } from "./orderTemplate";
+import { insertTemplateRow, templateRowsFromColumn } from "./orderTemplate";
 import { planProductSync } from "./productSync";
 import { readXlsxColumnA, type XlsxStyledCell } from "./xlsx";
 
@@ -70,5 +70,33 @@ describe.skipIf(!existsSync(REAL))("the real encoder order workbook", () => {
     expect(plan.items.map((i) => `${i.category}/${i.name}`)).toEqual(rows.map((r) => `${r.category}/${r.name}`));
     expect(plan.toCreate).toHaveLength(56);
     expect(new Set(plan.items.map((i) => i.category)).size).toBe(6);
+  });
+});
+
+describe("insertTemplateRow", () => {
+  const rows = [
+    { category: "CLASS A (LITER)", name: "SWEET A" },
+    { category: "CLASS A (LITER)", name: "SPECIAL A" },
+    { category: "PREMIUM (LITER)", name: "SPECIAL" },
+  ];
+
+  it("puts a row after the last row of its category", () => {
+    expect(insertTemplateRow(rows, { category: "Class A (Liter)", name: "Mystery" }).map((r) => r.name)).toEqual(["SWEET A", "SPECIAL A", "Mystery", "SPECIAL"]);
+    expect(insertTemplateRow(rows, { category: "Premium (Liter)", name: "Old Fish" }).map((r) => r.name)).toEqual(["SWEET A", "SPECIAL A", "SPECIAL", "Old Fish"]);
+  });
+
+  it("matches the category the way the sync does: case, spacing and stray punctuation ignored", () => {
+    expect(insertTemplateRow(rows, { category: "class a -(liter)", name: "X" }).map((r) => r.name)).toEqual(["SWEET A", "SPECIAL A", "X", "SPECIAL"]);
+  });
+
+  it("starts a new heading at the end for a category the template does not have", () => {
+    expect(insertTemplateRow(rows, { category: "Oils", name: "Chili Oil" }).map((r) => r.name)).toEqual(["SWEET A", "SPECIAL A", "SPECIAL", "Chili Oil"]);
+  });
+
+  it("works on an empty template and never changes the list it was given", () => {
+    expect(insertTemplateRow([], { category: "Oils", name: "Chili Oil" })).toEqual([{ category: "Oils", name: "Chili Oil" }]);
+    const before = [...rows];
+    insertTemplateRow(rows, { category: "Oils", name: "Chili Oil" });
+    expect(rows).toEqual(before);
   });
 });

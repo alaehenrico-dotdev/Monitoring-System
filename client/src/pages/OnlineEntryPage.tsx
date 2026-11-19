@@ -65,7 +65,7 @@ import {
   useSavedValueLookup,
   useUndoRedoKeys,
 } from "../hooks/useGridView";
-import { formatDateDisplay } from "../utils/dateFormat";
+import { formatDateDisplay, formatDateLong } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import { filterNotes, pdfFileName, stockGridSection } from "../utils/pdfTables";
 import {
@@ -680,7 +680,7 @@ export function OnlineEntryPage() {
           <>
             Daily Online Stock Monitoring
             <span className="ae-title-sub">
-              {formatDateDisplay(date)} - {shiftWithWord(shift)}
+              {formatDateLong(date)} - {shiftWithWord(shift)}
             </span>
           </>
         }

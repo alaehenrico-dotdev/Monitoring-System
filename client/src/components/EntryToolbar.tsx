@@ -198,6 +198,17 @@ export function EntryToolbar(p: EntryToolbarProps) {
         },
       ],
     },
+    {
+      items: [
+        {
+          id: "reorder",
+          label: "Reorder products…",
+          icon: <ReorderIcon />,
+          disabledReason: p.isAdmin ? undefined : "Only an admin can change the product order",
+          onSelect: () => setReorderOpen(true),
+        },
+      ],
+    },
     { items: [{ id: "refresh", label: "Refresh", icon: <SyncIcon />, disabledReason: saveInProgress, onSelect: p.onRefresh }] },
   ];
 
@@ -210,13 +221,6 @@ export function EntryToolbar(p: EntryToolbarProps) {
           icon: p.anyExpanded ? <CollapseAllIcon /> : <ExpandAllIcon />,
           disabledReason: loading,
           onSelect: p.onToggleExpandAll,
-        },
-        {
-          id: "reorder",
-          label: "Reorder products…",
-          icon: <ReorderIcon />,
-          disabledReason: p.isAdmin ? undefined : "Only an admin can change the product order",
-          onSelect: () => setReorderOpen(true),
         },
         {
           id: "version-history",

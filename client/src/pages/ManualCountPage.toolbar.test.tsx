@@ -92,6 +92,21 @@ describe("ManualCountPage - toolbar from the entry pages", () => {
     await waitFor(() => expect(screen.queryAllByText(/unsaved change/)).toHaveLength(0));
   });
 
+  it("keeps Reorder products in the Edit menu, for an admin only, and not in View", async () => {
+    await open();
+    expect(menuItem("Edit", /Reorder products/).getAttribute("aria-disabled")).not.toBe("true");
+    fireEvent.click(screen.getAllByRole("menuitem", { name: /^View/ })[0]);
+    expect(screen.queryByRole("menuitem", { name: /Reorder products/ })).toBeNull();
+  });
+
+  it("makes Reorder unavailable to an encoder, and says why", async () => {
+    auth.role = "ENCODER";
+    await open();
+    const item = menuItem("Edit", /Reorder products/);
+    expect(item.getAttribute("aria-disabled")).toBe("true");
+    expect(item.getAttribute("title")).toBe("Only an admin can change the product order");
+  });
+
   it("expands every category from one button", async () => {
     await open();
     // Collapsed rows stay in the DOM, hidden by this class.

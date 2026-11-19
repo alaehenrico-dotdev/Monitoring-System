@@ -1,5 +1,5 @@
-import { Fragment, useMemo, useState } from "react";
-import { syncProducts } from "../api/products";
+import { Fragment, useEffect, useMemo, useState } from "react";
+import { listProducts, syncProducts } from "../api/products";
 import { saveOrderTemplate } from "../api/orderTemplates";
 import type { Product } from "../types";
 import { colors } from "../theme";
@@ -8,7 +8,8 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { showToast } from "./Toast";
 import { categoryKey, fuzzyScore } from "../utils/importMatch";
 import { planProductSync, sheetRowKey } from "../utils/productSync";
-import type { TemplateRow } from "../utils/orderTemplate";
+import { insertTemplateRow, type TemplateRow } from "../utils/orderTemplate";
+import { ProductChooser } from "./ProductChooser";
 
 /**
  * What applying an Excel order template would do, shown before anything is
@@ -32,24 +33,53 @@ import type { TemplateRow } from "../utils/orderTemplate";
  * done, moved ones take the template's category, and the template's sequence
  * becomes the order of the whole list. Products the template does not mention
  * are not touched - they stay in the system, after the listed ones.
+ *
+ * "Add product" adds existing SKUs to the template itself: it offers every SKU, active or inactive, that the template does
+ * not list yet, and a chosen one becomes a row of the template under its own category. An inactive one is switched back on
+ * when the template is applied. When the template is a saved one, applying keeps it with the added rows.
  */
 const SYNC_OPTIONS = { renameLinked: false };
 
 export function OrderTemplateReview({
-  rows,
-  existing,
+  rows: templateRows,
+  existing: activeProducts,
   saveAs,
+  savedName,
   onBack,
   onDone,
 }: {
   rows: TemplateRow[];
   existing: Product[];
+  /// The name of the saved template being reviewed, so rows added here are kept in it when applied.
+  savedName?: string;
   /// Applying also keeps the template under this name (a template read from a file),
   /// so it is still there after a reset or rebuild. Omitted for one that is already saved.
   saveAs?: string;
   onBack: () => void;
   onDone: () => void;
 }) {
+  // SKUs the admin added to the template here. They become rows after the template's own, under their category.
+  const [extra, setExtra] = useState<Product[]>([]);
+  const [picking, setPicking] = useState(false);
+  const addedIds = useMemo(() => new Set(extra.map((p) => p.id)), [extra]);
+  const rows = useMemo(() => extra.reduce((list, p) => insertTemplateRow(list, { category: p.category, name: p.name }), templateRows), [templateRows, extra]);
+  // The products a row can be matched to: the active ones plus any inactive SKU that was added (the sync switches it on).
+  const existing = useMemo(() => [...activeProducts, ...extra.filter((p) => !activeProducts.some((a) => a.id === p.id))], [activeProducts, extra]);
+  // An added row is tied to the SKU it was added for, so a look-alike cannot take its place.
+  const addedLinks = useMemo(() => Object.fromEntries(extra.map((p) => [sheetRowKey(p.category, p.name), p.id])), [extra]);
+  // Every SKU in the system, active or not: what Add product chooses from.
+  const [allProducts, setAllProducts] = useState<Product[] | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listProducts({ includeInactive: true }).then(
+      (list) => !cancelled && setAllProducts(list),
+      () => !cancelled && setAllProducts([]),
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Template rows the admin said are an existing product (row key -> id), for
   // rows that would otherwise be added as new.
   const [links, setLinks] = useState<Record<string, number>>({});
@@ -66,7 +96,7 @@ export function OrderTemplateReview({
   const [error, setError] = useState<string | null>(null);
 
   // As matched by name only - tells which product each row would use before any merge.
-  const base = useMemo(() => planProductSync(rows, existing, links, SYNC_OPTIONS), [rows, existing, links]);
+  const base = useMemo(() => planProductSync(rows, existing, { ...addedLinks, ...links }, SYNC_OPTIONS), [rows, existing, links, addedLinks]);
   const byId = useMemo(() => new Map(existing.map((p) => [p.id, p])), [existing]);
 
   /// For each row that matched a product with no SKU: that product.
@@ -74,10 +104,10 @@ export function OrderTemplateReview({
     const m = new Map<string, Product>();
     for (const item of base.items) {
       const p = item.productId === undefined ? undefined : byId.get(item.productId);
-      if (p && !p.sku) m.set(sheetRowKey(item.category, item.name), p);
+      if (p && !p.sku && !addedIds.has(p.id)) m.set(sheetRowKey(item.category, item.name), p);
     }
     return m;
-  }, [base, byId]);
+  }, [base, byId, addedIds]);
 
   // Products being merged away. They are taken out of what the plan can match, so
   // no other template row (one with the same name under another category, say)
@@ -89,10 +119,10 @@ export function OrderTemplateReview({
       planProductSync(
         rows,
         existing.filter((p) => !mergedAway.has(p.id)),
-        { ...links, ...merges },
+        { ...addedLinks, ...links, ...merges },
         SYNC_OPTIONS,
       ),
-    [rows, existing, links, merges, mergedAway],
+    [rows, existing, links, merges, mergedAway, addedLinks],
   );
 
   // Existing products no template row has claimed - what a row can be linked to.
@@ -102,6 +132,12 @@ export function OrderTemplateReview({
     const claimed = new Set(plan.items.flatMap((i) => (i.productId === undefined ? [] : [i.productId])));
     return existing.filter((p) => !claimed.has(p.id) && !mergedAway.has(p.id));
   }, [plan, existing, mergedAway]);
+  // Add product offers every SKU no row of the template claims, active or inactive.
+  const claimedIds = useMemo(() => new Set(plan.items.flatMap((i) => (i.productId === undefined ? [] : [i.productId]))), [plan]);
+  const addCandidates = useMemo(
+    () => (allProducts === null ? null : allProducts.filter((p) => !claimedIds.has(p.id) && !mergedAway.has(p.id))),
+    [allProducts, claimedIds, mergedAway],
+  );
   /// Best matches first: the same name with a size or unit tacked on ("Palm Oil
   /// Liter") ranks above unrelated products, but every free product is offered.
   const choicesFor = (item: { category: string; name: string }) =>
@@ -119,6 +155,8 @@ export function OrderTemplateReview({
   const mergeCount = items.filter((i) => i.mergeFromId !== undefined).length;
   // Products no template row claims, and which are not being merged away.
   const hideCount = hideOthers ? unclaimed.length : 0;
+  // A template read from a file is kept when applied; a saved one is kept again only when rows were added to it here.
+  const nameToSave = saveAs ?? (extra.length > 0 ? savedName : undefined);
 
   const categories = new Set(plan.items.map((i) => categoryKey(i.category))).size;
   const placed = plan.items.filter((i) => i.productId !== undefined).length;
@@ -133,10 +171,10 @@ export function OrderTemplateReview({
       // The order is applied; keeping the template is a courtesy and must not turn a
       // successful apply into an error, so a failure here is only reported.
       let kept = "";
-      if (saveAs) {
+      if (nameToSave) {
         try {
-          await saveOrderTemplate(saveAs, rows);
-          kept = `saved as "${saveAs}"`;
+          await saveOrderTemplate(nameToSave, rows);
+          kept = saveAs ? `saved as "${nameToSave}"` : `"${nameToSave}" updated`;
         } catch {
           kept = "could not be saved as a template";
         }
@@ -145,6 +183,7 @@ export function OrderTemplateReview({
         `${r.total} products in the template's order`,
         r.created ? `${r.created} added` : "",
         r.merged ? `${r.merged} merged` : "",
+        r.reactivated ? `${r.reactivated} switched back on` : "",
         r.deactivated ? `${r.deactivated} hidden` : "",
         kept,
         r.moved ? `${r.moved} changed` : "",
@@ -167,6 +206,7 @@ export function OrderTemplateReview({
         <span style={{ color: colors.subtleInk }}>
           {" "}
           - exactly as the template lists them.
+          {extra.length > 0 && ` ${extra.length} added by you.`}
           {plan.toCreate.length > 0 && ` ${plan.toCreate.length} will be added.`}
           {mergeCount > 0 && ` ${mergeCount} will be merged.`}
           {plan.toMove.length > 0 && ` ${plan.toMove.length} will move to the template's category.`}
@@ -180,6 +220,32 @@ export function OrderTemplateReview({
         <div role="alert" style={{ color: colors.danger, fontSize: "calc(13px * var(--ae-fs, 1))", marginBottom: 10 }}>
           {error}
         </div>
+      )}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={saving || picking}
+          onClick={() => setPicking(true)}
+          title="Add a SKU the template does not list: choose from every SKU, active or inactive"
+        >
+          Add product
+        </Button>
+      </div>
+      {picking && (
+        <ProductChooser
+          formLabel="Add product to the template"
+          candidates={addCandidates}
+          emptyMessage="Every SKU in the system is already in this template."
+          help="These SKUs are in the system but not in the template. Each one is added under its own category; an inactive one is switched back on when you apply the template. To make a product that does not exist yet, use the SKUs tab."
+          onSubmit={(chosen) => {
+            setExtra((cur) => [...cur, ...chosen]);
+            setPicking(false);
+            return null;
+          }}
+          onCancel={() => setPicking(false)}
+        />
       )}
       <ol
         style={{
@@ -240,6 +306,23 @@ export function OrderTemplateReview({
                     <span style={{ fontWeight: 400, fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}> (template: {item.name})</span>
                   )}
                 </span>
+                {current && addedIds.has(current.id) && (
+                  <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", color: colors.subtleInk }}>
+                    added by you{current.isActive ? "" : " · inactive, switched back on when applied"}
+                  </span>
+                )}
+                {current && addedIds.has(current.id) && (
+                  <button
+                    type="button"
+                    className="ae-fill-down-btn"
+                    disabled={saving}
+                    onClick={() => setExtra((cur) => cur.filter((p) => p.id !== current.id))}
+                    title="Take it out of the template again"
+                    aria-label={`Remove ${current.name} from the template`}
+                  >
+                    &times;
+                  </button>
+                )}
                 {isNew && <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", fontWeight: 700, color: colors.warningText }}>NEW</span>}
                 {duplicate && !merging && (
                   <span style={{ fontSize: "calc(11px * var(--ae-fs, 1))", fontWeight: 700, color: colors.warningText }} title="No SKU: added earlier, not one of the original products">
@@ -342,10 +425,10 @@ export function OrderTemplateReview({
         <Button
           type="button"
           onClick={() => (mergeCount > 0 || hideCount > 0 ? setConfirming(true) : void apply())}
-          disabled={(plan.inSync && mergeCount === 0 && hideCount === 0) || saving}
+          disabled={(plan.inSync && mergeCount === 0 && hideCount === 0 && !(extra.length > 0 && nameToSave)) || saving}
           loading={saving}
         >
-          {plan.inSync && mergeCount === 0 && hideCount === 0
+          {plan.inSync && mergeCount === 0 && hideCount === 0 && !(extra.length > 0 && nameToSave)
             ? "Already matches"
             : mergeCount > 0
               ? `Apply template & merge ${mergeCount}`

@@ -106,7 +106,18 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || "/admin-queue";
+  // Only a page of this app is ever opened: the link is resolved against our own origin and anything else
+  // (another origin, a non-http(s) scheme) falls back to the Admin Queue.
+  let url = "/admin-queue";
+  try {
+    const wanted = event.notification.data && event.notification.data.url;
+    const target = new URL(wanted || "/admin-queue", self.location.origin);
+    if (target.origin === self.location.origin && (target.protocol === "https:" || target.protocol === "http:")) {
+      url = target.pathname + target.search + target.hash;
+    }
+  } catch {
+    url = "/admin-queue";
+  }
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((wins) => {
       const open = wins[0];

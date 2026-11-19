@@ -30,19 +30,19 @@ describe("getStockFlow", () => {
     );
     const rows = await getStockFlow(d("2026-10-01"), d("2026-10-03"));
     expect(rows.map((r) => r.date)).toEqual(["2026-10-01", "2026-10-02", "2026-10-03"]);
-    expect(rows[1]).toEqual({ date: "2026-10-02", production: null, fulfillment: null, delivery: null });
+    expect(rows[1]).toEqual({ date: "2026-10-02", production: null, productionOnline: null, productionOffline: null, fulfillment: null, delivery: null });
   });
 
-  it("adds Online and Offline production and keeps a side with no entry null", async () => {
+  it("adds Online and Offline production, reports each side on its own, and keeps a side with no entry null", async () => {
     seed(
       [{ entryDate: d("2026-10-01"), _sum: { productionIn: 10, fulfillmentOut: 40 } }],
       [{ entryDate: d("2026-10-01"), _sum: { productionIn: 5, deliveryOut: 20 } }],
     );
     const [both] = await getStockFlow(d("2026-10-01"), d("2026-10-01"));
-    expect(both).toEqual({ date: "2026-10-01", production: 15, fulfillment: 40, delivery: 20 });
+    expect(both).toEqual({ date: "2026-10-01", production: 15, productionOnline: 10, productionOffline: 5, fulfillment: 40, delivery: 20 });
 
     seed([{ entryDate: d("2026-10-01"), _sum: { productionIn: 10, fulfillmentOut: 40 } }], []);
     const [onlyOnline] = await getStockFlow(d("2026-10-01"), d("2026-10-01"));
-    expect(onlyOnline).toEqual({ date: "2026-10-01", production: 10, fulfillment: 40, delivery: null });
+    expect(onlyOnline).toEqual({ date: "2026-10-01", production: 10, productionOnline: 10, productionOffline: null, fulfillment: 40, delivery: null });
   });
 });

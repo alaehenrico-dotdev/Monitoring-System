@@ -32,6 +32,56 @@ async function setup() {
 
 beforeEach(() => vi.clearAllMocks());
 
+describe("adding a SKU: the category's products", () => {
+  const several = [
+    product({ id: 1, sku: "AFP007", name: "SWEET A", category: "Class A", sortOrder: 1 }),
+    product({ id: 2, sku: "AFP008", name: "SPECIAL A", category: "Class A", sortOrder: 2 }),
+    product({ id: 3, sku: null, name: "OLD SOY", category: "Class A", isActive: false, sortOrder: 3 }),
+    product({ id: 4, sku: "AFP020", name: "FISH SAUCE", category: "Premium", sortOrder: 4 }),
+  ];
+  async function openAddForm() {
+    api.listProducts.mockResolvedValue(several);
+    render(
+      <MemoryRouter>
+        <ProductsAdminPage />
+      </MemoryRouter>,
+    );
+    await screen.findByLabelText("SKU code of SWEET A");
+  }
+
+  it("shows nothing until a category is chosen", async () => {
+    await openAddForm();
+    expect(screen.queryByRole("region", { name: /Products in/ })).toBeNull();
+  });
+
+  it("lists the chosen category's products, inactive ones marked, and says where the new one goes", async () => {
+    await openAddForm();
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "Class A" } });
+    const box = await screen.findByRole("region", { name: "Products in Class A" });
+    expect(box.textContent).toContain("Already in Class A (3)");
+    expect(box.textContent).toContain("AFP007 · SWEET A");
+    expect(box.textContent).toContain("AFP008 · SPECIAL A");
+    expect(box.textContent).toContain("no SKU · OLD SOY (inactive)");
+    expect(box.textContent).not.toContain("FISH SAUCE");
+    expect(box.textContent).toContain("A new product here goes after OLD SOY");
+  });
+
+  it("follows the category chosen", async () => {
+    await openAddForm();
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "Premium" } });
+    const box = await screen.findByRole("region", { name: "Products in Premium" });
+    expect(box.textContent).toContain("Already in Premium (1)");
+    expect(box.textContent).toContain("AFP020 · FISH SAUCE");
+  });
+
+  it("is not shown for a new category, which has no products yet", async () => {
+    await openAddForm();
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "__new__" } });
+    fireEvent.change(await screen.findByLabelText("New category name"), { target: { value: "Oils" } });
+    expect(screen.queryByRole("region", { name: /Products in/ })).toBeNull();
+  });
+});
+
 describe("editing a SKU code", () => {
   it("saves the new code on Enter/blur, hyphens included", async () => {
     const input = await setup();

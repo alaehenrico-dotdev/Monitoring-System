@@ -85,6 +85,35 @@ export async function disableNotifications(): Promise<NotifyMode> {
   return currentMode();
 }
 
+/// Signing out on purpose ends notifications on this browser: the push subscription is cancelled (the push service then
+/// tells the server the device is gone, and the server drops it) and the remembered choice is cleared, so the next
+/// person to sign in here starts with notifications off. A session that merely expires does not call this.
+export async function clearNotificationsOnSignOut(): Promise<void> {
+  remember(null);
+  try {
+    if (!canPush()) return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    await sub?.unsubscribe();
+  } catch {
+    /* nothing to undo */
+  }
+}
+
+/// A device that has notifications on tells the server about itself each time the app opens. This puts a device back
+/// after the server dropped it (a password change, "sign out everywhere"), and does nothing for a device that was
+/// never turned on. Quiet on failure: the person can still turn it on again from the bell.
+export async function resyncNotifications(): Promise<void> {
+  if (currentMode() !== "push" || !canPush()) return;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (sub) await savePushSubscription(sub.toJSON());
+  } catch {
+    /* offline, or the server has push switched off */
+  }
+}
+
 /// Shows one notification from the open app (the "local" kind).
 export async function showLocalNotification(title: string, body: string, url: string): Promise<void> {
   if (!canNotify() || Notification.permission !== "granted") return;

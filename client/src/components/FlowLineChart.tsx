@@ -3,6 +3,7 @@ import { niceScale } from "../utils/chartScale";
 import { compactNumber, fullNumber } from "../utils/chartFormat";
 import { smoothPath } from "../utils/smoothPath";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
+import { useChartPrefs } from "../context/ThemeContext";
 
 export interface FlowSeries {
   key: string;
@@ -15,6 +16,8 @@ export interface FlowPoint {
   key: string;
   /// Axis text; thinned out when there are many points.
   label: string;
+  /// A second, smaller axis line under the label (the day of the week); shown with the label.
+  sub?: string;
   /// Tooltip heading.
   title: string;
   /// Accessible name of the focusable column.
@@ -25,7 +28,7 @@ export interface FlowPoint {
 }
 
 /**
- * Smooth multi-line chart: one curve per series on a shared, round-numbered y
+ * Multi-series chart (lines, grouped bars or filled areas, per Settings > Appearance > Charts): one mark per series on a shared, round-numbered y
  * scale, a crosshair that snaps to the day under the pointer and one tooltip
  * listing every value. Each day is a focusable column so the same readout opens
  * on keyboard focus and screen readers get the aria label. Days with no entry
@@ -33,6 +36,11 @@ export interface FlowPoint {
  */
 /// Narrowest a day's column gets on a phone before the plot scrolls sideways instead.
 const PHONE_DAY_WIDTH = 44;
+
+/// Stacked bars: the plot is this many equal rows tall; each block in a stack is one row, so a day is a pile
+/// of identical blocks and its height reads as a count (the tooltip has the exact figures).
+const STACK_ROWS = 24;
+const STACK_GAP_PX = 2;
 
 const hasData = (p: FlowPoint) => Object.values(p.values).some((v) => v !== null && v !== undefined);
 
@@ -53,7 +61,36 @@ export function FlowLineChart({
   scrollOnPhone?: boolean;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  const { chartType, chartLook } = useChartPrefs();
+  const stacked = chartType === "stack";
+  const bars = chartType === "bar" || stacked;
   const count = points.length;
+  // Whatever draws the plot afresh (another kind of chart, another period) plays the load animation again and
+  // is not a live update; after it has played the chart counts as settled and changes arrive as quick, local ones.
+  const plotKey = `${chartType}:${points[0]?.key}:${count}`;
+  const [settledKey, setSettledKey] = useState<string | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setSettledKey(plotKey), 1800);
+    return () => clearTimeout(t);
+  }, [plotKey]);
+  const settled = settledKey === plotKey;
+  // Days whose figures just changed (someone saved an entry): flashed briefly. Compared while rendering, the way
+  // React recommends for state derived from a prop change, and only once the chart has settled.
+  const [seen, setSeen] = useState(points);
+  const [flash, setFlash] = useState<string[]>([]);
+  if (seen !== points) {
+    setSeen(points);
+    if (settled) {
+      const before = new Map(seen.map((p) => [p.key, JSON.stringify(p.values)]));
+      const changed = points.filter((p) => before.has(p.key) && before.get(p.key) !== JSON.stringify(p.values)).map((p) => p.key);
+      if (changed.length) setFlash(changed);
+    }
+  }
+  useEffect(() => {
+    if (!flash.length) return;
+    const t = setTimeout(() => setFlash([]), 1500);
+    return () => clearTimeout(t);
+  }, [flash]);
   const labelEvery = Math.max(1, Math.ceil(count / 7));
   const phone = useReadOnlyPhone();
   // A phone is too narrow for a label under every day: label every few days, counted back from the latest
@@ -80,25 +117,52 @@ export function FlowLineChart({
   };
 
   const scale = useMemo(
-    () => niceScale(Math.max(0, ...points.flatMap((p) => series.map((s) => p.values[s.key] ?? 0)))),
-    [points, series],
+    () =>
+      niceScale(
+        Math.max(
+          0,
+          // Stacked columns reach the day's TOTAL; every other drawing reaches its tallest single value.
+          ...(stacked
+            ? points.map((p) => series.reduce((sum, s) => sum + Math.max(0, p.values[s.key] ?? 0), 0))
+            : points.flatMap((p) => series.map((s) => p.values[s.key] ?? 0))),
+        ),
+      ),
+    [points, series, stacked],
   );
   const x = (i: number) => ((i + 0.5) / count) * 100;
   const y = (v: number) => 100 - (Math.max(0, v) / scale.max) * 100;
   const pct = (v: number) => `${(Math.max(0, v) / scale.max) * 100}%`;
 
+  /// One day's blocks per series: its value in rows (rounded, at least one for any recorded amount), trimmed from
+  /// the top so the pile never rises past the plot.
+  const stackBlocks = (p: FlowPoint) => {
+    let room = STACK_ROWS;
+    return series.map((s) => {
+      const v = Math.max(0, p.values[s.key] ?? 0);
+      const wanted = v > 0 ? Math.max(1, Math.round((v / scale.max) * STACK_ROWS)) : 0;
+      const blocks = Math.min(wanted, room);
+      room -= blocks;
+      return { s, blocks };
+    });
+  };
+
   const paths = useMemo(
     () =>
-      series.map((s) => ({
-        s,
-        d: smoothPath(
-          points.flatMap((p, i) => {
-            const v = p.values[s.key] ?? (zeroFill ? 0 : null);
-            return v === null ? [] : [{ x: x(i), y: y(v) }];
-          }),
-        ),
-        lone: !zeroFill && points.filter((p) => p.values[s.key] !== null && p.values[s.key] !== undefined).length === 1,
-      })),
+      series.map((s) => {
+        const coords = points.flatMap((p, i) => {
+          const v = p.values[s.key] ?? (zeroFill ? 0 : null);
+          return v === null ? [] : [{ x: x(i), y: y(v) }];
+        });
+        const d = smoothPath(coords);
+        // The area under the curve: the same path, closed down to the baseline.
+        const fill = coords.length > 1 ? `${d} L ${coords[coords.length - 1].x} 100 L ${coords[0].x} 100 Z` : "";
+        return {
+          s,
+          d,
+          fill,
+          lone: !zeroFill && points.filter((p) => p.values[s.key] !== null && p.values[s.key] !== undefined).length === 1,
+        };
+      }),
     // x / y close over count and scale.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [points, series, scale, zeroFill],
@@ -118,7 +182,10 @@ export function FlowLineChart({
       </div>
       <div
         ref={chartRef}
-        className={scrolls ? "ae-fl-chart ae-fl-chart--scroll" : "ae-fl-chart"}
+        className={`${scrolls ? "ae-fl-chart ae-fl-chart--scroll" : "ae-fl-chart"}${points.some((p) => p.sub) ? " ae-fl-chart--sub" : ""}`}
+        data-type={chartType}
+        data-settled={settled ? "true" : undefined}
+        data-look={chartLook}
         style={scrolls ? ({ "--ae-fl-min": `${count * PHONE_DAY_WIDTH}px` } as CSSProperties) : undefined}
         onPointerLeave={() => setActive(null)}
       >
@@ -129,19 +196,64 @@ export function FlowLineChart({
             </span>
           ))}
         </div>
-        <div className="ae-fl-plot">
+        {/* Keyed by the drawing and the days shown, so it plays its load animation whenever the chart is shown or
+            its kind or period changes, but not on a live refresh of the same days. */}
+        <div className="ae-fl-plot" key={plotKey}>
           {scale.ticks.map((t) => (
             <div key={t} aria-hidden className={`ae-fl-grid${t === 0 ? " ae-fl-grid--base" : ""}`} style={{ bottom: pct(t) }} />
           ))}
-          <svg aria-hidden className="ae-fl-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-            {paths.map(({ s, d, lone }) =>
-              d && !lone ? <path key={s.key} d={d} className="ae-fl-line" vectorEffect="non-scaling-stroke" style={{ stroke: s.color }} /> : null,
+          {/* Today is still being entered: a softly breathing band behind its column says the figures are live. */}
+          {points.map((p, i) =>
+            p.current ? <div key="today" aria-hidden className="ae-fl-today" style={{ left: `${(i / count) * 100}%`, width: `${100 / count}%` }} /> : null,
+          )}
+          {/* Encoding often runs a little behind: a day with nothing entered blinks an amber band, so a gap is noticed
+              and can be chased. Not when the whole period is empty (the chart already says so). */}
+          {points.some(hasData) &&
+            points.map((p, i) =>
+              hasData(p) ? null : <div key={`missing-${p.key}`} aria-hidden className="ae-fl-missing" style={{ left: `${(i / count) * 100}%`, width: `${100 / count}%` }} />,
             )}
-          </svg>
+          {points.map((p, i) =>
+            flash.includes(p.key) ? <div key={`flash-${p.key}`} aria-hidden className="ae-fl-flash" style={{ left: `${(i / count) * 100}%`, width: `${100 / count}%` }} /> : null,
+          )}
+          {bars ? (
+            <div aria-hidden className="ae-fl-bars">
+              {points.map((p, i) => (
+                <div key={p.key} className={stacked ? "ae-fl-bargroup ae-fl-bargroup--stack" : "ae-fl-bargroup"} style={{ left: `${(i / count) * 100}%`, width: `${100 / count}%`, "--ae-d": `${Math.round((i / count) * 420)}ms` } as CSSProperties}>
+                  {stacked
+                    ? (() => {
+                        // The block's place in its pile, bottom first, so the pile can build upward.
+                        let place = 0;
+                        return stackBlocks(p).flatMap((b) =>
+                          Array.from({ length: b.blocks }, (_, n) => (
+                            <span
+                              key={`${b.s.key}-${n}`}
+                              className="ae-fl-bar"
+                              style={{ height: `calc(${100 / STACK_ROWS}% - ${STACK_GAP_PX}px)`, background: b.s.color, "--ae-n": place++ } as CSSProperties}
+                            />
+                          )),
+                        );
+                      })()
+                    : series.map((s) => {
+                        const v = p.values[s.key] ?? (zeroFill ? 0 : null);
+                        return <span key={s.key} className="ae-fl-bar" style={{ height: v === null ? 0 : v > 0 ? `max(2px, ${pct(v)})` : 0, background: s.color }} />;
+                      })}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <svg aria-hidden className="ae-fl-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
+              {chartType === "area" &&
+                paths.map(({ s, fill, lone }) => (fill && !lone ? <path key={`${s.key}-fill`} d={fill} className="ae-fl-area" style={{ fill: s.color, d: `path("${fill}")` } as CSSProperties} /> : null))}
+              {paths.map(({ s, d, lone }) =>
+                d && !lone ? <path key={s.key} d={d} className="ae-fl-line" vectorEffect="non-scaling-stroke" style={{ stroke: s.color, d: `path("${d}")` } as CSSProperties} /> : null,
+              )}
+            </svg>
+          )}
           {/* Every recorded reading keeps a marker, so a sparse period (a few
               days with entries among empty ones) reads as the real readings it
               is, not as a line drawn out of nothing. */}
-          {series.flatMap((s) =>
+          {!bars &&
+            series.flatMap((s) =>
             points.flatMap((p, i) =>
               p.values[s.key] === null || p.values[s.key] === undefined
                 ? []
@@ -164,8 +276,12 @@ export function FlowLineChart({
           </div>
           {active !== null && activePoint && (
             <>
-              <div aria-hidden className="ae-fl-cross" style={{ left: `${x(active)}%` }} />
-              {series.map((s) => {
+              {bars ? (
+                <div aria-hidden className="ae-fl-cross ae-fl-cross--band" style={{ left: `${(active / count) * 100}%`, width: `${100 / count}%` }} />
+              ) : (
+                <div aria-hidden className="ae-fl-cross" style={{ left: `${x(active)}%` }} />
+              )}
+              {!bars && series.map((s) => {
                 const v = activePoint.values[s.key];
                 return v === null || v === undefined ? null : (
                   <span key={s.key} aria-hidden className="ae-fl-dot" style={{ left: `${x(active)}%`, bottom: pct(v), background: s.color }} />
@@ -180,9 +296,12 @@ export function FlowLineChart({
                     : { right: `calc(${100 - x(active)}% + 14px)` }
                 }
               >
-                <div className="ae-fl-tip-title">{activePoint.title}</div>
+                <div className="ae-fl-tip-title">
+                  {activePoint.title}
+                  {activePoint.current && <span className="ae-fl-tip-live"> · in progress</span>}
+                </div>
                 {series.some((s) => activePoint.values[s.key] != null) ? (
-                  series.map((s) => {
+                  [...series.map((s) => {
                     const v = activePoint.values[s.key];
                     return v === null || v === undefined ? null : (
                       <div key={s.key} className="ae-fl-tip-row">
@@ -191,7 +310,13 @@ export function FlowLineChart({
                         <strong>{fullNumber.format(v)}</strong>
                       </div>
                     );
-                  })
+                  }),
+                  stacked ? (
+                    <div key="total" className="ae-fl-tip-row ae-fl-tip-total">
+                      <span>Total</span>
+                      <strong>{fullNumber.format(series.reduce((sum, s) => sum + (activePoint.values[s.key] ?? 0), 0))}</strong>
+                    </div>
+                  ) : null]
                 ) : (
                   <div className="ae-fl-tip-empty">No entries recorded</div>
                 )}
@@ -200,11 +325,15 @@ export function FlowLineChart({
           )}
         </div>
         <div aria-hidden className="ae-fl-xaxis">
-          {points.map((p, i) => (
-            <span key={p.key} className={p.current ? "ae-fl-xlabel ae-fl-xlabel--current" : "ae-fl-xlabel"}>
-              {labelled(i, p) ? p.label : ""}
+          {points.map((p, i) => {
+            const named = labelled(i, p);
+            return (
+            <span key={p.key} className={p.current ? (named ? "ae-fl-xlabel ae-fl-xlabel--current ae-fl-xlabel--live" : "ae-fl-xlabel ae-fl-xlabel--current") : "ae-fl-xlabel"}>
+              {named ? p.label : ""}
+              {named && p.sub && <small className="ae-fl-xsub">{p.sub}</small>}
             </span>
-          ))}
+            );
+          })}
         </div>
       </div>
     </>

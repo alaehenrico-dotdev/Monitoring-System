@@ -6,6 +6,10 @@ export interface StockFlowEntry {
   date: string; // YYYY-MM-DD
   /// Production In, Online + Offline.
   production: number | null;
+  /// Production In on the Online sheets alone.
+  productionOnline: number | null;
+  /// Production In on the Offline sheets alone.
+  productionOffline: number | null;
   /// Online fulfillment out.
   fulfillment: number | null;
   /// Offline delivery out.

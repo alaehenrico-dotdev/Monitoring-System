@@ -33,7 +33,7 @@ import {
   OFFLINE_NET_TOTALS,
 } from "../config/stockColumns";
 import { toExcelTable, downloadExcel } from "../utils/excel";
-import { formatDateDisplay, formatStamp } from "../utils/dateFormat";
+import { formatDateDisplay, formatDateLong, formatStamp } from "../utils/dateFormat";
 import { downloadTablePdf } from "../utils/tablePdf";
 import {
   filterNotes,
@@ -587,7 +587,7 @@ export function DailyReportPage() {
   return (
     <div>
       <PageHeader
-        title={`Daily Report - ${formatDateDisplay(date)}`}
+        title={`Daily Report - ${formatDateLong(date)}`}
         subtitle="Every entry, the audit and Daily Out for any date - saved to Google Drive when generated."
       >
         <PageToolbar

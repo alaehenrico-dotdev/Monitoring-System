@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { getStockFlow, type StockFlowEntry } from "../api/stockFlow";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { addDaysIso } from "../utils/dateMath";
-import { formatDateDisplay } from "../utils/dateFormat";
+import { formatDateLong, formatWeekdayShort } from "../utils/dateFormat";
 import { fullNumber } from "../utils/chartFormat";
 import { getCurrentShiftAndDate } from "../utils/shift";
 import { FlowLineChart, type FlowPoint, type FlowSeries } from "./FlowLineChart";
@@ -21,23 +21,25 @@ function shortDate(date: string): string {
 }
 
 const SERIES: FlowSeries[] = [
-  { key: "production", label: "Produced", color: "var(--ae-viz-produced)" },
+  { key: "productionOnline", label: "Produced online", color: "var(--ae-viz-produced)" },
+  { key: "productionOffline", label: "Produced offline", color: "var(--ae-viz-produced-offline)" },
   { key: "fulfillment", label: "Fulfilled online", color: "var(--ae-viz-online)" },
   { key: "delivery", label: "Delivered offline", color: "var(--ae-viz-offline)" },
 ];
 
 function flowPoints(rows: StockFlowEntry[], today: string): FlowPoint[] {
   return rows.map((e) => {
-    const empty = e.production === null && e.fulfillment === null && e.delivery === null;
+    const empty = e.productionOnline === null && e.productionOffline === null && e.fulfillment === null && e.delivery === null;
     const side = (label: string, v: number | null) => `${label}: ${v === null ? "no entry" : fullNumber.format(v)}`;
     return {
       key: e.date,
       label: shortDate(e.date),
-      title: formatDateDisplay(e.date),
+      sub: formatWeekdayShort(e.date),
+      title: formatDateLong(e.date),
       ariaLabel: empty
-        ? `${formatDateDisplay(e.date)} — No entries recorded`
-        : `${formatDateDisplay(e.date)} — ${side("Produced", e.production)} · ${side("Fulfilled online", e.fulfillment)} · ${side("Delivered offline", e.delivery)}`,
-      values: { production: e.production, fulfillment: e.fulfillment, delivery: e.delivery },
+        ? `${formatDateLong(e.date)} — No entries recorded`
+        : `${formatDateLong(e.date)} — ${side("Produced online", e.productionOnline)} · ${side("Produced offline", e.productionOffline)} · ${side("Fulfilled online", e.fulfillment)} · ${side("Delivered offline", e.delivery)}`,
+      values: { productionOnline: e.productionOnline, productionOffline: e.productionOffline, fulfillment: e.fulfillment, delivery: e.delivery },
       current: e.date === today,
     };
   });
@@ -83,8 +85,9 @@ export function StockFlowChart({ aside }: { aside?: ReactNode } = {}) {
   }, [from, today, realtimeVersion]);
 
   const points = useMemo(() => (rows ? flowPoints(rows, today) : null), [rows, today]);
-  const anyData = rows?.some((r) => r.production !== null || r.fulfillment !== null || r.delivery !== null) ?? false;
-  const daysWithData = rows?.filter((r) => r.production !== null || r.fulfillment !== null || r.delivery !== null).length ?? 0;
+  const hasEntry = (r: StockFlowEntry) => r.productionOnline !== null || r.productionOffline !== null || r.fulfillment !== null || r.delivery !== null;
+  const anyData = rows?.some(hasEntry) ?? false;
+  const daysWithData = rows?.filter(hasEntry).length ?? 0;
   const outOnline = rows?.reduce((sum, r) => sum + (r.fulfillment ?? 0), 0) ?? 0;
   const outOffline = rows?.reduce((sum, r) => sum + (r.delivery ?? 0), 0) ?? 0;
 
@@ -126,6 +129,7 @@ export function StockFlowChart({ aside }: { aside?: ReactNode } = {}) {
                   <>
                     <li>Units per day, each product in its own unit</li>
                     <li>{daysWithData} of {days} days have entries (others drawn at 0)</li>
+                    {daysWithData < days && <li>Blinking days have no entries yet</li>}
                   </>
                 ) : (
                   <li>Nothing was recorded in this period</li>

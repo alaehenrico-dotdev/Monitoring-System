@@ -25,6 +25,16 @@ export type HeaderStyle = "standard" | "inline" | "ribbon" | "dock";
 export const HEADER_STYLES: readonly HeaderStyle[] = ["standard", "inline", "ribbon", "dock"];
 export const DEFAULT_HEADER_STYLE: HeaderStyle = "standard";
 
+/// How the charts (Dashboard stock flow, Daily Out) are drawn, chosen in Settings > Appearance > Charts.
+/// Two independent choices, stored per browser like the theme. They change only the drawing, never
+/// the numbers: the type is lines, grouped bars, stacked columns or filled areas; the look is how heavy the marks are.
+export type ChartType = "line" | "bar" | "stack" | "area";
+export type ChartLook = "classic" | "minimal" | "bold";
+export const CHART_TYPES: readonly ChartType[] = ["line", "bar", "stack", "area"];
+export const CHART_LOOKS: readonly ChartLook[] = ["classic", "minimal", "bold"];
+export const DEFAULT_CHART_TYPE: ChartType = "line";
+export const DEFAULT_CHART_LOOK: ChartLook = "classic";
+
 /// The interface typeface and text size (Settings > Appearance > Font). Like the
 /// theme they are a per-browser preference, applied as data attributes on <html>
 /// that index.css keys off. The data tables are not scaled by the text size - they
@@ -61,6 +71,8 @@ export function ensureWebFont(font: FontFamily) {
 const STORAGE_KEY = "ae-theme";
 const UI_STORAGE_KEY = "ae-ui";
 const HEADER_STORAGE_KEY = "ae-header";
+const CHART_TYPE_STORAGE_KEY = "ae-chart-type";
+const CHART_LOOK_STORAGE_KEY = "ae-chart-look";
 const FONT_STORAGE_KEY = "ae-font";
 const FONT_SIZE_STORAGE_KEY = "ae-font-size";
 
@@ -72,6 +84,10 @@ interface ThemeContextValue {
   setUiStyle: (style: UiStyle) => void;
   headerStyle: HeaderStyle;
   setHeaderStyle: (style: HeaderStyle) => void;
+  chartType: ChartType;
+  setChartType: (type: ChartType) => void;
+  chartLook: ChartLook;
+  setChartLook: (look: ChartLook) => void;
   fontFamily: FontFamily;
   setFontFamily: (font: FontFamily) => void;
   fontSize: FontSize;
@@ -110,6 +126,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   const [uiStyle, setUiStyle] = useState<UiStyle>(getInitialUiStyle);
   const [headerStyle, setHeaderStyle] = useState<HeaderStyle>(() => readChoice(HEADER_STORAGE_KEY, HEADER_STYLES, DEFAULT_HEADER_STYLE));
+  const [chartType, setChartType] = useState<ChartType>(() => readChoice(CHART_TYPE_STORAGE_KEY, CHART_TYPES, DEFAULT_CHART_TYPE));
+  const [chartLook, setChartLook] = useState<ChartLook>(() => readChoice(CHART_LOOK_STORAGE_KEY, CHART_LOOKS, DEFAULT_CHART_LOOK));
   const [fontFamily, setFontFamily] = useState<FontFamily>(() => readChoice(FONT_STORAGE_KEY, FONT_FAMILIES, DEFAULT_FONT));
   const [fontSize, setFontSize] = useState<FontSize>(() => readChoice(FONT_SIZE_STORAGE_KEY, FONT_SIZES, DEFAULT_FONT_SIZE));
 
@@ -143,6 +161,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       // Not remembered, still applied for this session.
     }
   }, [headerStyle]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHART_TYPE_STORAGE_KEY, chartType);
+      localStorage.setItem(CHART_LOOK_STORAGE_KEY, chartLook);
+    } catch {
+      // Not remembered, still applied for this session.
+    }
+  }, [chartType, chartLook]);
 
   // Typeface and size are attributes on <html> too (index.css reads them). A web
   // font is requested only once it is picked; until it arrives the fallback shows.
@@ -200,8 +227,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ theme, toggleTheme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle, fontFamily, setFontFamily, fontSize, setFontSize, resetFont }),
-    [theme, toggleTheme, uiStyle, headerStyle, fontFamily, fontSize, resetFont],
+    () => ({ theme, toggleTheme, setTheme, uiStyle, setUiStyle, headerStyle, setHeaderStyle, chartType, setChartType, chartLook, setChartLook, fontFamily, setFontFamily, fontSize, setFontSize, resetFont }),
+    [theme, toggleTheme, uiStyle, headerStyle, chartType, chartLook, fontFamily, fontSize, resetFont],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -218,4 +245,11 @@ export function useTheme() {
 /// (a test, a print view) is simply the standard layout.
 export function useHeaderStyle(): HeaderStyle {
   return useContext(ThemeContext)?.headerStyle ?? DEFAULT_HEADER_STYLE;
+}
+
+/// The chart type and look for a chart that only needs to read them. Does not throw outside a
+/// ThemeProvider (a test, a print view): the chart is then the classic line chart.
+export function useChartPrefs(): { chartType: ChartType; chartLook: ChartLook } {
+  const ctx = useContext(ThemeContext);
+  return { chartType: ctx?.chartType ?? DEFAULT_CHART_TYPE, chartLook: ctx?.chartLook ?? DEFAULT_CHART_LOOK };
 }

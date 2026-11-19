@@ -27,6 +27,14 @@ export function formatDateLong(dateStr: string): string {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 }
 
+/// "Mon" - the day of the week of a "YYYY-MM-DD" date, for a chart's axis. Built from the parts like the
+/// functions above, so a timezone behind UTC cannot shift it to the day before.
+export function formatWeekdayShort(dateStr: string): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short" });
+}
+
 /// "3m ago" / "2h ago" / "5d ago" for a recent-activity feed (Dashboard) -
 /// falls back to a plain date once something is old enough that a relative
 /// label stops being useful ("just now" is more informative than "4w ago").

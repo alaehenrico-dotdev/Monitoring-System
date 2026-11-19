@@ -10,6 +10,10 @@ export interface StockFlowEntry {
   date: string;
   /// Production In, Online + Offline. Null when neither pool has an entry.
   production: number | null;
+  /// Production In on the Online sheets alone. Null when no Online entry exists for the day.
+  productionOnline: number | null;
+  /// Production In on the Offline sheets alone. Null when no Offline entry exists for the day.
+  productionOffline: number | null;
   /// Online Fulfillment Out. Null when no Online entry exists for the day.
   fulfillment: number | null;
   /// Offline Delivery Out (gross - backloads are not netted here, this is what
@@ -46,6 +50,8 @@ export async function getStockFlow(from: Date, to: Date): Promise<StockFlowEntry
     return {
       date,
       production: o || f ? round2(toNum(o?.productionIn) + toNum(f?.productionIn)) : null,
+      productionOnline: o ? round2(toNum(o.productionIn)) : null,
+      productionOffline: f ? round2(toNum(f.productionIn)) : null,
       fulfillment: o ? round2(toNum(o.fulfillmentOut)) : null,
       delivery: f ? round2(toNum(f.deliveryOut)) : null,
     };

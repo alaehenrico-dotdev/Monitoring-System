@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
-const api = vi.hoisted(() => ({ listProducts: vi.fn(), reorderProducts: vi.fn(), syncProducts: vi.fn(), createProduct: vi.fn() }));
+const api = vi.hoisted(() => ({ listProducts: vi.fn(), reorderProducts: vi.fn(), syncProducts: vi.fn(), createProduct: vi.fn(), updateProduct: vi.fn() }));
 vi.mock("../api/products", () => api);
 const templates = vi.hoisted(() => ({ listOrderTemplates: vi.fn(), saveOrderTemplate: vi.fn(), deleteOrderTemplate: vi.fn() }));
 vi.mock("../api/orderTemplates", () => templates);
@@ -280,77 +280,304 @@ describe("Arrange product order - Excel template", () => {
   });
 
   describe("add product", () => {
+    const inactive = { ...product(7, "Old Soy", "Class A (Liter)", "AFP007"), isActive: false };
+    const inactiveFish = { ...product(8, "Old Fish", "Premium (Liter)", null), isActive: false };
+    const withInactive = (opts?: { includeInactive?: boolean }) =>
+      Promise.resolve([product(1, "Special", "Premium (Liter)"), product(2, "Sweet A", "Class A (Liter)"), product(3, "Mystery", "Class A (Liter)"), ...(opts?.includeInactive ? [inactive, inactiveFish] : [])]);
     const openForm = async () => {
       await open();
       fireEvent.click(screen.getByRole("button", { name: "Add product" }));
       return await screen.findByRole("form", { name: "Add product" });
     };
-    const fillName = (value: string) => fireEvent.change(screen.getByLabelText("Product name"), { target: { value } });
-    const submit = () => fireEvent.click(within(screen.getByRole("form", { name: "Add product" })).getByRole("button", { name: "Add product" }));
+    const form = () => within(screen.getByRole("form", { name: "Add product" }));
+    const submit = () => fireEvent.click(form().getByRole("button", { name: /^Add (product|\d+ products)$/ }));
+    const tick = (label: string) => fireEvent.click(form().getByRole("checkbox", { name: label }));
+    const listed = () => within(screen.getByRole("list", { name: "SKUs to add" })).queryAllByRole("checkbox").map((c) => c.getAttribute("aria-label"));
 
-    it("adds a product to an existing category, filling in its unit, and shows it where the server placed it", async () => {
-      api.createProduct.mockResolvedValue(product(9, "More Sweet A", "Class A (Liter)", null));
+    it("lists every SKU that is not in the list, inactive ones included, grouped by category", async () => {
+      api.listProducts.mockImplementation(withInactive);
       await openForm();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      expect(listed()).toEqual(["AFP007 · Old Soy", "no SKU · Old Fish"]);
+      expect(within(screen.getByRole("list", { name: "SKUs to add" })).getAllByText("inactive")).toHaveLength(2);
+      expect([...form().getByRole("combobox", { name: "Category" }).querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+        "All categories (2)",
+        "Class A (Liter) (1)",
+        "Premium (Liter) (1)",
+      ]);
+    });
 
-      fillName("More Sweet A");
-      fireEvent.change(screen.getByLabelText("Category"), { target: { value: "Class A (Liter)" } });
-      expect((screen.getByLabelText("Unit") as HTMLInputElement).value).toBe("pc"); // the unit that category already uses
+    it("shows only the chosen category's products", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      await openForm();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      fireEvent.change(form().getByRole("combobox", { name: "Category" }), { target: { value: "Premium (Liter)" } });
+      expect(listed()).toEqual(["no SKU · Old Fish"]);
+    });
+
+    it("narrows the list by name, SKU or category, and says when nothing matches", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      await openForm();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      fireEvent.change(form().getByLabelText("Search SKUs"), { target: { value: "afp007" } });
+      expect(listed()).toEqual(["AFP007 · Old Soy"]);
+      fireEvent.change(form().getByLabelText("Search SKUs"), { target: { value: "zzz" } });
+      expect(listed()).toEqual([]);
+      expect(screen.getByText("No SKU matches")).toBeTruthy();
+    });
+
+    it("has no way to type a new product here", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      await openForm();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      expect(screen.queryByLabelText("Product name")).toBeNull();
+      expect(api.createProduct).not.toHaveBeenCalled();
+    });
+
+    it("brings a ticked SKU back, shows it after the rest of its category, and leaves its place to be saved", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      const back = { ...inactive, isActive: true };
+      api.updateProduct.mockResolvedValue(back);
+      await openForm();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      tick("AFP007 · Old Soy");
+      // After the switch-on the server lists it at the place it had before it was switched off.
+      api.listProducts.mockResolvedValue([back, product(1, "Special", "Premium (Liter)"), product(2, "Sweet A", "Class A (Liter)"), product(3, "Mystery", "Class A (Liter)")]);
       submit();
 
-      await waitFor(() => expect(api.createProduct).toHaveBeenCalledWith({ sku: undefined, name: "More Sweet A", category: "Class A (Liter)", unit: "pc" }));
-      // Right after the last product of its category - and it is saved, so the order is not "changed".
-      await waitFor(() => expect(names()).toEqual(["Special", "Sweet A", "Mystery", "More Sweet A"]));
-      expect((screen.getByRole("button", { name: "Save order" }) as HTMLButtonElement).disabled).toBe(true);
+      await waitFor(() => expect(api.updateProduct).toHaveBeenCalledWith(7, { isActive: true }));
+      await waitFor(() => expect(names()).toEqual(["Special", "Sweet A", "Mystery", "Old Soy"]));
+      // Its saved place differs from where it is shown, so the order has a change to save.
+      await waitFor(() => expect((screen.getByRole("button", { name: "Save order" }) as HTMLButtonElement).disabled).toBe(false));
       expect(screen.queryByRole("form", { name: "Add product" })).toBeNull();
     });
 
-    it("can start a new category, which goes at the end", async () => {
-      api.createProduct.mockResolvedValue(product(9, "Chili Oil", "Oils", "AFP090"));
+    it("adds several at once, each after its own category, with one select-all for what is shown", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      api.updateProduct.mockImplementation(async (id: number) => ({ ...(id === 7 ? inactive : inactiveFish), isActive: true }));
       await openForm();
-
-      fillName("Chili Oil");
-      fireEvent.change(screen.getByLabelText("SKU code (optional)"), { target: { value: " AFP090 " } });
-      fireEvent.change(screen.getByLabelText("Category"), { target: { value: "__new__" } });
-      fireEvent.change(await screen.findByLabelText("New category name"), { target: { value: "Oils" } });
-      fireEvent.change(screen.getByLabelText("Unit"), { target: { value: "Bottle" } });
+      await screen.findByRole("list", { name: "SKUs to add" });
+      fireEvent.click(form().getByRole("checkbox", { name: "Select all shown" }));
+      expect(form().getByRole("button", { name: "Add 2 products" })).toBeTruthy();
       submit();
 
-      await waitFor(() => expect(api.createProduct).toHaveBeenCalledWith({ sku: "AFP090", name: "Chili Oil", category: "Oils", unit: "Bottle" }));
-      await waitFor(() => expect(names()).toEqual(["Special", "Sweet A", "Mystery", "Chili Oil"]));
+      await waitFor(() => expect(api.updateProduct).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(names()).toEqual(["Special", "Old Fish", "Sweet A", "Mystery", "Old Soy"]));
+      expect(screen.queryByRole("form", { name: "Add product" })).toBeNull();
     });
 
-    it("keeps reordering in progress when a product is added", async () => {
-      api.createProduct.mockResolvedValue(product(9, "More Sweet A", "Class A (Liter)", null));
+    it("keeps reordering in progress when SKUs are brought back", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      api.updateProduct.mockResolvedValue({ ...inactive, isActive: true });
       await openForm();
       fireEvent.click(screen.getByRole("button", { name: "Move Sweet A up" })); // an unsaved change
-
-      fillName("More Sweet A");
-      fireEvent.change(screen.getByLabelText("Category"), { target: { value: "Class A (Liter)" } });
+      await screen.findByRole("list", { name: "SKUs to add" });
+      tick("AFP007 · Old Soy");
       submit();
-
-      await waitFor(() => expect(names()).toEqual(["Sweet A", "Special", "Mystery", "More Sweet A"]));
-      expect((screen.getByRole("button", { name: "Save order" }) as HTMLButtonElement).disabled).toBe(false);
+      await waitFor(() => expect(names()).toEqual(["Sweet A", "Special", "Mystery", "Old Soy"]));
     });
 
-    it("asks for name, category and unit, and shows the server's message when it refuses", async () => {
+    it("asks for something to be ticked", async () => {
+      api.listProducts.mockImplementation(withInactive);
       await openForm();
+      await screen.findByRole("list", { name: "SKUs to add" });
       submit();
-      expect((await screen.findByRole("alert")).textContent).toBe("Name, category and unit are required.");
-      expect(api.createProduct).not.toHaveBeenCalled();
-
-      api.createProduct.mockRejectedValue(new Error("A product with that SKU already exists"));
-      fillName("Dup");
-      fireEvent.change(screen.getByLabelText("Category"), { target: { value: "Class A (Liter)" } });
-      submit();
-      expect((await screen.findByText("A product with that SKU already exists"))).toBeTruthy();
+      expect((await screen.findByRole("alert")).textContent).toBe("Tick at least one product to add.");
+      expect(api.updateProduct).not.toHaveBeenCalled();
     });
 
-    it("is not offered while a template is being reviewed", async () => {
+    it("when one of several is refused, keeps the ones that were added and the form open for the rest", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      api.updateProduct.mockImplementation(async (id: number) => {
+        if (id === 8) throw new Error("Not allowed");
+        return { ...inactive, isActive: true };
+      });
+      await openForm();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      fireEvent.click(form().getByRole("checkbox", { name: "Select all shown" }));
+      submit();
+
+      expect(await screen.findByText("Old Fish: Not allowed")).toBeTruthy();
+      await waitFor(() => expect(names()).toContain("Old Soy"));
+      // The one that went in is no longer offered; the refused one stays ticked to try again.
+      expect(listed()).toEqual(["no SKU · Old Fish"]);
+      expect((form().getByRole("checkbox", { name: "no SKU · Old Fish" }) as HTMLInputElement).checked).toBe(true);
+    });
+
+    it("says so, and points to the SKUs tab, when every SKU is already in the list", async () => {
+      await openForm();
+      expect(await screen.findByText(/Every SKU in the system is already in the list/)).toBeTruthy();
+      expect(screen.getByText(/created on the SKUs tab/)).toBeTruthy();
+      expect((form().getByRole("button", { name: "Add product" }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("can be cancelled without changing anything", async () => {
+      api.listProducts.mockImplementation(withInactive);
+      await openForm();
+      fireEvent.click(form().getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("form", { name: "Add product" })).toBeNull();
+      expect(api.updateProduct).not.toHaveBeenCalled();
+    });
+
+    it("is the template's own while a template is being reviewed, not the order list's", async () => {
       xlsx.readXlsxColumnA.mockResolvedValue([{ name: "OCT 8", cells: [cell(1, "CLASS A (LITER)", 16), cell(2, "SWEET A", 11)] }]);
       await open();
       pick(file());
       await screen.findByText(/1 product in 1 category/);
-      expect(screen.queryByRole("button", { name: "Add product" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+      expect(await screen.findByRole("form", { name: "Add product to the template" })).toBeTruthy();
+      expect(screen.queryByRole("form", { name: "Add product" })).toBeNull();
+    });
+  });
+
+  describe("add product to the template", () => {
+    // The system has five SKUs; the template lists two of them. Old Soy and Old Fish are inactive.
+    const oldSoy = { ...product(7, "Old Soy", "Class A (Liter)", "AFP007"), isActive: false };
+    const oldFish = { ...product(8, "Old Fish", "Premium (Liter)", null), isActive: false };
+    const everything = (opts?: { includeInactive?: boolean }) =>
+      Promise.resolve([product(1, "Special", "Premium (Liter)"), product(2, "Sweet A", "Class A (Liter)"), product(3, "Mystery", "Class A (Liter)"), ...(opts?.includeInactive ? [oldSoy, oldFish] : [])]);
+    const templateSheet = () =>
+      xlsx.readXlsxColumnA.mockResolvedValue([{ name: "OCT 8", cells: [cell(5, "CLASS A (LITER)", 16), cell(6, "SWEET A", 11), cell(7, "PREMIUM (LITER)", 16), cell(8, "SPECIAL", 11)] }]);
+    const openChooser = async () => {
+      api.listProducts.mockImplementation(everything);
+      templateSheet();
+      await open();
+      pick(file());
+      await screen.findByText(/2 products in 2 categories/);
+      fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+      return await screen.findByRole("form", { name: "Add product to the template" });
+    };
+    const chooser = () => within(screen.getByRole("form", { name: "Add product to the template" }));
+    const listed = () => within(screen.getByRole("list", { name: "SKUs to add" })).queryAllByRole("checkbox").map((c) => c.getAttribute("aria-label"));
+    const tick = (label: string) => fireEvent.click(chooser().getByRole("checkbox", { name: label }));
+    const add = () => fireEvent.click(chooser().getByRole("button", { name: /^Add (product|\d+ products)$/ }));
+
+    it("offers every SKU the template does not list, active and inactive, and none that it lists", async () => {
+      await openChooser();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      // Mystery is active but not in the template; the two inactive ones are offered too; Sweet A and Special are in it.
+      expect(listed()).toEqual(["no SKU · Mystery", "AFP007 · Old Soy", "no SKU · Old Fish"]);
+      expect([...chooser().getByRole("combobox", { name: "Category" }).querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+        "All categories (3)",
+        "Class A (Liter) (2)",
+        "Premium (Liter) (1)",
+      ]);
+    });
+
+    it("adds an active SKU as a row of the template under its category, and applies it with the rest", async () => {
+      await openChooser();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      tick("no SKU · Mystery");
+      add();
+
+      // The chooser closes, the row sits after the template's last Class A row, and the summary counts it.
+      await waitFor(() => expect(screen.queryByRole("form", { name: "Add product to the template" })).toBeNull());
+      expect(screen.getByText(/3 products in 2 categories/)).toBeTruthy();
+      expect(screen.getByText(/1 added by you\./)).toBeTruthy();
+      expect(screen.getByText("added by you")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Apply template" }));
+      await waitFor(() =>
+        expect(api.syncProducts).toHaveBeenCalledWith(
+          [
+            { category: "Class A (Liter)", name: "SWEET A", productId: 2 },
+            { category: "Class A (Liter)", name: "Mystery", productId: 3 },
+            { category: "Premium (Liter)", name: "SPECIAL", productId: 1 },
+          ],
+          { deactivateUnlisted: false },
+        ),
+      );
+    });
+
+    it("adds inactive SKUs as the SKUs themselves (never new duplicates), which the sync switches back on", async () => {
+      api.syncProducts.mockResolvedValue({ created: 0, moved: 0, renamed: 0, reactivated: 2, reordered: 4, total: 4 });
+      await openChooser();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      tick("AFP007 · Old Soy");
+      tick("no SKU · Old Fish");
+      expect(chooser().getByRole("button", { name: "Add 2 products" })).toBeTruthy();
+      add();
+
+      await screen.findAllByText(/inactive, switched back on when applied/);
+      // Chosen on purpose, so neither is offered as "an existing product?" or flagged as a stray duplicate.
+      expect(screen.queryByLabelText("Is Old Soy an existing product?")).toBeNull();
+      expect(screen.queryByLabelText("Is Old Fish an existing product?")).toBeNull();
+      expect(screen.queryByText("NEW")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Apply template" }));
+      await waitFor(() =>
+        expect(api.syncProducts).toHaveBeenCalledWith(
+          [
+            { category: "Class A (Liter)", name: "SWEET A", productId: 2 },
+            { category: "Class A (Liter)", name: "Old Soy", productId: 7 },
+            { category: "Premium (Liter)", name: "SPECIAL", productId: 1 },
+            { category: "Premium (Liter)", name: "Old Fish", productId: 8 },
+          ],
+          { deactivateUnlisted: false },
+        ),
+      );
+    });
+
+    it("no longer offers what was added, and can take it out of the template again", async () => {
+      await openChooser();
+      await screen.findByRole("list", { name: "SKUs to add" });
+      tick("no SKU · Mystery");
+      add();
+      await screen.findByText("added by you");
+
+      fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+      await screen.findByRole("list", { name: "SKUs to add" });
+      expect(listed()).toEqual(["AFP007 · Old Soy", "no SKU · Old Fish"]);
+      fireEvent.click(chooser().getByRole("button", { name: "Cancel" }));
+
+      fireEvent.click(screen.getByRole("button", { name: "Remove Mystery from the template" }));
+      expect(screen.getByText(/2 products in 2 categories/)).toBeTruthy();
+      expect(screen.queryByText("added by you")).toBeNull();
+    });
+
+    it("says so when the template already lists every SKU", async () => {
+      api.listProducts.mockResolvedValue([product(1, "Special", "Premium (Liter)"), product(2, "Sweet A", "Class A (Liter)")]);
+      templateSheet();
+      await open();
+      pick(file());
+      await screen.findByText(/2 products in 2 categories/);
+      fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+      expect(await screen.findByText(/Every SKU in the system is already in this template/)).toBeTruthy();
+    });
+
+    it("keeps a saved template up to date: applying saves it again with the added rows", async () => {
+      const savedRows = [{ category: "CLASS A (LITER)", name: "SWEET A" }, { category: "PREMIUM (LITER)", name: "SPECIAL" }];
+      templates.listOrderTemplates.mockResolvedValue([{ id: 5, name: "Encoder default order", rows: savedRows, updatedAt: "2026-10-16T00:00:00Z" }]);
+      api.listProducts.mockImplementation(everything);
+      templates.saveOrderTemplate.mockResolvedValue({ id: 5, name: "Encoder default order", rows: [], updatedAt: "" });
+      await open();
+      fireEvent.change(await screen.findByLabelText("Saved templates"), { target: { value: "5" } });
+      await screen.findByText(/2 products in 2 categories/);
+      fireEvent.click(screen.getByRole("button", { name: "Add product" }));
+      await screen.findByRole("list", { name: "SKUs to add" });
+      tick("no SKU · Mystery");
+      add();
+      fireEvent.click(await screen.findByRole("button", { name: "Apply template" }));
+
+      await waitFor(() => expect(api.syncProducts).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(templates.saveOrderTemplate).toHaveBeenCalledWith("Encoder default order", [
+          { category: "CLASS A (LITER)", name: "SWEET A" },
+          { category: "Class A (Liter)", name: "Mystery" },
+          { category: "PREMIUM (LITER)", name: "SPECIAL" },
+        ]),
+      );
+    });
+
+    it("leaves a saved template alone when nothing was added", async () => {
+      const savedRows = [{ category: "CLASS A (LITER)", name: "SWEET A" }, { category: "PREMIUM (LITER)", name: "SPECIAL" }];
+      templates.listOrderTemplates.mockResolvedValue([{ id: 5, name: "Encoder default order", rows: savedRows, updatedAt: "" }]);
+      api.listProducts.mockImplementation(everything);
+      await open();
+      fireEvent.change(await screen.findByLabelText("Saved templates"), { target: { value: "5" } });
+      await screen.findByText(/2 products in 2 categories/);
+      fireEvent.click(screen.getByRole("button", { name: "Apply template" }));
+      await waitFor(() => expect(api.syncProducts).toHaveBeenCalled());
+      expect(templates.saveOrderTemplate).not.toHaveBeenCalled();
     });
   });
 

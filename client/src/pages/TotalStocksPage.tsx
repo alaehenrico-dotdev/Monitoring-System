@@ -21,7 +21,7 @@ import { StockSourceFilter } from "../components/StockSourceFilter";
 import { TableSkeleton } from "../components/Skeleton";
 import { matchesSearch } from "../utils/search";
 import { useSearchHandoff } from "../hooks/useSearchHandoff";
-import { formatDateDisplay } from "../utils/dateFormat";
+import { formatDateDisplay, formatDateLong } from "../utils/dateFormat";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useRealtimeVersion } from "../context/RealtimeContext";
 import { getCurrentShiftAndDate } from "../utils/shift";
@@ -131,7 +131,7 @@ export function TotalStocksPage() {
   return (
     <div>
       <PageHeader
-        title={`${SOURCE_TITLES[source]} - ${formatDateDisplay(date)}`}
+        title={`${SOURCE_TITLES[source]} - ${formatDateLong(date)}`}
         subtitle="Online and offline remaining stock for the date, added together."
       >
         <PageToolbar

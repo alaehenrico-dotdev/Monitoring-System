@@ -220,17 +220,10 @@ describe("Edit menu", () => {
   });
 });
 
-describe("View and Export menus", () => {
-  it("expand/collapse flips its words with the state and acts", () => {
-    const p = show({ anyExpanded: true });
-    openMenu("View");
-    fireEvent.click(item("Collapse all categories"));
-    expect(p.onToggleExpandAll).toHaveBeenCalledTimes(1);
-  });
-
+describe("Edit menu: Reorder", () => {
   it("Reorder is visible but unavailable to a non-admin, and opens for an admin", () => {
     show();
-    openMenu("View");
+    openMenu("Edit");
     expect(item(/Reorder products/).getAttribute("title")).toBe("Only an admin can change the product order");
     fireEvent.click(item(/Reorder products/));
     expect(screen.queryByRole("dialog", { name: "reorder dialog" })).toBeNull();
@@ -238,9 +231,24 @@ describe("View and Export menus", () => {
 
   it("an admin's Reorder opens the dialog", () => {
     show({ isAdmin: true });
-    openMenu("View");
+    openMenu("Edit");
     fireEvent.click(item(/Reorder products/));
     expect(screen.getByRole("dialog", { name: "reorder dialog" })).toBeTruthy();
+  });
+
+  it("is no longer in the View menu", () => {
+    show({ isAdmin: true });
+    const view = openMenu("View");
+    expect(within(view).queryByRole("menuitem", { name: /Reorder products/ })).toBeNull();
+  });
+});
+
+describe("View and Export menus", () => {
+  it("expand/collapse flips its words with the state and acts", () => {
+    const p = show({ anyExpanded: true });
+    openMenu("View");
+    fireEvent.click(item("Collapse all categories"));
+    expect(p.onToggleExpandAll).toHaveBeenCalledTimes(1);
   });
 
   it("zoom steps by 25% within 50-200% and says when it cannot go further", () => {

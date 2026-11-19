@@ -3,6 +3,7 @@ import { z } from "zod";
 import { asyncHandler } from "../utils/asyncHandler";
 import { HttpError } from "../utils/HttpError";
 import { authenticate, authorize, ROLES } from "../middleware/auth";
+import { pushEndpointSchema } from "../utils/pushEndpoint";
 import { getAlerts, pushPublicKey, removePushSubscription, savePushSubscription } from "../services/alerts.service";
 
 const router = Router();
@@ -19,7 +20,7 @@ router.get("/push-key", asyncHandler(async (_req, res) => {
 }));
 
 const subscribeSchema = z.object({
-  endpoint: z.string().url().max(500),
+  endpoint: pushEndpointSchema,
   keys: z.object({ p256dh: z.string().min(1).max(200), auth: z.string().min(1).max(100) }),
 });
 

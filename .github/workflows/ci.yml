@@ -49,6 +49,9 @@ jobs:
       - name: Test (both workspaces)
         run: npm test
 
+      - name: Coverage gate (stock calculation code must stay tested)
+        run: npm run test:coverage --workspace server
+
       - name: Build (both workspaces)
         run: npm run build
 

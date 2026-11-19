@@ -45,6 +45,7 @@
   --ae-viz-online: #b8860b;
   --ae-viz-offline: #2a78d6;
   --ae-viz-produced: #2f9e8f;
+  --ae-viz-produced-offline: #c0467f;
   --ae-viz-now: #d4a000;
   --ae-viz-bar: color-mix(in srgb, var(--ae-text) 16%, transparent);
   --ae-viz-bar-active: color-mix(in srgb, var(--ae-text) 26%, transparent);
@@ -197,6 +198,7 @@
   --ae-viz-online: #c98500;
   --ae-viz-offline: #3987e5;
   --ae-viz-produced: #4fb8a8;
+  --ae-viz-produced-offline: #e0709f;
   --ae-viz-bar-key: #8f8f8f;
   --ae-focus-ring: #f5c000;
   /* Charcoal black instead of near-pure black (#070707) - easier on the
@@ -971,6 +973,18 @@ table input[type="number"] {
     border-color 120ms ease,
     box-shadow 120ms ease,
     background-color 120ms ease;
+}
+/* The list a native dropdown opens is drawn by the browser on its own background. Left alone, the options inherit the
+   field's text colour (pale in the dark theme) but not its background, so they come out pale on white and cannot be
+   read. Canvas and CanvasText are the browser's own page colours for the colour-scheme set on <html>, so the list is
+   always readable, and opaque, in light and dark and in every theme. */
+.ae-select option,
+.ae-select optgroup {
+  background-color: Canvas;
+  color: CanvasText;
+}
+.ae-select option:disabled {
+  color: GrayText;
 }
 .ae-input:hover:not(:disabled):not(:focus),
 .ae-select:hover:not(:disabled):not(:focus) {

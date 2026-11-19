@@ -24,6 +24,7 @@ import { parkDraftsForLogout, restoreDraftBackup } from "../utils/draftBackup";
 import { countAllUnsavedWork } from "../utils/unsavedWork";
 import { isDeviceRemembered, saveDeviceChoice } from "../utils/rememberDevice";
 import { clearAllAiChats } from "../utils/aiChat";
+import { clearNotificationsOnSignOut } from "../utils/pushNotifications";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -184,6 +185,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    // Signing out on purpose also ends alert notifications on this browser (an expired session does not).
+    void clearNotificationsOnSignOut();
     setToken(null);
     setUser(null);
     setSessionExpired(false);

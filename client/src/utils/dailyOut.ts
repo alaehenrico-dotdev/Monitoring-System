@@ -1,7 +1,7 @@
 import type { DailyOutEntry } from "../api/dailyOut";
 import type { FlowPoint, FlowSeries } from "../components/FlowLineChart";
 import { fullNumber } from "./chartFormat";
-import { formatDateDisplay } from "./dateFormat";
+import { formatDateLong, formatWeekdayShort } from "./dateFormat";
 import { toCsv } from "./csv";
 
 /// "2026-10-06" -> "Oct 6", for the axis. Built from the parts (not
@@ -13,7 +13,7 @@ function shortDate(date: string): string {
 }
 
 function describeDay(e: DailyOutEntry): string {
-  const when = formatDateDisplay(e.date);
+  const when = formatDateLong(e.date);
   if (e.totalOut === null) return `${when} — No entries recorded`;
   const side = (label: string, v: number | null) => `${label}: ${v === null ? "no entry" : fullNumber.format(v)}`;
   return `${when} — ${side("Online out", e.onlineOut)} · ${side("Offline out", e.offlineOut)} · Combined out: ${fullNumber.format(e.totalOut)}`;
@@ -32,7 +32,8 @@ export function dailyOutFlowPoints(rows: DailyOutEntry[], today: string): FlowPo
   return rows.map((e) => ({
     key: e.date,
     label: shortDate(e.date),
-    title: formatDateDisplay(e.date),
+    sub: formatWeekdayShort(e.date),
+    title: formatDateLong(e.date),
     ariaLabel: describeDay(e),
     values: { total: e.totalOut, online: e.onlineOut, offline: e.offlineOut },
     current: e.date === today,
