@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.6.0 - 2026-11-19
+
+**Upgrading a running server:** run the normal deploy (it snapshots the database first). One new migration since 2.5.3, `20261119090000_push_alerts`, adds the tables for push subscriptions and seen alerts. Push notifications are optional and off until the VAPID keys are set (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`; see `server/.env.example`). Without them nothing about push appears. Stock entry and stock calculations are unchanged.
+
+### Added
+- **Admin alerts.** A bell for administrators listing backup and operations problems, stock reconciliation mismatches, and who last signed in and whether they use two-step verification. Alerts also show as notifications while the app is open and, once an admin turns it on, as Web Push on phones and desktops (subscriptions are removed when a user is removed or signs out).
+- **Chart styles (Settings > Appearance).** Line, grouped bars, stacked square-block bars and area charts, each in a Detailed, Clean or Bold look. Charts animate on every load (stacked blocks rise from the bottom), the Dashboard updates live while entry is in progress, days with no entries blink, dates show the weekday, and Produced is split into Online and Offline. Stacked blocks sit on a whole-device-pixel grid so every gap is identical.
+- **Add product from existing SKUs.** In Reorder products, products are picked by category from every SKU (inactive ones included, multi-select) and saved order templates can take extra products. New products are created only on the SKUs tab, which now shows each category's products.
+- A demo data seed and a coverage gate in CI.
+
+### Changed
+- **Reorder products** moved into the Edit menu.
+- **Header totals strip** is simpler, with one-word labels.
+- **Minimalism theme:** editable grid cells are square, like every other theme; dropdown options are readable in every theme.
+
+### Security
+- Hardening from a security audit: stricter handling of push endpoints (host allowlist, send timeout and concurrency limits), and related fixes.
+
 ## 2.5.3 - 2026-11-17
 
 **Upgrading a running server:** run the normal deploy. No new database migrations since 2.5.2. The AI features are optional and off until a key is set (`GEMINI_API_KEY`, optionally `OPENROUTER_API_KEY` / `OPENROUTER_MODEL`, `AI_USER_DAILY_LIMIT` and `AI_DAILY_CALL_LIMIT`; see `server/.env.example` and `.env.docker.example`). Without them nothing about the AI appears and nothing else changes.

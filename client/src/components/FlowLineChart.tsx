@@ -4,6 +4,7 @@ import { compactNumber, fullNumber } from "../utils/chartFormat";
 import { smoothPath } from "../utils/smoothPath";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { useChartPrefs } from "../context/ThemeContext";
+import { STACK_GAP_PX, STACK_ROWS, stackGrid } from "../utils/stackGrid";
 
 export interface FlowSeries {
   key: string;
@@ -37,10 +38,6 @@ export interface FlowPoint {
 /// Narrowest a day's column gets on a phone before the plot scrolls sideways instead.
 const PHONE_DAY_WIDTH = 44;
 
-/// Stacked bars: the plot is this many equal rows tall; each block in a stack is one row, so a day is a pile
-/// of identical blocks and its height reads as a count (the tooltip has the exact figures).
-const STACK_ROWS = 24;
-const STACK_GAP_PX = 2;
 
 const hasData = (p: FlowPoint) => Object.values(p.values).some((v) => v !== null && v !== undefined);
 
@@ -69,6 +66,18 @@ export function FlowLineChart({
   // is not a live update; after it has played the chart counts as settled and changes arrive as quick, local ones.
   const plotKey = `${chartType}:${points[0]?.key}:${count}`;
   const [settledKey, setSettledKey] = useState<string | null>(null);
+  // The plot's height, for the stacked blocks' pixel grid. Read by an observer, so it also follows a resize or a zoom.
+  const plotRef = useRef<HTMLDivElement>(null);
+  const [plotHeight, setPlotHeight] = useState(0);
+  useEffect(() => {
+    const el = plotRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => setPlotHeight(el.clientHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [plotKey]);
+  const grid = useMemo(() => stackGrid(plotHeight, typeof window === "undefined" ? 1 : window.devicePixelRatio || 1), [plotHeight]);
+  const stackRows = grid?.rows ?? STACK_ROWS;
   useEffect(() => {
     const t = setTimeout(() => setSettledKey(plotKey), 1800);
     return () => clearTimeout(t);
@@ -136,10 +145,10 @@ export function FlowLineChart({
   /// One day's blocks per series: its value in rows (rounded, at least one for any recorded amount), trimmed from
   /// the top so the pile never rises past the plot.
   const stackBlocks = (p: FlowPoint) => {
-    let room = STACK_ROWS;
+    let room = stackRows;
     return series.map((s) => {
       const v = Math.max(0, p.values[s.key] ?? 0);
-      const wanted = v > 0 ? Math.max(1, Math.round((v / scale.max) * STACK_ROWS)) : 0;
+      const wanted = v > 0 ? Math.max(1, Math.round((v / scale.max) * stackRows)) : 0;
       const blocks = Math.min(wanted, room);
       room -= blocks;
       return { s, blocks };
@@ -198,7 +207,7 @@ export function FlowLineChart({
         </div>
         {/* Keyed by the drawing and the days shown, so it plays its load animation whenever the chart is shown or
             its kind or period changes, but not on a live refresh of the same days. */}
-        <div className="ae-fl-plot" key={plotKey}>
+        <div className="ae-fl-plot" key={plotKey} ref={plotRef}>
           {scale.ticks.map((t) => (
             <div key={t} aria-hidden className={`ae-fl-grid${t === 0 ? " ae-fl-grid--base" : ""}`} style={{ bottom: pct(t) }} />
           ))}
@@ -228,7 +237,15 @@ export function FlowLineChart({
                             <span
                               key={`${b.s.key}-${n}`}
                               className="ae-fl-bar"
-                              style={{ height: `calc(${100 / STACK_ROWS}% - ${STACK_GAP_PX}px)`, background: b.s.color, "--ae-n": place++ } as CSSProperties}
+                              style={
+                                {
+                                  // The measured pixel grid, or (before the height is known) the same thing as percentages.
+                                  height: grid ? `${grid.block}px` : `calc(${100 / STACK_ROWS}% - ${STACK_GAP_PX}px)`,
+                                  ...(grid ? { marginTop: `${grid.gap}px` } : {}),
+                                  background: b.s.color,
+                                  "--ae-n": place++,
+                                } as CSSProperties
+                              }
                             />
                           )),
                         );

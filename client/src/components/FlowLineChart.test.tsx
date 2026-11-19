@@ -8,6 +8,7 @@ vi.mock("../hooks/useReadOnlyPhone", () => ({ useReadOnlyPhone: () => false }));
 
 import { ThemeProvider, useChartPrefs, useTheme } from "../context/ThemeContext";
 import { FlowLineChart, type FlowPoint, type FlowSeries } from "./FlowLineChart";
+import { stackGrid } from "../utils/stackGrid";
 import { act, renderHook } from "@testing-library/react";
 
 const SERIES: FlowSeries[] = [
@@ -170,6 +171,59 @@ describe("days with nothing entered", () => {
       const { container, unmount } = render(<FlowLineChart points={withGap} series={SERIES} />, { wrapper });
       expect(container.querySelectorAll(".ae-fl-missing")).toHaveLength(1);
       unmount();
+    }
+  });
+});
+
+describe("stacked blocks sit on a whole-pixel grid, so every gap is the same", () => {
+  it("sizes blocks and gaps in whole device pixels from the plot height", () => {
+    // 218px at 1x: a 9px pitch (7px block, 2px gap) - not 9.08px, which is what put edges on different sub-pixels.
+    expect(stackGrid(218, 1)).toEqual({ rows: 24, block: 7, gap: 2 });
+    // 150% scaling: 327 device px, a 13-device-px pitch, a 3-device-px gap, 10 device px of block.
+    const g = stackGrid(218, 1.5)!;
+    expect(g.gap * 1.5).toBeCloseTo(3, 10);
+    expect(g.block * 1.5).toBeCloseTo(10, 10);
+    expect(g.rows).toBe(25);
+  });
+
+  it("is the same for any height: whole device pixels, never a fraction of one", () => {
+    for (const [h, dpr] of [[200, 1], [217.6, 1], [233, 1.25], [180.4, 2], [340, 1.75]] as const) {
+      const g = stackGrid(h, dpr)!;
+      expect(Number.isInteger(Math.round(g.block * dpr * 1e6) / 1e6), String(h)).toBe(true);
+      expect(Number.isInteger(Math.round(g.gap * dpr * 1e6) / 1e6), String(h)).toBe(true);
+      // The pile never rises above the plot.
+      expect(g.rows * (g.block + g.gap) * dpr).toBeLessThanOrEqual(Math.floor(h * dpr) + 1e-6);
+    }
+  });
+
+  it("has no grid until the height is known", () => {
+    expect(stackGrid(0, 1)).toBeNull();
+    expect(stackGrid(Number.NaN, 1)).toBeNull();
+  });
+
+  it("gives every block of the chart the same size and gap once the plot has a height", () => {
+    const originalObserver = globalThis.ResizeObserver;
+    const heightOf = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientHeight");
+    Object.defineProperty(HTMLElement.prototype, "clientHeight", { configurable: true, get: () => 218 });
+    globalThis.ResizeObserver = class {
+      constructor(private cb: () => void) {}
+      observe() {
+        this.cb();
+      }
+      disconnect() {}
+      unobserve() {}
+    } as unknown as typeof ResizeObserver;
+    try {
+      localStorage.setItem("ae-chart-type", "stack");
+      const { container } = chart();
+      const blocks = [...container.querySelectorAll<HTMLElement>(".ae-fl-bar")];
+      expect(blocks.length).toBeGreaterThan(0);
+      expect(new Set(blocks.map((b) => b.style.height))).toEqual(new Set(["7px"]));
+      expect(new Set(blocks.map((b) => b.style.marginTop))).toEqual(new Set(["2px"]));
+    } finally {
+      globalThis.ResizeObserver = originalObserver;
+      if (heightOf) Object.defineProperty(HTMLElement.prototype, "clientHeight", heightOf);
+      else delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight;
     }
   });
 });

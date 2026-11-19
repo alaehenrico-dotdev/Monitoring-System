@@ -398,8 +398,10 @@
   border-radius: var(--ae-mini-radius);
   box-shadow: none;
 }
+/* An editable grid cell sits flush in its table cell, square, in every theme (base.css). Minimalism rounds fields and
+   selects, but not these. */
 :root[data-ui="minimal"] .ae-input-cell {
-  border-radius: var(--ae-mini-radius);
+  border-radius: 0;
 }
 
 /* ---- Dialogs: a plain sheet with a hairline header ----------------------- */

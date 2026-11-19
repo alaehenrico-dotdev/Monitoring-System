@@ -98,6 +98,13 @@ describe("Minimalism theme", () => {
     expect(radii.length).toBeGreaterThan(5);
   });
 
+  it("keeps the editable grid cells square, like every other theme, while fields and selects take the corner token", () => {
+    expect(rule(':root[data-ui="minimal"] .ae-input-cell')).toMatch(/border-radius:\s*0\s*;/);
+    expect(rule(':root[data-ui="minimal"] .ae-input:not(.ae-input-cell),\n:root[data-ui="minimal"] .ae-select')).toContain("border-radius: var(--ae-mini-radius)");
+    // The base cell is square too, so nothing else in the cascade rounds it.
+    expect(css).toMatch(/\.ae-input-cell\s*\{[^}]*border-radius:\s*0;/);
+  });
+
   it("shows column names at full contrast - white in dark mode, near-black in light - through one token", () => {
     expect(light["--ae-mini-colhead"]).toBeDefined();
     expect(dark["--ae-mini-colhead"]).toBe("#ffffff");
