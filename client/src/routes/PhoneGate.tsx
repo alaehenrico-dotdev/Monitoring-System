@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { isPhonePage, phoneHomeFor } from "../config/navigation";
+import { desktopHomeFor, isPhonePage, phoneHomeFor } from "../config/navigation";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 
 /// On a phone only the read-only pages open (config/navigation.ts, PHONE_PAGES);
@@ -19,5 +19,5 @@ export function PhoneGate() {
 export function HomeRedirect() {
   const phone = useReadOnlyPhone();
   const { user } = useAuth();
-  return <Navigate to={phone ? phoneHomeFor(user?.role) : "/online"} replace />;
+  return <Navigate to={phone ? phoneHomeFor(user?.role) : desktopHomeFor(user?.role)} replace />;
 }

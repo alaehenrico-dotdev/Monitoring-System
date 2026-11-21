@@ -7,6 +7,7 @@ import { TypingPractice } from "./TypingPractice";
 import { HeaderCalculator } from "./Calculator";
 import { useReadOnlyPhone } from "../hooks/useReadOnlyPhone";
 import { useAiAvailable } from "../hooks/useAiAvailable";
+import { useOptionalAuth } from "../context/AuthContext";
 
 /// Clock + dark-mode toggle, sitting at the right end of the header's title
 /// row (PageHeader.tsx) so they're vertically centered on the h2, rather than sitting among that page's own toolbar
@@ -23,6 +24,9 @@ export function HeaderExtras() {
   // Supervisor/Admin on a server with an AI key: the same button, AI-styled, and the palette it opens
   // also takes questions. Everyone else gets the plain search icon.
   const ai = useAiAvailable();
+  // The auditor's count page carries its own calculator in the toolbar (also on a phone); two of them
+  // would both answer Alt+C.
+  const role = useOptionalAuth()?.user?.role;
   return (
     <span
       className="no-print ae-page-header-extras"
@@ -51,7 +55,7 @@ export function HeaderExtras() {
         {ai && !phone && <span className="ae-hsb-label">Search</span>}
       </button>
       <AlertBell />
-      <HeaderCalculator />
+      {role !== "AUDITOR" && <HeaderCalculator />}
       {!phone && <TypingPractice />}
       <LiveClock />
       <ThemeToggle />

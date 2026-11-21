@@ -46,7 +46,9 @@
   --ae-mini-radius: 3px;
   /* The sub-page tab outline's own radius: 4px, so a 1px outline is a clean quarter circle of 3.5px at its
      centre, the same for the tab corners, the feet and the frame (see the sub-page tabs section). */
-  --ae-mini-tab-radius: 4px;
+  --ae-mini-tab-radius: 7px;
+  /* The sub-page tab outline's colour: a soft grey line, like an editor's panel tabs, not full ink. */
+  --ae-mini-tab-line: #cfcfcb;
   /* Column names: full contrast, so they read at a glance. Near-black here (white on a white
      header would vanish); pure white in dark mode below. */
   --ae-mini-colhead: #1a1a1a;
@@ -78,7 +80,8 @@
   --ae-mini-wash: rgba(255, 255, 255, 0.06);
   --ae-mini-wash-strong: rgba(255, 255, 255, 0.11);
   --ae-mini-radius: 3px;
-  --ae-mini-tab-radius: 4px;
+  --ae-mini-tab-radius: 7px;
+  --ae-mini-tab-line: #3c3c3c;
   --ae-mini-colhead: #ffffff;
 }
 
@@ -177,7 +180,10 @@
   align-items: flex-end;
   gap: 0;
   margin-bottom: 0; /* the frame starts right at the strip */
-  padding: 4px 10px 0; /* the side room keeps the first tab (and its foot) clear of the frame's corner */
+  /* The side room keeps the first and last tab (and their feet) clear of the frame's corners: the outline needs two
+     corner radii of room each side, or it draws the rule unbroken and the open tab loses its line and fill. It
+     follows the radius token, so a rounder corner never leaves the first tab bare. */
+  padding: 4px calc(var(--ae-mini-tab-radius) * 2 + 2px) 0;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -212,6 +218,7 @@
 :root[data-ui="minimal"] .ae-subtabs--framed .ae-subtab[aria-selected="true"]:hover {
   color: var(--ae-text);
   font-weight: 600;
+  /* No fill here: the open tab's fill is part of the outline (below), so the fill and the line move as one. */
   background: transparent;
 }
 /* The keyboard ring sits INSIDE the tab: the strip clips sideways, and a ring drawn outside the
@@ -238,7 +245,11 @@
   pointer-events: none;
 }
 :root[data-ui="minimal"] .ae-subtab-outline path {
-  stroke: var(--ae-mini-ink);
+  stroke: var(--ae-mini-tab-line);
+  /* The outline is one closed shape (the open tab and the content box), so filling it gives the tab and its
+     content one colour - and because it is the same element as the line, the fill glides with it to the new tab
+     instead of appearing at once while the line is still on its way. */
+  fill: var(--ae-mini-wash);
 }
 
 /* ---- Areas: no fill, no shadow; a hairline only where one is needed ------ */

@@ -91,10 +91,10 @@ describe("Minimalism theme", () => {
     expect(dark["--ae-mini-radius"]).toBe(light["--ae-mini-radius"]);
     const radii = [...block.matchAll(/border-radius:\s*([^;]+);/g)].map((m) => m[1].replace("!important", "").trim()).filter((v) => v !== "0");
     // Each corner is a token or square (a tab rounds only its top corners: "token token 0 0"). The sub-page tab
-    // outline uses its own 4px token so that tabs, feet and frame are one curve (see the next tests).
+    // outline uses its own 7px token so that tabs, feet and frame are one curve (see the next tests).
     for (const r of radii) for (const corner of r.split(/\s+/)) expect(["var(--ae-mini-radius)", "var(--ae-mini-tab-radius)", "0"]).toContain(corner);
-    expect(light["--ae-mini-tab-radius"]).toBe("4px");
-    expect(dark["--ae-mini-tab-radius"]).toBe("4px");
+    expect(light["--ae-mini-tab-radius"]).toBe("7px");
+    expect(dark["--ae-mini-tab-radius"]).toBe("7px");
     expect(radii.length).toBeGreaterThan(5);
   });
 
@@ -132,7 +132,7 @@ describe("Minimalism theme", () => {
     expect(outline).toContain("position: absolute");
     expect(outline).toContain("overflow: visible"); // it reaches above the content box, over the strip
     expect(outline).toContain("pointer-events: none");
-    expect(rule(':root[data-ui="minimal"] .ae-subtab-outline path')).toContain("stroke: var(--ae-mini-ink)");
+    expect(rule(':root[data-ui="minimal"] .ae-subtab-outline path')).toContain("stroke: var(--ae-mini-tab-line)");
     // The tabs and the frame draw no line of their own: no border, shadow or gradient on any of them.
     const tabSection = block.slice(block.indexOf("Sub-page tabs (Settings"), block.indexOf("Areas: no fill"));
     expect(tabSection).not.toMatch(/gradient\(/);
@@ -153,10 +153,10 @@ describe("Minimalism theme", () => {
     expect(rule(`${strip} .ae-subtab:focus-visible`)).toMatch(/outline-offset:\s*-\d+px/);
   });
 
-  it("gives the sub-page outline its own 4px radius token, in both colour modes", () => {
-    // 4px outer on a 1px line = a 3.5px centre line; utils/subTabOutline.ts draws the corners with the same value.
-    expect(light["--ae-mini-tab-radius"]).toBe("4px");
-    expect(dark["--ae-mini-tab-radius"]).toBe("4px");
+  it("gives the sub-page outline its own 7px radius token, in both colour modes", () => {
+    // SubTabPanel reads this token and hands it to utils/subTabOutline.ts, so the line, the tab fill and the frame share one curve.
+    expect(light["--ae-mini-tab-radius"]).toBe("7px");
+    expect(dark["--ae-mini-tab-radius"]).toBe("7px");
   });
 
   it("only boxes strips that have a content panel: a status filter in a toolbar row keeps its own look", () => {

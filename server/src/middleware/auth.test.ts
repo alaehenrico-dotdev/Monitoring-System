@@ -20,7 +20,7 @@ vi.mock("../lib/cache", () => ({
 import { verifyToken } from "../utils/jwt";
 import { userRepository } from "../repositories/userRepository";
 import { getOrSet, invalidate } from "../lib/cache";
-import { authenticate } from "./auth";
+import { auditorMayCall, authenticate } from "./auth";
 
 const decodedUser = { id: 1, username: "alice", name: "Alice", role: "SUPERVISOR_ADMIN" as const };
 
@@ -186,5 +186,64 @@ describe("authenticate - cache gone stale behind the database", () => {
     await vi.waitFor(() => expect(next).toHaveBeenCalled());
     expect(next.mock.calls[0][0]).toMatchObject({ status: 401 });
     expect(invalidate).not.toHaveBeenCalled();
+  });
+});
+
+describe("auditor accounts", () => {
+  const auditor = { id: 7, username: "counter", name: "Counter", role: "AUDITOR" as const };
+  const callAs = async (method: string, originalUrl: string) => {
+    vi.mocked(verifyToken).mockReturnValue(auditor);
+    vi.mocked(userRepository.findStatus).mockResolvedValue({ isActive: true, role: "AUDITOR", tokenVersion: 0, mustChangePassword: false } as never);
+    const req = { headers: { authorization: "Bearer t" }, method, originalUrl } as unknown as Request;
+    const next = vi.fn();
+    authenticate(req, {} as Response, next as NextFunction);
+    await vi.waitFor(() => expect(next).toHaveBeenCalled());
+    return next.mock.calls[0][0];
+  };
+
+  it("lets an auditor read the product list and use their own account", async () => {
+    expect(await callAs("GET", "/api/products")).toBeUndefined();
+    expect(await callAs("GET", "/api/products?includeInactive=false")).toBeUndefined();
+    expect(await callAs("GET", "/api/auth/me")).toBeUndefined();
+    expect(await callAs("POST", "/api/auth/change-password")).toBeUndefined();
+  });
+
+  it("refuses everything that could show a system figure, a variance or another user's work", async () => {
+    for (const [method, url] of [
+      ["GET", "/api/manual-counts?date=2026-11-21"],
+      ["GET", "/api/manual-counts/variance-report"],
+      ["GET", "/api/manual-counts/snapshots/3"],
+      ["GET", "/api/total-stocks"],
+      ["GET", "/api/online-stock"],
+      ["PUT", "/api/manual-counts/5"],
+      ["POST", "/api/products"],
+    ] as const) {
+      const err = await callAs(method, url);
+      expect(err, `${method} ${url}`).toBeInstanceOf(HttpError);
+      expect(err.status).toBe(403);
+    }
+  });
+});
+
+describe("auditorMayCall", () => {
+  it("ignores a trailing slash and the query string, and never allows a look-alike path", () => {
+    expect(auditorMayCall("GET", "/api/products/")).toBe(true);
+    expect(auditorMayCall("GET", "/api/products/12")).toBe(false);
+    expect(auditorMayCall("GET", "/api/products-export")).toBe(false);
+    expect(auditorMayCall("GET", "/api/app-settings/entry-rules")).toBe(false);
+    expect(auditorMayCall("GET", "/api/app-settings/shift-mode")).toBe(true);
+    expect(auditorMayCall("DELETE", "/api/products")).toBe(false);
+  });
+});
+
+describe("auditor access to their own count submission", () => {
+  it("reaches only /count-submissions/mine (any method), never the admin side of it", () => {
+    expect(auditorMayCall("GET", "/api/count-submissions/mine?date=2026-11-21&shift=NIGHT")).toBe(true);
+    expect(auditorMayCall("PUT", "/api/count-submissions/mine/lines")).toBe(true);
+    expect(auditorMayCall("POST", "/api/count-submissions/mine/submit")).toBe(true);
+    expect(auditorMayCall("GET", "/api/count-submissions?date=2026-11-21&shift=NIGHT")).toBe(false);
+    expect(auditorMayCall("POST", "/api/count-submissions/reopen")).toBe(false);
+    expect(auditorMayCall("GET", "/api/count-submissions/mine-other")).toBe(false);
+    expect(auditorMayCall("GET", "/api/count-submissions/minefield/x")).toBe(false);
   });
 });

@@ -69,7 +69,7 @@ export function UserPasswordsPage() {
                 <div className="ae-account-meta">
                   <span>{a.username}</span>
                   <span className="ae-account-role">
-                    {a.role === "SUPERVISOR_ADMIN" ? "Admin" : "Encoder"}
+                    {a.role === "SUPERVISOR_ADMIN" ? "Admin" : a.role === "AUDITOR" ? "Auditor" : "Encoder"}
                   </span>
                   {!a.isActive && (
                     <span className="ae-account-role ae-account-role--off">

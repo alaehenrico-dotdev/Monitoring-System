@@ -159,6 +159,9 @@ export function QuickJump() {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isPhone = useReadOnlyPhone();
+  // An auditor searches pages (Count, Settings) and products only: the phone search's dates, stock
+  // figures and Daily Report links would show them what a blind count must not.
+  const isAuditor = user?.role === "AUDITOR";
   // AI: the "Ask AI" row, and the AI chat it opens. The chat is a mode of the panel (chatOpen): the
   // thread of saved replies replaces the result list, and typing in the box writes the next question
   // instead of going back to searching. Escape leaves the chat first, a second Escape closes the panel.
@@ -253,8 +256,9 @@ export function QuickJump() {
     loadProducts().then((list) => {
       if (!cancelled) setProducts(list);
     });
-    // Phone only: the stock figures shown under each product.
-    if (isPhone) {
+    // Phone only: the stock figures shown under each product. Never for an auditor: their count is
+    // blind, and the server refuses them that endpoint anyway.
+    if (isPhone && !isAuditor) {
       loadStocks(getCurrentShiftAndDate().date).then((map) => {
         if (!cancelled) setStocks(map);
       });
@@ -262,7 +266,7 @@ export function QuickJump() {
     return () => {
       cancelled = true;
     };
-  }, [open, isPhone]);
+  }, [open, isPhone, isAuditor]);
 
   const phone = isPhone;
   const [dock, setDock] = useState<SearchDock>(readDock);
@@ -284,7 +288,7 @@ export function QuickJump() {
   // is nothing here worth debouncing - a debounce would only add latency to
   // the keystroke it is meant to protect.
   const results = useMemo<Result[]>(() => {
-    const base: Result[] = phone
+    const base: Result[] = phone && !isAuditor
       ? rankPhoneSearch(query, { pages, groupOf, settings, products, stocks, today: getCurrentShiftAndDate().date, theme })
       : rankQuickJump(query, pages, products, groupOf);
     const q = query.trim();
@@ -305,7 +309,7 @@ export function QuickJump() {
     // A question goes first (Enter asks it); anything else goes last, so Enter still jumps to the
     // best page or product exactly as it always did.
     return questionFirst(q) ? [row, ...base] : [...base, row];
-  }, [phone, query, pages, settings, products, stocks, theme, aiOn, chat.length]);
+  }, [phone, isAuditor, query, pages, settings, products, stocks, theme, aiOn, chat.length]);
 
   // A narrowing query can leave the cursor past the end of the list.
   const clampedActive = Math.min(active, Math.max(results.length - 1, 0));

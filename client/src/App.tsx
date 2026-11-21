@@ -108,6 +108,9 @@ const CorrectionsPage = lazy(() =>
 const AwaitingReleasePage = lazy(() =>
   import("./pages/AwaitingReleasePage").then((m) => ({ default: m.AwaitingReleasePage })),
 );
+const AuditorCountPage = lazy(() =>
+  import("./pages/AuditorCountPage").then((m) => ({ default: m.AuditorCountPage })),
+);
 const SettingsPage = lazy(() =>
   import("./pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
@@ -137,6 +140,8 @@ export default function App() {
                   <Route element={<Layout />}>
                   <Route element={<PhoneGate />}>
                     <Route index element={<HomeRedirect />} />
+                    {/* Entry, audit and report pages are for the encoder and the admin. The auditor (blind count, on a phone) only gets the count page and Settings below; the server refuses them everything else too. */}
+                    <Route element={<ProtectedRoute allow={["ENCODER", "SUPERVISOR_ADMIN"]} />}>
                     <Route path="/online" element={<OnlineEntryPage />} />
                     <Route path="/offline" element={<OfflineEntryPage />} />
                     <Route path="/total-stocks" element={<TotalStocksPage />} />
@@ -150,8 +155,12 @@ export default function App() {
                     <Route path="/daily-report" element={<DailyReportPage />} />
                     <Route path="/corrections" element={<CorrectionsPage />} />
                     <Route path="/awaiting-release" element={<AwaitingReleasePage />} />
+                    </Route>
                     {/* Every role: Appearance is a per-browser preference. The admin tabs inside are hidden from others and the server refuses them anyway. */}
                     <Route path="/settings" element={<SettingsPage />} />
+                    <Route element={<ProtectedRoute allow={["AUDITOR"]} />}>
+                      <Route path="/audit-count" element={<AuditorCountPage />} />
+                    </Route>
 
                     <Route
                       element={<ProtectedRoute allow={["SUPERVISOR_ADMIN"]} />}

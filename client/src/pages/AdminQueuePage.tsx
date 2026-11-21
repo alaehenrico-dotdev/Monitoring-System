@@ -59,6 +59,7 @@ const KIND_LABEL: Record<QueueItem["kind"], string> = {
   backup: "Backup",
   correction: "Correction",
   "unlock-request": "Unlock request",
+  "auditor-submission": "Auditor count",
 };
 
 const SHIFTS: Shift[] = ["MORNING", "NIGHT"];
@@ -151,6 +152,7 @@ function QueueTab() {
     ["Backup issues", c.backup],
     ["Corrections to review", c.corrections],
     ["Unlock requests", c.unlockRequests ?? 0],
+    ["Auditor counts to review", c.auditorSubmissions ?? 0],
   ];
 
   return (

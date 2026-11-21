@@ -10,11 +10,14 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// Two roles: an ENCODER enters stock on both the Online and Offline grids; the
-/// admin (SUPERVISOR_ADMIN) approves, reports on and configures everything.
+/// Three roles: an ENCODER enters stock on both the Online and Offline grids; the
+/// admin (SUPERVISOR_ADMIN) approves, reports on and configures everything; an
+/// AUDITOR only does the blind physical count on a phone (client AuditorCountPage)
+/// and is kept off every other API route (middleware/auth.ts, auditorMayCall).
 enum Role {
   ENCODER
   SUPERVISOR_ADMIN
+  AUDITOR
 }
 
 enum StockLocation {
@@ -68,6 +71,8 @@ model User {
   resetCodeAttempts  Int       @default(0)
   createdAt    DateTime @default(now())
 
+  /// An auditor's blind counts, one submission per sheet (see ManualCountSubmission).
+  countSubmissions     ManualCountSubmission[] @relation("AuditorSubmissions")
   onlineEntries        DailyOnlineStock[]    @relation("OnlineEncodedBy")
   offlineEntries       DailyOfflineStock[]   @relation("OfflineEncodedBy")
   manualCounts         ManualCount[]         @relation("CountedBy")
@@ -116,6 +121,7 @@ model Product {
   onlineStocks  DailyOnlineStock[]
   offlineStocks DailyOfflineStock[]
   manualCounts  ManualCount[]
+  submissionLines ManualCountSubmissionLine[]
   stockExtras   DailyStockExtra[]
   pendingReleases PendingRelease[]
 
@@ -285,6 +291,57 @@ model SheetExtraColumn {
 
   @@unique([location, entryDate, shift, columnKey, slotIndex], map: "sheet_extra_column_key")
   @@map("sheet_extra_columns")
+}
+
+/// An auditor's blind count of one sheet (date + shift): DRAFT while they are counting, SUBMITTED once
+/// they send it. It is a staging area and never touches manual_counts - the admin looks at it on the
+/// Audit page, stages the figures they accept into the real count (which saves through the normal
+/// path) and publishes as usual. One row per auditor per sheet, so two auditors never overwrite each
+/// other and the admin can see where they disagree. Reopening (admin) sends it back to DRAFT.
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+}
+
+model ManualCountSubmission {
+  id           Int              @id @default(autoincrement())
+  auditorId    Int
+  auditor      User             @relation("AuditorSubmissions", fields: [auditorId], references: [id])
+  entryDate    DateTime         @db.Date
+  shift        Shift
+  status       SubmissionStatus @default(DRAFT)
+  submittedAt  DateTime?
+  /// Set when an admin reopened a submitted sheet so the auditor can recount it.
+  reopenedAt   DateTime?
+  reopenedById Int?
+  reopenReason String?          @db.VarChar(500)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  lines ManualCountSubmissionLine[]
+
+  @@unique([auditorId, entryDate, shift])
+  @@index([entryDate, shift])
+  @@map("manual_count_submissions")
+}
+
+/// One counted product at one location. No row means "not counted"; `qty` is null only for a line that
+/// holds just a note. Counted 0 is a real 0.
+model ManualCountSubmissionLine {
+  id           Int                   @id @default(autoincrement())
+  submissionId Int
+  submission   ManualCountSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  productId    Int
+  product      Product               @relation(fields: [productId], references: [id])
+  /// ONLINE or OFFLINE (TOTAL is never counted separately; the service refuses it).
+  location     StockLocation
+  qty          Decimal?              @db.Decimal(14, 2)
+  note         String?               @db.VarChar(500)
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([submissionId, productId, location])
+  @@index([productId])
+  @@map("manual_count_submission_lines")
 }
 
 /// 5.4 manual_counts - physical count capture; variance is always derived

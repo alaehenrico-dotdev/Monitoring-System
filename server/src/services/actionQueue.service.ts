@@ -5,6 +5,7 @@ import { getTotalStocksGrid } from "./totalStocks.service";
 import { backupHealth } from "./backupVerify.service";
 import { countPendingCorrections } from "./correction.service";
 import { countPendingUnlockRequests, listPendingUnlockRequests, sweepStaleUnlockRequests } from "./unlockRequest.service";
+import { pendingSubmissionSheets } from "./countSubmission.service";
 
 /// How far back the queue looks for missing entries and unexplained variances.
 /// Older history is still in the reports; the queue is for what can still be fixed.
@@ -27,7 +28,7 @@ const key = (d: Date, s: string) => `${toDateOnlyString(d)}|${s}`;
 
 export interface QueueItem {
   id: string;
-  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction" | "unlock-request";
+  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction" | "unlock-request" | "auditor-submission";
   severity: "high" | "medium" | "low";
   title: string;
   detail: string;
@@ -50,7 +51,7 @@ export async function getActionQueue(now = new Date()) {
   const varianceFrom = addDays(today, -VARIANCE_LOOKBACK_DAYS);
   const yesterday = addDays(today, -1);
 
-  const [online, offline, manual, variances, stockRows, health, pending, pendingCount, negOnline, negOffline, closures, unlockRequestResult] = await Promise.all([
+  const [online, offline, manual, variances, stockRows, health, pending, pendingCount, negOnline, negOffline, closures, unlockRequestResult, submissions] = await Promise.all([
     prisma.dailyOnlineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
     prisma.dailyOfflineStock.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
     prisma.manualCount.groupBy({ by: ["entryDate", "shift"], where: { entryDate: { gte: from, lte: yesterday } }, _count: { _all: true } }),
@@ -83,6 +84,8 @@ export async function getActionQueue(now = new Date()) {
     sweepStaleUnlockRequests()
       .then(() => Promise.all([listPendingUnlockRequests(), countPendingUnlockRequests()]))
       .catch(queueSideListFailed("unlock requests", [[], 0] as [Awaited<ReturnType<typeof listPendingUnlockRequests>>, number])),
+    // Also a side list (the table may not be migrated yet): auditor counts waiting to be reviewed.
+    pendingSubmissionSheets(from).catch(queueSideListFailed("auditor submissions", [] as Awaited<ReturnType<typeof pendingSubmissionSheets>>)),
   ]);
 
   const items: QueueItem[] = [];
@@ -220,6 +223,21 @@ export async function getActionQueue(now = new Date()) {
     });
   }
 
+  // An auditor has submitted a count that nobody has published yet. High, so it also reaches the
+  // admins' phones (alerts.service pushes urgent items once). Resubmitting after a reopen is a new
+  // item (the id carries the submit time), so it announces again.
+  for (const s of submissions) {
+    const date = toDateOnlyString(s.entryDate);
+    items.push({
+      id: `auditor-submission:${s.id}:${s.submittedAt.getTime()}`,
+      kind: "auditor-submission",
+      severity: "high",
+      title: `${s.auditor} submitted a count - ${date} ${s.shift.toLowerCase()}`,
+      detail: "Review it on the Audit page, accept what is right, then publish.",
+      link: `/manual-count?review=1&date=${date}&shift=${s.shift}`,
+    });
+  }
+
   const counts = {
     variance: variances.reduce((n, v) => n + v._count._all, 0),
     lowStock: alerts.length,
@@ -227,10 +245,11 @@ export async function getActionQueue(now = new Date()) {
     backup: (health.failedSince ? 1 : 0) + (health.overdue ? 1 : 0),
     corrections: pendingCount,
     unlockRequests: unlockRequestCount,
+    auditorSubmissions: submissions.length,
   };
   return {
     generatedAt: now.toISOString(),
-    total: counts.variance + counts.lowStock + counts.missingEntries + counts.backup + counts.corrections + counts.unlockRequests,
+    total: counts.variance + counts.lowStock + counts.missingEntries + counts.backup + counts.corrections + counts.unlockRequests + counts.auditorSubmissions,
     counts,
     items,
   };

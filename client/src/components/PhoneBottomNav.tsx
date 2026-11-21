@@ -1,10 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { phoneNavLabel, phoneNavPages } from "../config/navigation";
 import {
   EllipsisVerticalIcon,
+  NavCountIcon,
   NavDashboardIcon,
   NavLogIcon,
   NavOutIcon,
@@ -15,6 +16,7 @@ import {
 
 const ICONS: Record<string, ReactNode> = {
   "/dashboard": <NavDashboardIcon />,
+  "/audit-count": <NavCountIcon />,
   "/daily-report": <NavReportIcon />,
   "/total-stocks": <NavStocksIcon />,
   "/daily-out": <NavOutIcon />,
@@ -132,6 +134,42 @@ export function PhoneBottomNav() {
     );
   }, [layout]);
 
+  // The line over the open tab is one element for the whole bar that slides to the tab just chosen
+  // (across both pills in the split layout), instead of each tab drawing its own. Placed from
+  // offsetLeft/offsetTop, which a tab's own FLIP transform does not disturb. Only a page change glides;
+  // a layout switch, a resize or the first paint put it in place at once.
+  const { pathname } = useLocation();
+  const glideRef = useRef<HTMLSpanElement>(null);
+  const lastPath = useRef<string | null>(null);
+  const placeGlide = (animate: boolean) => {
+    const nav = navRef.current;
+    const line = glideRef.current;
+    if (!nav || !line) return;
+    const active = nav.querySelector<HTMLElement>(".ae-bottomnav-item[aria-current=\"page\"]");
+    if (!active) {
+      line.style.opacity = "0";
+      return;
+    }
+    const bar = active.offsetParent as HTMLElement | null;
+    if (!bar) return;
+    const inset = active.offsetWidth * 0.28;
+    const x = bar.offsetLeft + active.offsetLeft + inset;
+    const y = bar.offsetTop + active.offsetTop - 1;
+    line.style.transition = animate ? "" : "none";
+    line.style.width = `${active.offsetWidth - inset * 2}px`;
+    line.style.transform = `translate(${x}px, ${y}px)`;
+    line.style.opacity = "1";
+  };
+  useLayoutEffect(() => {
+    placeGlide(lastPath.current !== null && lastPath.current !== pathname);
+    lastPath.current = pathname;
+  }, [pathname, layout, compact, pages.length]);
+  useEffect(() => {
+    const onResize = () => placeGlide(false);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   if (pages.length === 0) return null;
 
   const choose = (next: NavLayout) => {
@@ -197,6 +235,7 @@ export function PhoneBottomNav() {
   if (compact) {
     return (
       <nav ref={navRef} className="ae-bottomnav no-print" data-layout="centered" data-compact="true" aria-label="Main navigation">
+      <span ref={glideRef} className="ae-nav-glide" aria-hidden="true" />
         <div className="ae-bottomnav-bar">
           {ring}
           {pages.map(item)}
@@ -207,6 +246,7 @@ export function PhoneBottomNav() {
 
   return (
     <nav ref={navRef} className="ae-bottomnav no-print" data-layout={layout} aria-label="Main navigation">
+      <span ref={glideRef} className="ae-nav-glide" aria-hidden="true" />
       {layout === "split" ? (
         <>
           <div className="ae-bottomnav-bar">

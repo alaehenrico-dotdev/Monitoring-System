@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ManualCountPage } from "./ManualCountPage";
 import { chooseFromMenu, menuItem } from "./menuTestHelpers";
@@ -10,6 +10,8 @@ const pdf = vi.hoisted(() => ({ downloadTablePdf: vi.fn() }));
 const auth = vi.hoisted(() => ({ role: "SUPERVISOR_ADMIN" }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => ({ user: { id: 1, name: "Sup", username: "sup", role: auth.role } }) }));
 vi.mock("../api/manualCounts", () => api);
+const subs = vi.hoisted(() => ({ listSubmissions: vi.fn(), reopenSubmissions: vi.fn() }));
+vi.mock("../api/countSubmissions", () => subs);
 vi.mock("../api/reportHistory", () => ({ recordReportHistory: vi.fn().mockResolvedValue({}) }));
 vi.mock("../components/PageHeader", () => ({
   PageHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -49,6 +51,8 @@ beforeEach(() => {
   auth.role = "SUPERVISOR_ADMIN";
   sessionStorage.clear();
   Element.prototype.scrollIntoView = vi.fn();
+  subs.listSubmissions.mockResolvedValue([]);
+  subs.reopenSubmissions.mockResolvedValue({ reopened: 1 });
   api.getManualCountGrid.mockImplementation((_d: string, _s: string, loc: "ONLINE" | "OFFLINE") =>
     Promise.resolve([
       row(1, "Soy Sauce", "Sauces", loc, 10, loc === "ONLINE" ? 8 : null),
@@ -130,6 +134,154 @@ describe("ManualCountPage - toolbar from the entry pages", () => {
     await waitFor(() => expect(screen.queryByText("Rice")).toBeNull());
     expect(screen.getByText("Soy Sauce")).toBeTruthy();
     expect(screen.queryByText("Vinegar")).toBeNull();
+  });
+});
+
+describe("ManualCountPage - a category with staged counts", () => {
+  const bar = (name: RegExp) => screen.getByRole("button", { name });
+  const hidden = (product: string) => screen.getByText(product).closest("tr")!.classList.contains("ae-row-collapsed");
+
+  it("opens by itself, turns its bar blue, and can still be collapsed (staying blue)", async () => {
+    await open();
+    expect(bar(/^Sauces/).classList.contains("ae-cat-toggle--edited")).toBe(false);
+
+    fireEvent.click(screen.getAllByText("Clear all")[0]); // stages counts in Sauces
+    await waitFor(() => expect(bar(/^Sauces/).classList.contains("ae-cat-toggle--edited")).toBe(true));
+    expect(hidden("Soy Sauce")).toBe(false);
+    expect(bar(/^Sauces/).getAttribute("aria-disabled")).toBeNull();
+    // Only the edited category changes colour.
+    expect(bar(/^Grains/).classList.contains("ae-cat-toggle--edited")).toBe(false);
+
+    fireEvent.click(bar(/^Sauces/));
+    await waitFor(() => expect(hidden("Soy Sauce")).toBe(true));
+    expect(bar(/^Sauces/).getAttribute("aria-expanded")).toBe("false");
+    expect(bar(/^Sauces/).classList.contains("ae-cat-toggle--edited")).toBe(true);
+
+    fireEvent.click(bar(/^Sauces/));
+    await waitFor(() => expect(hidden("Soy Sauce")).toBe(false));
+  });
+});
+
+type SubLine = { productId: number; location: "ONLINE" | "OFFLINE"; qty: number | null; note: string | null };
+const submission = (id: number, name: string, status: "DRAFT" | "SUBMITTED", lines: SubLine[]) => ({
+  id,
+  auditor: { id: id + 10, name },
+  status,
+  submittedAt: status === "SUBMITTED" ? "2026-10-09T14:00:00.000Z" : null,
+  reopenedAt: null,
+  reopenReason: null,
+  updatedAt: "2026-10-09T14:00:00.000Z",
+  counted: {
+    ONLINE: lines.filter((l) => l.location === "ONLINE" && l.qty !== null).length,
+    OFFLINE: lines.filter((l) => l.location === "OFFLINE" && l.qty !== null).length,
+  },
+  lines,
+});
+const L = (productId: number, location: "ONLINE" | "OFFLINE", qty: number | null, note: string | null = null): SubLine => ({ productId, location, qty, note });
+// Saved Online counts are Soy Sauce 8, Vinegar 5, Rice 0; Offline is uncounted.
+const ANA = () => submission(1, "Ana Cruz", "SUBMITTED", [L(1, "ONLINE", 9, "shelf B"), L(2, "ONLINE", 5), L(3, "OFFLINE", 4)]);
+const BEN = () => submission(2, "Ben Lim", "SUBMITTED", [L(1, "ONLINE", 9), L(3, "OFFLINE", 6)]);
+const cell = (loc: "ONLINE" | "OFFLINE", id: number) => document.querySelector<HTMLInputElement>(`input[data-cell="manual-count-${loc}-${id}"]`)!;
+
+describe("ManualCountPage - auditor counts", () => {
+  it("opens the sheet a queue/alert link names (review=1), without printing or resuming another sheet", async () => {
+    await open("/?review=1&date=2026-10-08&shift=MORNING");
+    await waitFor(() => expect(api.getManualCountGrid).toHaveBeenCalledWith("2026-10-08", "MORNING", "ONLINE"));
+    expect(subs.listSubmissions).toHaveBeenCalledWith("2026-10-08", "MORNING");
+  });
+
+  it("shows nothing extra when no auditor has sent anything", async () => {
+    await open();
+    expect(screen.queryByRole("region", { name: "Auditor counts" })).toBeNull();
+    expect(document.querySelector(".ae-aud-chips")).toBeNull();
+  });
+
+  it("lists who is counting and who submitted, with how much", async () => {
+    subs.listSubmissions.mockResolvedValue([ANA(), submission(3, "Cy Tan", "DRAFT", [L(1, "ONLINE", 3)])]);
+    await open();
+    const panel = await screen.findByRole("region", { name: "Auditor counts" });
+    expect(within(panel).getByText("Ana Cruz")).toBeTruthy();
+    expect(within(panel).getByText(/^Submitted/)).toBeTruthy();
+    expect(within(panel).getByText("Online 2 · Offline 1")).toBeTruthy();
+    expect(within(panel).getByText("Counting…")).toBeTruthy();
+  });
+
+  it("shows no buttons on the rows; each submitted auditor is a button in the banner", async () => {
+    subs.listSubmissions.mockResolvedValue([ANA(), BEN()]);
+    await open();
+    expect(await screen.findByRole("button", { name: "Use Ana Cruz's counts (2)" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Ben Lim's counts (2)" })).toBeTruthy();
+    expect(document.querySelector(".ae-aud-chips")).toBeNull();
+  });
+
+  it("clicking an auditor fills the cells as ordinary unsaved counts - nothing is saved", async () => {
+    subs.listSubmissions.mockResolvedValue([ANA(), BEN()]);
+    await open();
+    fireEvent.click(await screen.findByRole("button", { name: "Use Ana Cruz's counts (2)" }));
+    await waitFor(() => expect(cell("ONLINE", 1).value).toBe("9"));
+    expect(cell("OFFLINE", 3).value).toBe("4");
+    expect((await screen.findAllByText(/unsaved change/)).length).toBeGreaterThan(0);
+    expect(api.saveManualCount).not.toHaveBeenCalled();
+    // Ana is now fully in the table; Ben still differs on Rice (6 vs 4), so he stays clickable.
+    expect(screen.getByRole("button", { name: "Ana Cruz's counts are already in the table" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Use Ben Lim's counts (1)" })).toBeTruthy();
+    // The category holding it turns blue.
+    expect(screen.getByRole("button", { name: /^Sauces/ }).classList.contains("ae-cat-toggle--edited")).toBe(true);
+  });
+
+  it("a draft auditor is shown but cannot be used", async () => {
+    subs.listSubmissions.mockResolvedValue([submission(3, "Cy Tan", "DRAFT", [L(1, "ONLINE", 3)])]);
+    await open();
+    const panel = await screen.findByRole("region", { name: "Auditor counts" });
+    expect(within(panel).getByText("Cy Tan")).toBeTruthy();
+    expect(within(panel).queryByRole("button", { name: /Use Cy Tan/ })).toBeNull();
+  });
+
+  it("can filter to the rows still to review", async () => {
+    subs.listSubmissions.mockResolvedValue([ANA(), BEN()]);
+    await open();
+    await screen.findByRole("button", { name: /Use Ana Cruz/ });
+    fireEvent.click(screen.getAllByRole("button", { name: /Filter rows/i })[0]);
+    fireEvent.click(await screen.findByRole("option", { name: /Auditor: to review \(2\)/ }));
+    // Soy Sauce (9 vs 8) and Rice (offline, undecided) stay; Vinegar already matches Ana's 5.
+    await waitFor(() => expect(screen.queryByText("Vinegar")).toBeNull());
+    expect(screen.getByText("Soy Sauce")).toBeTruthy();
+    expect(screen.getByText("Rice")).toBeTruthy();
+  });
+
+  it("sends back only the auditors the admin picks, with a note", async () => {
+    subs.listSubmissions.mockResolvedValue([ANA(), BEN()]);
+    await open();
+    fireEvent.click(await screen.findByRole("button", { name: "Reopen…" }));
+    const dialog = await screen.findByRole("dialog");
+    const ana = within(dialog).getByRole("checkbox", { name: /Ana Cruz/ }) as HTMLInputElement;
+    const ben = within(dialog).getByRole("checkbox", { name: /Ben Lim/ }) as HTMLInputElement;
+    expect(ana.checked && ben.checked).toBe(true);
+    fireEvent.click(ben);
+    fireEvent.change(within(dialog).getByPlaceholderText(/Recount aisle 3/), { target: { value: "recount cold room" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reopen 1" }));
+    await waitFor(() => expect(subs.reopenSubmissions).toHaveBeenCalledWith(expect.any(String), expect.any(String), [11], "recount cold room"));
+    expect(await screen.findByText(/Sent 1 count back for a recount/)).toBeTruthy();
+  });
+
+  it("cannot reopen with nobody picked, or when nothing is submitted", async () => {
+    subs.listSubmissions.mockResolvedValue([submission(3, "Cy Tan", "DRAFT", [L(1, "ONLINE", 3)])]);
+    await open();
+    expect(((await screen.findByRole("button", { name: "Reopen…" })) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("warns at publish when an auditor has counts typed but not submitted, and says go on", async () => {
+    api.publishManualCounts.mockResolvedValue({ published: 3, publishedAt: "2026-10-09T22:00:00.000Z" });
+    subs.listSubmissions.mockResolvedValue([ANA(), submission(3, "Cy Tan", "DRAFT", [L(1, "ONLINE", 3)])]);
+    await open();
+    await screen.findByRole("region", { name: "Auditor counts" });
+    await screen.findAllByText("3 unpublished");
+    fireEvent.click(screen.getAllByRole("button", { name: /Publish/ })[0]);
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Cy Tan has counts typed but not submitted/)).toBeTruthy();
+    expect(within(dialog).getByText(/auditor counts you have not used/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Publish 3" }));
+    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), true, true));
   });
 });
 
@@ -301,7 +453,7 @@ describe("ManualCountPage - publishing the sheet", () => {
     fireEvent.click(screen.getAllByRole("button", { name: /Publish/ })[0]);
     fireEvent.click(await screen.findByRole("button", { name: "Publish 3" }));
 
-    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), expect.any(String), true));
+    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/), expect.any(String), true, false));
     expect(await screen.findByText(/Published 3 counts - now the next day's opening stock/)).toBeTruthy();
   });
 
@@ -315,7 +467,7 @@ describe("ManualCountPage - publishing the sheet", () => {
     expect(toggle.checked).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Publish 3" }));
 
-    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), true));
+    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), true, false));
     expect(await screen.findByText(/now the next day's opening stock · 2 products have a later day that could not be updated/)).toBeTruthy();
   });
 
@@ -328,7 +480,7 @@ describe("ManualCountPage - publishing the sheet", () => {
     fireEvent.click(await screen.findByLabelText(/Also use these counts as the next day's opening stock/));
     fireEvent.click(screen.getByRole("button", { name: "Publish 3" }));
 
-    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), false));
+    await waitFor(() => expect(api.publishManualCounts).toHaveBeenCalledWith(expect.any(String), expect.any(String), false, false));
     expect(await screen.findByText(/Published 3 counts - now final for reporting/)).toBeTruthy();
   });
 

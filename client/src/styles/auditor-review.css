@@ -1,0 +1,145 @@
+/* The admin's view of auditor counts on the Audit page: the strip above the table
+   (components/AuditorReviewPanel.tsx).
+   Colours come from the same tokens the rest of the app uses; the blue matches the "edited" category
+   bar, since an accepted figure becomes an unsaved edit. */
+
+.ae-rv-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 3px solid #1d4e89;
+  background: var(--ae-bg-alt);
+  color: var(--ae-text);
+  font-size: calc(12.5px * var(--ae-fs, 1));
+}
+
+.ae-rv-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ae-rv-who {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+/* A submitted auditor is a button: click to fill the table with their counts. */
+.ae-rv-who--btn {
+  border-color: #1d4e89;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.ae-rv-who--btn:hover:not(:disabled) {
+  background: color-mix(in srgb, #1d4e89 22%, transparent);
+}
+
+.ae-rv-who--btn:focus-visible {
+  outline: 2px solid #6db3ff;
+  outline-offset: 1px;
+}
+
+.ae-rv-who--btn:disabled {
+  border-color: #2f6b3c;
+  cursor: default;
+}
+
+.ae-rv-use {
+  font-weight: 600;
+  color: #6db3ff;
+}
+
+.ae-rv-who--btn:disabled .ae-rv-use {
+  color: var(--ae-text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ae-rv-who--btn {
+    transition: none;
+  }
+}
+
+.ae-rv-tag {
+  padding: 1px 7px;
+  border: 1px solid var(--ae-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+
+.ae-rv-tag--sent {
+  border-color: #2f6b3c;
+  color: var(--ae-text);
+}
+
+.ae-rv-counts {
+  color: var(--ae-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ae-rv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ae-rv-choose {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.ae-rv-choose legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+
+.ae-rv-choose label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.ae-rv-reason {
+  display: grid;
+  gap: 4px;
+  font-size: calc(12px * var(--ae-fs, 1));
+  font-weight: 600;
+  color: var(--ae-text-muted);
+}
+
+.ae-rv-reason textarea {
+  min-height: 72px;
+  resize: vertical;
+  font-weight: 400;
+}
+
+.ae-rv-explain {
+  margin: 0;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}

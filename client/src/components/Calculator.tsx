@@ -229,8 +229,12 @@ const TapeLines = memo(function TapeLines({
   );
 });
 
-export function HeaderCalculator() {
-  const phone = useReadOnlyPhone();
+/// `allowOnPhone`: show it on a phone too. The page that asks (the auditor's count sheet, where sums like
+/// 3 boxes x 12 + 5 are the point) puts it in its own toolbar and has no sheet-editing shortcuts to clash with.
+export function HeaderCalculator({ allowOnPhone = false }: { allowOnPhone?: boolean } = {}) {
+  const phoneView = useReadOnlyPhone();
+  /// Off on a mobile view unless the page asked for it.
+  const phone = phoneView && !allowOnPhone;
   // Read once, on mount, so a page change brings back the sum, the tape, the memory and the open panel.
   const [saved] = useState(readSaved);
   const [open, setOpen] = useState(saved.open);

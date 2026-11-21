@@ -8,6 +8,9 @@ import {
   Calculator,
   Calendar,
   Check,
+  ClipboardCheck,
+  Send,
+  StickyNote,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -350,4 +353,18 @@ export function NavLogIcon() {
 
 export function NavSettingsIcon() {
   return <Settings {...nav} />;
+}
+
+/// The auditor's count page (a phone's bottom bar, PhoneBottomNav.tsx).
+export function NavCountIcon() {
+  return <ClipboardCheck {...nav} />;
+}
+
+/// The auditor count page: Submit (the toolbar's main action) and a row's note.
+export function SubmitIcon() {
+  return <Send {...look(16, 1.6)} />;
+}
+
+export function NoteIcon() {
+  return <StickyNote {...look(15, 1.6)} />;
 }

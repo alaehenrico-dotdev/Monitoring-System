@@ -1191,7 +1191,9 @@
   position: relative;
   flex: 0 0 auto;
   min-width: 0;
-  min-height: var(--ae-bottomnav-bar);
+  /* Inset from the bar's edge so the highlight is a floating pill, not flush against the border. */
+  margin: 4px 0;
+  min-height: calc(var(--ae-bottomnav-bar) - 8px);
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1202,6 +1204,8 @@
   color: var(--ae-text-muted);
   text-decoration: none;
   -webkit-tap-highlight-color: transparent;
+  /* The press / focus highlight is a rounded pill that follows the bar's curve, never a square. */
+  border-radius: 20px;
 }
 :root:root:root[data-phone="true"] .ae-bottomnav-item svg {
   flex: none;
@@ -1217,35 +1221,45 @@
 :root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"] {
   color: var(--ae-warning-text);
 }
-:root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"]::before {
-  content: "";
+/* The open tab's colour eases in; its line is one element (.ae-nav-glide, placed by PhoneBottomNav) that
+   slides from the old tab to the new one, over both pills in the split layout. */
+:root:root:root[data-phone="true"] .ae-bottomnav-item {
+  transition: color 180ms ease, background-color 200ms ease;
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item svg {
+  transition: transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+:root:root:root[data-phone="true"] .ae-bottomnav-item:active svg {
+  transform: scale(0.88);
+}
+:root:root:root[data-phone="true"] .ae-nav-glide {
   position: absolute;
-  top: 3px;
-  left: 28%;
-  right: 28%;
+  top: 0;
+  left: 0;
+  z-index: 1;
   height: 2px;
   border-radius: 2px;
-  background: currentColor;
-}
-/* The open tab: its colour eases in and its line grows out from the middle when it becomes current. */
-:root:root:root[data-phone="true"] .ae-bottomnav-item {
-  transition: color 180ms ease;
-}
-:root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"]::before {
-  animation: ae-nav-line 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-@keyframes ae-nav-line {
-  from {
-    transform: scaleX(0);
-  }
+  background: var(--ae-warning-text);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 300ms cubic-bezier(0.2, 0.8, 0.2, 1), width 300ms cubic-bezier(0.2, 0.8, 0.2, 1), opacity 150ms ease;
 }
 @media (prefers-reduced-motion: reduce) {
-  :root:root:root[data-phone="true"] .ae-bottomnav-item[aria-current="page"]::before {
-    animation: none;
+  :root:root:root[data-phone="true"] .ae-nav-glide {
+    transition: none !important;
   }
 }
 :root:root:root[data-phone="true"] .ae-bottomnav-item:active {
-  background: var(--ae-row-hover);
+  /* A soft white wash (the theme's text colour, so it stays visible on light themes too). */
+  background: color-mix(in srgb, var(--ae-text) 12%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:root:root[data-phone="true"] .ae-bottomnav-item svg {
+    transition: none;
+  }
+  :root:root:root[data-phone="true"] .ae-bottomnav-item:active svg {
+    transform: none;
+  }
 }
 :root:root:root[data-phone="true"] .ae-bottomnav-item:focus-visible {
   outline: 2px solid var(--ae-focus-ring, #8a6800);

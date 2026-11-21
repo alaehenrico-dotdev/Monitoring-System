@@ -481,9 +481,11 @@ export function StockGrid({
   // Explicit expand/collapse choices, keyed by category name - absent means
   // "no choice made yet", which defaults to collapsed (below), not expanded.
   // Categories start collapsed so a long product list opens as a manageable
-  // overview rather than every SKU at once; a category is force-expanded
-  // regardless of this map whenever it has a pending edit (see `pending`
-  // above), so this map alone never determines the final visible state.
+  // overview rather than every SKU at once. A category the user has not
+  // touched opens by itself while it holds a pending edit (see `pending`
+  // above and isCategoryOpen below), so the edit is not hidden - but the
+  // user's own choice, kept here, always wins: an edited category can be
+  // collapsed (its bar turns blue to say the edit is still inside).
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
@@ -651,9 +653,14 @@ export function StockGrid({
   // each filled cell against, so it's only offered when the page wired both.
   const canQuickFill = !readOnly && !!onCommitMany && !!getSavedValue;
 
-  /// Expand/collapse every category at once. Categories holding a pending
-  /// edit are force-expanded regardless (see `pending`), so "collapse all"
-  /// genuinely means "collapse everything that is safe to hide".
+  /// Whether a category shows its rows: the user's explicit choice if there is one, otherwise open
+  /// while it holds an unsaved edit (so a paste, a fill or an import into a closed category is seen)
+  /// and closed. One rule for the table, the row selection and the bar, so they cannot disagree.
+  function isCategoryOpen(category: string, groupRows: GridRow[]): boolean {
+    return expandedOverride[category] ?? (!!pending && groupRows.some((r) => pending[r.product.id]));
+  }
+
+  /// Expand/collapse every category at once - edited ones too (their bars stay blue).
   function setAllExpanded(expanded: boolean) {
     const next: Record<string, boolean> = {};
     for (const category of groups.keys()) next[category] = expanded;
@@ -770,10 +777,7 @@ export function StockGrid({
   // its rows are never part of the selection (same open/closed rule as the
   // render below, including "a category with a pending edit is always open").
   const visibleIds = [...groups.entries()].flatMap(([category, groupRows]) =>
-    (!!pending && groupRows.some((r) => pending[r.product.id])) ||
-    expandedOverride[category]
-      ? groupRows.map((r) => r.product.id)
-      : [],
+    isCategoryOpen(category, groupRows) ? groupRows.map((r) => r.product.id) : [],
   );
   const selected = selectedIds(selection, visibleIds);
   const selectedSet = new Set(selected);
@@ -1289,7 +1293,7 @@ export function StockGrid({
             {[...groups.entries()].map(([category, groupRows]) => {
               const hasPending =
                 !!pending && groupRows.some((row) => pending[row.product.id]);
-              const isExpanded = hasPending || !!expandedOverride[category];
+              const isExpanded = isCategoryOpen(category, groupRows);
               const isCollapsed = !isExpanded;
               return (
                 <Fragment key={category}>
@@ -1320,7 +1324,7 @@ export function StockGrid({
                       <button
                         type="button"
                         onClick={() =>
-                          reveal.toggle(category, isExpanded, !hasPending, () =>
+                          reveal.toggle(category, isExpanded, true, () =>
                             setExpandedOverride((e) => ({ ...e, [category]: !isExpanded })),
                           )
                         }
@@ -1328,16 +1332,10 @@ export function StockGrid({
                         aria-controls={groupRows
                           .map((row) => `ae-stockgrid-row-${row.product.id}`)
                           .join(" ")}
-                        aria-disabled={hasPending || undefined}
-                        title={
-                          hasPending
-                            ? `${category} has unsaved edits, so it stays expanded`
-                            : isCollapsed
-                              ? `Expand ${category}`
-                              : `Collapse ${category}`
-                        }
-                        className="ae-cat-toggle"
-                        style={categoryStyleFor(category)}
+                        title={`${isCollapsed ? "Expand" : "Collapse"} ${category}${hasPending ? " (has unsaved edits)" : ""}`}
+                        className={`ae-cat-toggle${hasPending ? " ae-cat-toggle--edited" : ""}`}
+                        // An edited category is blue whatever custom colour it has, so the edit shows even when it is collapsed.
+                        style={hasPending ? undefined : categoryStyleFor(category)}
                         onContextMenu={(e) => {
                           e.preventDefault();
                           setCatMenu({
@@ -1362,6 +1360,7 @@ export function StockGrid({
                             <ChevronIcon />
                           </span>
                           {category}
+                          {hasPending && <span className="ae-sr-only"> - unsaved edits</span>}
                         </span>
                         {canQuickFill && (
                           // Nested inside the toggle button is invalid HTML, so

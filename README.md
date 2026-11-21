@@ -216,6 +216,7 @@ Administrators should then turn on two-step verification under Settings > My Acc
   browser download with a live byte counter, and the passcode-gated Data Reset panel for wiping
   transactional data between test runs or a new rollout period.
 - Role-based access: Encoder (enters stock on both grids, requests corrections) / Admin (approvals, releases, reports, setup).
+- Auditor (a third role, made with `npm run create-user -- <username> AUDITOR "Full name"` in `server/`): counts stock blind on a phone - no system figure, no variance - and submits Online and Offline together. The count is staged, never written to the real counts: an admin reviews it on the Audit page (the auditors' figures show as chips under each count box), uses the ones that are right as ordinary unsaved counts, saves and publishes as usual. An admin can send a submitted count back to any chosen auditors to recount. An auditor can reach nothing else (the server refuses every other route).
 
 **Data entry & reporting tools**
 - Excel-style zoom (25%–200%) on every grid page — genuinely re-lays-out text/cells/inputs at the

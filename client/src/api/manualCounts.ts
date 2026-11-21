@@ -122,10 +122,11 @@ export function setCountRemarks(
 /// `leftSaved` says how many counted products have a later day that could not be
 /// updated: a finished one (held for approval) or one with an imported opening.
 /// Supervisor/Admin only.
-export function publishManualCounts(date: string, shift: Shift, applyToOpening = false) {
+export function publishManualCounts(date: string, shift: Shift, applyToOpening = false, acknowledgeAuditorDrafts = false) {
   return http.post<{ published: number; publishedAt: string; appliedToOpening?: boolean; leftSaved?: number; impliedZero?: number; snapshotId?: number }>(
     `/manual-counts/publish?date=${date}&shift=${shift}`,
-    { applyToOpening },
+    // acknowledgeAuditorDrafts: the admin has been told an auditor has counts typed but not submitted, and goes on.
+    { applyToOpening, acknowledgeAuditorDrafts },
   );
 }
 

@@ -37,6 +37,19 @@ describe("HeaderCalculator on a mobile view", () => {
     }
   });
 
+  it("is there when the page asks for it (the auditor's count sheet), and opens", () => {
+    localStorage.setItem("ala-eh-force-phone", "1");
+    try {
+      render(<HeaderCalculator allowOnPhone />);
+      fireEvent.click(screen.getByRole("button", { name: "Calculator" }));
+      expect(screen.getByRole("group", { name: "Calculator" })).toBeTruthy();
+      fireEvent.keyDown(document.body, { key: "c", code: "KeyC", altKey: true });
+      expect(screen.queryByRole("group", { name: "Calculator" })).toBeNull();
+    } finally {
+      localStorage.removeItem("ala-eh-force-phone");
+    }
+  });
+
   it("does not bring back a panel that was left open on a computer", () => {
     sessionStorage.setItem("ae:calc-state", JSON.stringify({ open: true, expr: "5", fresh: false }));
     localStorage.setItem("ala-eh-force-phone", "1");

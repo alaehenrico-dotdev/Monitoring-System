@@ -1,0 +1,221 @@
+/* The auditor's count sheet (pages/AuditorCountPage.tsx) is built from the shared table, category bars,
+   entry-grid cells, toolbar and toasts, so it follows every theme and the phone layout by itself.
+   This file only styles what no shared class covers: the count cell and a row's second line. Colours,
+   radii and sizes come from the same tokens the other tables use. */
+
+/* The product's name may wrap here (the shared cell is nowrap, which on a phone would push the Count
+   column off screen); the unit and any note sit on a second line. */
+.ae-table.ae-ac-table td.ae-ac-name {
+  white-space: normal;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ae-ac-sub {
+  display: block;
+  margin-top: 1px;
+  font-size: calc(11px * var(--ae-fs, 1));
+  font-weight: 400;
+  color: var(--ae-text-muted);
+}
+
+.ae-ac-note {
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Category bar: how many are counted, at the bar's right edge. */
+.ae-ac-cat-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+}
+
+/* Count cell: the entry grids' input with the zero and note buttons beside it. */
+.ae-ac-count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.ae-ac-input {
+  width: var(--ae-cell-w, 64px);
+  min-width: 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ae-ac-btn.ae-ac-btn {
+  flex: 0 0 auto;
+  min-width: 30px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+
+.ae-ac-btn[aria-pressed="true"],
+.ae-ac-btn--on {
+  color: var(--ae-glass-accent);
+}
+
+.ae-ac-note-field {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  font-size: 16px; /* 16px+ keeps iOS from zooming the page when the box is focused */
+}
+
+/* On a phone: bigger touch targets, and 16px text in the count box (below that iOS zooms in on focus). */
+:root:root:root[data-phone="true"] .ae-ac-input {
+  height: 40px;
+  font-size: 16px;
+}
+
+:root:root:root[data-phone="true"] .ae-ac-btn.ae-ac-btn {
+  min-width: 36px;
+  min-height: 40px;
+}
+
+/* Side margins. On a phone the shared table scroller pulls itself 6-10px PAST the pane's padding
+   (toolbar.css, .ae-table-scroll) so read-only tables run almost edge to edge. A sheet you tap and type
+   in needs room at the sides - a thumb resting at the edge should not be on the screen bezel - so here
+   the scroller keeps to the pane's padding and the progress line, the table, the loading skeleton and
+   the error block all take the same small extra inset. The header card is left alone (it keeps its
+   usual 6px gap). On a wide screen the pane's own 24px padding is already enough. */
+@media (max-width: 900px) {
+  .ae-ac-page .ae-table-scroll {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .ae-ac-page > :not(.ae-sticky-head) {
+    margin-left: 6px;
+    margin-right: 6px;
+  }
+}
+
+@media (max-width: 520px) {
+  .ae-ac-page > :not(.ae-sticky-head) {
+    margin-left: 4px;
+    margin-right: 4px;
+  }
+}
+
+/* Submit, beside the title in the header. Unavailable until something is counted: dimmed and dashed (like
+   the toolbar's unavailable buttons) rather than disabled, so it keeps focus and its reason stays readable. */
+.ae-ac-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.ae-ac-submit[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+  border-style: dashed;
+}
+
+/* "Submitted at ..." / "The admin sent this back ..." under the header. */
+.ae-ac-banner {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--ae-glass-accent, #d4a000);
+  background: var(--ae-bg-alt);
+  color: var(--ae-text);
+  font-size: calc(13px * var(--ae-fs, 1));
+  line-height: 1.45;
+}
+
+.ae-ac-banner--attention {
+  border-left-color: #1d4e89;
+}
+
+/* The calculator in the toolbar, after the category filter. Its panel is anchored to the right edge of its
+   button and 300px wide, which on a phone would run off the left of the screen from the middle of the
+   toolbar. There it becomes un-anchored from the button (so it anchors to the header card instead) and
+   drops below the card at the full width of the screen. */
+:root:root:root[data-phone="true"] .ae-ac-page .ae-mb-filters .ae-calc-wrap {
+  position: static;
+}
+
+:root:root:root[data-phone="true"] .ae-ac-page .ae-mb-filters .ae-calc-pop {
+  top: calc(100% + 6px);
+  left: 8px;
+  right: 8px;
+  width: auto;
+  max-width: 340px;
+  margin-inline: auto;
+}
+
+/* ---- "My counts" history list ---------------------------------------------------------------- */
+.ae-ah-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ae-ah-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--ae-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ae-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.ae-ah-item:hover {
+  background: var(--ae-bg-alt);
+}
+
+.ae-ah-item:focus-visible {
+  outline: 2px solid #6db3ff;
+  outline-offset: 1px;
+}
+
+.ae-ah-item[aria-current] {
+  border-left: 3px solid var(--ae-glass-accent, #d4a000);
+}
+
+.ae-ah-title {
+  font-weight: 600;
+}
+
+.ae-ah-meta {
+  grid-column: 1 / -1;
+  font-size: calc(12px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.ae-ac-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.ae-ac-banner .ae-ac-banner-action {
+  margin-left: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ae-ah-item {
+    transition: none;
+  }
+}

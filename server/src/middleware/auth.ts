@@ -16,6 +16,24 @@ const USER_STATUS_TTL_MS = 30_000;
 
 const PASSWORD_CHANGE_PATHS = new Set(["/api/auth/me", "/api/auth/change-password"]);
 
+/// What an AUDITOR may call. The role counts stock blind, so it must never read a system figure,
+/// a variance or anyone's entries - and most routes only require `authenticate`, so listing the
+/// roles that ARE allowed (authorize) would leave every one of them open to a new role. This
+/// allow-list is checked once, in authenticate, instead: anything not named here is refused
+/// whatever the route's own rules say. The account's own endpoints (sign-in state, password,
+/// two-step), the product master list (SKU + name to count against), the shift-mode flag the app
+/// shell loads, and their own count submission (/api/count-submissions/mine). Widen it deliberately
+/// when the count page gains endpoints.
+export function auditorMayCall(method: string, rawUrl: string): boolean {
+  const path = rawUrl.split("?")[0].replace(/\/+$/, "");
+  if (path.startsWith("/api/auth/")) return true;
+  // Their own blind count: read it, save lines, submit. The admin's endpoints (/count-submissions and
+  // /count-submissions/reopen) are not under /mine and stay refused.
+  if (path === "/api/count-submissions/mine" || path.startsWith("/api/count-submissions/mine/")) return true;
+  if (method !== "GET") return false;
+  return path === "/api/products" || path === "/api/app-settings/shift-mode";
+}
+
 /// Verifies the Bearer token, re-checks the user's current isActive/role
 /// against the DB (see USER_STATUS_TTL_MS above), and attaches the result
 /// to req.user.
@@ -58,6 +76,10 @@ async function authenticateHandler(req: Request, _res: Response, next: NextFunct
   // themselves up and change it - so this is enforced here, not just by the screen.
   if (status.mustChangePassword && !PASSWORD_CHANGE_PATHS.has(req.originalUrl.split("?")[0].replace(/\/+$/, ""))) {
     throw HttpError.forbidden("You must change your password before continuing.");
+  }
+
+  if (status.role === "AUDITOR" && !auditorMayCall(req.method, req.originalUrl)) {
+    throw HttpError.forbidden("Auditor accounts can only use the count page.");
   }
 
   req.user = { ...decoded, role: status.role };

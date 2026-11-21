@@ -13,6 +13,9 @@ export interface NavGroup {
 
 const ALL_ROLES: Role[] = ["ENCODER", "SUPERVISOR_ADMIN"];
 
+/// The auditor's one working page, and where that role lands.
+export const AUDITOR_HOME = "/audit-count";
+
 /**
  * Single source of truth for the app's page list and who may open each one -
  * previously inlined in HeaderTabs.tsx, which was fine while the tab strip
@@ -31,6 +34,9 @@ export const navGroups: NavGroup[] = [
   {
     heading: "Data Entry",
     links: [
+      // The auditor's own page (the blind manual count, done on a phone). ALL_ROLES below is the
+      // encoder + admin pair: the auditor is deliberately in none of the other lists but Settings.
+      { to: AUDITOR_HOME, label: "Count", roles: ["AUDITOR"] },
       { to: "/dashboard", label: "Dashboard", roles: ["SUPERVISOR_ADMIN"] },
       { to: "/manual-count", label: "Audit", roles: ALL_ROLES },
       { to: "/online", label: "Online Entry", roles: ALL_ROLES },
@@ -74,7 +80,7 @@ export const navGroups: NavGroup[] = [
     heading: "System",
     links: [
       { to: "/products", label: "SKUs", roles: ["SUPERVISOR_ADMIN"] },
-      { to: "/settings", label: "Settings", roles: ALL_ROLES },
+      { to: "/settings", label: "Settings", roles: [...ALL_ROLES, "AUDITOR"] },
     ],
   },
 ];
@@ -92,7 +98,8 @@ export function pagesForRole(role: Role | undefined, phone = false): NavLinkDef[
 /// The only pages a phone shows (hooks/useReadOnlyPhone.ts): the ones that just
 /// read. Everything else - entry grids, audits, approvals, admin - needs the
 /// desktop layout (a phone browser's "Desktop site" option gets it).
-export const PHONE_PAGES = ["/dashboard", "/daily-report", "/total-stocks", "/daily-out", "/change-log", "/settings"] as const;
+/// "/audit-count" is the one page that is NOT read-only on a phone: counting is done on one.
+export const PHONE_PAGES = ["/dashboard", "/daily-report", "/total-stocks", "/daily-out", "/change-log", "/settings", AUDITOR_HOME] as const;
 
 /// What the phone's bottom bar (components/PhoneBottomNav.tsx) calls each page: six items share
 /// the width of a phone, so each gets one short word. The full name stays the accessible name.
@@ -125,10 +132,16 @@ export function isPhonePage(path: string): boolean {
   return PHONE_PAGES.some((p) => path === p || path.startsWith(p + "/"));
 }
 
-/// Where a phone lands: the Dashboard for an admin (the only role allowed it),
-/// the Daily Report for everyone else.
+/// Where a phone lands: the Dashboard for an admin (the only role allowed it), the count page for
+/// an auditor (the Daily Report would show them system figures), the Daily Report for everyone else.
 export function phoneHomeFor(role: Role | undefined): string {
+  if (role === "AUDITOR") return AUDITOR_HOME;
   return role === "SUPERVISOR_ADMIN" ? "/dashboard" : "/daily-report";
+}
+
+/// Where this role lands on a computer ("/").
+export function desktopHomeFor(role: Role | undefined): string {
+  return role === "AUDITOR" ? AUDITOR_HOME : "/online";
 }
 
 /// The entry grids, which are the only pages a product result can sensibly
@@ -137,6 +150,7 @@ export function phoneHomeFor(role: Role | undefined): string {
 export const GRID_PAGES = ["/online", "/offline", "/total-stocks"] as const;
 
 /// Where a product result goes when the user isn't already on a grid page.
-export function defaultGridPageFor(_role: Role | undefined, phone = false): string {
+export function defaultGridPageFor(role: Role | undefined, phone = false): string {
+  if (role === "AUDITOR") return AUDITOR_HOME;
   return phone ? "/total-stocks" : "/online";
 }

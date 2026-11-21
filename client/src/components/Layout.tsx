@@ -115,7 +115,8 @@ export function Layout() {
         <Toast
           id="phone-readonly"
           message={
-            phone && !phoneNoteDismissed
+            // The auditor counts on a phone: the read-only note would be wrong for them.
+            phone && !phoneNoteDismissed && user?.role !== "AUDITOR"
               ? "Phone view is read-only. To enter or edit stock, use your browser's \"Desktop site\" option."
               : null
           }

@@ -5,7 +5,7 @@ import type { Shift } from "../types";
 
 export interface QueueItem {
   id: string;
-  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction" | "unlock-request";
+  kind: "variance" | "negative-open" | "low-stock" | "missing-entry" | "backup" | "correction" | "unlock-request" | "auditor-submission";
   severity: "high" | "medium" | "low";
   title: string;
   detail: string;
@@ -16,7 +16,7 @@ export interface QueueItem {
 export interface ActionQueue {
   generatedAt: string;
   total: number;
-  counts: { variance: number; lowStock: number; missingEntries: number; backup: number; corrections: number; unlockRequests?: number };
+  counts: { variance: number; lowStock: number; missingEntries: number; backup: number; corrections: number; unlockRequests?: number; auditorSubmissions?: number };
   items: QueueItem[];
 }
 

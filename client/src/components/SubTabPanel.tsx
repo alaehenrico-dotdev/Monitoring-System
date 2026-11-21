@@ -62,6 +62,10 @@ export function SubTabPanel({ label, children }: { label?: string; children: Rea
       setOutline(null);
       return;
     }
+    // The corner radius is the theme's (--ae-mini-tab-radius), so the line and the tab's fill share it; unset, the
+    // outline's own default is used.
+    const cssRadius = parseFloat(getComputedStyle(panel).getPropertyValue("--ae-mini-tab-radius"));
+    const radius = cssRadius > 0 ? cssRadius : undefined;
     const dpr = window.devicePixelRatio || 1;
     const snap = (v: number) => Math.round(v * dpr) / dpr;
     const p = panel.getBoundingClientRect();
@@ -71,7 +75,7 @@ export function SubTabPanel({ label, children }: { label?: string; children: Rea
     // fall on whole pixels. The SVG is then shifted by the (tiny) difference to start there.
     const ox = snap(p.left);
     const oy = snap(p.top);
-    const base = { width: snap(p.right) - ox, height: snap(p.bottom) - oy, ruleBottom: snap(s.bottom) - oy, dpr };
+    const base = { width: snap(p.right) - ox, height: snap(p.bottom) - oy, ruleBottom: snap(s.bottom) - oy, dpr, radius };
     const target: TabBox | null = t ? { left: snap(t.left) - ox, right: snap(t.right) - ox, top: snap(t.top) - oy } : null;
     const place = (tab: TabBox | null) => {
       shownTab.current = tab;

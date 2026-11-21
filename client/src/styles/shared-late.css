@@ -136,6 +136,16 @@ button.ae-header-search-btn--labeled.ae-header-search-btn--labeled.ae-header-sea
   padding: 5px 32px 5px 8px;
   background: linear-gradient(90deg, color-mix(in srgb, #f5c000 45%, var(--ae-cat-charcoal)) 0%, var(--ae-cat-charcoal) 100%);
 }
+/* A category holding unsaved edits (Online/Offline Entry) or staged counts (Audit, Count) turns blue,
+   open or collapsed, so an edit is never out of sight. The bar and the label's fade both paint from
+   --ae-cat-charcoal, so setting it here recolours every theme's bar; the custom per-category colour
+   is dropped in the markup while edited, so it cannot cover the blue. */
+:root:is([data-ui], :not([data-ui])) .ae-cat-toggle.ae-cat-toggle--edited {
+  --ae-cat-charcoal: #1d4e89;
+}
+:root:is([data-ui], :not([data-ui])) .ae-cat-toggle.ae-cat-toggle--edited > .ae-cat-label {
+  background: linear-gradient(90deg, color-mix(in srgb, #6db3ff 55%, var(--ae-cat-charcoal)) 0%, var(--ae-cat-charcoal) 100%);
+}
 
 /* ---- Google Drive Connect / Reconnect button (pages/GoogleDriveSettings.tsx) --------------
    Google's own button style, so it reads as "sign in with Google" and not as one of this app's

@@ -20,6 +20,7 @@ import {
   saveManualCount,
   setCountRemarks,
 } from "../services/manualCounts.service";
+import { draftsBlockingPublish } from "../services/countSubmission.service";
 
 const locationSchema = z.nativeEnum(StockLocation);
 const entrySchema = z.object({
@@ -151,5 +152,16 @@ export async function postRevertSnapshot(req: Request, res: Response) {
 export async function postPublish(req: Request, res: Response) {
   const entryDate = parseDateOnly(req.query.date ?? req.body?.date);
   const shift = parseShift(req.query.shift ?? req.body?.shift);
+  // An auditor who has typed counts but not submitted them would be left out of this publish (and,
+  // with "use as next day's opening", what they hold would be set to 0): the admin has to say go on.
+  if (req.body?.acknowledgeAuditorDrafts !== true) {
+    const drafts = await draftsBlockingPublish(entryDate, shift);
+    if (drafts.length > 0) {
+      throw HttpError.conflict(
+        `${drafts.map((d) => d.auditor).join(" and ")} ${drafts.length === 1 ? "has" : "have"} counts typed but not submitted yet. Publish anyway, or wait for them to submit.`,
+        { auditorDrafts: drafts },
+      );
+    }
+  }
   res.json(await publishManualCounts(entryDate, shift, req.user?.id, req.body?.applyToOpening === true));
 }

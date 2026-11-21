@@ -2,6 +2,7 @@ import { useBusyAction } from "../hooks/useBusyAction";
 import {
   Fragment,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -95,6 +96,9 @@ import { useTopProgress } from "../hooks/useTopProgress";
 import { useCategoryReveal } from "../hooks/useCategoryReveal";
 import { useRecentCells } from "../hooks/useRecentCells";
 import type { ToastVariant } from "../components/Toast";
+import { listSubmissions, type AdminSubmission } from "../api/countSubmissions";
+import { AuditorReviewPanel } from "../components/AuditorReviewPanel";
+import { buildAuditorCells, planStageAuditor, rowNeedsReview } from "../utils/auditorReview";
 
 /// The two places stock is physically counted. Both are entered on this one
 /// page; each is still stored (and its variance computed) per location.
@@ -267,6 +271,9 @@ export function ManualCountPage() {
   // trigger the PDF once the counts have loaded (same as the report pages).
   const [searchParams] = useSearchParams();
   const openedFromHistory = searchParams.get("history") === "1";
+  // Opened from the Admin Queue / an alert about an auditor's submission: the link names the sheet to open
+  // (date and shift) but, unlike Audit History, must not print or rebuild a published copy.
+  const openedForReview = searchParams.get("review") === "1";
   // An entry made by a Publish carries the id of the frozen copy it opens; an
   // older entry (made by exporting the sheet) does not, and rebuilds from the
   // live counts as it always did.
@@ -274,7 +281,7 @@ export function ManualCountPage() {
   const snapshotId = openedFromHistory && Number.isInteger(snapshotParam) && snapshotParam > 0 ? snapshotParam : null;
   const printAfterLoad = useRef(openedFromHistory && snapshotId === null);
   // Read once: coming back to the page resumes the sheet with unsaved counts.
-  const [resumed] = useState(() => (openedFromHistory ? null : loadStoredView()));
+  const [resumed] = useState(() => (openedFromHistory || openedForReview ? null : loadStoredView()));
   const [{ date, shift }, setDateShift] = useState<{
     date: string;
     shift: Shift;
@@ -283,7 +290,7 @@ export function ManualCountPage() {
     const now = getDefaultAuditSheet();
     const d = searchParams.get("date") ?? "";
     const s = searchParams.get("shift");
-    if (!openedFromHistory || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return resumed ?? now;
+    if (!(openedFromHistory || openedForReview) || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return resumed ?? now;
     return { date: d, shift: s === "MORNING" || s === "NIGHT" ? coerceShift(s) : now.shift };
   });
   const setDate = (d: string) => setDateShift((prev) => ({ ...prev, date: d }));
@@ -320,10 +327,9 @@ export function ManualCountPage() {
     CountLocation,
     ManualCountGridRow[]
   > | null>(null);
-  // Which categories are expanded - absent means collapsed (the default), a
-  // category with a pending draft force-expands regardless of this map. See
-  // StockGrid's identical `expandedOverride`/`pending` pair (Online/Offline
-  // Entry) for the fuller rationale - same behavior here.
+  // Which categories are expanded - absent means no choice yet (collapsed by default). A category the
+  // user has not touched opens by itself while it holds a staged count, but their own choice always
+  // wins (see isCategoryOpen). StockGrid (Online/Offline Entry) follows the same rule.
   const [expandedOverride, setExpandedOverride] = useState<
     Record<string, boolean>
   >({});
@@ -364,7 +370,7 @@ export function ManualCountPage() {
   const [categoryFilter, setCategoryFilter] = useState("");
   // Which rows the grid shows: everything, only counts with a non-zero
   // variance, or only the ones staged but not yet saved.
-  const [rowFilter, setRowFilter] = useState<"all" | "flagged" | "changed">(
+  const [rowFilter, setRowFilter] = useState<"all" | "flagged" | "changed" | "review">(
     "all",
   );
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -400,12 +406,18 @@ export function ManualCountPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const dateGate = useSaveDateGate(date, showConfirm);
   const realtimeVersion = useRealtimeVersion();
+  // What the auditors have sent for this sheet (admin only). A draft shows who is counting; only
+  // submitted figures can be accepted (utils/auditorReview.ts). Reloaded with the sheet and on every
+  // realtime tick, so a submission appears without a refresh.
+  const [submissions, setSubmissions] = useState<AdminSubmission[]>([]);
+  const [submissionsTick, setSubmissionsTick] = useState(0);
   // Bumped after the product list changed from an import, so the grid reloads.
   const [productsVersion, setProductsVersion] = useState(0);
   const progress = useTopProgress();
 
   useResetOnKeyChange(`${date}:${shift}`, () => {
     setGridRows(null);
+    setSubmissions([]);
     // Not cleared: whichever date/shift is being left keeps what it had
     // staged (still there if switched back to) and the one being loaded
     // picks up whatever it already had staged.
@@ -437,6 +449,17 @@ export function ManualCountPage() {
       cancelled = true;
     };
   }, [date, shift, realtimeVersion, productsVersion]);
+
+  useEffect(() => {
+    if (!canPublish) return;
+    let cancelled = false;
+    listSubmissions(date, shift)
+      .then((list) => !cancelled && setSubmissions(list))
+      .catch(() => !cancelled && setSubmissions([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [date, shift, realtimeVersion, submissionsTick, canPublish]);
 
   // Remember which sheet is open so it can be resumed (see loadStoredView).
   useEffect(() => {
@@ -476,6 +499,16 @@ export function ManualCountPage() {
   function isRealChange(loc: CountLocation, productId: number, draft: string) {
     return isRealDraftChange(draft, savedCountOf(loc, productId));
   }
+
+  /// The count the table holds for a cell: the staged figure if there is one, else the saved one.
+  function currentCountOf(loc: CountLocation, productId: number): number | null {
+    const staged = drafts[loc][productId];
+    if (staged !== undefined) return staged === "" ? null : Number(staged);
+    return savedCountOf(loc, productId);
+  }
+  const auditorCells = useMemo(() => buildAuditorCells(submissions), [submissions]);
+  /// Auditors who have typed counts but not submitted them (a publish now would leave them out).
+  const draftAuditors = submissions.filter((s) => s.status === "DRAFT" && s.counted.ONLINE + s.counted.OFFLINE > 0);
 
   const pendingCount = COUNT_LOCATIONS.reduce(
     (n, loc) =>
@@ -532,6 +565,20 @@ export function ManualCountPage() {
       const next = { ONLINE: { ...prev.ONLINE }, OFFLINE: { ...prev.OFFLINE } };
       for (const e of edits) delete next[e.loc][e.productId];
       return next;
+    });
+  }
+
+  /// Clicking an auditor's banner fills the table with their counts. They become ordinary staged
+  /// counts: unsaved until Save, undoable, and published like any other. Nothing is written by this.
+  function fillFromAuditor(sub: AdminSubmission) {
+    const edits = planStageAuditor(sub, visibleLocations, currentCountOf);
+    if (edits.length === 0) return;
+    pushHistory();
+    setDraftMany(edits);
+    const n = edits.length;
+    setNotice({
+      message: `Filled ${n} count${n === 1 ? "" : "s"} from ${sub.auditor.name} - check them, then Save.`,
+      variant: "info",
     });
   }
 
@@ -593,7 +640,7 @@ export function ManualCountPage() {
     setPublishing(true);
     setError(null);
     try {
-      const { published, leftSaved = 0, impliedZero = 0 } = await publishManualCounts(date, shift, applyToOpening);
+      const { published, leftSaved = 0, impliedZero = 0 } = await publishManualCounts(date, shift, applyToOpening, draftAuditors.length > 0);
       setShowPublishConfirm(false);
       setApplyToOpening(true);
       // Later saved days are recalculated by an applied publish. Say when one could
@@ -920,6 +967,7 @@ export function ManualCountPage() {
   const categories = Array.from(
     new Set((auditRows ?? []).map((r) => r.product.category)),
   ).sort();
+  const reviewCount = auditorCells.size === 0 ? 0 : (auditRows ?? []).filter((r) => rowNeedsReview(r.product.id, visibleLocations, auditorCells, currentCountOf)).length;
   const visibleRows = auditRows?.filter(
     (r) =>
       matchesSearch(
@@ -928,7 +976,11 @@ export function ManualCountPage() {
       ) &&
       (categoryFilter === "" || r.product.category === categoryFilter) &&
       (rowFilter === "all" ||
-        (rowFilter === "flagged" ? isFlagged(r) : hasStagedCount(r))),
+        (rowFilter === "flagged"
+          ? isFlagged(r)
+          : rowFilter === "review"
+            ? rowNeedsReview(r.product.id, visibleLocations, auditorCells, currentCountOf)
+            : hasStagedCount(r))),
   );
   // Grouped the same way as StockGrid/TotalStocksTable, for the same
   // collapsible-category treatment.
@@ -945,12 +997,16 @@ export function ManualCountPage() {
   // range, Ctrl/Cmd+press to add or remove one, or press and drag (see
   // hooks/useRowSelection.ts). Only rows on screen can be selected, so a
   // collapsed category's rows are not part of it (same open/closed rule as the
-  // table below: a category holding a staged count is always open).
+  // table below: the user's choice, else open while it holds a staged count).
+  const holdsStagedCount = (groupRows: { product: { id: number } }[]) =>
+    groupRows.some((r) => drafts.ONLINE[r.product.id] !== undefined || drafts.OFFLINE[r.product.id] !== undefined);
+  /// Whether a category shows its rows: the user's explicit choice if there is one, otherwise open
+  /// while it holds a staged count (so a paste or fill into a closed category is seen), else closed.
+  /// One rule for the table, the row selection and the bar. A category with staged counts can still be
+  /// collapsed - its bar turns blue to say the counts are still inside.
+  const isCategoryOpen = (category: string, groupRows: { product: { id: number } }[]) => expandedOverride[category] ?? holdsStagedCount(groupRows);
   const selectableIds = [...groupedRows.entries()].flatMap(([category, groupRows]) =>
-    groupRows.some((r) => drafts.ONLINE[r.product.id] !== undefined || drafts.OFFLINE[r.product.id] !== undefined) ||
-    expandedOverride[category]
-      ? groupRows.map((r) => r.product.id)
-      : [],
+    isCategoryOpen(category, groupRows) ? groupRows.map((r) => r.product.id) : [],
   );
   const selection = useRowSelection({
     visibleIds: selectableIds,
@@ -1000,8 +1056,7 @@ export function ManualCountPage() {
       rows.length,
     );
   }
-  // Categories holding a staged count stay open whatever this says (see
-  // `hasPending` in the table), so "collapse all" hides only what is safe to.
+  // "Collapse all" closes categories holding staged counts too; their bars stay blue.
   const anyExpanded = [...groupedRows.keys()].some((c) => expandedOverride[c]);
   function setAllExpanded(expanded: boolean) {
     setExpandedOverride(
@@ -1385,6 +1440,15 @@ export function ManualCountPage() {
                   onChange={(v) => setRowFilter(v as typeof rowFilter)}
                   options={[
                     { value: "all", label: "All rows" },
+                    ...(submissions.length > 0
+                      ? [
+                          {
+                            value: "review",
+                            label: reviewCount ? `Auditor: to review (${reviewCount})` : "Auditor: to review",
+                            title: "Rows where an auditor's count is not in the table yet, or the auditors differ",
+                          },
+                        ]
+                      : []),
                     {
                       value: "flagged",
                       label: flaggedCount
@@ -1552,6 +1616,20 @@ export function ManualCountPage() {
           option ticked when publishing.
         </p>
       )}
+      {canPublish && (
+        <AuditorReviewPanel
+          submissions={submissions}
+          date={date}
+          shift={shift}
+          stageCountOf={(sub) => planStageAuditor(sub, visibleLocations, currentCountOf).length}
+          onUseCounts={fillFromAuditor}
+          onReopened={(n) => {
+            setSubmissionsTick((t) => t + 1);
+            setNotice({ message: `Sent ${n} count${n === 1 ? "" : "s"} back for a recount.`, variant: "success" });
+          }}
+          onError={(m) => setError(m)}
+        />
+      )}
       {!auditRows ? (
         <TableSkeleton
           headers={headers}
@@ -1594,12 +1672,8 @@ export function ManualCountPage() {
               </thead>
               <tbody>
                 {[...groupedRows.entries()].map(([category, groupRows]) => {
-                  const hasPending = groupRows.some(
-                    (r) =>
-                      drafts.ONLINE[r.product.id] !== undefined ||
-                      drafts.OFFLINE[r.product.id] !== undefined,
-                  );
-                  const isExpanded = hasPending || !!expandedOverride[category];
+                  const hasPending = holdsStagedCount(groupRows);
+                  const isExpanded = isCategoryOpen(category, groupRows);
                   const isCollapsed = !isExpanded;
                   return (
                     <Fragment key={category}>
@@ -1608,21 +1682,16 @@ export function ManualCountPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              reveal.toggle(category, isExpanded, !hasPending, () =>
+                              reveal.toggle(category, isExpanded, true, () =>
                                 setExpandedOverride((e) => ({ ...e, [category]: !isExpanded })),
                               )
                             }
                             aria-expanded={!isCollapsed}
-                            title={
-                              hasPending
-                                ? `${category} has unsaved counts, so it stays expanded`
-                                : isCollapsed
-                                  ? `Expand ${category}`
-                                  : `Collapse ${category}`
-                            }
-                            className="ae-cat-toggle"
+                            title={`${isCollapsed ? "Expand" : "Collapse"} ${category}${hasPending ? " (has unsaved counts)" : ""}`}
+                            className={`ae-cat-toggle${hasPending ? " ae-cat-toggle--edited" : ""}`}
+                            // A category with staged counts is blue whatever custom colour it has, so they show even when it is collapsed.
                             style={(() => {
-                              const c = getCategoryColor(category);
+                              const c = hasPending ? null : getCategoryColor(category);
                               return c
                                 ? { background: c, color: inkFor(c) }
                                 : undefined;
@@ -1651,6 +1720,7 @@ export function ManualCountPage() {
                                 <ChevronIcon />
                               </span>
                               {category}
+                              {hasPending && <span className="ae-sr-only"> - unsaved counts</span>}
                             </span>
                             {/* A sibling-style click target inside the bar (a
                                 real button can't nest in a button); it stops
@@ -1933,6 +2003,28 @@ export function ManualCountPage() {
                 ))}
               </ul>
               {uncounted.length > 40 && <div style={{ marginTop: 4, color: colors.subtleInk }}>+{uncounted.length - 40} more</div>}
+            </div>
+          )}
+          {draftAuditors.length > 0 && (
+            <div
+              role="note"
+              style={{ marginTop: 12, padding: "8px 10px", border: "1px solid var(--ae-border)", borderLeft: "3px solid var(--ae-warning-text)", borderRadius: 4, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}
+            >
+              <strong>
+                {draftAuditors.map((d) => d.auditor.name).join(" and ")} {draftAuditors.length === 1 ? "has" : "have"} counts typed but not submitted.
+              </strong>{" "}
+              Those counts are not in what you are publishing. Wait for them to submit, or publish without them.
+            </div>
+          )}
+          {reviewCount > 0 && (
+            <div
+              role="note"
+              style={{ marginTop: 12, padding: "8px 10px", border: "1px solid var(--ae-border)", borderLeft: "3px solid var(--ae-warning-text)", borderRadius: 4, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}
+            >
+              <strong>
+                {reviewCount} product{reviewCount === 1 ? " has" : "s have"} auditor counts you have not used.
+              </strong>{" "}
+              Use them in the table first if they are right (filter Rows - Auditor: to review).
             </div>
           )}
           <label
