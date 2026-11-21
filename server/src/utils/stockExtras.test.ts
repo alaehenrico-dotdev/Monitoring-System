@@ -229,3 +229,13 @@ describe("parseExtraCellKey", () => {
     }
   });
 });
+
+describe("totalsFromExtras - hostile column keys", () => {
+  it("keeps a __proto__ key as plain data and never touches Object.prototype", () => {
+    const totals = totalsFromExtras([{ columnKey: "__proto__", slotIndex: 1, amount: 5 } as never]);
+    expect(Object.keys(totals)).toEqual(["__proto__"]);
+    expect(Object.getPrototypeOf(totals)).toBe(Object.prototype);
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).amount).toBeUndefined();
+  });
+});

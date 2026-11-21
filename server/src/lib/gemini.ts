@@ -177,7 +177,8 @@ async function generateWithGemini(opts: GenerateOptions, keys: string[]): Promis
   const ready = keys.map((key, index) => ({ key, index })).filter(({ index }) => (cooldowns.get(index)?.until ?? 0) <= now);
   if (ready.length === 0) {
     // Every key was refused moments ago. Say why without spending another call on one.
-    console.error(JSON.stringify({ level: "warn", event: `${opts.event}-all-keys-cooling`, keys: keys.length }));
+    // (The count is the number of cooldowns, not read from the key list: nothing derived from a key is logged.)
+    console.error(JSON.stringify({ level: "warn", event: `${opts.event}-all-keys-cooling`, keysCooling: cooldowns.size }));
     throw cooldowns.get(0)?.failure ?? new HttpError(502, userMessageFor(429));
   }
 

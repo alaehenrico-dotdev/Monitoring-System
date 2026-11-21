@@ -197,9 +197,11 @@ export function flattenExtras(extras: { columnKey: string; slotIndex: number; am
  * total that doesn't match the amounts behind it.
  */
 export function totalsFromExtras(extras: StockExtraInput[]): Record<string, number> {
-  const totals: Record<string, number> = {};
-  for (const e of extras) totals[e.columnKey] = (totals[e.columnKey] ?? 0) + e.amount;
-  return totals;
+  // A Map, not an object written to by key: a column key comes from the request, and a key like "__proto__" must
+  // never reach an object's prototype. Object.fromEntries makes each one a plain own property.
+  const totals = new Map<string, number>();
+  for (const e of extras) totals.set(e.columnKey, (totals.get(e.columnKey) ?? 0) + e.amount);
+  return Object.fromEntries(totals);
 }
 
 /// The distinct main columns a set of extras touches.
