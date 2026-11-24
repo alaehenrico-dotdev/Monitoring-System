@@ -86,7 +86,7 @@ export function AccountSettings() {
           description="Sign out all other devices, including remembered ones. This one stays signed in."
         >
           <Button {...actionButton} onClick={handleSignOutEverywhere} loading={signingOut} loadingLabel="Signing out…">
-            Sign out everywhere else
+            Sign out others
           </Button>
         </Setting>
       </div>

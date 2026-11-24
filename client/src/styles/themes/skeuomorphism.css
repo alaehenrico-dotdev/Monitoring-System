@@ -221,3 +221,20 @@
   color: #f6ead0 !important;
 }
 
+
+/* Settings cards: paper sheets - slightly see-through, lit along the top edge, resting on the desk. */
+:root[data-ui="skeuo"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0) 40%),
+    color-mix(in srgb, var(--ae-surface) 84%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 1px solid var(--ae-border);
+  border-radius: 8px;
+  box-shadow: var(--ae-sk-paper);
+}
+:root[data-ui="skeuo"][data-theme="dark"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 40%),
+    color-mix(in srgb, var(--ae-surface) 84%, transparent);
+}

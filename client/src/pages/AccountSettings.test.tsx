@@ -106,7 +106,7 @@ describe("AccountSettings", () => {
 
   it("signs out the other devices", async () => {
     render(<AccountSettings />);
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere else" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out others" }));
     await waitFor(() => expect(auth.signOutEverywhere).toHaveBeenCalledTimes(1));
   });
 });

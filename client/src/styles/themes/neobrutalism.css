@@ -216,3 +216,17 @@
   color: #0c0c0c !important;
 }
 
+
+/* Settings cards: still outlined, square and hard-shadowed, but the fill lets the seal show through. */
+:root[data-ui="brutal"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+  background: color-mix(in srgb, var(--ae-surface-glass) 82%, transparent);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: 2px solid var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--ae-nb-line);
+}
+:root[data-ui="brutal"] .ae-account-card:hover {
+  border-color: var(--ae-nb-line);
+  box-shadow: 7px 7px 0 var(--ae-nb-line);
+}

@@ -1136,3 +1136,78 @@
 .ae-mm-notelist li::marker {
   color: var(--ae-glass-accent, #d4a000);
 }
+
+/* ---------------------------------------------------------------------------
+   Settings cards (My Account, User Passwords, Entry Rules, Google Drive, Backup / Restore):
+   one shared "lifted glass" surface - a translucent, top-lit tint with a defined edge and a soft
+   shadow, so the cards stand out from the page while the seal watermark still shows through.
+   Built from the text colour, so it reads in light and dark. The themes below restyle it in
+   their own language; Minimalism and Studio keep their flat hairline (their .ae-panel and
+   .ae-dash-card rules are more specific and win).
+   ------------------------------------------------------------------------ */
+:root :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--ae-text) 11%, transparent),
+    color-mix(in srgb, var(--ae-text) 4%, transparent)
+  );
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 1px solid color-mix(in srgb, var(--ae-text) 20%, transparent);
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 color-mix(in srgb, var(--ae-text) 14%, transparent);
+}
+:root .ae-account-card:hover {
+  border-color: var(--ae-glass-accent);
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.3),
+    0 0 14px rgba(245, 192, 0, 0.14),
+    inset 0 1px 0 color-mix(in srgb, var(--ae-text) 14%, transparent);
+}
+
+/* ---------------------------------------------------------------------------
+   Settings action buttons: one size for every card's single action ("Change password", "Set up",
+   "Change", "Sign out others"), so they stack as a tidy column. The width is FIXED, not a minimum:
+   a minimum let the longest label push its own button wider than the rest. It scales with the
+   text-size setting so a label never outgrows it, and a label that still doesn't fit is clipped
+   with an ellipsis instead of stretching. Size and text only - colour, border and corner radius
+   stay with the theme. On a phone the buttons fill the card width.
+   ------------------------------------------------------------------------ */
+:root .ae-setting-action,
+:root .ae-account-actions {
+  --ae-act-h: calc(34px * var(--ae-fs, 1));
+  --ae-act-w: calc(164px * var(--ae-fs, 1));
+}
+:root .ae-account-actions {
+  --ae-act-w: calc(112px * var(--ae-fs, 1));
+}
+:root .ae-setting-action .ae-btn,
+:root .ae-account-actions .ae-btn {
+  /* A block-level box (not flex) so text-overflow's ellipsis works; line-height = height centres it. */
+  display: inline-block;
+  box-sizing: border-box;
+  flex: none;
+  width: var(--ae-act-w);
+  height: var(--ae-act-h);
+  padding: 0 12px;
+  overflow: hidden;
+  font-family: inherit;
+  font-size: calc(13px * var(--ae-fs, 1));
+  font-weight: 600;
+  line-height: calc(var(--ae-act-h) - 2px);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+@media (max-width: 520px) {
+  :root .ae-setting-action .ae-btn {
+    width: 100%;
+  }
+  /* User Passwords: the row's buttons share its width equally. */
+  :root .ae-account-actions .ae-btn {
+    width: auto;
+    flex: 1 1 0;
+  }
+}

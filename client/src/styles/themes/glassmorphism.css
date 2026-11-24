@@ -273,3 +273,16 @@
     transform: none;
   }
 }
+
+/* Settings cards: frosted panes with the bright glass edge, a little more see-through than the page panels. */
+:root[data-ui="glass"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.22));
+  -webkit-backdrop-filter: var(--ae-glass-blur);
+  backdrop-filter: var(--ae-glass-blur);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: 18px;
+  box-shadow: var(--ae-gl-shadow);
+}
+:root[data-ui="glass"][data-theme="dark"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+}
