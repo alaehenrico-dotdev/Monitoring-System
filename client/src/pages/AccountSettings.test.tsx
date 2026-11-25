@@ -44,7 +44,9 @@ describe("AccountSettings", () => {
   it("says whether two-step is on, and offers the matching action", () => {
     const { unmount } = render(<AccountSettings />);
     expect(screen.getByText("Off")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Set up" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Set up two-step verification" })).toBeTruthy();
+    // The recovery-email card has its own "Set up"; the names keep the two apart.
+    expect(screen.getByRole("button", { name: "Set up recovery email" })).toBeTruthy();
     unmount();
     auth.user = { ...auth.user, mfaEnabled: true };
     render(<AccountSettings />);
@@ -56,7 +58,7 @@ describe("AccountSettings", () => {
     api.startMfaSetup.mockResolvedValue({ secret: "ABCDEFGHIJKLMNOP", otpauthUrl: "otpauth://totp/x" });
     api.enableMfa.mockResolvedValue({ recoveryCodes: ["AAAAA-BBBBB", "CCCCC-DDDDD"] });
     render(<AccountSettings />);
-    fireEvent.click(screen.getByRole("button", { name: "Set up" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set up two-step verification" }));
 
     fireEvent.change(passwordInput(), { target: { value: "my-password" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
@@ -83,7 +85,7 @@ describe("AccountSettings", () => {
   it("shows a wrong password instead of moving on", async () => {
     api.startMfaSetup.mockRejectedValue(new Error("Incorrect password"));
     render(<AccountSettings />);
-    fireEvent.click(screen.getByRole("button", { name: "Set up" }));
+    fireEvent.click(screen.getByRole("button", { name: "Set up two-step verification" }));
     fireEvent.change(passwordInput(), { target: { value: "nope" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect((await screen.findByRole("alert")).textContent).toBe("Incorrect password");

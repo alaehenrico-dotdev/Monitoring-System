@@ -94,7 +94,7 @@ export function AccountSettings() {
           status={<span className={`ae-account-role${enabled ? " ae-account-role--on" : ""}`}>{enabled ? "On" : "Off"}</span>}
           description={enabled ? "Sign-in needs your password and an app code." : "Adds an app code at sign-in. Recommended for admins."}
         >
-          <Button {...actionButton} onClick={() => setDialog(enabled ? "mfa-off" : "mfa-on")}>
+          <Button {...actionButton} aria-label={enabled ? undefined : "Set up two-step verification"} onClick={() => setDialog(enabled ? "mfa-off" : "mfa-on")}>
             {enabled ? "Turn off" : "Set up"}
           </Button>
         </Setting>
@@ -115,7 +115,11 @@ export function AccountSettings() {
                   : "Lets you reset your own password by email if you forget it."
             }
           >
-            <Button {...actionButton} onClick={() => setDialog("email")}>
+            <Button
+              {...actionButton}
+              aria-label={user.recoveryEmail || user.recoveryEmailPending ? "Change recovery email" : "Set up recovery email"}
+              onClick={() => setDialog("email")}
+            >
               {user.recoveryEmail || user.recoveryEmailPending ? "Change" : "Set up"}
             </Button>
           </Setting>
