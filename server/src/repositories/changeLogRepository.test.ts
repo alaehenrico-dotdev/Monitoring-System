@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { buildChangeLogWhere } from "./changeLogRepository";
+import { buildChangeLogWhere, CHANGE_LOG_COUNT_CAP, cappedCount } from "./changeLogRepository";
+
+describe("cappedCount", () => {
+  it("reports the exact count while it is under the cap", () => {
+    expect(cappedCount(0)).toEqual({ total: 0, capped: false });
+    expect(cappedCount(160)).toEqual({ total: 160, capped: false });
+    expect(cappedCount(CHANGE_LOG_COUNT_CAP)).toEqual({ total: CHANGE_LOG_COUNT_CAP, capped: false });
+  });
+
+  it("stops at the cap and says so once one more row than the cap was read", () => {
+    expect(cappedCount(CHANGE_LOG_COUNT_CAP + 1)).toEqual({ total: CHANGE_LOG_COUNT_CAP, capped: true });
+  });
+});
 
 describe("buildChangeLogWhere", () => {
   it("is unfiltered when nothing is set", () => {

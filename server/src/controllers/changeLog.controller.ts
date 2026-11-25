@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { z } from "zod";
 import {
+  CHANGE_LOG_COUNT_CAP,
   DEFAULT_CHANGE_LOG_LIMIT,
   MAX_CHANGE_LOG_LIMIT,
   exportChangeLogCsv,
@@ -48,7 +49,8 @@ const pageSchema = filterSchema.extend({
   limit: z.coerce.number().int().positive().max(MAX_CHANGE_LOG_LIMIT).default(DEFAULT_CHANGE_LOG_LIMIT),
   cursor: z.coerce.number().int().positive().optional(),
   // Numbered paging: skip this many newest rows, and say how many match in all.
-  offset: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  // No deeper than the count goes (CHANGE_LOG_COUNT_CAP): a deep OFFSET still reads every skipped row.
+  offset: z.coerce.number().int().min(0).max(CHANGE_LOG_COUNT_CAP).optional(),
   withTotal: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
 });
 
@@ -113,9 +115,14 @@ export async function getRecentCellsHandler(req: Request, res: Response) {
 
 const archiveQuerySchema = z.object({
   limit: z.coerce.number().int().positive().max(MAX_CHANGE_LOG_LIMIT).default(DEFAULT_CHANGE_LOG_LIMIT),
-  offset: z.coerce.number().int().min(0).max(1_000_000).optional(),
+  // Same depth limit as the live list: a deep OFFSET still reads every skipped row.
+  offset: z.coerce.number().int().min(0).max(CHANGE_LOG_COUNT_CAP).optional(),
   tableName: z.string().min(1).optional(),
   recordId: z.coerce.number().int().positive().optional(),
+  dateFrom: dateParam("from").optional(),
+  dateTo: dateParam("to").optional(),
+  userId: z.coerce.number().int().positive().optional(),
+  action: z.enum(["CREATE", "UPDATE", "DELETE"]).optional(),
 });
 
 export async function getArchive(req: Request, res: Response) {

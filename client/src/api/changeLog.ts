@@ -23,6 +23,8 @@ export interface ChangeLogPage {
   nextCursor: number | null;
   /// Rows matching the filters in all - only when asked for (`withTotal`).
   total?: number;
+  /// True when `total` stopped at the server's cap: there are more than this many.
+  totalCapped?: boolean;
 }
 
 function filterParams(filters: ChangeLogFilters): URLSearchParams {

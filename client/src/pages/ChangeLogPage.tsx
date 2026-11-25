@@ -518,6 +518,7 @@ function CategorySection({
       listChangeLogPage({ ...filters, tableName: table }, { limit, offset, withTotal: true }).then((r) => ({
         items: r.items,
         total: r.total ?? r.items.length,
+        totalCapped: r.totalCapped === true,
       })),
     // filterKey is the serialized `filters`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -556,13 +557,14 @@ function CategorySection({
             <button type="button" onClick={onToggle} aria-expanded={!collapsed} style={groupToggleStyle}>
               <span aria-hidden="true">{collapsed ? "▶" : "▼"}</span>
               <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>{tableLabel(table)}</span>
-              <span style={{ flex: "none", fontWeight: 500, color: colors.subtleInk }}>({list.total.toLocaleString()})</span>
+              <span style={{ flex: "none", fontWeight: 500, color: colors.subtleInk }}>({list.total.toLocaleString()}{list.data?.totalCapped ? "+" : ""})</span>
             </button>
             <Pager
               compact
               page={list.page}
               pageSize={list.pageSize}
               total={list.total}
+              totalCapped={list.data?.totalCapped}
               onPage={list.goToPage}
               onPageSize={list.setPageSize}
               loading={list.loading}

@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+**Upgrading a running server:** run the normal deploy. One new migration, `20261125100000_add_change_log_table_id_index`, adds one index and touches no rows (on a large `change_log` table the index takes a moment to build). New optional setting `SYSTEM_EVENT_RETENTION_DAYS` (default 90, 0 = off).
+
+### Changed
+- **Change Log is faster.** A new index serves the per-table lists, counts stop at 10,000 (shown as "10,000+"), and numbered paging stops there too. Narrow the filters or use the CSV export to reach older rows.
+
+- **The archive list matches the live log.** It filters by date, user and action, counts only up to 10,000 ("10,000+"), and pages no deeper than that.
+- **A cut-off CSV export says so.** When an export stops at 50,000 rows, its last line tells you to narrow the filters.
+- **A cell's edit history reaches into the archive.** Edits older than the retention period no longer vanish from the cell history.
+- **The nightly purge log line is more informative.** It records the cut-off date and the event types, and notes when a run stopped at its limit with more still to delete.
+
+### Added
+- **System log housekeeping.** Failure and refusal events (failed sign-ins, failed two-step codes, refused or failed reset and recovery-email steps) are deleted after `SYSTEM_EVENT_RETENTION_DAYS` days by the nightly job. Sign-ins and every successful security, settings or backup event are kept.
+
 ## 2.7.0 - 2026-11-25
 
 **Upgrading a running server:** run the normal deploy (it snapshots the database first). Three new migrations since 2.6.0: `20261121090000_auditor_role`, `20261121120000_count_submissions` and `20261124090000_add_admin_recovery_email`. All only add things (new tables, nullable columns, one unique index); no existing row is rewritten. Admin recovery email is optional and stays off until `SMTP_USER` and `SMTP_PASS` are set (see `docs/ADMIN_EMAIL_RECOVERY.md`); with Docker, the new `SMTP_*` lines in `docker-compose.yml` pass them through. The server host must allow outbound port 465.

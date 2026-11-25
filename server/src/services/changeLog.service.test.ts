@@ -9,6 +9,7 @@ vi.mock("../repositories/changeLogRepository", () => ({
     findStockRecordsByIds: vi.fn(),
     findProductsByIds: vi.fn(),
     findForRecord: vi.fn(),
+    findArchivedForRecord: vi.fn(),
     findRecentUserEdits: vi.fn(),
     findDayClosures: vi.fn(),
   },
@@ -197,6 +198,22 @@ describe("exportChangeLogCsv", () => {
     expect(vi.mocked(changeLogRepository.findPage).mock.calls[1][1].cursor).toBe(1501);
   });
 
+  it("ends with a note when the export stopped at its row cap", async () => {
+    // 50,000 rows in chunks of 500 and always more behind them.
+    vi.mocked(changeLogRepository.findPage).mockImplementation((async () =>
+      Array.from({ length: 501 }, (_, i) => logRow({ id: 1000000 - i }))) as never);
+
+    const lines = (await exportChangeLogCsv({})).split("\r\n");
+
+    expect(lines).toHaveLength(1 + 50_000 + 1);
+    expect(lines[lines.length - 1]).toContain("Export stopped at 50,000 rows");
+  });
+
+  it("adds no note when the log ends exactly at the cap or sooner", async () => {
+    vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow()] as never);
+    expect(await exportChangeLogCsv({})).not.toContain("Export stopped");
+  });
+
   it("neutralises spreadsheet formulas", async () => {
     vi.mocked(changeLogRepository.findPage).mockResolvedValue([logRow({ changedBy: { id: 1, name: "=HYPERLINK(1)", username: "x", role: "ENCODER" } })] as never);
     expect(await exportChangeLogCsv({})).toContain("'=HYPERLINK(1)");
@@ -230,6 +247,28 @@ describe("isCellHistoryTable", () => {
 });
 
 describe("getCellHistory", () => {
+  beforeEach(() => {
+    vi.mocked(changeLogRepository.findArchivedForRecord).mockResolvedValue([] as never);
+  });
+
+  it("reads the archive when the live table could not fill the page, and keeps newest first", async () => {
+    mockEntries([entry("UPDATE", { stockIn: 9 }, { stockIn: 12 }, "Ana", new Date("2026-10-09T08:00:00Z"))]);
+    vi.mocked(changeLogRepository.findArchivedForRecord).mockResolvedValue([
+      entry("UPDATE", { stockIn: 5 }, { stockIn: 9 }, "Ben", new Date("2025-01-02T08:00:00Z")),
+    ] as never);
+
+    const out = await getCellHistory(ONLINE);
+
+    expect(changeLogRepository.findArchivedForRecord).toHaveBeenCalledWith("daily_online_stock", 100, 299);
+    expect(out.map((e) => [e.who, e.newValue])).toEqual([["Ana", 12], ["Ben", 9]]);
+  });
+
+  it("skips the archive when the live table already filled the page", async () => {
+    mockEntries(Array.from({ length: 300 }, (_, i) => entry("UPDATE", { stockIn: i }, { stockIn: i + 1 })));
+    await getCellHistory(ONLINE);
+    expect(changeLogRepository.findArchivedForRecord).not.toHaveBeenCalled();
+  });
+
   it("returns only the entries in which the requested field moved", async () => {
     mockEntries([
       entry("UPDATE", { stockIn: 5, productionIn: 1 }, { stockIn: 9, productionIn: 1 }),

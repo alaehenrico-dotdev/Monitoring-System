@@ -238,6 +238,10 @@ export const env = {
   // by the nightly maintenance job (services/maintenance.service.ts). 0 turns
   // archiving off.
   changeLogRetentionMonths: nonNegativeInt("CHANGE_LOG_RETENTION_MONTHS", 12),
+  // Failure and refusal events in the system log (failed sign-ins, refused reset links ...) are deleted
+  // after this many days by the same job. Sign-ins and every successful security or settings change are
+  // kept. 0 turns it off.
+  systemEventRetentionDays: nonNegativeInt("SYSTEM_EVENT_RETENTION_DAYS", 90),
   // Browser error reports (POST /api/client-errors) accept anonymous input, so the
   // table is bounded: reports older than this many days are deleted by the nightly
   // maintenance job, and no more than this many are ever kept (oldest go first).

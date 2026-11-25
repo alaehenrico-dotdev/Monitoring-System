@@ -1,6 +1,9 @@
 import { ChangeAction } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
-import { changeLogRepository, REPORTS_TABLE, SNAPSHOT_TABLE, type ChangeLogFilters } from "../repositories/changeLogRepository";
+import { CHANGE_LOG_COUNT_CAP, changeLogRepository, REPORTS_TABLE, SNAPSHOT_TABLE, type ChangeLogFilters } from "../repositories/changeLogRepository";
+
+/// How far the Change Log counts and pages (controllers read it from here, not from the repository).
+export { CHANGE_LOG_COUNT_CAP };
 import { toDateOnlyString } from "../utils/date";
 import { CALCULATED_FIELDS, diffChanges, summarizeChange } from "../utils/changeSummary";
 import { DELIVERY_COLUMN, DELIVERY_LEGACY_SLOTS, extraCellKey } from "../utils/stockExtras";
@@ -192,18 +195,18 @@ export type ChangeLogItem = Awaited<ReturnType<typeof enrich>>[number];
 export async function listChangeLog(
   filters: ChangeLogFilters,
   page: { limit?: number; cursor?: number; offset?: number; withTotal?: boolean } = {},
-): Promise<{ items: ChangeLogItem[]; nextCursor: number | null; total?: number }> {
+): Promise<{ items: ChangeLogItem[]; nextCursor: number | null; total?: number; totalCapped?: boolean }> {
   const limit = Math.min(page.limit ?? DEFAULT_CHANGE_LOG_LIMIT, MAX_CHANGE_LOG_LIMIT);
-  const [rows, total] = await Promise.all([
+  const [rows, counted] = await Promise.all([
     changeLogRepository.findPage(filters, { limit, cursor: page.cursor, offset: page.offset }),
-    page.withTotal ? changeLogRepository.count(filters) : Promise.resolve(undefined),
+    page.withTotal ? changeLogRepository.countUpTo(filters) : Promise.resolve(undefined),
   ]);
   const hasMore = rows.length > limit;
   const pageRows = hasMore ? rows.slice(0, limit) : rows;
   return {
     items: await enrich(pageRows),
     nextCursor: hasMore ? pageRows[pageRows.length - 1].id : null,
-    ...(total === undefined ? {} : { total }),
+    ...(counted === undefined ? {} : { total: counted.total, ...(counted.capped ? { totalCapped: true } : {}) }),
   };
 }
 
@@ -221,10 +224,14 @@ const CSV_HEADERS = ["When", "Table", "Action", "Source", "Changed by", "SKU", "
 export async function exportChangeLogCsv(filters: ChangeLogFilters): Promise<string> {
   const lines = [CSV_HEADERS.join(",")];
   let cursor: number | undefined;
+  let truncated = false;
+  let hasMore = true;
   while (lines.length - 1 < EXPORT_ROW_CAP) {
     const { items, nextCursor } = await listChangeLog(filters, { limit: EXPORT_CHUNK, cursor });
     // The last chunk can overshoot the cap; trim so it is exact.
-    for (const r of items.slice(0, EXPORT_ROW_CAP - (lines.length - 1))) {
+    const room = EXPORT_ROW_CAP - (lines.length - 1);
+    if (items.length > room) truncated = true;
+    for (const r of items.slice(0, room)) {
       const c = r.context;
       const summary = r.tableName === "system" ? String(asObject(r.newValue).event ?? "System event") : r.summary;
       lines.push(
@@ -246,8 +253,13 @@ export async function exportChangeLogCsv(filters: ChangeLogFilters): Promise<str
           .join(","),
       );
     }
+    hasMore = nextCursor !== null;
     if (nextCursor === null) break;
     cursor = nextCursor;
+  }
+  // Stopped by the cap with rows still unread: say so inside the file, so nobody takes it for the whole log.
+  if (truncated || (hasMore && lines.length - 1 >= EXPORT_ROW_CAP)) {
+    lines.push(csvCell(`Export stopped at ${EXPORT_ROW_CAP.toLocaleString("en-US")} rows - narrow the filters (dates, table, user) to get the rest.`));
   }
   return lines.join("\r\n");
 }
@@ -269,6 +281,8 @@ const CELL_HISTORY_TABLES = new Set([
 export function isCellHistoryTable(tableName: string): boolean {
   return CELL_HISTORY_TABLES.has(tableName);
 }
+
+const CELL_HISTORY_READ = 300;
 
 export interface CellHistoryEntry {
   changedAt: Date;
@@ -307,6 +321,11 @@ export async function getCellHistory(params: {
   limit: number;
 }): Promise<CellHistoryEntry[]> {
   const entries = await changeLogRepository.findForRecord(params.tableName, params.recordId);
+  // The live table holds a year; a cell older than that has its earlier edits in the archive. Read it only
+  // when the live rows could not fill the page.
+  if (entries.length < CELL_HISTORY_READ) {
+    entries.push(...(await changeLogRepository.findArchivedForRecord(params.tableName, params.recordId, CELL_HISTORY_READ - entries.length)));
+  }
 
   const out: CellHistoryEntry[] = [];
   for (const e of entries) {

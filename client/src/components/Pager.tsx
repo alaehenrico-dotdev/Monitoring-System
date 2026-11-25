@@ -18,6 +18,7 @@ export function Pager({
   onPageSize,
   pageSizes = PAGE_SIZES,
   loading = false,
+  totalCapped = false,
   compact = false,
   label = "Pagination",
 }: {
@@ -31,6 +32,8 @@ export function Pager({
   pageSizes?: readonly number[];
   /// A page is being fetched: the controls are held.
   loading?: boolean;
+  /// `total` is a floor (the list was counted only up to a cap): shown as "10,000+".
+  totalCapped?: boolean;
   /// Tighter spacing, for a category header row.
   compact?: boolean;
   label?: string;
@@ -63,7 +66,7 @@ export function Pager({
       <span aria-live="polite">
         <span style={strong}>{from.toLocaleString()}–{to.toLocaleString()}</span>
         <span className="ae-pager-of">
-          {" "}of <span style={strong}>{total.toLocaleString()}</span>
+          {" "}of <span style={strong}>{total.toLocaleString()}{totalCapped ? "+" : ""}</span>
         </span>
       </span>
       {onPageSize && (

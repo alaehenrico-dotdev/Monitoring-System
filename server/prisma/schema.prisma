@@ -448,6 +448,9 @@ model ChangeLog {
   // import gets steadily slower as history accumulates. `id` is included so
   // the `ORDER BY id DESC LIMIT 1` is served by the index too.
   @@index([tableName, recordId, id])
+  // The Change Log page lists one table at a time, newest first (WHERE tableName = ? ORDER BY id DESC
+  // LIMIT n). The index above needs a recordId to be useful there; this one serves that list directly.
+  @@index([tableName, id])
   @@map("change_log")
 }
 

@@ -74,6 +74,15 @@ export function buildChangeLogWhere(f: ChangeLogFilters): Prisma.ChangeLogWhereI
   return and.length ? { AND: and } : {};
 }
 
+/// The most rows the Change Log will count for a filter. Past this the page says "10,000+" instead of
+/// counting every match, so a broad filter on a big table stays cheap.
+export const CHANGE_LOG_COUNT_CAP = 10_000;
+
+/// A count read through a cap: `matched` is how many ids were read (at most cap + 1).
+export function cappedCount(matched: number, cap = CHANGE_LOG_COUNT_CAP): { total: number; capped: boolean } {
+  return matched > cap ? { total: cap, capped: true } : { total: matched, capped: false };
+}
+
 export interface ChangeLogPageOptions {
   limit: number;
   /// Return rows older than this id (the previous page's nextCursor).
@@ -113,9 +122,16 @@ export const changeLogRepository = {
     });
   },
 
-  /// How many rows match, for "Showing 21-30 of 160" and the page count.
-  count(filters: ChangeLogFilters) {
-    return prisma.changeLog.count({ where: buildChangeLogWhere(filters) });
+  /// How many rows match, for "Showing 21-30 of 160" and the page count - read through a cap, so it
+  /// stops after CHANGE_LOG_COUNT_CAP + 1 matches instead of counting a whole table.
+  async countUpTo(filters: ChangeLogFilters) {
+    const rows = await prisma.changeLog.findMany({
+      where: buildChangeLogWhere(filters),
+      select: { id: true },
+      orderBy: { id: "desc" },
+      take: CHANGE_LOG_COUNT_CAP + 1,
+    });
+    return cappedCount(rows.length);
   },
 
   /// Live records the change rows point at, for labelling. Batched per table.
@@ -142,6 +158,16 @@ export const changeLogRepository = {
       orderBy: { id: "desc" },
       take,
     });
+  },
+
+  /// The same trail from change_log_archive (rows older than the retention period), shaped like
+  /// findForRecord's rows so the cell history can read both. Served by the archive's (tableName, recordId, id) index.
+  async findArchivedForRecord(tableName: string, recordId: number, take = 300) {
+    const rows = await prisma.changeLogArchive.findMany({ where: { tableName, recordId }, orderBy: { id: "desc" }, take });
+    const ids = [...new Set(rows.map((r) => r.changedById).filter((id): id is number => id !== null))];
+    const users = ids.length ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : [];
+    const names = new Map(users.map((u) => [u.id, u.name] as const));
+    return rows.map((r) => ({ ...r, changedBy: r.changedById !== null && names.has(r.changedById) ? { name: names.get(r.changedById)! } : null }));
   },
 
   /// User-made writes to these records since `since`, newest first - the input
