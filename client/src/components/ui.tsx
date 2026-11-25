@@ -149,12 +149,20 @@ function Label({ children, ...rest }: LabelHTMLAttributes<HTMLLabelElement> & { 
 }
 
 /** Label + control stacked - the "Date" / "Location" / etc. filter-bar pattern used across pages. */
-export function Field({ label, children, style, htmlFor }: { label: string; children: ReactNode; style?: CSSProperties; htmlFor?: string }) {
+export function Field({ label, children, style, htmlFor, action }: { label: string; children: ReactNode; style?: CSSProperties; htmlFor?: string; action?: ReactNode }) {
   return (
     <div style={style}>
       {/* htmlFor ties the label to its control (the control needs the matching id): clicking the label
           focuses it and assistive tech reads it. Without it the two are only neighbours. */}
-      <Label htmlFor={htmlFor}>{label}</Label>
+      {action ? (
+        // `action` is a small control on the label's right edge (e.g. "Show" on a password field).
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+          <Label htmlFor={htmlFor}>{label}</Label>
+          <span style={{ marginBottom: 4, fontSize: "calc(12px * var(--ae-fs, 1))" }}>{action}</span>
+        </div>
+      ) : (
+        <Label htmlFor={htmlFor}>{label}</Label>
+      )}
       {children}
     </div>
   );

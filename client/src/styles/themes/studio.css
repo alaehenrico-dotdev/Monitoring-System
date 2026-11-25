@@ -382,7 +382,7 @@
   text-underline-offset: 3px;
 }
 :root[data-ui="studio"] .ae-dash-link:hover {
-  text-decoration-color: var(--ae-text);
+  filter: brightness(1.25);
 }
 
 /* ---- Tables: quiet header, one hairline per row -------------------------- */
@@ -482,3 +482,14 @@
   color: var(--ae-text) !important;
 }
 
+
+/* Entry-start date dialog: flat, hairline, with the gold accent kept as the left rule. */
+:root[data-ui="studio"] .ae-startconfirm-date {
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-hairline);
+  border-left: 3px solid #d4a000;
+  border-radius: 2px;
+}
+:root[data-ui="studio"] .ae-startconfirm-day {
+  font-weight: 600;
+}

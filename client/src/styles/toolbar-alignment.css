@@ -900,7 +900,7 @@
   cursor: pointer;
 }
 .ae-qj-chat-btn:hover:not(:disabled) {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 .ae-qj-chat-btn:disabled {
   opacity: 0.4;
@@ -996,10 +996,6 @@
   font-size: calc(12.5px * var(--ae-fs, 1));
   line-height: 1.5;
 }
-.ae-quickjump-ai-q {
-  color: #8f8f8f;
-  font-size: calc(11.5px * var(--ae-fs, 1));
-}
 .ae-quickjump-ai-a {
   margin-top: 6px;
   white-space: pre-wrap;
@@ -1031,7 +1027,7 @@
 }
 .ae-quickjump-ai-retry:hover,
 .ae-quickjump-ai-retry:focus-visible {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 .ae-quickjump-ai-src,
 .ae-quickjump-ai-note {
@@ -1187,7 +1183,7 @@
 }
 .ae-dash-list-jump:hover .ae-dash-list-name,
 .ae-dash-list-jump:focus-visible .ae-dash-list-name {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 
 /* These panels float over a grid of several hundred cells. Each already
@@ -1629,7 +1625,6 @@
 }
 .ae-link-btn:hover {
   color: var(--ae-text);
-  text-decoration: underline;
 }
 .ae-link-btn:focus-visible {
   outline: 2px solid var(--ae-btn-yellow);
@@ -2581,7 +2576,7 @@
 }
 .ae-calc-copy:hover:not(:disabled),
 .ae-calc-link:hover {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 .ae-calc-copy:disabled {
   opacity: 0.4;
@@ -3138,7 +3133,7 @@
   color: var(--ae-text);
 }
 .ae-alert-item:hover {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 .ae-alert-empty {
   margin: 0 0 8px;

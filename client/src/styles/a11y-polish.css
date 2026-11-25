@@ -93,10 +93,6 @@
 .ae-page-header-badges .ae-entry-total--action:not(:disabled):hover .ae-entry-total-label {
   color: var(--ae-text);
 }
-.ae-page-header-badges .ae-entry-total--action:not(:disabled):hover .ae-entry-total-label {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
 .ae-page-header-badges .ae-entry-total--on {
   border-bottom: 2px solid var(--ae-danger-text);
 }

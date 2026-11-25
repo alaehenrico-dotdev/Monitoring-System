@@ -2,7 +2,7 @@
 
 /// Friendly names for the server's read-only lookups (server services/aiAsk.service.ts), for the
 /// "Based on ..." line under an answer.
-export const TOOL_LABEL: Record<string, string> = {
+const TOOL_LABEL: Record<string, string> = {
   period_summary: "Period summary",
   variance_by_product: "Variance by product",
   days_of_stock: "Days of stock",

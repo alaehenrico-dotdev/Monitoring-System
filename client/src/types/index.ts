@@ -14,6 +14,10 @@ export interface AuthUser {
   mustChangePassword?: boolean;
   /// Present on /auth/me: two-step verification is turned on for this account.
   mfaEnabled?: boolean;
+  /// Present on /auth/me for an admin: the verified recovery email (null when none), and a new
+  /// address still waiting for its confirmation link.
+  recoveryEmail?: string | null;
+  recoveryEmailPending?: string | null;
 }
 
 export interface Product {

@@ -680,7 +680,7 @@
   cursor: pointer;
 }
 .ae-dash-ai-clear:hover {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 /* While the AI is working, the border runs about three times faster. */
 .ae-dash-ai--busy .ae-ring > i,
@@ -835,7 +835,7 @@
   text-decoration: none;
 }
 .ae-dash-link:hover {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 .ae-dash-card {
   overflow: hidden;
@@ -864,7 +864,7 @@
   text-decoration: none;
 }
 .ae-dash-cell-link:hover {
-  text-decoration: underline;
+  filter: brightness(1.25);
 }
 .ae-dash-cell-link:focus-visible {
   outline: 2px solid #d4a000;

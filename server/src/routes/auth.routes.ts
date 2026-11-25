@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { asyncHandler } from "../utils/asyncHandler";
-import { authenticate } from "../middleware/auth";
-import { authLimiter, loginIpLimiter, mfaLimiter, resetCodeLimiter } from "../middleware/rateLimit";
-import { getMe, postChangePassword, postLogin, postMfaDisable, postMfaEnable, postMfaLogin, postMfaSetup, postSignOutEverywhere, postForgotPasswordReset, postVerifyPassword } from "../controllers/auth.controller";
+import { authenticate, authorize, ROLES } from "../middleware/auth";
+import { authLimiter, loginIpLimiter, mfaLimiter, emailVerifyLimiter, resetCodeLimiter, resetRequestAccountLimiter, resetRequestLimiter } from "../middleware/rateLimit";
+import { getMe, postChangePassword, postLogin, postMfaDisable, postMfaEnable, postMfaLogin, postMfaSetup, postSignOutEverywhere, postForgotPasswordReset, postForgotPasswordRequest, postRecoveryEmail, postVerifyEmail, postVerifyPassword } from "../controllers/auth.controller";
 
 const router = Router();
 
@@ -17,6 +17,9 @@ router.use((_req, res, next) => {
 router.post("/login", loginIpLimiter, authLimiter, asyncHandler(postLogin));
 router.post("/login/mfa", mfaLimiter, asyncHandler(postMfaLogin));
 router.post("/forgot-password/reset", loginIpLimiter, resetCodeLimiter, asyncHandler(postForgotPasswordReset));
+router.post("/forgot-password/request", loginIpLimiter, resetRequestLimiter, resetRequestAccountLimiter, asyncHandler(postForgotPasswordRequest));
+router.post("/email/verify", loginIpLimiter, emailVerifyLimiter, asyncHandler(postVerifyEmail));
+router.post("/recovery-email", authenticate, authorize(ROLES.SUPERVISOR_ADMIN), mfaLimiter, asyncHandler(postRecoveryEmail));
 router.get("/me", authenticate, asyncHandler(getMe));
 router.post("/change-password", authenticate, asyncHandler(postChangePassword));
 router.post("/verify-password", mfaLimiter, authenticate, asyncHandler(postVerifyPassword));

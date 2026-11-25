@@ -1,5 +1,24 @@
 # Changelog
 
+## 2.7.0 - 2026-11-25
+
+**Upgrading a running server:** run the normal deploy (it snapshots the database first). Three new migrations since 2.6.0: `20261121090000_auditor_role`, `20261121120000_count_submissions` and `20261124090000_add_admin_recovery_email`. All only add things (new tables, nullable columns, one unique index); no existing row is rewritten. Admin recovery email is optional and stays off until `SMTP_USER` and `SMTP_PASS` are set (see `docs/ADMIN_EMAIL_RECOVERY.md`); with Docker, the new `SMTP_*` lines in `docker-compose.yml` pass them through. The server host must allow outbound port 465.
+
+### Added
+- **Admin recovery email.** An administrator can set a recovery email in Account Settings (their password is required) and confirm it with a link sent to the new address. If they forget their password, **Forgot password?** can email them a one-time code (works once, expires after 30 minutes). Responses never say whether an account or email exists, mail is limited to one a minute per account and six an hour, and only hashes are stored. The old address is warned when a change is requested and told when it completes, and the recovery address is told when a password is reset. Gmail SMTP with an App Password by default; all mail leaves through `server/src/lib/mailer.ts`.
+- **Auditor role and count submissions.** Auditors enter blind counts as drafts, submit them once per sheet, and administrators review, reopen or accept them from the action queue, with a history of each submission.
+
+### Changed
+- **Forgot password page** is simpler: one line of instructions, "Email me a code" as a small link beside the code field, a Show/Hide toggle instead of a confirm field, and the username filled in when opened from the emailed link.
+- **Emails** share one layout: the reset code is set to select in a single click or tap, and the notices use a highlighted value and a clear "if this wasn't you" call-out.
+- **Hover** on clickable text no longer underlines; it lightens instead (all themes).
+- **Settings:** translucent cards per theme and uniform action buttons.
+- On iPhone, the app now draws to the screen edges and pads for the notch and home indicator (`viewport-fit=cover`).
+
+### Security
+- Reset codes cannot be replaced by two simultaneous requests, and failed email-link attempts no longer use up reset-code attempts from the same address.
+- Hardened prototype-pollution handling when totalling stock extras.
+
 ## 2.6.0 - 2026-11-19
 
 **Upgrading a running server:** run the normal deploy (it snapshots the database first). One new migration since 2.5.3, `20261119090000_push_alerts`, adds the tables for push subscriptions and seen alerts. Push notifications are optional and off until the VAPID keys are set (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`; see `server/.env.example`). Without them nothing about push appears. Stock entry and stock calculations are unchanged.

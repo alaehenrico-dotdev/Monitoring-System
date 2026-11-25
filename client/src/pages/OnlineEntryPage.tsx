@@ -22,7 +22,9 @@ import { useTopProgress } from "../hooks/useTopProgress";
 import { useResetOnKeyChange } from "../hooks/useResetOnKeyChange";
 import { useShiftWithSavedData } from "../hooks/useShiftWithSavedData";
 import { SaveSummary } from "../components/SaveSummary";
+import { useCarryEditsToDate } from "../hooks/useCarryEditsToDate";
 import { useSaveDateGate } from "../hooks/useSaveDateGate";
+import { EntryStartConfirm, useEntryStartConfirm } from "../components/EntryStartConfirm";
 import { openDatePicker } from "../utils/openDatePicker";
 import { EntryProgress } from "../components/EntryProgress";
 import { useOpeningBreaks } from "../hooks/useOpeningBreaks";
@@ -301,6 +303,25 @@ export function OnlineEntryPage() {
     stageMany,
     getSavedValue,
     columns,
+  });
+  const carry = useCarryEditsToDate({
+    storagePrefix: "ala-eh-pending:online",
+    date,
+    shift,
+    setDate,
+    loaded: rows !== null,
+    hasPending: pendingCount > 0,
+    openReview: () => setShowPreview(true),
+  });
+  const hasSavedRows = useMemo(
+    () => (rows ?? []).some((r) => typeof (r.entry as { id?: unknown }).id === "number"),
+    [rows],
+  );
+  const startConfirm = useEntryStartConfirm({
+    date,
+    shift,
+    active: canEdit && rows !== null,
+    fresh: pendingCount === 0 && !hasSavedRows,
   });
 
   // A finished (or otherwise read-only) sheet shows exactly the columns that
@@ -698,7 +719,7 @@ export function OnlineEntryPage() {
           location="ONLINE"
           date={date}
           shift={shift}
-          onDateChange={setDate}
+          onDateChange={carry.changeDate}
           onShiftChange={setShift}
           query={query}
           onQueryChange={setQuery}
@@ -816,7 +837,7 @@ export function OnlineEntryPage() {
           label="Loading online entries…"
         />
       ) : (
-        <div className="ae-grid-fill" style={zoomStyle(zoom)}>
+        <div className="ae-grid-fill" style={zoomStyle(zoom)} {...startConfirm.gridProps}>
           {/* Keyed by date+shift so switching either remounts the grid fresh -
               categories start collapsed again on a newly-loaded dataset
               instead of carrying over whatever was expanded on the last one.
@@ -858,6 +879,19 @@ export function OnlineEntryPage() {
           />
         </div>
       )}
+      {startConfirm.asking && (
+        <EntryStartConfirm
+          page="Online Stocks"
+          date={date}
+          shift={shift}
+          onConfirm={startConfirm.confirm}
+          onClose={startConfirm.cancel}
+          onChangeDate={() => {
+            startConfirm.cancel();
+            openDatePicker();
+          }}
+        />
+      )}
       <EntrySaveBar
         pendingCount={pendingCount}
         pendingCellCount={pendingCellCount}
@@ -877,6 +911,7 @@ export function OnlineEntryPage() {
             products={new Set(saveReviewItems.map((i) => i.productId)).size}
             gate={dateGate}
             onChangeDate={() => {
+              carry.arm();
               setShowPreview(false);
               openDatePicker();
             }}

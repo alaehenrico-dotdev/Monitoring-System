@@ -1,5 +1,5 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { disableMfa, enableMfa, startMfaSetup } from "../api/auth";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { disableMfa, enableMfa, setRecoveryEmail, startMfaSetup } from "../api/auth";
 import { ChangePasswordForm } from "../components/ChangePasswordForm";
 import { Modal } from "../components/Modal";
 import { QrCode } from "../components/QrCode";
@@ -33,8 +33,26 @@ const actionButton = { variant: "secondary", className: "ae-btn-solid", size: "s
 /// Every role: your own password, two-step verification, and signing out other devices. Admins
 /// manage OTHER people's passwords in the User Passwords tab.
 export function AccountSettings() {
-  const { user, signOutEverywhere } = useAuth();
-  const [dialog, setDialog] = useState<"password" | "mfa-on" | "mfa-off" | null>(null);
+  const { user, signOutEverywhere, refreshUser } = useAuth();
+  // The confirmation link opens in another tab, so while a new recovery email is waiting, re-check
+  // whenever this tab is looked at again instead of showing "Waiting" until a manual reload.
+  const waitingForEmail = Boolean(user?.recoveryEmailPending);
+  useEffect(() => {
+    if (!waitingForEmail) return;
+    const recheck = () => {
+      if (document.visibilityState === "visible") void refreshUser().catch(() => {});
+    };
+    recheck();
+    window.addEventListener("focus", recheck);
+    document.addEventListener("visibilitychange", recheck);
+    return () => {
+      window.removeEventListener("focus", recheck);
+      document.removeEventListener("visibilitychange", recheck);
+    };
+    // refreshUser is recreated every render; only the waiting flag should restart this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingForEmail]);
+  const [dialog, setDialog] = useState<"password" | "mfa-on" | "mfa-off" | "email" | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const enabled = Boolean(user?.mfaEnabled);
 
@@ -81,6 +99,28 @@ export function AccountSettings() {
           </Button>
         </Setting>
 
+        {user?.role === "SUPERVISOR_ADMIN" && (
+          <Setting
+            title="Recovery email"
+            status={
+              <span className={`ae-account-role${user.recoveryEmail ? " ae-account-role--on" : ""}`}>
+                {user.recoveryEmail ? "Verified" : user.recoveryEmailPending ? "Waiting" : "Not set"}
+              </span>
+            }
+            description={
+              user.recoveryEmail
+                ? `Password reset codes go to ${user.recoveryEmail}.${user.recoveryEmailPending ? ` Waiting for you to confirm ${user.recoveryEmailPending}.` : ""}`
+                : user.recoveryEmailPending
+                  ? `Waiting for you to open the link we sent to ${user.recoveryEmailPending}.`
+                  : "Lets you reset your own password by email if you forget it."
+            }
+          >
+            <Button {...actionButton} onClick={() => setDialog("email")}>
+              {user.recoveryEmail || user.recoveryEmailPending ? "Change" : "Set up"}
+            </Button>
+          </Setting>
+        )}
+
         <Setting
           title="Signed-in devices"
           description="Sign out all other devices, including remembered ones. This one stays signed in."
@@ -98,6 +138,7 @@ export function AccountSettings() {
       )}
       {dialog === "mfa-on" && <SetUpTwoStep onClose={() => setDialog(null)} />}
       {dialog === "mfa-off" && <TurnOffTwoStep onClose={() => setDialog(null)} />}
+      {dialog === "email" && <RecoveryEmailDialog onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -266,6 +307,66 @@ function TurnOffTwoStep({ onClose }: { onClose: () => void }) {
           Turn off
         </Button>
       </form>
+    </Modal>
+  );
+}
+
+/// An admin sets or changes their own recovery email. Needs the current password; the address only
+/// counts once the link sent to it is clicked, and the old one stays active until then.
+function RecoveryEmailDialog({ onClose }: { onClose: () => void }) {
+  const { refreshUser } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy || !email.trim() || !password) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setRecoveryEmail(email.trim(), password);
+      setSentTo(email.trim().toLowerCase());
+      await refreshUser().catch(() => {});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save the email. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="Recovery email" width={420} onClose={onClose}>
+      {sentTo ? (
+        <div style={{ display: "grid", gap: 14 }}>
+          <p style={note}>
+            We sent a confirmation link to <strong>{sentTo}</strong>. It works once and expires in 1 hour. Your current recovery email, if you have one, stays active until you click it.
+          </p>
+          <Button type="button" onClick={onClose}>
+            Done
+          </Button>
+        </div>
+      ) : (
+        <form onSubmit={submit} style={{ display: "grid", gap: 14 }} autoComplete="off">
+          <p style={note}>If you forget your password, a one-time reset code is emailed here. Enter your password to change it.</p>
+          <Field label="Email address">
+            <TextInput type="email" autoComplete="email" autoFocus value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%" }} />
+          </Field>
+          <Field label="Your password">
+            <TextInput type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%" }} />
+          </Field>
+          {error && (
+            <p role="alert" style={{ ...note, color: colors.danger }}>
+              {error}
+            </p>
+          )}
+          <Button type="submit" disabled={busy || !email.trim() || !password} loading={busy} loadingLabel="Sending…">
+            Send confirmation link
+          </Button>
+        </form>
+      )}
     </Modal>
   );
 }

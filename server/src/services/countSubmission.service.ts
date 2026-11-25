@@ -28,7 +28,7 @@ const LOCAL_UTC_OFFSET_HOURS = 8;
 const SHEET_DAYS_BACK = 3;
 const SHEET_DAYS_AHEAD = 1;
 
-export function assertSheetInRange(entryDate: Date, now = new Date()): void {
+function assertSheetInRange(entryDate: Date, now = new Date()): void {
   const local = new Date(now.getTime() + LOCAL_UTC_OFFSET_HOURS * 3_600_000);
   const today = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
   const days = Math.round((entryDate.getTime() - today) / 86_400_000);

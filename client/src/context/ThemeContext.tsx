@@ -23,17 +23,17 @@ const UI_STYLES: readonly UiStyle[] = ["classic", "brutal", "glass", "minimal", 
 /// Stored per browser like the theme. A saved value no longer in this list falls back to standard.
 export type HeaderStyle = "standard" | "inline" | "ribbon" | "dock";
 export const HEADER_STYLES: readonly HeaderStyle[] = ["standard", "inline", "ribbon", "dock"];
-export const DEFAULT_HEADER_STYLE: HeaderStyle = "standard";
+const DEFAULT_HEADER_STYLE: HeaderStyle = "standard";
 
 /// How the charts (Dashboard stock flow, Daily Out) are drawn, chosen in Settings > Appearance > Charts.
 /// Two independent choices, stored per browser like the theme. They change only the drawing, never
 /// the numbers: the type is lines, grouped bars, stacked columns or filled areas; the look is how heavy the marks are.
 export type ChartType = "line" | "bar" | "stack" | "area";
 export type ChartLook = "classic" | "minimal" | "bold";
-export const CHART_TYPES: readonly ChartType[] = ["line", "bar", "stack", "area"];
-export const CHART_LOOKS: readonly ChartLook[] = ["classic", "minimal", "bold"];
-export const DEFAULT_CHART_TYPE: ChartType = "line";
-export const DEFAULT_CHART_LOOK: ChartLook = "classic";
+const CHART_TYPES: readonly ChartType[] = ["line", "bar", "stack", "area"];
+const CHART_LOOKS: readonly ChartLook[] = ["classic", "minimal", "bold"];
+const DEFAULT_CHART_TYPE: ChartType = "line";
+const DEFAULT_CHART_LOOK: ChartLook = "classic";
 
 /// The interface typeface and text size (Settings > Appearance > Font). Like the
 /// theme they are a per-browser preference, applied as data attributes on <html>

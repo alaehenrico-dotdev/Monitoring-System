@@ -37,7 +37,37 @@ export const userRepository = {
   /// The two account-security flags /auth/me reports; a lean read, so nothing sensitive
   /// (the password hash, the TOTP secret) is loaded just to answer "who am I".
   findSecurityFlags(id: number) {
-    return prisma.user.findUnique({ where: { id }, select: { mustChangePassword: true, totpEnabledAt: true } });
+    return prisma.user.findUnique({
+      where: { id },
+      select: { mustChangePassword: true, totpEnabledAt: true, email: true, emailVerifiedAt: true, pendingEmail: true, emailVerifyExpiresAt: true },
+    });
+  },
+
+  findByEmail(email: string) {
+    return prisma.user.findUnique({ where: { email } });
+  },
+
+  /// Starts a recovery-email change: parks the new address until the link sent to it is clicked.
+  setPendingEmail(id: number, pendingEmail: string, hash: string, expiresAt: Date) {
+    return prisma.user.update({
+      where: { id },
+      data: { pendingEmail, emailVerifyHash: hash, emailVerifyExpiresAt: expiresAt },
+      select: { id: true },
+    });
+  },
+
+  findByEmailVerifyHash(hash: string) {
+    return prisma.user.findFirst({ where: { emailVerifyHash: hash } });
+  },
+
+  /// Makes the pending address the recovery email. One conditional update, so the same link
+  /// cannot be spent twice by racing requests.
+  async confirmPendingEmail(id: number, pendingEmail: string, hash: string, now: Date): Promise<boolean> {
+    const r = await prisma.user.updateMany({
+      where: { id, pendingEmail, emailVerifyHash: hash, emailVerifyExpiresAt: { gt: now } },
+      data: { email: pendingEmail, emailVerifiedAt: now, pendingEmail: null, emailVerifyHash: null, emailVerifyExpiresAt: null },
+    });
+    return r.count === 1;
   },
 
   findAllPublic() {
@@ -65,6 +95,16 @@ export const userRepository = {
   /// Stores a freshly issued reset code (replacing any earlier one) with a clean attempt count.
   setResetCode(id: number, hash: string, expiresAt: Date) {
     return prisma.user.update({ where: { id }, data: { resetCodeHash: hash, resetCodeExpiresAt: expiresAt, resetCodeAttempts: 0 }, select: { id: true } });
+  },
+
+  /// Issues an emailed reset code only if the last one is older than the cooldown. One conditional
+  /// update (issue time = expiry - ttl), so two simultaneous requests cannot both win and both send a mail.
+  async issueResetCodeIfDue(id: number, hash: string, expiresAt: Date, cutoff: Date): Promise<boolean> {
+    const r = await prisma.user.updateMany({
+      where: { id, OR: [{ resetCodeExpiresAt: null }, { resetCodeExpiresAt: { lte: cutoff } }] },
+      data: { resetCodeHash: hash, resetCodeExpiresAt: expiresAt, resetCodeAttempts: 0 },
+    });
+    return r.count === 1;
   },
 
   /// A wrong guess at a live code. Once `maxAttempts` is reached the code is cancelled outright.

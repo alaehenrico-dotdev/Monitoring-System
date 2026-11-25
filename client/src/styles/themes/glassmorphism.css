@@ -274,6 +274,17 @@
   }
 }
 
+/* Entry-start date dialog: a frosted inset pane with a bright edge. */
+:root[data-ui="glass"] .ae-startconfirm-date {
+  background: var(--ae-glass-bg);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid var(--ae-gl-edge);
+  border-left: 1px solid var(--ae-gl-edge);
+  border-radius: 16px;
+  box-shadow: var(--ae-gl-shadow);
+}
+
 /* Settings cards: frosted panes with the bright glass edge, a little more see-through than the page panels. */
 :root[data-ui="glass"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.22));

@@ -320,6 +320,15 @@ export const env = {
   // is still cut off at once by a password change, "sign out everywhere", or deactivation.
   rememberDeviceDays: rememberDays("REMEMBER_DEVICE_DAYS", 30),
   clientOrigin: clientOrigin(),
+  // Recovery email (lib/mailer.ts): Gmail SMTP with an App Password by default. Optional - with
+  // SMTP_USER or SMTP_PASS empty the feature is simply off and no mail is ever attempted.
+  mail: {
+    host: process.env.SMTP_HOST?.trim() || "smtp.gmail.com",
+    port: Number(process.env.SMTP_PORT ?? 465) || 465,
+    user: process.env.SMTP_USER?.trim() || "",
+    pass: (process.env.SMTP_PASS ?? "").replace(/\s+/g, ""),
+    from: process.env.MAIL_FROM?.trim() || process.env.SMTP_USER?.trim() || "",
+  },
   dataResetPasscode: requiredSecret("DATA_RESET_PASSCODE"),
   // Full path to the mysqldump binary, for hosts (notably Windows) where the
   // MySQL client tools aren't on PATH. Defaults to plain "mysqldump".

@@ -129,6 +129,50 @@ export const resetCodeLimiter = rateLimit({
   },
 });
 
+/// "Email me a code" on the forgot page: sends mail, so it is much tighter than the code-entry limiter -
+/// it must not become a way to fill someone's inbox. Per address AND per username.
+export const resetRequestLimiter = rateLimit({
+  store: new PrismaRateLimitStore("resetreq"),
+  // Database unreachable: let the request through (sign-in itself needs the database anyway).
+  passOnStoreError: true,
+  windowMs: env.rateLimit.loginWindowMs,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: `Too many attempts - please wait ${waitText()} and try again.` },
+  keyGenerator: (req: Request) => {
+    const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
+    return `${ipKeyGenerator(req.ip ?? "")}:resetreq:${username}`;
+  },
+});
+
+/// The same request, capped per ACCOUNT per hour whatever the address: the per-address limiter above
+/// cannot stop someone rotating IPs from filling one admin's inbox. Applies to every username alike,
+/// so a refusal says nothing about whether the account exists.
+export const resetRequestAccountLimiter = rateLimit({
+  store: new PrismaRateLimitStore("resetacct"),
+  passOnStoreError: true,
+  windowMs: 60 * 60 * 1000,
+  limit: 6,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many reset requests for this account - please try again in an hour." },
+  keyGenerator: (req: Request) => `resetacct:${typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase().slice(0, 64) : ""}`,
+});
+
+/// Confirming a recovery-email link. Its own bucket: it must not spend the reset-code-entry attempts
+/// of the same address (they used to share one key).
+export const emailVerifyLimiter = rateLimit({
+  store: new PrismaRateLimitStore("emailverify"),
+  passOnStoreError: true,
+  windowMs: env.rateLimit.loginWindowMs,
+  limit: env.rateLimit.loginLimit,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: `Too many attempts - please wait ${waitText()} and try again.` },
+  keyGenerator: (req: Request) => `${ipKeyGenerator(req.ip ?? "")}:emailverify`,
+});
+
 export const passcodeLimiter = rateLimit({
   store: new PrismaRateLimitStore("passcode"),
   // Database unreachable: let the request through (sign-in itself needs the database anyway).

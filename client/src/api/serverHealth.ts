@@ -12,7 +12,7 @@
 import { API_URL } from "./http";
 
 export const HEALTH_CHECK_INTERVAL_MS = 5_000;
-export const HEALTH_CHECK_TIMEOUT_MS = 2_000;
+const HEALTH_CHECK_TIMEOUT_MS = 2_000;
 
 export interface ServerHealthSnapshot {
   /// null until the first check has answered - "not known yet", which the
@@ -31,7 +31,7 @@ let inFlight: Promise<void> | null = null;
 
 /// One-shot reachability probe. Exported for callers that need an answer
 /// right now rather than the polled value.
-export async function checkServerReachable(): Promise<boolean> {
+async function checkServerReachable(): Promise<boolean> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return false;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), HEALTH_CHECK_TIMEOUT_MS);
@@ -57,7 +57,7 @@ function publish(reachable: boolean) {
 /// Runs one check and publishes the result. Deduped: an interval tick and an
 /// online/offline event arriving together share a single in-flight request
 /// rather than each hitting /health.
-export function refreshServerHealth(): Promise<void> {
+function refreshServerHealth(): Promise<void> {
   if (inFlight) return inFlight;
   inFlight = checkServerReachable()
     .then(publish)

@@ -10,6 +10,7 @@ import { assertAdminPassword } from "./adminPassword.service";
 import { verifyMfaCode } from "./mfa.service";
 import { logSystemEvent, recordChange } from "./changeLog.service";
 import { removeAllPushSubscriptions } from "./pushSubscriptions.service";
+import { notifyPasswordReset } from "./recoveryEmail.service";
 
 function assertAcceptablePassword(password: string, username: string) {
   const problem = passwordProblem(password, username);
@@ -57,7 +58,14 @@ export async function signOutEverywhere(userId: number, remember = false) {
 /// What /auth/me adds to the token's identity: the two account-security flags.
 export async function getSecurityFlags(userId: number) {
   const flags = await userRepository.findSecurityFlags(userId);
-  return { mustChangePassword: flags?.mustChangePassword ?? false, mfaEnabled: Boolean(flags?.totpEnabledAt) };
+  return {
+    mustChangePassword: flags?.mustChangePassword ?? false,
+    mfaEnabled: Boolean(flags?.totpEnabledAt),
+    // The verified recovery email only (never the hashes), and whether a change is waiting for its link.
+    recoveryEmail: flags?.email && flags.emailVerifiedAt ? flags.email : null,
+    // An expired link is not "pending" any more: hide it instead of showing a change that can't complete.
+    recoveryEmailPending: flags?.pendingEmail && flags.emailVerifyExpiresAt && flags.emailVerifyExpiresAt > new Date() ? flags.pendingEmail : null,
+  };
 }
 
 /// An administrator issues a one-time reset code for someone who forgot their password. It needs
@@ -102,6 +110,7 @@ export async function resetPasswordWithCode(username: string, code: string, newP
     invalidate(`user-status:${user!.id}`);
     await removeAllPushSubscriptions(user!.id);
     await logSystemEvent("password_reset_by_code", { username: user!.username, ip: ip ?? null }, user!.id, "UPDATE");
+    notifyPasswordReset(user!, ip);
     return;
   }
 

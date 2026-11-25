@@ -311,7 +311,7 @@
   text-underline-offset: 3px;
 }
 :root[data-ui="minimal"] .ae-dash-link:hover {
-  text-decoration-color: var(--ae-text);
+  filter: brightness(1.25);
 }
 
 /* ---- Tables: quiet header, one hairline per row -------------------------- */
@@ -464,3 +464,16 @@
   vertical-align: middle;
 }
 
+
+/* Entry-start date dialog: no fill, no accent bar - a hairline and type hierarchy only. */
+:root[data-ui="minimal"] .ae-startconfirm-date {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--ae-hairline);
+  border-bottom: 1px solid var(--ae-hairline);
+  border-radius: 0;
+  padding: 16px 4px;
+}
+:root[data-ui="minimal"] .ae-startconfirm-day {
+  font-weight: 600;
+}

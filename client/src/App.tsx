@@ -17,6 +17,7 @@ import { useAnimatedFavicon } from "./hooks/useAnimatedFavicon";
 import { LoadingBlock } from "./components/Spinner";
 import { LoginPage } from "./pages/LoginPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 
 // Every page below `<ProtectedRoute>` is its own lazily-loaded chunk instead
 // of bundled into the one main chunk every visitor downloads before they've
@@ -133,6 +134,7 @@ export default function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/verify-email" element={<VerifyEmailPage />} />
 
                 <Route element={<ProtectedRoute />}>
                   <Route element={<DesktopModeGate />}>

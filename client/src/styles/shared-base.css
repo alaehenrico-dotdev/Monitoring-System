@@ -1137,6 +1137,47 @@
   color: var(--ae-glass-accent, #d4a000);
 }
 
+/* "Is this the right date?" dialog shown before the first entry on a fresh sheet (EntryStartConfirm).
+   The date card is the focus; each theme below restyles the card, never the layout. */
+.ae-startconfirm {
+  text-align: center;
+}
+.ae-startconfirm-date {
+  padding: 14px 16px;
+  background: var(--ae-bg-alt);
+  border: 1px solid var(--ae-border);
+  border-left: 4px solid #d4a000;
+  border-radius: 6px;
+}
+.ae-startconfirm-page {
+  font-size: calc(11.5px * var(--ae-fs, 1));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ae-text-muted);
+}
+.ae-startconfirm-day {
+  margin: 4px 0 2px;
+  font-size: calc(21px * var(--ae-fs, 1));
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--ae-text);
+}
+.ae-startconfirm-shift {
+  font-size: calc(14px * var(--ae-fs, 1));
+  color: var(--ae-text-muted);
+}
+.ae-startconfirm-text {
+  margin: 14px 0 18px;
+  font-size: calc(13px * var(--ae-fs, 1));
+  color: var(--ae-text);
+}
+.ae-startconfirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
 /* ---------------------------------------------------------------------------
    Settings cards (My Account, User Passwords, Entry Rules, Google Drive, Backup / Restore):
    one shared "lifted glass" surface - a translucent, top-lit tint with a defined edge and a soft

@@ -69,6 +69,14 @@ model User {
   resetCodeHash      String?   @db.VarChar(64)
   resetCodeExpiresAt DateTime?
   resetCodeAttempts  Int       @default(0)
+  // Recovery email (admins only - enforced in services/recoveryEmail.service.ts). `email` only counts
+  // once `emailVerifiedAt` is set. A change waits in `pendingEmail` until the link sent to it is
+  // clicked (SHA-256 of the token in `emailVerifyHash`, valid until `emailVerifyExpiresAt`).
+  email                String?   @unique @db.VarChar(254)
+  emailVerifiedAt      DateTime?
+  pendingEmail         String?   @db.VarChar(254)
+  emailVerifyHash      String?   @db.VarChar(64)
+  emailVerifyExpiresAt DateTime?
   createdAt    DateTime @default(now())
 
   /// An auditor's blind counts, one submission per sheet (see ManualCountSubmission).

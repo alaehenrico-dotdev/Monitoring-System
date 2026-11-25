@@ -182,9 +182,11 @@ export function unionLayouts(...layouts: { columnKey: string; slotIndex: number 
 /// The amounts flattened onto a grid row, so the client reads an added
 /// column's cell exactly like any other (`row.entry[key]`).
 export function flattenExtras(extras: { columnKey: string; slotIndex: number; amount: unknown }[]): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const e of extras) out[extraCellKey(e.columnKey, e.slotIndex)] = Number(e.amount);
-  return out;
+  // Map + fromEntries: keys become own data properties, so a hostile columnKey
+  // can never reach a prototype setter (and every key ends in `__x<slot>` anyway).
+  const cells = new Map<string, number>();
+  for (const e of extras) cells.set(extraCellKey(e.columnKey, e.slotIndex), Number(e.amount));
+  return Object.fromEntries(cells);
 }
 
 /**

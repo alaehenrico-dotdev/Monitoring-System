@@ -6,7 +6,7 @@ import { ApiError } from "../api/http";
 
 const auth = vi.hoisted(() => ({ user: null as unknown }));
 vi.mock("../context/AuthContext", () => ({ useAuth: () => auth }));
-const api = vi.hoisted(() => ({ resetPasswordWithCode: vi.fn() }));
+const api = vi.hoisted(() => ({ resetPasswordWithCode: vi.fn(), requestResetEmail: vi.fn() }));
 vi.mock("../api/auth", () => api);
 const toast = vi.hoisted(() => ({ showToast: vi.fn() }));
 vi.mock("../components/Toast", () => toast);
@@ -27,8 +27,8 @@ const open = () =>
 // The Field labels are not tied to their inputs, so find the inputs by what they are.
 const field = (c: HTMLElement, i: number) => c.querySelectorAll("input")[i] as HTMLInputElement;
 const submit = () => screen.getByRole("button", { name: "Set new password" }) as HTMLButtonElement;
-function fill(c: HTMLElement, v: { username?: string; code?: string; next?: string; confirm?: string }) {
-  const values = [v.username ?? "ana", v.code ?? "ABCDE-FGHJK", v.next ?? GOOD, v.confirm ?? v.next ?? GOOD];
+function fill(c: HTMLElement, v: { username?: string; code?: string; next?: string }) {
+  const values = [v.username ?? "ana", v.code ?? "ABCDE-FGHJK", v.next ?? GOOD];
   values.forEach((value, i) => fireEvent.change(field(c, i), { target: { value } }));
 }
 
@@ -39,21 +39,40 @@ beforeEach(() => {
 });
 
 describe("ForgotPasswordPage", () => {
-  it("explains that an administrator issues the code", () => {
+  it("asks for the code in one short line", () => {
     open();
-    expect(screen.getByText(/Ask your administrator for a reset code/)).toBeTruthy();
+    expect(screen.getByText(/Enter the code you were given/)).toBeTruthy();
     expect(submit().disabled).toBe(true);
   });
 
-  it("only enables the button once everything is filled in, long enough, and matching", () => {
+  it("only enables the button once everything is filled in and the password is long enough", () => {
     const { container } = open();
     fill(container, { next: "short" });
     expect(submit().disabled).toBe(true);
-    fill(container, { next: GOOD, confirm: "something-different-1" });
-    expect(submit().disabled).toBe(true);
-    expect(screen.getByRole("alert").textContent).toMatch(/don't match/);
     fill(container, {});
     expect(submit().disabled).toBe(false);
+  });
+
+  it("can show and hide the new password", () => {
+    const { container } = open();
+    expect(field(container, 2).type).toBe("password");
+    fireEvent.click(screen.getByRole("button", { name: "Show" }));
+    expect(field(container, 2).type).toBe("text");
+    fireEvent.click(screen.getByRole("button", { name: "Hide" }));
+    expect(field(container, 2).type).toBe("password");
+  });
+
+  it("emails a code from the link beside the code field, then waits before offering it again", async () => {
+    api.requestResetEmail.mockResolvedValue({ success: true, message: "If that administrator account has a verified recovery email, a code was sent to it." });
+    const { container } = open();
+    const link = () => screen.getByRole("button", { name: /Email me a code/ }) as HTMLButtonElement;
+    expect(link().disabled).toBe(true); // needs a username first
+    fireEvent.change(field(container, 0), { target: { value: " ana " } });
+    fireEvent.click(link());
+    await waitFor(() => expect(api.requestResetEmail).toHaveBeenCalledWith("ana"));
+    expect((await screen.findByRole("status")).textContent).toMatch(/a code was sent/);
+    expect(link().disabled).toBe(true);
+    expect(link().textContent).toMatch(/\(\d+s\)/);
   });
 
   it("sends the username, code and new password, then goes to sign in with a notice", async () => {

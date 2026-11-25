@@ -2,6 +2,7 @@ import type { Request, Response } from "express";
 import { z } from "zod";
 import { completeMfaLogin, login } from "../services/auth.service";
 import { assertAdminPassword } from "../services/adminPassword.service";
+import { confirmEmail, requestEmailChange, requestResetEmail } from "../services/recoveryEmail.service";
 import { changeOwnPassword, getSecurityFlags, resetPasswordWithCode, signOutEverywhere } from "../services/users.service";
 import { disableMfa, enableMfa, startMfaSetup } from "../services/mfa.service";
 import { PASSWORD_MAX } from "../utils/password";
@@ -90,5 +91,23 @@ export async function postForgotPasswordReset(req: Request, res: Response) {
 /// (the same per-user lockout every other password re-check uses).
 export async function postVerifyPassword(req: Request, res: Response) {
   await assertAdminPassword(req.user!.id, typeof req.body?.password === "string" ? req.body.password : undefined);
+  res.json({ success: true });
+}
+
+/// Public, and the answer is always the same: it never says whether the account exists or has an email.
+export async function postForgotPasswordRequest(req: Request, res: Response) {
+  await requestResetEmail(req.body?.username, req.ip);
+  res.json({ success: true, message: "If that administrator account has a verified recovery email, a code was sent to it." });
+}
+
+/// A signed-in admin sets or changes THEIR OWN recovery email (needs their password).
+export async function postRecoveryEmail(req: Request, res: Response) {
+  await requestEmailChange(req.user!.id, req.body?.email, typeof req.body?.password === "string" ? req.body.password : undefined);
+  res.json({ success: true });
+}
+
+/// Public: the link from the confirmation mail.
+export async function postVerifyEmail(req: Request, res: Response) {
+  await confirmEmail(req.body?.token);
   res.json({ success: true });
 }

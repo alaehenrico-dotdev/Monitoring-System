@@ -217,6 +217,29 @@
 }
 
 
+/* Entry-start date dialog: a flat gold slab with a thick outline and hard offset shadow. */
+:root[data-ui="brutal"] .ae-startconfirm-date {
+  background: var(--ae-nb-gold);
+  border: 3px solid var(--ae-nb-line);
+  border-left: 3px solid var(--ae-nb-line);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--ae-nb-line);
+  color: #0c0c0c;
+}
+:root[data-ui="brutal"] .ae-startconfirm-page,
+:root[data-ui="brutal"] .ae-startconfirm-shift {
+  color: #3a3426;
+  font-weight: 700;
+}
+:root[data-ui="brutal"] .ae-startconfirm-day {
+  color: #0c0c0c;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+:root[data-ui="brutal"] .ae-startconfirm-actions {
+  margin-top: 4px;
+}
+
 /* Settings cards: still outlined, square and hard-shadowed, but the fill lets the seal show through. */
 :root[data-ui="brutal"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
   background: color-mix(in srgb, var(--ae-surface-glass) 82%, transparent);

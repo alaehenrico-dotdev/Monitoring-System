@@ -24,7 +24,7 @@ const SEND_CONCURRENCY = 5;
 /// Devices one person may register (a phone, a laptop, a desktop or two, a tablet).
 export const MAX_SUBSCRIPTIONS_PER_USER = 10;
 
-export const pushConfigured = () => Boolean(env.vapidPublicKey && env.vapidPrivateKey);
+const pushConfigured = () => Boolean(env.vapidPublicKey && env.vapidPrivateKey);
 
 /// Drift is two table scans over a week of rows, so it is shared between the bell's pollers.
 const recentDrift = (today: Date) => getOrSet(`alerts:drift:${toDateOnlyString(today)}`, DRIFT_TTL_MS, () => findStockDrift(today, 7));
@@ -50,7 +50,7 @@ async function computeAlerts(now: Date) {
 }
 
 /// What interrupts someone (a notification), as opposed to what just waits in the list.
-export const isUrgent = (i: AlertItem) => i.severity === "high";
+const isUrgent = (i: AlertItem) => i.severity === "high";
 
 /// The text of one notification for newly appeared urgent problems.
 export function buildPushMessage(fresh: AlertItem[]): { title: string; body: string; url: string } {

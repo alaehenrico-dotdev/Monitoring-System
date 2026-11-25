@@ -1455,9 +1455,6 @@
   font-size: 14px;
   overscroll-behavior: contain;
 }
-:root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-ai-q {
-  font-size: 12px;
-}
 :root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-ai-src,
 :root:root:root[data-phone="true"] .ae-quickjump--phone .ae-quickjump-ai-note {
   font-size: 11.5px;

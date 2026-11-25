@@ -51,3 +51,19 @@ export function resetPasswordWithCode(username: string, code: string, newPasswor
 export function verifyPassword(password: string) {
   return http.post<{ success: true }>("/auth/verify-password", { password });
 }
+
+/// Forgot password, admins only: emails a one-time code to the account's verified recovery email.
+/// The answer is always the same - it never says whether the account exists or has an email.
+export function requestResetEmail(username: string) {
+  return http.post<{ success: true; message: string }>("/auth/forgot-password/request", { username });
+}
+
+/// A signed-in admin sets or changes their own recovery email. A confirmation link goes to the new address.
+export function setRecoveryEmail(email: string, password: string) {
+  return http.post<{ success: true }>("/auth/recovery-email", { email, password });
+}
+
+/// The link from the confirmation email (no sign-in needed: the mailbox is the proof).
+export function verifyRecoveryEmail(token: string) {
+  return http.post<{ success: true }>("/auth/email/verify", { token });
+}

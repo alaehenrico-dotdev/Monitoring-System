@@ -10,7 +10,7 @@ export interface SettingsTabDef {
   keywords: string;
 }
 
-export const SETTINGS_TABS: SettingsTabDef[] = [
+const SETTINGS_TABS: SettingsTabDef[] = [
   { key: "appearance", label: "Appearance", adminOnly: false, keywords: "theme dark light mode font size text header layout style look colour color" },
   { key: "account", label: "My Account", adminOnly: false, keywords: "password change two-step verification authenticator mfa 2fa recovery codes sign in profile" },
   { key: "entry", label: "Entry Rules", adminOnly: true, keywords: "shifts night morning lock rules encoding" },
