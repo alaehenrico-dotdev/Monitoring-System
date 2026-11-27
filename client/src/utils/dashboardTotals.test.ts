@@ -29,3 +29,14 @@ describe("dashboard stock totals", () => {
     expect(makeDelta(5, undefined)).toBeUndefined();
   });
 });
+
+describe("summarize - the shared stock is counted once", () => {
+  const row = (online: number, offline: number, sharedStockDuplicate = false) =>
+    ({ onlineRemainingStock: online, offlineRemainingStock: offline, totalRemainingStock: online + offline, sharedStockDuplicate }) as never;
+
+  it("leaves the second palm oil row out of the Online and Offline totals", () => {
+    // Palm oil: both rows show the pool's 11 / 11; one other product holds 5 / 3.
+    const totals = summarize([row(11, 11), row(11, 11, true), row(5, 3)]);
+    expect(totals).toEqual({ online: 16, offline: 14 });
+  });
+});

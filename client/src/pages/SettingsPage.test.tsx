@@ -36,7 +36,7 @@ describe("SettingsPage appearance", () => {
     open();
     expect(screen.getByRole("tab", { name: "Appearance", selected: true })).toBeTruthy();
     expect((screen.getByRole("radio", { name: /Light/ }) as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByRole("radio", { name: /^Minimalism$/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /^Glassmorphism$/ }) as HTMLInputElement).checked).toBe(true);
   });
 
   it("switching the theme applies at once and is remembered", () => {
@@ -145,7 +145,7 @@ describe("SettingsPage font settings", () => {
   it("does not disturb the theme and colour mode choices", () => {
     open();
     fireEvent.click(screen.getByRole("radio", { name: "Monospace" }));
-    expect((screen.getByRole("radio", { name: /^Minimalism$/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("radio", { name: /^Glassmorphism$/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole("radio", { name: /Light/ }) as HTMLInputElement).checked).toBe(true);
   });
 });
@@ -176,7 +176,7 @@ describe("SettingsPage header layout", () => {
   it("does not change the theme or the colour mode", () => {
     open();
     fireEvent.click(screen.getByRole("radio", { name: /^Ribbon$/ }));
-    expect(root.dataset.ui).toBe("minimal");
+    expect(root.dataset.ui).toBe("glass");
     expect(root.dataset.theme).toBe("light");
   });
 });

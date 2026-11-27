@@ -1978,8 +1978,7 @@ export function ManualCountPage() {
               style={{
                 marginTop: 12,
                 padding: "8px 10px",
-                border: "1px solid var(--ae-border)",
-                borderLeft: "3px solid var(--ae-warning-text)",
+                border: "1px solid var(--ae-warning-text)",
                 borderRadius: 4,
                 fontSize: "calc(12.5px * var(--ae-fs, 1))",
               }}
@@ -2008,7 +2007,7 @@ export function ManualCountPage() {
           {draftAuditors.length > 0 && (
             <div
               role="note"
-              style={{ marginTop: 12, padding: "8px 10px", border: "1px solid var(--ae-border)", borderLeft: "3px solid var(--ae-warning-text)", borderRadius: 4, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}
+              style={{ marginTop: 12, padding: "8px 10px", border: "1px solid var(--ae-warning-text)", borderRadius: 4, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}
             >
               <strong>
                 {draftAuditors.map((d) => d.auditor.name).join(" and ")} {draftAuditors.length === 1 ? "has" : "have"} counts typed but not submitted.
@@ -2019,7 +2018,7 @@ export function ManualCountPage() {
           {reviewCount > 0 && (
             <div
               role="note"
-              style={{ marginTop: 12, padding: "8px 10px", border: "1px solid var(--ae-border)", borderLeft: "3px solid var(--ae-warning-text)", borderRadius: 4, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}
+              style={{ marginTop: 12, padding: "8px 10px", border: "1px solid var(--ae-warning-text)", borderRadius: 4, fontSize: "calc(12.5px * var(--ae-fs, 1))" }}
             >
               <strong>
                 {reviewCount} product{reviewCount === 1 ? " has" : "s have"} auditor counts you have not used.

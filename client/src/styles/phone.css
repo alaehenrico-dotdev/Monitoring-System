@@ -467,12 +467,26 @@
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
+/* The change pill sits in the tile's top row, on the icon's centre line: the icon is 24px tall from the
+   tile's 8px top padding, the pill 20px tall, so it starts 2px lower. It keeps the tile's 10px side
+   padding on the right (lined up with the figure below), and never grows past the room beside the
+   icon (tile - 10px padding - 24px icon - 8px gap - 10px padding); a longer text is cut with an ellipsis
+   instead of running under the icon. */
 :root:root:root[data-phone="true"] .ae-dash-stat .ae-dash-stat-delta {
   position: absolute;
-  top: 8px;
-  right: 6px;
+  top: 10px;
+  right: 10px;
+  display: block;
+  box-sizing: border-box;
+  max-width: calc(100% - 52px);
+  height: 20px;
   margin: 0;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 10.5px;
+  line-height: 20px;
 }
 
 /* Quick links: the same square tiles, icon over label. */
@@ -556,6 +570,9 @@
 :root:root:root[data-phone="true"] .ae-mm-body .ae-dash-stat .ae-dash-stat-delta {
   top: 6px;
   right: 6px;
+  height: auto;
+  max-width: none;
+  line-height: normal;
   padding: 0;
   background: none;
   font-size: 10px;
@@ -1088,7 +1105,8 @@
   padding: 0 6px;
   box-sizing: border-box;
   background: var(--ae-surface);
-  border: 1px solid transparent;
+  /* A plain static hairline: no animated ring. */
+  border: 1px solid var(--ae-border);
   border-radius: 28px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 2px 6px rgba(0, 0, 0, 0.18);
 }
@@ -1109,11 +1127,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   font-size: 10.5px;
-}
-/* The pills' ring: one device pixel thick (PhoneBottomNav sets --ae-hair to 1 / devicePixelRatio), so it
-   is crisp on any screen density; 1px until that is set. */
-:root:root:root[data-phone="true"] .ae-bottomnav-bar > .ae-ring {
-  padding: var(--ae-hair, 1px);
 }
 /* The three-dots button, last in the right-hand pill, and the layout menu it opens above it. */
 :root:root:root[data-phone="true"] .ae-bottomnav-more {

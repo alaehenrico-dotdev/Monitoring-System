@@ -483,11 +483,10 @@
 }
 
 
-/* Entry-start date dialog: flat, hairline, with the gold accent kept as the left rule. */
+/* Entry-start date dialog: flat and hairline. */
 :root[data-ui="studio"] .ae-startconfirm-date {
   background: var(--ae-bg-alt);
   border: 1px solid var(--ae-hairline);
-  border-left: 3px solid #d4a000;
   border-radius: 2px;
 }
 :root[data-ui="studio"] .ae-startconfirm-day {

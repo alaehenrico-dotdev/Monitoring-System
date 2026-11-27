@@ -354,7 +354,8 @@ function ImportTargetBanner({ label }: { label: string }) {
       style={{
         margin: "14px 0 0",
         padding: "8px 10px",
-        borderLeft: `4px solid ${colors.red}`,
+        border: `1px solid ${colors.red}`,
+        borderRadius: 4,
         background: colors.warningBg,
         fontSize: "calc(13px * var(--ae-fs, 1))",
         fontWeight: 600,

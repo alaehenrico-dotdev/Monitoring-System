@@ -162,7 +162,7 @@ export function DatabaseRestoreCard() {
   const stage = !resetToken ? "lock" : file ? "restore" : "choose";
 
   return (
-    <div className="ae-bk" style={{ padding: "14px 18px" }}>
+    <div className="ae-panel ae-bk" style={{ padding: "14px 18px" }}>
       <div
         className="ae-bk-restore-row"
         style={{

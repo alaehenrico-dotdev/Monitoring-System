@@ -23,6 +23,9 @@ let lastScrollLeft = 0;
 // The active-tab line slides to the new tab in one short ease-out: both edges
 // move together, so it never stretches or lags behind.
 const SLIDE = { duration: 0.2, ease: "easeOut" } as const;
+// The Glassmorphism theme draws the bar as a glass pill behind the open tab, and there the trailing edge
+// lags the leading one a little, so the pill stretches and settles like a drop of liquid.
+const GLASS_TRAIL = { duration: 0.32, ease: "easeOut" } as const;
 
 // Matches the 10px side padding of .ae-header-tab: the line spans the label.
 const TAB_INSET = 10;
@@ -56,7 +59,7 @@ export function HeaderTabs() {
 
     // offsetLeft/offsetWidth (not getBoundingClientRect) so the result stays
     // in the strip's own coordinates under the app's CSS zoom control.
-    const measure = (): (Edges & { top: number }) | null => {
+    const measure = (): (Edges & { top: number; height: number }) | null => {
       const active = nav.querySelector<HTMLElement>(
         '.ae-header-tab[aria-current="page"]',
       );
@@ -66,6 +69,7 @@ export function HeaderTabs() {
         left,
         right: active.offsetLeft + active.offsetWidth - TAB_INSET,
         top: active.offsetTop + active.offsetHeight - 4,
+        height: active.offsetHeight,
       };
     };
 
@@ -77,6 +81,7 @@ export function HeaderTabs() {
     }
     bar.style.opacity = "1";
     bar.style.top = `${target.top}px`;
+    bar.style.setProperty("--ae-tab-h", `${target.height}px`); // the glass pill's height (see glassmorphism.css)
 
     let stop: (() => void) | undefined;
     let cancelled = false;
@@ -95,15 +100,20 @@ export function HeaderTabs() {
       const cur = { ...from };
       const draw = () => place(cur.left, cur.right);
       draw();
+      const glass = document.documentElement.getAttribute("data-ui") === "glass";
+      const movingRight = target.left >= from.left;
+      // Glass: the edge the pill is moving toward leads, the other trails.
+      const leftTiming = glass && movingRight ? GLASS_TRAIL : SLIDE;
+      const rightTiming = glass && !movingRight ? GLASS_TRAIL : SLIDE;
       const leftAnim = animate(from.left, target.left, {
-        ...SLIDE,
+        ...leftTiming,
         onUpdate: (v) => {
           cur.left = v;
           draw();
         },
       });
       const rightAnim = animate(from.right, target.right, {
-        ...SLIDE,
+        ...rightTiming,
         onUpdate: (v) => {
           cur.right = v;
           draw();
@@ -131,6 +141,7 @@ export function HeaderTabs() {
       const t = measure();
       if (t) {
         bar.style.top = `${t.top}px`;
+        bar.style.setProperty("--ae-tab-h", `${t.height}px`);
         place(t.left, t.right);
       }
     });

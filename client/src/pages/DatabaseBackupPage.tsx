@@ -89,19 +89,11 @@ export function DatabaseBackupPage() {
 
   return (
     <div style={{ width: "100%", maxWidth: 640, margin: "0 auto" }}>
-    <div
-      style={{
-        maxWidth: 640,
-        background: "var(--ae-surface-glass)",
-        backdropFilter: "var(--ae-glass-blur)",
-        WebkitBackdropFilter: "var(--ae-glass-blur)",
-        border: `1px solid ${colors.border}`,
-        borderRadius: 4,
-        overflow: "hidden",
-      }}
-    >
+    {/* Backup and Restore are two cards of their own, like the History card below: no extra box
+        around them (it doubled the border and squared off the themes' rounded corners). */}
+    <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640 }}>
       <div
-        className="ae-bk ae-bk-backup-row"
+        className="ae-panel ae-bk ae-bk-backup-row"
         style={{
           position: "relative",
           display: "flex",
@@ -205,7 +197,6 @@ export function DatabaseBackupPage() {
         )}
       </div>
 
-      <div style={{ height: 1, background: colors.border }} />
       <DatabaseRestoreCard />
     </div>
     <BackupHistoryCard key={historyKey} />

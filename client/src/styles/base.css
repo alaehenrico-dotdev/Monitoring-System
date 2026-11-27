@@ -591,7 +591,6 @@ table input[type="number"] {
   padding: 6px 8px;
   font-size: calc(13px * var(--ae-fs, 1));
   border: 1px solid var(--ae-border);
-  border-left: 3px solid #f5c000;
   border-radius: 4px;
   background: var(--ae-row-selected-bg);
 }

@@ -81,6 +81,57 @@ describe("PhoneBottomNav", () => {
     expect(again.container.querySelectorAll(".ae-bottomnav-bar")).toHaveLength(2);
   });
 
+  it("switching layout leaves an inert ghost of the old pills for the animation, and clears it afterwards", () => {
+    auth.user = { id: 1, role: "SUPERVISOR_ADMIN" };
+    const finish: Array<() => void> = [];
+    const original = Element.prototype.animate;
+    // jsdom has no Web Animations; a stand-in that lets the test finish the ghost's fade by hand.
+    Element.prototype.animate = vi.fn(function () {
+      const anim: { onfinish: null | (() => void) } = { onfinish: null };
+      finish.push(() => anim.onfinish?.());
+      return anim;
+    }) as never;
+    try {
+      const { container } = open("/dashboard");
+      fireEvent.click(screen.getByRole("button", { name: "Navigation layout" }));
+      fireEvent.click(screen.getByRole("menuitemradio", { name: "Centered" }));
+
+      expect(container.querySelectorAll(".ae-bottomnav-bar")).toHaveLength(1);
+      const ghosts = document.body.querySelectorAll(":scope > .ae-bottomnav-bar");
+      expect(ghosts).toHaveLength(2); // the two old pills, merging
+      expect(ghosts[0].getAttribute("aria-hidden")).toBe("true");
+      expect(ghosts[0].hasAttribute("inert")).toBe(true);
+
+      finish.forEach((f) => f());
+      expect(document.body.querySelectorAll(":scope > .ae-bottomnav-bar")).toHaveLength(0);
+    } finally {
+      Element.prototype.animate = original;
+    }
+  });
+
+  it("going to split starts the two new pills over the old one, with no ghost kept", () => {
+    auth.user = { id: 1, role: "SUPERVISOR_ADMIN" };
+    localStorage.setItem("ae:phone-nav-layout", "centered");
+    const original = Element.prototype.animate;
+    const animate = vi.fn(() => ({ onfinish: null }));
+    Element.prototype.animate = animate as never;
+    try {
+      const { container } = open("/dashboard");
+      expect(container.querySelectorAll(".ae-bottomnav-bar")).toHaveLength(1);
+      fireEvent.click(screen.getByRole("button", { name: "Navigation layout" }));
+      fireEvent.click(screen.getByRole("menuitemradio", { name: "Split (both sides)" }));
+
+      expect(container.querySelectorAll(".ae-bottomnav-bar")).toHaveLength(2);
+      expect(document.body.querySelectorAll(":scope > .ae-bottomnav-bar")).toHaveLength(0);
+      // Each new pill is animated by a slide only (no scale, no opacity).
+      const frames = (animate.mock.calls as unknown as Array<[Array<Record<string, string>>]>).map((c) => c[0]).flat();
+      expect(frames.some((f) => typeof f.transform === "string" && f.transform.includes("scale"))).toBe(false);
+      expect(frames.some((f) => "opacity" in f && "transform" in f)).toBe(false);
+    } finally {
+      Element.prototype.animate = original;
+    }
+  });
+
   it("closes the menu on Escape", () => {
     auth.user = { id: 1, role: "SUPERVISOR_ADMIN" };
     open("/dashboard");

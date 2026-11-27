@@ -130,6 +130,9 @@ export interface TotalStockRow {
   totalRemainingStock: number;
   totalManualCount: number | null;
   totalVariance: number | null;
+  /// The second row of the shared stock (Palm Oil Gallon / Liter): it shows the same figure as the first, so
+  /// totals over the rows leave it out (utils/sharedStock.ts withoutSharedDuplicates).
+  sharedStockDuplicate?: boolean;
 }
 
 export interface ChangeLogEntry {

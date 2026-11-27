@@ -1,6 +1,7 @@
 import { Shift } from "@prisma/client";
 import { prisma, type Db } from "../lib/prisma";
 import { manualCountRepository } from "./manualCountRepository";
+import { findSharedStockPartnerId, poolSharedRows } from "./sharedStockPool";
 import { resolveOpeningStock } from "../utils/stockMath";
 
 export interface OfflineStockData {
@@ -166,9 +167,11 @@ export const dailyOfflineStockRepository = {
     return result;
   },
 
-  upsert(id: number | undefined, data: OfflineStockData, db: Db = prisma) {
-    return id
-      ? db.dailyOfflineStock.update({ where: { id }, data })
-      : db.dailyOfflineStock.create({ data });
+  /// Every write of an Offline row goes through here, which is what keeps the two products that
+  /// share one stock (utils/sharedStock.ts) in step: after the write, the pool's four rows are re-pooled.
+  async upsert(id: number | undefined, data: OfflineStockData, db: Db = prisma) {
+    const saved = id ? await db.dailyOfflineStock.update({ where: { id }, data }) : await db.dailyOfflineStock.create({ data });
+    const partnerId = await findSharedStockPartnerId(data.productId, db);
+    return partnerId === null ? saved : poolSharedRows(saved, "OFFLINE", partnerId, db);
   },
 };

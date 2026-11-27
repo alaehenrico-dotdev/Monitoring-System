@@ -44,9 +44,9 @@ export type FontSize = "sm" | "md" | "lg" | "xl";
 
 export const FONT_FAMILIES: readonly FontFamily[] = ["inter", "hyperlegible", "plex", "system", "serif", "mono"];
 const FONT_SIZES: readonly FontSize[] = ["sm", "md", "lg", "xl"];
-/// What someone who has not picked a layout in Settings > Appearance gets: the plain,
-/// quiet one. A saved choice always wins.
-const DEFAULT_UI_STYLE: UiStyle = "minimal";
+/// What someone who has not picked a layout in Settings > Appearance gets: Glassmorphism.
+/// A saved choice always wins.
+const DEFAULT_UI_STYLE: UiStyle = "glass";
 export const DEFAULT_FONT: FontFamily = "inter";
 export const DEFAULT_FONT_SIZE: FontSize = "md";
 

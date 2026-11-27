@@ -221,7 +221,6 @@
 :root[data-ui="brutal"] .ae-startconfirm-date {
   background: var(--ae-nb-gold);
   border: 3px solid var(--ae-nb-line);
-  border-left: 3px solid var(--ae-nb-line);
   border-radius: 0;
   box-shadow: 5px 5px 0 var(--ae-nb-line);
   color: #0c0c0c;

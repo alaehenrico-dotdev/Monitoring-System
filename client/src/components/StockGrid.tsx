@@ -41,6 +41,7 @@ import {
   lastChange,
 } from "../utils/cellHistory";
 import { consumeQuickJump, subscribeQuickJump } from "../utils/quickJumpTarget";
+import { rowsForColumnTotal } from "../utils/sharedStock";
 import {
   describePasteResult,
   describePasteSkips,
@@ -631,7 +632,7 @@ export function StockGrid({
   const percentTotal = useMemo(
     () =>
       percentOfTotalKey
-        ? sumRounded(rows.map((r) => toNum(r.entry[percentOfTotalKey])))
+        ? sumRounded(rowsForColumnTotal(rows, percentOfTotalKey).map((r) => toNum(r.entry[percentOfTotalKey])))
         : 0,
     [rows, percentOfTotalKey],
   );
@@ -639,7 +640,8 @@ export function StockGrid({
 
   /// A column's total over `list`, net of its `netTotals` partner when it has one.
   const totalOf = (col: GridColumn, list: GridRow[]) => {
-    const own = sumRounded(list.map((r) => toNum(r.entry[col.key])));
+    // The shared stock (Palm Oil Gallon / Liter) shows the pool on both rows: a total counts it once.
+    const own = sumRounded(rowsForColumnTotal(list, col.key).map((r) => toNum(r.entry[col.key])));
     const less = netTotals?.[col.key];
     return less ? sumRounded([own, -sumRounded(list.map((r) => toNum(r.entry[less])))]) : own;
   };

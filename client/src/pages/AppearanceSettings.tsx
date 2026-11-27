@@ -41,7 +41,7 @@ const THEMES: Choice<UiStyle>[] = [
   {
     value: "classic",
     label: "Classic",
-    description: "Gold accents on warm cream. The default look.",
+    description: "Gold accents on warm cream.",
     preview: <ClassicPreview />,
   },
   {
@@ -53,7 +53,7 @@ const THEMES: Choice<UiStyle>[] = [
   {
     value: "glass",
     label: "Glassmorphism",
-    description: "Frosted, see-through panes over a soft colour glow.",
+    description: "Frosted, see-through panes over a soft colour glow. The default look.",
     preview: <GlassPreview />,
   },
   {

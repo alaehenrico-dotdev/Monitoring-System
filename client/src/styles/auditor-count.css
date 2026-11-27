@@ -124,7 +124,8 @@
 .ae-ac-banner {
   margin: 0 0 8px;
   padding: 8px 10px;
-  border-left: 3px solid var(--ae-glass-accent, #d4a000);
+  border: 1px solid var(--ae-border);
+  border-radius: 6px;
   background: var(--ae-bg-alt);
   color: var(--ae-text);
   font-size: calc(13px * var(--ae-fs, 1));
@@ -132,7 +133,8 @@
 }
 
 .ae-ac-banner--attention {
-  border-left-color: #1d4e89;
+  border-color: var(--ae-warning-text);
+  background: var(--ae-warning-bg);
 }
 
 /* The calculator in the toolbar, after the category filter. Its panel is anchored to the right edge of its

@@ -1862,10 +1862,10 @@
 /* ---- Per-preset backdrops (the card itself follows the dialog rules above) ---- */
 :root[data-ui="glass"] .ae-auth {
   background:
-    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.45), transparent 60%),
-    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.32), transparent 60%),
-    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.3), transparent 60%),
-    #0f0d0a;
+    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.3), transparent 60%),
+    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.22), transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.18), transparent 60%),
+    #050504;
 }
 :root[data-ui="brutal"] .ae-auth {
   background: #1a1a1a;

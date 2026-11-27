@@ -58,6 +58,11 @@ vi.mock("../repositories/dailyOfflineStockRepository", () => ({
   },
 }));
 vi.mock("./staleOpening.service", () => ({ holdStaleOpening: vi.fn() }));
+// The shared-stock pair (Palm Oil Gallon and Liter) is looked up by SKU; no pair here unless a test says so.
+vi.mock("../repositories/sharedStockPool", () => ({
+  findSharedStockPartnerId: vi.fn().mockResolvedValue(null),
+  findSharedStockProductIds: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("../repositories/productRepository", () => ({
   productRepository: { findActiveById: vi.fn(), findActive: vi.fn() },
 }));
@@ -68,6 +73,7 @@ import { manualCountRepository } from "../repositories/manualCountRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
+import { findSharedStockProductIds } from "../repositories/sharedStockPool";
 import { changeLogRepository } from "../repositories/changeLogRepository";
 import { userRepository } from "../repositories/userRepository";
 import { recordChange } from "./changeLog.service";
@@ -523,6 +529,58 @@ describe("publishing counts", () => {
         const out = await publishManualCounts(DATE, SHIFT, 7, false);
 
         expect(out.impliedZero).toBe(0);
+        expect(manualCountRepository.upsert).not.toHaveBeenCalled();
+      });
+    });
+
+    // The shared stock: Palm Oil Gallon and Liter, Online and Offline, are ONE stock, counted once.
+    describe("the shared stock is counted once", () => {
+      const typed = (id: number, productId: number, location: "ONLINE" | "OFFLINE", manualCount: number, minute: number) => ({
+        id,
+        productId,
+        location,
+        manualCount,
+        systemRemainingStock: 12,
+        isOpeningBalance: false,
+        remarks: null,
+        countedById: 3,
+        publishedAt: null,
+        updatedAt: new Date(`2026-11-27T10:${String(minute).padStart(2, "0")}:00.000Z`),
+      });
+      beforeEach(() => {
+        vi.mocked(findSharedStockProductIds).mockResolvedValue([10, 11]);
+        vi.mocked(productRepository.findActive).mockResolvedValue([{ id: 10 }, { id: 11 }] as never);
+        vi.mocked(manualCountRepository.upsert).mockImplementation(((id: number | undefined, data: object) => Promise.resolve({ id: id ?? 100, ...data })) as never);
+      });
+
+      it("counted on Offline only: the Online rows of both products get the same count, not 0", async () => {
+        vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([typed(1, 10, "OFFLINE", 11, 0), typed(2, 11, "OFFLINE", 11, 1)] as never);
+
+        const out = await publishManualCounts(DATE, SHIFT, 7, true);
+
+        const created = vi.mocked(manualCountRepository.upsert).mock.calls.map((c) => c[1]);
+        expect(created.map((c) => `${c.productId}:${c.location}`)).toEqual(["10:ONLINE", "11:ONLINE"]);
+        expect(created.every((c) => c.manualCount === 11)).toBe(true);
+        expect(manualCountRepository.updateRemarks).toHaveBeenCalledWith(100, "Shared stock: counted once for the whole pool.", expect.anything());
+        expect(out.impliedZero).toBe(2);
+      });
+
+      it("typed with different figures: the most recent one is the pool's, and the others keep theirs in the remark", async () => {
+        vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([typed(1, 10, "OFFLINE", 11, 0), typed(2, 11, "OFFLINE", 9, 5)] as never);
+
+        await publishManualCounts(DATE, SHIFT, 7, true);
+
+        // Product 10 was typed 11, the pool is 9 (typed later): its row is rewritten to 9 with a note saying so.
+        const rewritten = vi.mocked(manualCountRepository.upsert).mock.calls.find((c) => c[0] === 1);
+        expect(rewritten?.[1]).toMatchObject({ productId: 10, location: "OFFLINE", manualCount: 9, variance: -3 });
+        expect(manualCountRepository.updateRemarks).toHaveBeenCalledWith(1, "Counted 11 on this row; the shared stock was counted once as 9.", expect.anything());
+      });
+
+      it("an audit-only publish leaves the counts as typed", async () => {
+        vi.mocked(manualCountRepository.findUnpublishedForPeriod).mockResolvedValue([typed(1, 10, "OFFLINE", 11, 0), typed(2, 11, "OFFLINE", 9, 5)] as never);
+
+        await publishManualCounts(DATE, SHIFT, 7, false);
+
         expect(manualCountRepository.upsert).not.toHaveBeenCalled();
       });
     });

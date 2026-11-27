@@ -1138,7 +1138,8 @@
 }
 
 /* "Is this the right date?" dialog shown before the first entry on a fresh sheet (EntryStartConfirm).
-   The date card is the focus; each theme below restyles the card, never the layout. */
+   The date card is the focus; each theme below restyles the card, never the layout. No accent rule
+   on any side: the card uses the theme's own surface and border. */
 .ae-startconfirm {
   text-align: center;
 }
@@ -1146,7 +1147,6 @@
   padding: 14px 16px;
   background: var(--ae-bg-alt);
   border: 1px solid var(--ae-border);
-  border-left: 4px solid #d4a000;
   border-radius: 6px;
 }
 .ae-startconfirm-page {
@@ -1251,4 +1251,11 @@
     width: auto;
     flex: 1 1 0;
   }
+}
+
+/* Restore passcode field: on a frosted card the browser's default placeholder grey nearly vanishes.
+   Use the theme's own muted text colour so it reads in every theme, light and dark. */
+:root .ae-bk-slot .ae-input::placeholder {
+  color: var(--ae-text-muted);
+  opacity: 1;
 }

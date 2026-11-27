@@ -4,6 +4,8 @@ import { manualCountRepository } from "../repositories/manualCountRepository";
 import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepository";
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { productRepository } from "../repositories/productRepository";
+import { findSharedStockPartnerId, findSharedStockProductIds } from "../repositories/sharedStockPool";
+import { planSharedCounts } from "../utils/sharedStock";
 import { logSystemEvent, recordChange } from "./changeLog.service";
 import { recordReportHistoryIn } from "./reportHistory.service";
 import { assertPeriodOpen, isLockedForCarry } from "./dayLock.service";
@@ -44,6 +46,8 @@ export async function getSystemRemainingStock(productId: number, entryDate: Date
   };
   if (location === "ONLINE") return onlineRemaining();
   if (location === "OFFLINE") return offlineRemaining();
+  // The shared pool (utils/sharedStock.ts) is one stock across both channels: its total is that figure once.
+  if ((await findSharedStockPartnerId(productId, db)) !== null) return onlineRemaining();
   // TOTAL - Online + Offline remaining stock combined (Section 4.5).
   const [online, offline] = await Promise.all([onlineRemaining(), offlineRemaining()]);
   return online + offline;
@@ -508,6 +512,9 @@ export const MAX_REMARKS_LENGTH = 500;
 /// and do not change the wording without checking the places that read it.
 const NOT_COUNTED_NOTE = "Not counted in this audit - treated as 0.";
 
+/// The remark a row of the shared stock carries when it was given the pool's count without being typed.
+const SHARED_COUNT_NOTE = "Shared stock: counted once for the whole pool.";
+
 /**
  * Publishes a sheet's counts (one date + shift, every location): the
  * supervisor's sign-off that the counts are final for reporting. Counts are an
@@ -532,8 +539,42 @@ const NOT_COUNTED_NOTE = "Not counted in this audit - treated as 0.";
 export async function publishManualCounts(entryDate: Date, shift: Shift, userId?: number, applyToOpening = false) {
   const result = await prisma.$transaction(
     async (tx) => {
-      const pending = await manualCountRepository.findUnpublishedForPeriod(entryDate, shift, tx);
+      let pending = await manualCountRepository.findUnpublishedForPeriod(entryDate, shift, tx);
       if (pending.length === 0) throw HttpError.badRequest("There are no saved counts waiting to be published for this shift");
+
+      // The shared stock (utils/sharedStock.ts) is ONE stock behind four rows - Gallon and Liter, Online and
+      // Offline - so it is counted once. Published as the next day's opening, whichever of the four was
+      // counted gives the figure (the latest typed one), and every row of the pool gets that same count,
+      // so they all open the next day on it. A row typed with another figure keeps what was typed in its
+      // remark. None counted: the ordinary rule (uncounted is 0) applies.
+      const sharedIds = applyToOpening ? await findSharedStockProductIds(tx) : [];
+      const sharedCount = applyToOpening ? planSharedCounts(pending, sharedIds, NOT_COUNTED_NOTE) : null;
+      if (sharedCount !== null) {
+        for (const c of pending) {
+          if (!sharedIds.includes(c.productId) || c.location === "TOTAL" || toNum(c.manualCount) === sharedCount) continue;
+          const system = toNum(c.systemRemainingStock);
+          const updated = await manualCountRepository.upsert(
+            c.id,
+            {
+              productId: c.productId,
+              entryDate,
+              shift,
+              location: c.location,
+              systemRemainingStock: system,
+              manualCount: sharedCount,
+              variance: c.isOpeningBalance ? 0 : calculateVariance(system, sharedCount),
+              isOpeningBalance: c.isOpeningBalance,
+              countedById: c.countedById ?? undefined,
+            },
+            tx,
+          );
+          const note = `Counted ${toNum(c.manualCount)} on this row; the shared stock was counted once as ${sharedCount}.`;
+          const remarks = (c.remarks ? `${c.remarks} (${note})` : note).slice(0, MAX_REMARKS_LENGTH);
+          await manualCountRepository.updateRemarks(updated.id, remarks, tx);
+          await recordChange({ tableName: TABLE, recordId: c.id, action: "UPDATE", changedById: userId, oldValue: c, newValue: { ...updated, remarks } }, tx);
+        }
+        pending = await manualCountRepository.findUnpublishedForPeriod(entryDate, shift, tx);
+      }
 
       const now = new Date();
       // Later saved days the count could not reach: a finished day (held for an
@@ -570,6 +611,10 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
             if (impliedZero === 0) await assertPeriodOpen(entryDate, shift, tx, "count");
             const systemRemainingStock = await getSystemRemainingStock(product.id, entryDate, shift, location, tx);
             const isOpeningBalance = !(await manualCountRepository.hasAnyCount(product.id, location, tx));
+            // A row of the shared stock takes the pool's count; anything else not counted is 0.
+            const poolCount = sharedCount !== null && sharedIds.includes(product.id) ? sharedCount : null;
+            const countValue = poolCount ?? 0;
+            const note = poolCount !== null ? SHARED_COUNT_NOTE : NOT_COUNTED_NOTE;
             const created = await manualCountRepository.upsert(
               undefined,
               {
@@ -578,20 +623,20 @@ export async function publishManualCounts(entryDate: Date, shift: Shift, userId?
                 shift,
                 location,
                 systemRemainingStock,
-                manualCount: 0,
-                variance: isOpeningBalance ? 0 : calculateVariance(systemRemainingStock, 0),
+                manualCount: countValue,
+                variance: isOpeningBalance ? 0 : calculateVariance(systemRemainingStock, countValue),
                 isOpeningBalance,
                 countedById: userId,
               },
               tx,
             );
-            await manualCountRepository.updateRemarks(created.id, NOT_COUNTED_NOTE, tx);
+            await manualCountRepository.updateRemarks(created.id, note, tx);
             const changeId = await recordChange(
-              { tableName: TABLE, recordId: created.id, action: "CREATE", changedById: userId, newValue: { ...created, remarks: NOT_COUNTED_NOTE } },
+              { tableName: TABLE, recordId: created.id, action: "CREATE", changedById: userId, newValue: { ...created, remarks: note } },
               tx,
             );
             const published = await manualCountRepository.markPublished(created.id, userId ?? null, now, true, tx);
-            releasedCounts.push({ ...published, remarks: NOT_COUNTED_NOTE });
+            releasedCounts.push({ ...published, remarks: note });
             impliedZero++;
             if (await propagateOpeningStock(product.id, entryDate, shift, location, userId, tx, changeId, { reachSaved: true })) leftSaved++;
           }

@@ -18,10 +18,10 @@ beforeEach(() => {
 afterEach(() => localStorage.clear());
 
 describe("layout style", () => {
-  it("defaults to minimalism, and puts it on <html> for the stylesheet", () => {
+  it("defaults to glassmorphism, and puts it on <html> for the stylesheet", () => {
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("minimal");
-    expect(root.dataset.ui).toBe("minimal");
+    expect(result.current.uiStyle).toBe("glass");
+    expect(root.dataset.ui).toBe("glass");
   });
 
   it("switches to classic, applies it at once and remembers it", () => {
@@ -41,7 +41,7 @@ describe("layout style", () => {
   it("treats anything unrecognised as the default rather than breaking the layout", () => {
     localStorage.setItem("ae-ui", "neon");
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("minimal");
+    expect(result.current.uiStyle).toBe("glass");
   });
 
   it("is independent of the color mode", () => {
@@ -82,7 +82,7 @@ describe("layout style", () => {
   it.each(["gradient", "ledger", "slate", "card", "enterprise", "inline", "aurora", "plus", "halloween"])("falls back to the default for the retired %s theme", (old) => {
     localStorage.setItem("ae-ui", old);
     const { result } = renderHook(() => useTheme(), { wrapper });
-    expect(result.current.uiStyle).toBe("minimal");
+    expect(result.current.uiStyle).toBe("glass");
   });
 });
 

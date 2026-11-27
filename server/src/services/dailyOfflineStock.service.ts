@@ -11,6 +11,7 @@ import { combineSplitRows, WHOLE_DAY_COMBINED } from "../utils/wholeDay";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { holdLockedTransfers, requestHeldTransfers, type HeldTransfer } from "./heldTransfers.service";
 import { isNoopSave } from "../utils/noopSave";
+import { isSharedStockSku } from "../utils/sharedStock";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { propagateOpeningStock } from "./manualCounts.service";
 import { HttpError } from "../utils/HttpError";
@@ -131,7 +132,7 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { comb
   const sheetSplit =
     sheetHasDeliveryBreakdown(rows as unknown as Record<string, unknown>[]) || layoutRows.some((c) => c.columnKey === DELIVERY_COLUMN);
 
-  return products.map((product) => {
+  const gridRows = products.map((product) => {
     const stored = extrasByProduct.get(product.id) ?? [];
     const existing = rowByProduct.get(product.id);
     if (splitDay && (existing || morningByProduct.has(product.id))) {
@@ -149,7 +150,12 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { comb
         "upsellOut",
       ])!;
       const figures = merged as unknown as OfflineFigures & { openingStock: number };
-      const { offlineStock, remainingStock } = calculate(figures.openingStock, figures);
+      // The shared pool's rows already hold the pooled figure (utils/sharedStock.ts): the day closes where
+      // its last saved period closed, whatever the other rows of the pool did.
+      const pooled = isSharedStockSku(product.sku) ? (existing ?? morningByProduct.get(product.id)) : undefined;
+      const calculated = calculate(figures.openingStock, figures);
+      const offlineStock = pooled ? toNum(figures.openingStock) : calculated.offlineStock;
+      const remainingStock = pooled ? toNum(pooled.remainingStock) : calculated.remainingStock;
       // Each added column shows Morning + Night, so the breakdown is not lost
       // to the total when a day entered by shift is viewed as one sheet.
       const morningRow = morningByProduct.get(product.id);
@@ -200,6 +206,7 @@ export async function getOfflineGrid(entryDate: Date, shift: Shift, opts: { comb
       isSaved: false,
     };
   });
+  return gridRows;
 }
 
 /// Encoder-facing upsert for one product/date/shift cell row (Section 4.3).

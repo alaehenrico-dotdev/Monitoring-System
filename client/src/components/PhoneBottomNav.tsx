@@ -84,54 +84,93 @@ export function PhoneBottomNav() {
     };
   }, [menuOpen]);
 
-  // The ring is exactly one DEVICE pixel thick, whatever the screen's density (1 / devicePixelRatio CSS
-  // px): a fixed 0.5px is one device pixel only at 2x and blurs at 2.6x or 3x. Re-measured when the
-  // density changes (moving the window to another screen, zooming).
-  useEffect(() => {
-    const el = navRef.current;
-    if (!el) return;
-    let mq: MediaQueryList | undefined;
-    const apply = () => {
-      const dpr = window.devicePixelRatio || 1;
-      el.style.setProperty("--ae-hair", `${1 / dpr}px`);
-      if (typeof window.matchMedia !== "function") return;
-      mq?.removeEventListener("change", apply);
-      mq = window.matchMedia(`(resolution: ${dpr}dppx)`);
-      mq.addEventListener("change", apply, { once: true });
-    };
-    apply();
-    return () => mq?.removeEventListener("change", apply);
-  }, [compact, layout]);
-
-  // Switching layouts: each page link glides from where it was to where it now is (a FLIP move),
-  // and the pills ease in. The links are re-created under a different parent, so their old
-  // positions are taken just before the switch and matched up by address.
+  // Switching layouts: one pill and two pills are the same thing at different distances. Nothing is
+  // scaled and nothing cross-fades (both smeared the text and doubled the glass), so every edge of every
+  // pill is drawn the whole way through:
+  //  - to split, the two new pills start side by side exactly over the old pill, with their facing
+  //    corners square and their facing border hidden, so they read as the one pill; they
+  //    glide apart while those corners round off and the border comes back;
+  //  - to centered, the two old pills (kept as ghosts) glide together while their facing corners square
+  //    off and the facing border goes; the real pill, hidden until then, takes over in the same
+  //    instant they meet, its own border already in place.
+  // Every tab keeps its exact place on the way. Transforms are whole pixels so the text stays crisp.
+  // Skipped under reduced motion.
   const navRef = useRef<HTMLElement>(null);
-  const before = useRef<Map<string, DOMRect> | null>(null);
+  const glideRef = useRef<HTMLSpanElement>(null);
+  const before = useRef<{ tabs: Map<string, DOMRect>; bars: HTMLElement[] } | null>(null);
+  const ghosts = useRef<Set<HTMLElement>>(new Set());
+  useEffect(() => {
+    const live = ghosts.current;
+    return () => {
+      live.forEach((g) => g.remove());
+      live.clear();
+    };
+  }, []);
   useLayoutEffect(() => {
     const from = before.current;
     before.current = null;
     const nav = navRef.current;
-    if (!from || !nav || typeof nav.animate !== "function") return;
-    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
-    const timing = { duration: 340, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" };
-    nav.querySelectorAll<HTMLElement>(".ae-bottomnav-item").forEach((el) => {
-      const old = from.get(el.getAttribute("href") ?? "");
-      if (!old) return;
-      const now = el.getBoundingClientRect();
-      const dx = old.left - now.left;
-      const dy = old.top - now.top;
-      if (dx || dy) el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "none" }], timing);
-    });
-    nav.querySelectorAll<HTMLElement>(".ae-bottomnav-bar").forEach((el) =>
-      el.animate(
-        [
-          { opacity: 0, transform: "translateY(10px) scale(0.96)" },
-          { opacity: 1, transform: "none" },
-        ],
-        { ...timing, duration: 300 },
-      ),
-    );
+    if (!from || !nav) return;
+    // To split: quick off the mark, soft landing. To centered: an even glide that ends decisively, so the
+    // real pill can take over the moment the ghosts meet instead of after a slow tail.
+    const toCentered = from.bars.length > 0;
+    const MOVE = toCentered ? 340 : 420;
+    const glide = toCentered ? "cubic-bezier(0.45, 0, 0.2, 1)" : "cubic-bezier(0.22, 1, 0.36, 1)";
+    const px = (n: number) => `${Math.round(n)}px`;
+    const href = (bar: Element) => bar.querySelector(".ae-bottomnav-item")?.getAttribute("href") ?? "";
+    const tab = (h: string) => Array.from(nav.querySelectorAll<HTMLElement>(".ae-bottomnav-item")).find((el) => el.getAttribute("href") === h);
+    const bars = Array.from(nav.querySelectorAll<HTMLElement>(".ae-bottomnav-bar"));
+
+    // The facing side of a pill, as the one pill has it (square, no border) and as it is.
+    const edge = (el: HTMLElement, i: number) => {
+      const cs = getComputedStyle(el);
+      const side = i === 0 ? "Right" : "Left"; // the left pill faces right, the right pill faces left
+      const dash = side.toLowerCase();
+      const full = {
+        [`borderTop${side}Radius`]: cs.getPropertyValue(`border-top-${dash}-radius`),
+        [`borderBottom${side}Radius`]: cs.getPropertyValue(`border-bottom-${dash}-radius`),
+        [`border${side}Color`]: cs.getPropertyValue(`border-${dash}-color`),
+      };
+      const flat = { [`borderTop${side}Radius`]: "0px", [`borderBottom${side}Radius`]: "0px", [`border${side}Color`]: "transparent" };
+      return { full, flat };
+    };
+
+    if (from.bars.length === 0) {
+      // One pill becomes two.
+      bars.forEach((bar, i) => {
+        const first = tab(href(bar));
+        const old = from.tabs.get(href(bar));
+        if (!first || !old) return;
+        const now = first.getBoundingClientRect();
+        const { full, flat } = edge(bar, i);
+        bar.animate([{ transform: `translate(${px(old.left - now.left)}, ${px(old.top - now.top)})`, ...flat }, { transform: "none", ...full }], { duration: MOVE, easing: glide });
+      });
+    } else {
+      // Two pills become one.
+      bars[0]?.animate([{ visibility: "hidden" }, { visibility: "hidden" }], { duration: MOVE });
+      from.bars.forEach((ghost, i) => {
+        const h = href(ghost);
+        const target = tab(h);
+        const old = from.tabs.get(h);
+        const release = () => {
+          ghost.remove();
+          ghosts.current.delete(ghost);
+        };
+        if (!target || !old) return release();
+        const now = target.getBoundingClientRect();
+        const { flat } = edge(ghost, i);
+        ghost.animate([{ transform: "none" }, { transform: `translate(${px(now.left - old.left)}, ${px(now.top - old.top)})`, ...flat }], { duration: MOVE, easing: glide, fill: "forwards" }).onfinish = release;
+      });
+    }
+    // The open tab's line rides with its tab: from where that tab was to where it is, on the same curve
+    // as the pills, so it is never hidden and never fades in late.
+    const line = glideRef.current;
+    const active = nav.querySelector<HTMLElement>('.ae-bottomnav-item[aria-current="page"]');
+    const was = active && from.tabs.get(active.getAttribute("href") ?? "");
+    if (line && active && was) {
+      const now = active.getBoundingClientRect();
+      line.animate([{ transform: `translate(${px(was.left - now.left)}, ${px(was.top - now.top)})`, offset: 0 }, { transform: "none", offset: 1 }], { duration: MOVE, easing: glide, composite: "add" });
+    }
   }, [layout]);
 
   // The line over the open tab is one element for the whole bar that slides to the tab just chosen
@@ -139,7 +178,6 @@ export function PhoneBottomNav() {
   // offsetLeft/offsetTop, which a tab's own FLIP transform does not disturb. Only a page change glides;
   // a layout switch, a resize or the first paint put it in place at once.
   const { pathname } = useLocation();
-  const glideRef = useRef<HTMLSpanElement>(null);
   const lastPath = useRef<string | null>(null);
   const placeGlide = (animate: boolean) => {
     const nav = navRef.current;
@@ -173,12 +211,36 @@ export function PhoneBottomNav() {
   if (pages.length === 0) return null;
 
   const choose = (next: NavLayout) => {
-    if (next !== layout && navRef.current) {
-      const rects = new Map<string, DOMRect>();
-      navRef.current.querySelectorAll<HTMLElement>(".ae-bottomnav-item").forEach((el) => {
-        rects.set(el.getAttribute("href") ?? "", el.getBoundingClientRect());
+    const nav = navRef.current;
+    const motionOk = typeof Element.prototype.animate === "function" && !window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (next !== layout && nav && motionOk) {
+      const tabs = new Map<string, DOMRect>();
+      nav.querySelectorAll<HTMLElement>(".ae-bottomnav-item").forEach((el) => tabs.set(el.getAttribute("href") ?? "", el.getBoundingClientRect()));
+      const bars: HTMLElement[] = [];
+      // Only going to centered needs the old pills kept; to split, the new pills start over the old one.
+      const old = next === "centered" ? Array.from(nav.querySelectorAll<HTMLElement>(".ae-bottomnav-bar")) : [];
+      old.forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        const ghost = el.cloneNode(true) as HTMLElement;
+        ghost.setAttribute("aria-hidden", "true");
+        ghost.setAttribute("inert", "");
+        ghost.querySelectorAll("a, button").forEach((n) => n.setAttribute("tabindex", "-1"));
+        Object.assign(ghost.style, {
+          position: "fixed",
+          left: `${rect.left}px`,
+          top: `${rect.top}px`,
+          width: `${rect.width}px`,
+          height: `${rect.height}px`,
+          margin: "0",
+          pointerEvents: "none",
+          zIndex: "40",
+          willChange: "transform",
+        });
+        document.body.appendChild(ghost);
+        ghosts.current.add(ghost);
+        bars.push(ghost);
       });
-      before.current = rects;
+      before.current = { tabs, bars };
     }
     setLayout(next);
     saveNavLayout(next);
@@ -190,12 +252,6 @@ export function PhoneBottomNav() {
       {ICONS[l.to]}
       <span className="ae-bottomnav-label">{compact ? phoneNavLabel(l) : l.label}</span>
     </NavLink>
-  );
-
-  const ring = (
-    <span className="ae-ring" aria-hidden="true">
-      <i />
-    </span>
   );
 
   const more = (
@@ -237,7 +293,6 @@ export function PhoneBottomNav() {
       <nav ref={navRef} className="ae-bottomnav no-print" data-layout="centered" data-compact="true" aria-label="Main navigation">
       <span ref={glideRef} className="ae-nav-glide" aria-hidden="true" />
         <div className="ae-bottomnav-bar">
-          {ring}
           {pages.map(item)}
         </div>
       </nav>
@@ -250,18 +305,15 @@ export function PhoneBottomNav() {
       {layout === "split" ? (
         <>
           <div className="ae-bottomnav-bar">
-            {ring}
-            {pages.slice(0, half).map(item)}
+              {pages.slice(0, half).map(item)}
           </div>
           <div className="ae-bottomnav-bar">
-            {ring}
-            {pages.slice(half).map(item)}
+              {pages.slice(half).map(item)}
             {more}
           </div>
         </>
       ) : (
         <div className="ae-bottomnav-bar">
-          {ring}
           {pages.map(item)}
           {more}
         </div>

@@ -8,7 +8,11 @@
    :root[data-ui="glass"].
    ========================================================================= */
 :root[data-ui="glass"] {
-  --ae-glass-blur: blur(20px) saturate(160%);
+  --ae-glass-blur: blur(22px) saturate(185%);
+  /* One corner scale: panes, controls, dialogs. */
+  --ae-gl-r: 22px;
+  --ae-gl-r-ctl: 14px;
+  --ae-gl-r-dlg: 28px;
   --ae-gl-edge: rgba(255, 255, 255, 0.65);
   --ae-gl-shadow: 0 8px 32px rgba(90, 60, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.55);
 }
@@ -23,7 +27,7 @@
   --ae-col-b: #f9f0d9;
 }
 :root[data-ui="glass"][data-theme="dark"] {
-  --ae-bg: #0f0d0a;
+  --ae-bg: #050504;
   --ae-surface-glass: rgba(255, 255, 255, 0.07);
   --ae-header-glass: rgba(255, 255, 255, 0.1);
   --ae-glass-bg: rgba(255, 255, 255, 0.07);
@@ -45,9 +49,9 @@
 }
 :root[data-ui="glass"][data-theme="dark"] .app-shell {
   background:
-    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.3), transparent 60%),
-    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.34), transparent 60%),
-    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.3), transparent 60%),
+    radial-gradient(700px 500px at 8% 8%, rgba(245, 192, 0, 0.2), transparent 60%),
+    radial-gradient(650px 520px at 92% 12%, rgba(193, 39, 45, 0.22), transparent 60%),
+    radial-gradient(800px 600px at 60% 100%, rgba(47, 107, 60, 0.18), transparent 60%),
     var(--ae-bg);
   background-attachment: fixed;
   --ae-watermark-opacity: 0.5;
@@ -56,7 +60,7 @@
   -webkit-backdrop-filter: blur(22px) saturate(170%);
   backdrop-filter: blur(22px) saturate(170%);
   border: 1px solid var(--ae-gl-edge);
-  border-radius: 20px;
+  border-radius: calc(var(--ae-gl-r) + 2px);
   box-shadow: var(--ae-gl-shadow);
 }
 :root[data-ui="glass"] .ae-sticky-head > .ae-header-tabs {
@@ -64,42 +68,69 @@
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
 }
-:root[data-ui="glass"] .ae-header-tabs-bar,
 :root[data-ui="glass"] .ae-header-tab::after {
   display: none;
 }
+/* The open tab is a glass pill that glides from tab to tab: the sliding bar (HeaderTabs.tsx places it
+   by translateX + width on the open tab's label, and sets --ae-tab-h to the tab's height), restyled
+   from a thin underline into the pill and drawn BEHIND the labels. It reaches 10px past the label on
+   each side (the tab's own padding) and up over the tab's full height. */
+:root[data-ui="glass"] .ae-header-tabs-bar {
+  z-index: 0;
+  box-sizing: content-box;
+  height: var(--ae-tab-h, 30px);
+  margin: calc(4px - var(--ae-tab-h, 30px)) 0 0 -10px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow:
+    inset 0 0 0 1px var(--ae-gl-edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7),
+    0 4px 14px rgba(90, 60, 0, 0.18),
+    0 0 18px -4px rgba(245, 192, 0, 0.45);
+}
+:root[data-ui="glass"][data-theme="dark"] .ae-header-tabs-bar {
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 0 0 0 1px var(--ae-gl-edge),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    0 4px 14px rgba(0, 0, 0, 0.4),
+    0 0 18px -4px rgba(245, 192, 0, 0.45);
+}
 :root[data-ui="glass"] .ae-header-tab {
+  z-index: 1; /* above the sliding pill */
   border-radius: 999px;
   font-weight: 600;
+  transition: background-color 0.22s ease, color 0.2s ease;
 }
 :root[data-ui="glass"] .ae-header-tab:hover {
   background: rgba(255, 255, 255, 0.3);
 }
-:root[data-ui="glass"] .ae-header-tab[aria-current="page"] {
-  background: rgba(255, 255, 255, 0.55);
-  box-shadow: inset 0 0 0 1px var(--ae-gl-edge), 0 4px 14px rgba(90, 60, 0, 0.18);
-}
+:root[data-ui="glass"] .ae-header-tab[aria-current="page"],
 :root[data-ui="glass"][data-theme="dark"] .ae-header-tab[aria-current="page"] {
-  background: rgba(255, 255, 255, 0.14);
+  background: transparent;
 }
 :root[data-ui="glass"] .ae-panel,
-:root[data-ui="glass"] .ae-dash-stat,
-:root[data-ui="glass"] .ae-table-scroll,
-:root[data-ui="glass"] .ae-table-wrap {
+:root[data-ui="glass"] .ae-dash-stat {
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: 1px solid var(--ae-gl-edge);
-  border-radius: 18px;
+  border-radius: var(--ae-gl-r);
+  box-shadow: var(--ae-gl-shadow);
+}
+/* Table frames: the glass edge and shape, no blur of their own (see above). */
+:root[data-ui="glass"] .ae-table-scroll,
+:root[data-ui="glass"] .ae-table-wrap {
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: var(--ae-gl-r);
   box-shadow: var(--ae-gl-shadow);
 }
 :root[data-ui="glass"] .ae-table thead th {
   background-image: linear-gradient(rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.1));
 }
 :root[data-ui="glass"] .ae-btn {
-  border-radius: 12px;
+  border-radius: var(--ae-gl-r-ctl);
   border: 1px solid rgba(255, 255, 255, 0.45);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
 }
 :root[data-ui="glass"] .ae-btn-primary {
   background: rgba(193, 39, 45, 0.84);
@@ -121,9 +152,7 @@
 :root[data-ui="glass"] .ae-select {
   background: rgba(255, 255, 255, 0.5);
   border: 1px solid var(--ae-gl-edge);
-  border-radius: 12px;
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
+  border-radius: var(--ae-gl-r-ctl);
 }
 :root[data-ui="glass"][data-theme="dark"] .ae-input:not(.ae-input-cell),
 :root[data-ui="glass"][data-theme="dark"] .ae-select {
@@ -131,10 +160,10 @@
 }
 :root[data-ui="glass"] .ae-modal-panel {
   background: rgba(255, 255, 255, 0.78);
-  -webkit-backdrop-filter: blur(26px) saturate(170%);
-  backdrop-filter: blur(26px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  backdrop-filter: blur(28px) saturate(190%);
   border: 1px solid var(--ae-gl-edge);
-  border-radius: 22px;
+  border-radius: var(--ae-gl-r-dlg);
   box-shadow: 0 20px 60px rgba(60, 40, 0, 0.35);
 }
 :root[data-ui="glass"][data-theme="dark"] .ae-modal-panel {
@@ -161,8 +190,14 @@
 /* Light falls from the top-left: a faint sheen across every pane, a bright edge on the lit
    sides and a dim one on the shaded sides, instead of one even outline. */
 :root[data-ui="glass"] {
-  --ae-gl-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.34) 0%, rgba(255, 255, 255, 0.08) 38%, rgba(255, 255, 255, 0) 62%);
-  --ae-gl-lit: inset 1px 1px 0 rgba(255, 255, 255, 0.75), inset -1px -1px 0 rgba(255, 255, 255, 0.18);
+  --ae-gl-sheen:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.05) 26%, rgba(255, 255, 255, 0) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.06) 36%, rgba(255, 255, 255, 0) 62%);
+  --ae-gl-lit:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 1px 0 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -16px 24px -18px rgba(255, 255, 255, 0.45);
   --ae-gl-shadow:
     0 1px 2px rgba(90, 60, 0, 0.10),
     0 10px 30px rgba(90, 60, 0, 0.16),
@@ -170,8 +205,14 @@
     var(--ae-gl-lit);
 }
 :root[data-ui="glass"][data-theme="dark"] {
-  --ae-gl-sheen: linear-gradient(135deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.03) 38%, rgba(255, 255, 255, 0) 62%);
-  --ae-gl-lit: inset 1px 1px 0 rgba(255, 255, 255, 0.2), inset -1px -1px 0 rgba(255, 255, 255, 0.04);
+  --ae-gl-sheen:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 26%, rgba(255, 255, 255, 0) 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 36%, rgba(255, 255, 255, 0) 62%);
+  --ae-gl-lit:
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -16px 24px -20px rgba(255, 255, 255, 0.12);
   --ae-gl-shadow:
     0 1px 2px rgba(0, 0, 0, 0.4),
     0 12px 34px rgba(0, 0, 0, 0.45),
@@ -185,6 +226,10 @@
 :root[data-ui="glass"] .ae-table-wrap,
 :root[data-ui="glass"] .ae-modal-panel {
   background-image: var(--ae-gl-sheen);
+}
+/* Filled buttons catch the light on their upper half, like a glass bead. */
+:root[data-ui="glass"] :is(.ae-btn-primary, .ae-btn-secondary) {
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 55%);
 }
 :root[data-ui="glass"] .ae-modal-panel {
   box-shadow:
@@ -211,7 +256,7 @@
 /* Buttons: a bright top edge and a press-down. */
 :root[data-ui="glass"] .ae-btn {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1), box-shadow 0.2s ease, background-color 0.2s ease;
 }
 :root[data-ui="glass"] .ae-btn-primary {
   box-shadow: 0 4px 14px rgba(193, 39, 45, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.35);
@@ -237,12 +282,7 @@
 }
 
 /* The open tab glows a little gold, as if lit from within. */
-:root[data-ui="glass"] .ae-header-tab[aria-current="page"] {
-  box-shadow:
-    inset 0 0 0 1px var(--ae-gl-edge),
-    0 4px 14px rgba(90, 60, 0, 0.18),
-    0 0 18px -4px rgba(245, 192, 0, 0.45);
-}
+
 
 /* Table header: glass with a bright lower edge. */
 :root[data-ui="glass"] .ae-table thead th {
@@ -280,8 +320,7 @@
   -webkit-backdrop-filter: blur(12px) saturate(150%);
   backdrop-filter: blur(12px) saturate(150%);
   border: 1px solid var(--ae-gl-edge);
-  border-left: 1px solid var(--ae-gl-edge);
-  border-radius: 16px;
+  border-radius: calc(var(--ae-gl-r) - 4px);
   box-shadow: var(--ae-gl-shadow);
 }
 
@@ -291,9 +330,79 @@
   -webkit-backdrop-filter: var(--ae-glass-blur);
   backdrop-filter: var(--ae-glass-blur);
   border: 1px solid var(--ae-gl-edge);
-  border-radius: 18px;
+  border-radius: var(--ae-gl-r);
   box-shadow: var(--ae-gl-shadow);
 }
 :root[data-ui="glass"][data-theme="dark"] :is(.ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+}
+
+/* Reduced transparency (an OS accessibility setting): solid panes, no blur to paint, the same shapes and lighting. */
+@media (prefers-reduced-transparency: reduce) {
+  :root:root[data-ui="glass"] :is(.ae-page-header, .ae-panel, .ae-dash-stat, .ae-modal-panel, .ae-startconfirm-date, .ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background-color: rgb(250, 244, 228);
+  }
+  :root:root[data-ui="glass"][data-theme="dark"] :is(.ae-page-header, .ae-panel, .ae-dash-stat, .ae-modal-panel, .ae-startconfirm-date, .ae-setting, .ae-account-card, .ae-rules, .ae-gd, .ae-bk) {
+    background-color: rgb(28, 26, 22);
+  }
+}
+
+/* ---- Bottom navigation (phone / tablet) ---------------------------------------------------
+   The two floating pills as frosted glass over the page, like the header card. A phone drops every
+   other blur for scrolling smoothness (phone.css, "Smoothness"); these are two small fixed layers, the
+   same trade the header makes, so they keep theirs. The edge is a plain static glass hairline. */
+:root:root:root[data-phone="true"][data-ui="glass"] .ae-bottomnav-bar {
+  background-color: var(--ae-header-glass);
+  background-image: var(--ae-gl-sheen);
+  border-color: var(--ae-gl-edge);
+  -webkit-backdrop-filter: var(--ae-glass-blur) !important;
+  backdrop-filter: var(--ae-glass-blur) !important;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 10px 28px rgba(0, 0, 0, 0.38),
+    var(--ae-gl-lit);
+}
+/* The fade behind the pills is lighter, so the page shows through the frost instead of a dark slab. */
+:root:root:root[data-phone="true"][data-ui="glass"] .ae-bottomnav::before {
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--ae-bg) 78%, transparent) 0%,
+    color-mix(in srgb, var(--ae-bg) 52%, transparent) 40%,
+    color-mix(in srgb, var(--ae-bg) 20%, transparent) 74%,
+    transparent 100%
+  );
+}
+/* The open tab sits in a small lit bead of glass, tinted with the accent. */
+:root:root:root[data-phone="true"][data-ui="glass"] .ae-bottomnav-item[aria-current="page"] {
+  background-color: color-mix(in srgb, var(--ae-warning-text) 16%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), inset 0 0 0 1px color-mix(in srgb, var(--ae-warning-text) 22%, transparent);
+}
+/* The three-dots menu: a frosted sheet. Transient and on top of everything below it, so it gets a
+   firmer fill than the pills to keep its labels easy to read. */
+:root:root:root[data-phone="true"][data-ui="glass"] .ae-bottomnav-menu {
+  background-color: rgba(255, 255, 255, 0.78);
+  background-image: var(--ae-gl-sheen);
+  border: 1px solid var(--ae-gl-edge);
+  border-radius: calc(var(--ae-gl-r) - 4px);
+  -webkit-backdrop-filter: blur(26px) saturate(190%) !important;
+  backdrop-filter: blur(26px) saturate(190%) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.16), 0 18px 44px rgba(0, 0, 0, 0.36), var(--ae-gl-lit);
+}
+:root:root:root[data-phone="true"][data-ui="glass"][data-theme="dark"] .ae-bottomnav-menu {
+  background-color: rgba(30, 28, 24, 0.8);
+}
+:root:root:root[data-phone="true"][data-ui="glass"] .ae-bottomnav-menu-item {
+  border-radius: calc(var(--ae-gl-r-ctl) - 2px);
+}
+@media (prefers-reduced-transparency: reduce) {
+  :root:root:root[data-phone="true"][data-ui="glass"] :is(.ae-bottomnav-bar, .ae-bottomnav-menu) {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: rgb(250, 244, 228);
+  }
+  :root:root:root[data-phone="true"][data-ui="glass"][data-theme="dark"] :is(.ae-bottomnav-bar, .ae-bottomnav-menu) {
+    background-color: rgb(28, 26, 22);
+  }
 }
