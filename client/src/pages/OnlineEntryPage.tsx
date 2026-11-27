@@ -1,4 +1,3 @@
-import { applySharedStockToGrid } from "../utils/sharedStock";
 import { useBusyAction } from "../hooks/useBusyAction";
 import { useEffect, useMemo, useState } from "react";
 import { rememberSheet, resumeSheet } from "../utils/sheetView";
@@ -204,7 +203,7 @@ export function OnlineEntryPage() {
   const {
     pending,
     baselines,
-    displayRows: unpooledRows,
+    displayRows,
     stage,
     stageMany,
     clear,
@@ -221,8 +220,6 @@ export function OnlineEntryPage() {
     `ala-eh-pending:online:${date}:${shift}`,
     computeOnlineFigures,
   );
-  // Palm Oil Gallon and Liter share ONE stock across Online and Offline: preview both on the pool.
-  const displayRows = useMemo(() => applySharedStockToGrid(unpooledRows, rows, "ONLINE"), [unpooledRows, rows]);
 
   // Edits staged against values the server has since changed (typically made
   // offline, or before another user saved) - surfaced for side-by-side

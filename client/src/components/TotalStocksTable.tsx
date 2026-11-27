@@ -2,7 +2,6 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import type { StockLocation, TotalStockRow } from "../types";
 import { colors } from "../theme";
 import { sumRounded } from "../utils/gridFormat";
-import { withoutSharedDuplicates } from "../utils/sharedStock";
 import { isLowStock } from "../utils/lowStock";
 import { RowGlowScroll } from "./RowGlowScroll";
 import { GridSelectionBar } from "./GridSelectionBar";
@@ -78,7 +77,7 @@ export function TotalStocksTable({
     onAnyExpandedChange?.(anyExpanded);
   }, [anyExpanded, onAnyExpandedChange]);
 
-  const grandTotal = sumRounded(withoutSharedDuplicates(rows).map((r) => r.totalRemainingStock));
+  const grandTotal = sumRounded(rows.map((r) => r.totalRemainingStock));
 
   // Which remaining-stock column(s) are visible for the current source
   // filter - "TOTAL" shows all three (the original layout), "ONLINE"/
@@ -292,19 +291,19 @@ export function TotalStocksTable({
                   </td>
                   {showOnline && (
                     <td>
-                      {sumRounded(withoutSharedDuplicates(groupRows).map((r) => r.onlineRemainingStock))
+                      {sumRounded(groupRows.map((r) => r.onlineRemainingStock))
                         .toLocaleString()}
                     </td>
                   )}
                   {showOffline && (
                     <td>
-                      {sumRounded(withoutSharedDuplicates(groupRows).map((r) => r.offlineRemainingStock))
+                      {sumRounded(groupRows.map((r) => r.offlineRemainingStock))
                         .toLocaleString()}
                     </td>
                   )}
                   {showTotal && (
                     <td>
-                      {sumRounded(withoutSharedDuplicates(groupRows).map((r) => r.totalRemainingStock))
+                      {sumRounded(groupRows.map((r) => r.totalRemainingStock))
                         .toLocaleString()}
                     </td>
                   )}
@@ -318,13 +317,13 @@ export function TotalStocksTable({
             </td>
             {showOnline && (
               <td>
-                {sumRounded(withoutSharedDuplicates(rows).map((r) => r.onlineRemainingStock))
+                {sumRounded(rows.map((r) => r.onlineRemainingStock))
                   .toLocaleString()}
               </td>
             )}
             {showOffline && (
               <td>
-                {sumRounded(withoutSharedDuplicates(rows).map((r) => r.offlineRemainingStock))
+                {sumRounded(rows.map((r) => r.offlineRemainingStock))
                   .toLocaleString()}
               </td>
             )}
@@ -337,13 +336,13 @@ export function TotalStocksTable({
             <tr className="ae-row-selected-total">
               <td colSpan={2}>SELECTED ({selection.selected.length})</td>
               {showOnline && (
-                <td>{sumRounded(withoutSharedDuplicates(selectedRows).map((r) => r.onlineRemainingStock)).toLocaleString()}</td>
+                <td>{sumRounded(selectedRows.map((r) => r.onlineRemainingStock)).toLocaleString()}</td>
               )}
               {showOffline && (
-                <td>{sumRounded(withoutSharedDuplicates(selectedRows).map((r) => r.offlineRemainingStock)).toLocaleString()}</td>
+                <td>{sumRounded(selectedRows.map((r) => r.offlineRemainingStock)).toLocaleString()}</td>
               )}
               {showTotal && (
-                <td>{sumRounded(withoutSharedDuplicates(selectedRows).map((r) => r.totalRemainingStock)).toLocaleString()}</td>
+                <td>{sumRounded(selectedRows.map((r) => r.totalRemainingStock)).toLocaleString()}</td>
               )}
             </tr>
           </tfoot>

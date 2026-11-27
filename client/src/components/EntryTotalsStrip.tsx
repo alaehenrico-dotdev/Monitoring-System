@@ -1,6 +1,5 @@
 import type { GridRow } from "./StockGrid";
 import { hasNegativeValue, type RowFilter } from "../hooks/useGridView";
-import { rowsForColumnTotal } from "../utils/sharedStock";
 
 const num = (v: unknown) => (typeof v === "number" ? v : Number(v) || 0);
 
@@ -18,8 +17,7 @@ export function EntryTotalsStrip({
   onRowFilterChange: (f: RowFilter) => void;
   changed: number;
 }) {
-  // The shared stock (Palm Oil Gallon / Liter) shows the pool on both rows: it counts once.
-  const remaining = rowsForColumnTotal(rows, "remainingStock").reduce((sum, r) => sum + num(r.entry.remainingStock), 0);
+  const remaining = rows.reduce((sum, r) => sum + num(r.entry.remainingStock), 0);
   const negative = rows.filter(hasNegativeValue).length;
   const showingNegative = rowFilter === "negative";
   return (

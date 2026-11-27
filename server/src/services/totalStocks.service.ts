@@ -4,7 +4,6 @@ import { dailyOnlineStockRepository } from "../repositories/dailyOnlineStockRepo
 import { dailyOfflineStockRepository } from "../repositories/dailyOfflineStockRepository";
 import { manualCountRepository } from "../repositories/manualCountRepository";
 import { calculateVariance, toNum } from "../utils/stockMath";
-import { isSharedStockSku } from "../utils/sharedStock";
 
 /// Online/Offline/Manual Count entries are now per-shift (Morning, Night),
 /// but Total Stocks is still a single per-date snapshot rather than
@@ -73,20 +72,12 @@ export async function getTotalStocksGrid(entryDate: Date) {
     missingOfflineIds.length ? dailyOfflineStockRepository.getOpeningStocksForProducts(missingOfflineIds, entryDate, "MORNING") : new Map<number, number>(),
   ]);
 
-  // Palm Oil Gallon and Liter share ONE stock: both rows show the pool's figure, so a total over the rows
-  // must count it once. The second row (the higher id) is flagged, and the client leaves it out of sums.
-  const sharedProducts = products.filter((p) => isSharedStockSku(p.sku));
-  const sharedKeeperId = sharedProducts.length === 2 ? Math.min(...sharedProducts.map((p) => p.id)) : null;
-
   return products.map((product) => {
     const online = onlineByProduct.get(product.id);
     const offline = offlineByProduct.get(product.id);
     const onlineRemainingStock = online ? toNum(online.remainingStock) : toNum(carriedOnline.get(product.id));
     const offlineRemainingStock = offline ? toNum(offline.remainingStock) : toNum(carriedOffline.get(product.id));
-    // Palm Oil Gallon and Liter share ONE stock across Online and Offline (utils/sharedStock.ts): both rows
-    // already show the pool's figure, so the total is that figure once, not Online + Offline.
-    const shared = isSharedStockSku(product.sku);
-    const totalRemainingStock = shared ? onlineRemainingStock : onlineRemainingStock + offlineRemainingStock;
+    const totalRemainingStock = onlineRemainingStock + offlineRemainingStock;
 
     const counts = manualByProduct.get(product.id) ?? [];
     const totalCount = counts.find((count) => count.location === "TOTAL");
@@ -94,9 +85,7 @@ export async function getTotalStocksGrid(entryDate: Date) {
     const totalManualCount = totalCount
       ? toNum(totalCount.manualCount)
       : locationCount.length
-        ? shared
-          ? toNum(locationCount[0].manualCount) // the pool is counted once; every row carries the same count
-          : locationCount.reduce((sum, c) => sum + toNum(c.manualCount), 0)
+        ? locationCount.reduce((sum, c) => sum + toNum(c.manualCount), 0)
         : null;
     // Same formula as Manual Count's own variance (manualCounts.service.ts) -
     // shared via calculateVariance rather than re-derived here, so the two
@@ -116,7 +105,6 @@ export async function getTotalStocksGrid(entryDate: Date) {
       totalRemainingStock,
       totalManualCount,
       totalVariance,
-      sharedStockDuplicate: shared && sharedKeeperId !== null && product.id !== sharedKeeperId,
     };
   });
 }

@@ -1,7 +1,12 @@
 import { prisma } from "../lib/prisma";
 import { toDateOnlyString } from "../utils/date";
-import { calculateOfflineRemaining, calculateOfflineStock, calculateOnlineRemaining, calculateOnlineStock, toNum } from "../utils/stockMath";
-import { isSharedStockSku, poolShared } from "../utils/sharedStock";
+import {
+  calculateOfflineRemaining,
+  calculateOfflineStock,
+  calculateOnlineRemaining,
+  calculateOnlineStock,
+  toNum,
+} from "../utils/stockMath";
 
 export interface StockDrift {
   location: "ONLINE" | "OFFLINE" | "TRANSFER";
@@ -25,33 +30,17 @@ const addDays = (d: Date, n: number) => new Date(d.getTime() + n * 86_400_000);
 export async function findStockDrift(today: Date, days = 7, limit = 200): Promise<StockDrift[]> {
   const from = addDays(today, -days);
   const [online, offline] = await Promise.all([
-    prisma.dailyOnlineStock.findMany({ where: { entryDate: { gte: from, lte: today } }, include: { product: { select: { name: true, sku: true } } } }),
-    prisma.dailyOfflineStock.findMany({ where: { entryDate: { gte: from, lte: today } }, include: { product: { select: { name: true, sku: true } } } }),
+    prisma.dailyOnlineStock.findMany({ where: { entryDate: { gte: from, lte: today } }, include: { product: { select: { name: true } } } }),
+    prisma.dailyOfflineStock.findMany({ where: { entryDate: { gte: from, lte: today } }, include: { product: { select: { name: true } } } }),
   ]);
 
   const out: StockDrift[] = [];
   const push = (location: StockDrift["location"], r: { productId: number; entryDate: Date; shift: string; product: { name: string } }, problem: string) =>
     out.push({ location, productId: r.productId, name: r.product.name, date: toDateOnlyString(r.entryDate), shift: r.shift, problem });
 
-  // Palm Oil Gallon and Liter share ONE stock across Online and Offline (utils/sharedStock.ts): each of the
-  // four rows is expected to hold the figures of the whole pool, not of that row alone.
-  const periodKey = (r: { entryDate: Date; shift: string }) => `${toDateOnlyString(r.entryDate)}|${r.shift}`;
-  const sharedOnline = new Map<string, typeof online>();
-  const sharedOffline = new Map<string, typeof offline>();
-  for (const r of online) if (isSharedStockSku(r.product.sku)) sharedOnline.set(periodKey(r), [...(sharedOnline.get(periodKey(r)) ?? []), r]);
-  for (const r of offline) if (isSharedStockSku(r.product.sku)) sharedOffline.set(periodKey(r), [...(sharedOffline.get(periodKey(r)) ?? []), r]);
-  const pooled = (r: { entryDate: Date; shift: string; openingStock: unknown }) =>
-    poolShared(toNum(r.openingStock), sharedOnline.get(periodKey(r)) ?? [], sharedOffline.get(periodKey(r)) ?? []);
-
   for (const r of online) {
-    let sub: number;
-    let rem: number;
-    if (isSharedStockSku(r.product.sku)) {
-      ({ stock: sub, remaining: rem } = pooled(r));
-    } else {
-      sub = calculateOnlineStock(toNum(r.openingStock), toNum(r.stockInOffToOl), toNum(r.stockOutOlToOff));
-      rem = calculateOnlineRemaining(sub, toNum(r.productionIn), toNum(r.fulfillmentOut), toNum(r.rts));
-    }
+    const sub = calculateOnlineStock(toNum(r.openingStock), toNum(r.stockInOffToOl), toNum(r.stockOutOlToOff));
+    const rem = calculateOnlineRemaining(sub, toNum(r.productionIn), toNum(r.fulfillmentOut), toNum(r.rts));
     if (differs(sub, toNum(r.onlineStock))) push("ONLINE", r, `Online stock is ${toNum(r.onlineStock)}, inputs add up to ${sub}`);
     if (differs(rem, toNum(r.remainingStock))) push("ONLINE", r, `Remaining is ${toNum(r.remainingStock)}, inputs add up to ${rem}`);
   }
@@ -63,14 +52,8 @@ export async function findStockDrift(today: Date, days = 7, limit = 200): Promis
     if (deliveries > 0 && differs(deliveries, toNum(r.deliveryOut)) && toNum(r.deliveryOut) < deliveries) {
       push("OFFLINE", r, `Delivery total is ${toNum(r.deliveryOut)}, the slots add up to ${deliveries}`);
     }
-    let sub: number;
-    let rem: number;
-    if (isSharedStockSku(r.product.sku)) {
-      ({ stock: sub, remaining: rem } = pooled(r));
-    } else {
-      sub = calculateOfflineStock(toNum(r.openingStock), toNum(r.stockInOlToOff), toNum(r.stockOutOffToOl));
-      rem = calculateOfflineRemaining(sub, toNum(r.productionIn), toNum(r.deliveryOut), toNum(r.backloads), toNum(r.upsellOut));
-    }
+    const sub = calculateOfflineStock(toNum(r.openingStock), toNum(r.stockInOlToOff), toNum(r.stockOutOffToOl));
+    const rem = calculateOfflineRemaining(sub, toNum(r.productionIn), toNum(r.deliveryOut), toNum(r.backloads), toNum(r.upsellOut));
     if (differs(sub, toNum(r.offlineStock))) push("OFFLINE", r, `Offline stock is ${toNum(r.offlineStock)}, inputs add up to ${sub}`);
     if (differs(rem, toNum(r.remainingStock))) push("OFFLINE", r, `Remaining is ${toNum(r.remainingStock)}, inputs add up to ${rem}`);
   }

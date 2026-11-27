@@ -1,6 +1,5 @@
 import type { TotalStockRow } from "../types";
 import { sumRounded } from "./gridFormat";
-import { withoutSharedDuplicates } from "./sharedStock";
 
 export type Totals = {
   /// Online and Offline are separate stock pools (Section 2.1) - each gets
@@ -17,9 +16,8 @@ export type Delta = { diff: number };
 /// can leave noise such as 0.30000000000000004 or a tiny negative printed as "-0".
 export function summarize(rows: TotalStockRow[]): Totals {
   return {
-    // The shared stock (Palm Oil Gallon / Liter) shows the same figure on both rows: counted once.
-    online: sumRounded(withoutSharedDuplicates(rows).map((row) => Number(row.onlineRemainingStock || 0))),
-    offline: sumRounded(withoutSharedDuplicates(rows).map((row) => Number(row.offlineRemainingStock || 0))),
+    online: sumRounded(rows.map((row) => Number(row.onlineRemainingStock || 0))),
+    offline: sumRounded(rows.map((row) => Number(row.offlineRemainingStock || 0))),
   };
 }
 

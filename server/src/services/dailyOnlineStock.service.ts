@@ -11,7 +11,6 @@ import { combineSplitRows, WHOLE_DAY_COMBINED } from "../utils/wholeDay";
 import { assertEarlierDaysFinished, assertPeriodOpen } from "./dayLock.service";
 import { holdLockedTransfers, requestHeldTransfers, type HeldTransfer } from "./heldTransfers.service";
 import { isNoopSave } from "../utils/noopSave";
-import { isSharedStockSku } from "../utils/sharedStock";
 import { broadcastRealtimeEvent } from "../lib/realtime";
 import { propagateOpeningStock } from "./manualCounts.service";
 import { HttpError } from "../utils/HttpError";
@@ -125,18 +124,13 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combi
   const missingProductIds = products.filter((p) => !rowByProduct.has(p.id) && !morningByProduct.has(p.id)).map((p) => p.id);
   const openingStockByProduct = await dailyOnlineStockRepository.getOpeningStocksForProducts(missingProductIds, entryDate, splitDay ? "MORNING" : shift);
 
-  const gridRows = products.map((product) => {
+  return products.map((product) => {
     const extras = extrasByProduct.get(product.id) ?? [];
     const existing = rowByProduct.get(product.id);
     if (splitDay && (existing || morningByProduct.has(product.id))) {
       const merged = combineSplitRows(morningByProduct.get(product.id), existing, ["stockInOffToOl", "stockOutOlToOff", "productionIn", "fulfillmentOut", "rts"])!;
       const figures = merged as unknown as OnlineFigures & { openingStock: number };
-      // The shared pool's rows already hold the pooled figure (utils/sharedStock.ts): the day closes where
-      // its last saved period closed, whatever the other rows of the pool did.
-      const pooled = isSharedStockSku(product.sku) ? (existing ?? morningByProduct.get(product.id)) : undefined;
-      const calculated = calculate(figures.openingStock, figures);
-      const onlineStock = pooled ? toNum(figures.openingStock) : calculated.onlineStock;
-      const remainingStock = pooled ? toNum(pooled.remainingStock) : calculated.remainingStock;
+      const { onlineStock, remainingStock } = calculate(figures.openingStock, figures);
       const combinedExtras = sumExtras(morningExtraRows.filter((e) => e.productId === product.id), extras);
       const combinedLayout = unionLayouts(morningLayout, layoutRows);
       return {
@@ -162,7 +156,6 @@ export async function getOnlineGrid(entryDate: Date, shift: Shift, opts: { combi
       isSaved: false,
     };
   });
-  return gridRows;
 }
 
 /// Encoder-facing upsert for one product/date/shift cell row (Section 4.2).
